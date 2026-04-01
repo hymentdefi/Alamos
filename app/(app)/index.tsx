@@ -1,33 +1,147 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import { useAuth } from "../../lib/auth/context";
+import { View, Text, Image, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../lib/theme";
+import { assets, formatARS, type Asset } from "../../lib/data/assets";
+import AssetItem from "../../lib/components/AssetItem";
 
-export default function PortfolioScreen() {
-  const { user, logout } = useAuth();
+const heldAssets = assets.filter((a) => a.held);
+const totalBalance = 4287430;
+const changeAmount = 127650;
+const changePct = 3.07;
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const openDetail = (asset: Asset) => {
+    router.push({ pathname: "/(app)/detail", params: { ticker: asset.ticker } });
+  };
+
   return (
-    <View style={s.container}>
-      <Text style={s.brand}>Alamos Capital</Text>
-      <Text style={s.welcome}>Bienvenido, {user?.fullName}</Text>
-      <View style={s.card}>
-        <Text style={s.label}>Portfolio total</Text>
-        <Text style={s.amount}>$ 0.00</Text>
-        <Text style={s.pct}>+0.00%</Text>
+    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
+        <View style={s.headerRow}>
+          <View>
+            <Text style={s.greeting}>Buenos días</Text>
+            <Image
+              source={require("../../assets/logo-white.png")}
+              style={s.logoImg}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+
+        <Text style={s.balanceLabel}>Tu portfolio</Text>
+        <Text style={s.balance}>{formatARS(totalBalance)}</Text>
+        <View style={s.changeBadge}>
+          <Text style={s.changeText}>
+            ▲ +{formatARS(changeAmount)} (+{changePct}%) hoy
+          </Text>
+        </View>
       </View>
-      <Pressable onPress={logout} style={s.logoutBtn}>
-        <Text style={s.logoutText}>Cerrar sesion</Text>
-      </Pressable>
-    </View>
+
+      {/* Chart placeholder */}
+      <View style={s.chartArea}>
+        <View style={s.chartLine} />
+      </View>
+
+      {/* Quick actions */}
+      <View style={s.quickActions}>
+        <Pressable
+          style={[s.quickBtn, s.quickBtnAccent]}
+          onPress={() => router.push("/(app)/explore")}
+        >
+          <Text style={s.quickBtnAccentText}>+ Comprar</Text>
+        </Pressable>
+        <Pressable style={s.quickBtn}>
+          <Text style={s.quickBtnText}>→ Transferir</Text>
+        </Pressable>
+        <Pressable style={s.quickBtn}>
+          <Text style={s.quickBtnText}>← Retirar</Text>
+        </Pressable>
+      </View>
+
+      {/* Assets */}
+      <View style={s.sectionHeader}>
+        <Text style={s.sectionTitle}>Tu cartera</Text>
+        <Pressable onPress={() => router.push("/(app)/explore")}>
+          <Text style={s.sectionLink}>Ver todo</Text>
+        </Pressable>
+      </View>
+      <View style={s.assetList}>
+        {heldAssets.map((a) => (
+          <AssetItem key={a.ticker} asset={a} onPress={openDetail} />
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0], justifyContent: "center", alignItems: "center", paddingHorizontal: 32 },
-  brand: { color: colors.brand[500], fontSize: 28, fontWeight: "bold", marginBottom: 8 },
-  welcome: { color: colors.text.secondary, fontSize: 16, marginBottom: 32 },
-  card: { backgroundColor: colors.surface[50], borderRadius: 16, padding: 24, width: "100%", marginBottom: 24 },
-  label: { color: colors.text.muted, fontSize: 14, marginBottom: 4 },
-  amount: { color: colors.text.primary, fontSize: 36, fontWeight: "bold" },
-  pct: { color: colors.accent.positive, fontSize: 14, marginTop: 4 },
-  logoutBtn: { backgroundColor: colors.surface[100], borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
-  logoutText: { color: colors.text.secondary, fontSize: 14 },
+  container: { flex: 1, backgroundColor: colors.surface[0] },
+  header: { paddingHorizontal: 20 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  greeting: { fontSize: 14, color: colors.text.secondary, marginBottom: 2 },
+  logoImg: { width: 120, height: 28, marginTop: 4 },
+  balanceLabel: { fontSize: 14, color: colors.text.secondary, marginTop: 20, marginBottom: 4 },
+  balance: { fontSize: 36, fontWeight: "700", color: colors.text.primary, letterSpacing: -1 },
+  changeBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.accentDim,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  changeText: { fontSize: 14, fontWeight: "600", color: colors.brand[500] },
+  chartArea: {
+    height: 140,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    justifyContent: "center",
+  },
+  chartLine: {
+    height: 2,
+    backgroundColor: colors.brand[500],
+    borderRadius: 1,
+    opacity: 0.3,
+  },
+  quickActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  quickBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickBtnAccent: {
+    backgroundColor: colors.brand[500],
+    borderColor: colors.brand[500],
+  },
+  quickBtnText: { fontSize: 14, fontWeight: "600", color: colors.text.primary },
+  quickBtnAccentText: { fontSize: 14, fontWeight: "600", color: "#000" },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text.primary },
+  sectionLink: { fontSize: 13, color: colors.brand[500], fontWeight: "600" },
+  assetList: { paddingHorizontal: 20 },
 });
