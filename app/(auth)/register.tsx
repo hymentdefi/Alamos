@@ -1,63 +1,337 @@
-import { useState } from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
-import { Link } from "expo-router";
+import { useRef, useState } from "react";
+import {
+  View, Text, TextInput, Pressable, ActivityIndicator,
+  KeyboardAvoidingView, Platform, StyleSheet, Animated,
+  type TextInputProps,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../lib/auth/context";
 import { colors } from "../../lib/theme";
 
+/* ─── step definitions ─── */
+interface Step {
+  key: string;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  keyboard: TextInputProps["keyboardType"];
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  secureTextEntry?: boolean;
+  validate: (v: string) => boolean;
+}
+
+const steps: Step[] = [
+  {
+    key: "email",
+    title: "¿Cuál es tu email?",
+    subtitle: "Lo vas a usar para iniciar sesión.",
+    placeholder: "tu@email.com",
+    keyboard: "email-address",
+    autoCapitalize: "none",
+    validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+  },
+  {
+    key: "password",
+    title: "Elegí una contraseña",
+    subtitle: "Mínimo 8 caracteres.",
+    placeholder: "Contraseña",
+    keyboard: "default",
+    secureTextEntry: true,
+    validate: (v) => v.length >= 8,
+  },
+  {
+    key: "fullName",
+    title: "¿Cómo te llamás?",
+    subtitle: "Usá tu nombre como aparece en tu DNI.",
+    placeholder: "Nombre completo",
+    keyboard: "default",
+    validate: (v) => v.trim().split(" ").length >= 2,
+  },
+  {
+    key: "cuilCuit",
+    title: "¿Cuál es tu CUIL?",
+    subtitle: "Lo necesitamos por regulación de la CNV.",
+    placeholder: "20-12345678-9",
+    keyboard: "number-pad",
+    validate: (v) => v.replace(/\D/g, "").length >= 10,
+  },
+];
+
 export default function RegisterScreen() {
   const { register } = useAuth();
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [cuilCuit, setCuilCuit] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [values, setValues] = useState<Record<string, string>>({
+    email: "",
+    password: "",
+    fullName: "",
+    cuilCuit: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleRegister = async () => {
+  const inputRef = useRef<TextInput>(null);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const step = steps[currentStep];
+  const value = values[step.key];
+  const isValid = step.validate(value);
+  const isLast = currentStep === steps.length - 1;
+
+  const animateTransition = (cb: () => void) => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      cb();
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      });
+    });
+  };
+
+  const goNext = async () => {
+    if (!isValid) return;
     setError("");
-    setLoading(true);
-    try { await register({ email, password, fullName, cuilCuit }); }
-    catch (e: any) { setError(e.message ?? "Error al registrarse"); }
-    finally { setLoading(false); }
+
+    if (isLast) {
+      setLoading(true);
+      try {
+        await register({
+          email: values.email,
+          password: values.password,
+          fullName: values.fullName,
+          cuilCuit: values.cuilCuit,
+        });
+      } catch (e: any) {
+        setError(e.message ?? "Error al registrarse");
+        setLoading(false);
+      }
+      return;
+    }
+
+    animateTransition(() => setCurrentStep((s) => s + 1));
+  };
+
+  const goBack = () => {
+    if (currentStep === 0) {
+      router.back();
+      return;
+    }
+    setError("");
+    animateTransition(() => setCurrentStep((s) => s - 1));
+  };
+
+  const updateValue = (text: string) => {
+    setValues((prev) => ({ ...prev, [step.key]: text }));
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.flex}>
-      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={s.title}>Crear cuenta</Text>
-        <Text style={s.subtitle}>Inverti en Argentina desde tu celular</Text>
-        <View style={s.form}>
-          <TextInput placeholder="Nombre completo" placeholderTextColor={colors.text.muted} value={fullName} onChangeText={setFullName} style={s.input} />
-          <TextInput placeholder="Email" placeholderTextColor={colors.text.muted} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={s.input} />
-          <TextInput placeholder="CUIL / CUIT" placeholderTextColor={colors.text.muted} value={cuilCuit} onChangeText={setCuilCuit} keyboardType="number-pad" style={s.input} />
-          <TextInput placeholder="Contrasena" placeholderTextColor={colors.text.muted} value={password} onChangeText={setPassword} secureTextEntry style={s.input} />
-          {error ? <Text style={s.error}>{error}</Text> : null}
-          <Pressable onPress={handleRegister} disabled={loading} style={s.btn}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Crear cuenta</Text>}
-          </Pressable>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={s.flex}
+    >
+      {/* Header: back + progress */}
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable style={s.backBtn} onPress={goBack}>
+          {currentStep === 0 ? (
+            <Ionicons name="close" size={24} color={colors.text.primary} />
+          ) : (
+            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+          )}
+        </Pressable>
+
+        {/* Progress bar */}
+        <View style={s.progressBar}>
+          {steps.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                s.progressSegment,
+                i <= currentStep && s.progressSegmentActive,
+              ]}
+            />
+          ))}
         </View>
-        <View style={s.row}>
-          <Text style={s.muted}>Ya tenes cuenta? </Text>
-          <Link href="/(auth)/login" asChild>
-            <Pressable><Text style={s.link}>Inicia sesion</Text></Pressable>
-          </Link>
+      </View>
+
+      {/* Content */}
+      <Animated.View style={[s.content, { opacity: fadeAnim }]}>
+        <Text style={s.title}>{step.title}</Text>
+        <Text style={s.subtitle}>{step.subtitle}</Text>
+
+        {/* Input */}
+        <View style={s.inputWrap}>
+          <TextInput
+            ref={inputRef}
+            style={s.input}
+            placeholder={step.placeholder}
+            placeholderTextColor={colors.text.muted}
+            value={value}
+            onChangeText={updateValue}
+            keyboardType={step.keyboard}
+            autoCapitalize={step.autoCapitalize ?? "sentences"}
+            secureTextEntry={step.secureTextEntry && !showPassword}
+            autoFocus
+            onSubmitEditing={goNext}
+            returnKeyType={isLast ? "done" : "next"}
+          />
+          {step.secureTextEntry && (
+            <Pressable
+              style={s.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color={colors.text.muted}
+              />
+            </Pressable>
+          )}
         </View>
-      </ScrollView>
+
+        {error ? <Text style={s.error}>{error}</Text> : null}
+
+        {/* Legal text on first step */}
+        {currentStep === 0 && (
+          <Text style={s.legal}>
+            Al continuar, aceptás los Términos y Condiciones y la Política de Privacidad de Álamos Capital.
+          </Text>
+        )}
+      </Animated.View>
+
+      {/* Continue button */}
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable
+          onPress={goNext}
+          disabled={!isValid || loading}
+          style={[s.btn, isValid ? s.btnActive : s.btnDisabled]}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={[s.btnText, !isValid && s.btnTextDisabled]}>
+              {isLast ? "Crear cuenta" : "Continuar"}
+            </Text>
+          )}
+        </Pressable>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface[0] },
-  scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 32 },
-  title: { color: colors.text.primary, fontSize: 24, fontWeight: "bold" },
-  subtitle: { color: colors.text.muted, fontSize: 16, marginBottom: 40 },
-  form: { gap: 16 },
-  input: { backgroundColor: colors.surface[100], color: colors.text.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 16, borderWidth: 1, borderColor: colors.surface[200] },
-  error: { color: colors.accent.negative, fontSize: 14 },
-  btn: { backgroundColor: colors.brand[500], borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
-  btnText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  row: { flexDirection: "row", justifyContent: "center", marginTop: 32, marginBottom: 32 },
-  muted: { color: colors.text.muted },
-  link: { color: colors.brand[500], fontWeight: "600" },
+  header: {
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 4,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressBar: {
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.surface[200],
+  },
+  progressSegmentActive: {
+    backgroundColor: colors.text.primary,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.text.primary,
+    textAlign: "center",
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: colors.text.secondary,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 40,
+  },
+  inputWrap: {
+    position: "relative",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.surface[200],
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 17,
+    color: colors.text.primary,
+    textAlign: "center",
+  },
+  eyeBtn: {
+    position: "absolute",
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  error: {
+    color: colors.red,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 16,
+  },
+  legal: {
+    fontSize: 12,
+    color: colors.text.muted,
+    textAlign: "center",
+    marginTop: 24,
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
+  bottom: {
+    paddingHorizontal: 24,
+  },
+  btn: {
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnActive: {
+    backgroundColor: "#FFFFFF",
+  },
+  btnDisabled: {
+    backgroundColor: colors.surface[200],
+  },
+  btnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+  },
+  btnTextDisabled: {
+    color: colors.text.muted,
+  },
 });

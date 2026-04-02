@@ -1,59 +1,90 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../lib/theme";
-import { formatARS } from "../../lib/data/assets";
-import Button from "../../lib/components/Button";
+import { assets, formatARS } from "../../lib/data/assets";
 
 export default function SuccessScreen() {
-  const { ticker, qty, total } = useLocalSearchParams<{
+  const { ticker, amount, qty, mode } = useLocalSearchParams<{
     ticker: string;
+    amount: string;
     qty: string;
-    total: string;
+    mode?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const summaryRows = [
-    { label: "Activo", value: ticker },
-    { label: "Cantidad", value: qty },
-    { label: "Total invertido", value: formatARS(Number(total)) },
+  const isSell = mode === "sell";
+  const asset = assets.find((a) => a.ticker === ticker);
+  const numAmount = Number(amount) || 0;
+  const numQty = Number(qty) || 0;
+
+  const rows = [
+    {
+      label: "Monto en ARS",
+      value: formatARS(numAmount),
+      underline: true,
+    },
+    {
+      label: "Precio de ejecución",
+      value: asset ? formatARS(asset.price) : "—",
+    },
+    {
+      label: isSell ? `${ticker} vendidos` : `${ticker} comprados`,
+      value: `${numQty.toFixed(6)} ${ticker}`,
+    },
+    {
+      label: `Nueva posición ${ticker}`,
+      value: `${numQty.toFixed(6)} ${ticker}`,
+    },
   ];
 
   return (
-    <View style={[s.container, { paddingTop: insets.top + 40 }]}>
-      {/* Check icon */}
-      <View style={s.checkCircle}>
-        <Ionicons name="checkmark" size={40} color={colors.brand[500]} />
-      </View>
+    <View style={[s.container, { paddingTop: insets.top }]}>
+      {/* Top gradient area */}
+      <View style={s.gradientArea} />
 
-      <Text style={s.title}>¡Ya sos inversor!</Text>
-      <Text style={s.subtitle}>Tu compra fue ejecutada con éxito.</Text>
+      {/* Card */}
+      <View style={s.card}>
+        <Text style={s.cardTitle}>
+          Orden de {ticker} completada
+        </Text>
+        <Text style={s.cardDesc}>
+          Tu orden de mercado para {isSell ? "vender" : "comprar"} {formatARS(numAmount)} de {ticker} fue ejecutada.
+        </Text>
 
-      {/* Summary */}
-      <View style={s.summary}>
-        {summaryRows.map((row) => (
-          <View key={row.label} style={s.summaryRow}>
-            <Text style={s.summaryLabel}>{row.label}</Text>
-            <Text style={s.summaryValue}>{row.value}</Text>
+        {rows.map((row, i) => (
+          <View key={i}>
+            <View style={s.cardRow}>
+              <Text style={[s.cardRowLabel, row.underline && s.cardRowLabelUnderline]}>
+                {row.label}
+              </Text>
+              <Text style={s.cardRowValue}>{row.value}</Text>
+            </View>
+            {i < rows.length - 1 && <View style={s.cardDivider} />}
           </View>
         ))}
       </View>
 
       {/* Buttons */}
-      <View style={s.footer}>
-        <Button
-          title="Volver al inicio"
+      <View style={[s.buttons, { paddingBottom: insets.bottom + 20 }]}>
+        <Pressable
+          style={s.doneBtn}
           onPress={() => router.replace("/(app)")}
-          style={{ marginBottom: 10 }}
-        />
-        <Button
-          title="Seguir explorando"
-          variant="secondary"
-          onPress={() => router.replace("/(app)/explore")}
-        />
+        >
+          <Text style={s.doneBtnText}>Listo</Text>
+        </Pressable>
+
+        <Pressable
+          style={s.viewOrderBtn}
+          onPress={() => router.replace("/(app)")}
+        >
+          <Text style={s.viewOrderBtnText}>Ver orden</Text>
+        </Pressable>
       </View>
+
+      {/* Bottom gradient decoration */}
+      <View style={s.bottomGradient} />
     </View>
   );
 }
@@ -62,47 +93,105 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface[0],
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
+    justifyContent: "flex-end",
   },
-  checkCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.accentDim,
-    alignItems: "center",
-    justifyContent: "center",
+
+  /* Top gradient */
+  gradientArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+    backgroundColor: "#1a0a1a",
+    opacity: 0.3,
+  },
+
+  /* Card */
+  card: {
+    backgroundColor: colors.surface[100],
+    borderRadius: 20,
+    marginHorizontal: 20,
+    padding: 24,
     marginBottom: 24,
   },
-  title: {
+  cardTitle: {
     fontSize: 26,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.text.primary,
-    marginBottom: 8,
+    letterSpacing: -0.5,
+    marginBottom: 10,
   },
-  subtitle: {
-    fontSize: 15,
+  cardDesc: {
+    fontSize: 14,
     color: colors.text.secondary,
-    marginBottom: 32,
-    lineHeight: 22,
+    lineHeight: 20,
+    marginBottom: 24,
   },
-  summary: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    width: "100%",
-    marginBottom: 32,
-  },
-  summaryRow: {
+  cardRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
+    alignItems: "center",
+    paddingVertical: 14,
   },
-  summaryLabel: { fontSize: 13, color: colors.text.secondary },
-  summaryValue: { fontSize: 13, fontWeight: "600", color: colors.text.primary },
-  footer: { marginTop: "auto", width: "100%", paddingBottom: 20 },
+  cardRowLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
+  },
+  cardRowLabelUnderline: {
+    textDecorationLine: "underline",
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  cardRowValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+
+  /* Buttons */
+  buttons: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  doneBtn: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.text.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doneBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.surface[0],
+  },
+  viewOrderBtn: {
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.surface[200],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewOrderBtnText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+
+  /* Bottom gradient */
+  bottomGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: "#0a0a1a",
+    opacity: 0.15,
+  },
 });
