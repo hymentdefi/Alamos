@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, ActivityIndicator, Image,
   KeyboardAvoidingView, Platform, Modal, StyleSheet,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../lib/auth/context";
@@ -19,6 +19,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const isValid = email.length > 0 && password.length > 0;
 
@@ -42,8 +44,12 @@ export default function LoginScreen() {
     >
       {/* Header — green X */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={s.closeBtn} onPress={() => router.back()}>
-          <Ionicons name="close" size={26} color={colors.brand[500]} />
+        <Pressable
+          style={s.closeBtn}
+          onPress={() => router.back()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Ionicons name="close" size={28} color={colors.brand[500]} />
         </Pressable>
       </View>
 
@@ -60,7 +66,7 @@ export default function LoginScreen() {
         {/* Inputs */}
         <View style={s.inputWrap}>
           <TextInput
-            style={s.input}
+            style={[s.input, emailFocused && s.inputFocused]}
             placeholder="Email"
             placeholderTextColor={colors.text.muted}
             value={email}
@@ -68,12 +74,14 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             autoFocus
+            onFocus={() => setEmailFocused(true)}
+            onBlur={() => setEmailFocused(false)}
           />
         </View>
 
         <View style={s.inputWrap}>
           <TextInput
-            style={s.input}
+            style={[s.input, passwordFocused && s.inputFocused]}
             placeholder="Contraseña"
             placeholderTextColor={colors.text.muted}
             value={password}
@@ -81,6 +89,8 @@ export default function LoginScreen() {
             secureTextEntry={!showPassword}
             onSubmitEditing={handleLogin}
             returnKeyType="go"
+            onFocus={() => setPasswordFocused(true)}
+            onBlur={() => setPasswordFocused(false)}
           />
           <Pressable
             style={s.inputIconRight}
@@ -95,28 +105,30 @@ export default function LoginScreen() {
         </View>
 
         {error ? <Text style={s.error}>{error}</Text> : null}
+      </View>
 
-        {/* Buttons */}
-        <View style={s.buttons}>
-          <Pressable
-            onPress={handleLogin}
-            disabled={!isValid || loading}
-            style={[s.btnPrimary, !isValid && { opacity: 0.5 }]}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={s.btnPrimaryText}>Iniciar sesión</Text>
-            )}
-          </Pressable>
+      {/* Bottom buttons */}
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable
+          onPress={handleLogin}
+          disabled={!isValid || loading}
+          style={[s.btnPrimary, !isValid && s.btnPrimaryDisabled]}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={[s.btnPrimaryText, !isValid && s.btnPrimaryTextDisabled]}>
+              Iniciar sesión
+            </Text>
+          )}
+        </Pressable>
 
-          <Pressable
-            style={s.btnSecondary}
-            onPress={() => setHelpVisible(true)}
-          >
-            <Text style={s.btnSecondaryText}>Necesito ayuda</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          style={s.btnSecondary}
+          onPress={() => setHelpVisible(true)}
+        >
+          <Text style={s.btnSecondaryText}>Necesito ayuda</Text>
+        </Pressable>
       </View>
 
       {/* Help bottom sheet */}
@@ -161,8 +173,8 @@ const s = StyleSheet.create({
     paddingBottom: 4,
   },
   closeBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -174,12 +186,12 @@ const s = StyleSheet.create({
   },
   logoWrap: {
     alignItems: "center",
-    marginTop: 24,
-    marginBottom: 40,
+    marginTop: 32,
+    marginBottom: 48,
   },
   logo: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
   },
 
   /* Inputs */
@@ -188,13 +200,16 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.surface[200],
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
-    fontSize: 16,
+    fontSize: 17,
     color: colors.text.primary,
+  },
+  inputFocused: {
+    borderColor: colors.text.primary,
   },
   inputIconRight: {
     position: "absolute",
@@ -208,37 +223,42 @@ const s = StyleSheet.create({
     color: colors.red,
     fontSize: 14,
     textAlign: "center",
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 12,
   },
 
-  /* Buttons */
-  buttons: {
-    marginTop: 20,
+  /* Bottom */
+  bottom: {
+    paddingHorizontal: 24,
     gap: 12,
   },
   btnPrimary: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.brand[700],
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.brand[500],
     alignItems: "center",
     justifyContent: "center",
   },
+  btnPrimaryDisabled: {
+    backgroundColor: colors.surface[200],
+  },
   btnPrimaryText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
-    color: "#fff",
+    color: "#000",
+  },
+  btnPrimaryTextDisabled: {
+    color: colors.text.muted,
   },
   btnSecondary: {
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
     borderColor: colors.surface[200],
     alignItems: "center",
     justifyContent: "center",
   },
   btnSecondaryText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
     color: colors.text.primary,
   },
@@ -256,14 +276,14 @@ const s = StyleSheet.create({
     paddingTop: 24,
   },
   sheetTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: colors.text.primary,
     textAlign: "center",
     marginBottom: 24,
   },
   sheetItem: {
-    paddingVertical: 18,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -273,16 +293,16 @@ const s = StyleSheet.create({
     fontWeight: "500",
   },
   sheetCancel: {
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
     borderColor: colors.surface[200],
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
+    marginTop: 24,
   },
   sheetCancelText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
     color: colors.text.primary,
   },

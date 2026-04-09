@@ -1,29 +1,26 @@
 import { useState, useMemo, useRef } from "react";
 import {
   View, Text, TextInput, ScrollView, Pressable, StyleSheet,
-  Dimensions, Animated, Image, FlatList,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../lib/theme";
-import { assets, formatARS, type Asset } from "../../lib/data/assets";
+import { assets, formatARS } from "../../lib/data/assets";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-
-/* ─── Market indices ─── */
-interface MarketIndex {
-  name: string;
-  value: string;
-  change: number;
-}
-
-const marketIndices: MarketIndex[] = [
+/* ─── Market indices (3 columns like Robinhood) ─── */
+const marketIndices = [
   { name: "MERVAL", value: "1.842.350", change: 1.24 },
   { name: "Dólar CCL", value: "1.285", change: -0.32 },
-  { name: "Dólar MEP", value: "1.247", change: 0.15 },
-  { name: "Riesgo País", value: "782", change: -2.41 },
+  { name: "Bitcoin", value: "$68.432", change: 0.15 },
 ];
+
+/* ─── Snacks-style summary ─── */
+const marketSummary = {
+  time: "Cierre de hoy · 17:00",
+  text: "El MERVAL cerró en alza impulsado por el sector energético. YPF lideró las subas con +4.2% tras reportar resultados trimestrales por encima de las expectativas.",
+};
 
 /* ─── News items ─── */
 interface NewsItem {
@@ -87,13 +84,7 @@ const newsItems: NewsItem[] = [
 ];
 
 /* ─── Daily movers ─── */
-interface Mover {
-  ticker: string;
-  name: string;
-  change: number;
-}
-
-const dailyMovers: Mover[] = [
+const dailyMovers = [
   { ticker: "YPFD", name: "YPF", change: 4.21 },
   { ticker: "TXAR", name: "Ternium", change: 3.15 },
   { ticker: "COME", name: "Comercial del Plata", change: 2.94 },
@@ -102,12 +93,12 @@ const dailyMovers: Mover[] = [
   { ticker: "TSLA.BA", name: "Tesla CEDEAR", change: -2.17 },
 ];
 
-/* ─── Investment categories for search ─── */
+/* ─── Investment categories ─── */
 interface InvestCategory {
   title: string;
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
-  tickers: { ticker: string; price: number }[];
+  tickers: { ticker: string; name: string; price: number }[];
 }
 
 const investCategories: InvestCategory[] = [
@@ -116,11 +107,11 @@ const investCategories: InvestCategory[] = [
     description: "Los CEDEARs más operados del mercado argentino.",
     icon: "trending-up",
     tickers: [
-      { ticker: "AAPL.BA", price: 32150 },
-      { ticker: "AMZN.BA", price: 28470 },
-      { ticker: "TSLA.BA", price: 14890 },
-      { ticker: "MSFT.BA", price: 27830 },
-      { ticker: "GOOGL.BA", price: 19650 },
+      { ticker: "AAPL.BA", name: "Apple CEDEAR", price: 32150 },
+      { ticker: "AMZN.BA", name: "Amazon CEDEAR", price: 28470 },
+      { ticker: "TSLA.BA", name: "Tesla CEDEAR", price: 14890 },
+      { ticker: "MSFT.BA", name: "Microsoft CEDEAR", price: 27830 },
+      { ticker: "GOOGL.BA", name: "Alphabet CEDEAR", price: 19650 },
     ],
   },
   {
@@ -128,9 +119,9 @@ const investCategories: InvestCategory[] = [
     description: "Ideales para invertir de forma automática.",
     icon: "repeat",
     tickers: [
-      { ticker: "YPFD", price: 45280 },
-      { ticker: "GD30", price: 72340 },
-      { ticker: "AAPL.BA", price: 32150 },
+      { ticker: "YPFD", name: "YPF S.A.", price: 45280 },
+      { ticker: "GD30", name: "Bono Global 2030", price: 72340 },
+      { ticker: "AAPL.BA", name: "Apple CEDEAR", price: 32150 },
     ],
   },
   {
@@ -138,10 +129,12 @@ const investCategories: InvestCategory[] = [
     description: "Los activos más operados en el mercado.",
     icon: "flame",
     tickers: [
-      { ticker: "YPFD", price: 45280 },
-      { ticker: "GGAL", price: 8450 },
-      { ticker: "ALUA", price: 1842 },
-      { ticker: "COME", price: 562 },
+      { ticker: "YPFD", name: "YPF S.A.", price: 45280 },
+      { ticker: "GGAL", name: "Grupo Galicia", price: 8450 },
+      { ticker: "ALUA", name: "Aluar", price: 1842 },
+      { ticker: "COME", name: "Soc. Comercial", price: 562 },
+      { ticker: "TXAR", name: "Ternium", price: 3240 },
+      { ticker: "PAMP", name: "Pampa Energía", price: 5890 },
     ],
   },
   {
@@ -149,8 +142,8 @@ const investCategories: InvestCategory[] = [
     description: "Empresas del sector energético argentino.",
     icon: "flash",
     tickers: [
-      { ticker: "YPFD", price: 45280 },
-      { ticker: "PAMP", price: 5890 },
+      { ticker: "YPFD", name: "YPF S.A.", price: 45280 },
+      { ticker: "PAMP", name: "Pampa Energía", price: 5890 },
     ],
   },
   {
@@ -158,10 +151,10 @@ const investCategories: InvestCategory[] = [
     description: "Accedé a gigantes tech vía CEDEARs.",
     icon: "hardware-chip",
     tickers: [
-      { ticker: "AAPL.BA", price: 32150 },
-      { ticker: "MSFT.BA", price: 27830 },
-      { ticker: "GOOGL.BA", price: 19650 },
-      { ticker: "AMZN.BA", price: 28470 },
+      { ticker: "AAPL.BA", name: "Apple", price: 32150 },
+      { ticker: "MSFT.BA", name: "Microsoft", price: 27830 },
+      { ticker: "GOOGL.BA", name: "Alphabet", price: 19650 },
+      { ticker: "AMZN.BA", name: "Amazon", price: 28470 },
     ],
   },
   {
@@ -169,8 +162,8 @@ const investCategories: InvestCategory[] = [
     description: "Bonos del gobierno argentino en dólares y pesos.",
     icon: "document-text",
     tickers: [
-      { ticker: "GD30", price: 72340 },
-      { ticker: "AL30", price: 68420 },
+      { ticker: "GD30", name: "Global 2030", price: 72340 },
+      { ticker: "AL30", name: "Bono AL30", price: 68420 },
     ],
   },
   {
@@ -178,8 +171,8 @@ const investCategories: InvestCategory[] = [
     description: "Empresas industriales y de materiales.",
     icon: "construct",
     tickers: [
-      { ticker: "ALUA", price: 1842 },
-      { ticker: "TXAR", price: 3240 },
+      { ticker: "ALUA", name: "Aluar", price: 1842 },
+      { ticker: "TXAR", name: "Ternium", price: 3240 },
     ],
   },
 ];
@@ -218,18 +211,16 @@ export default function ExploreScreen() {
     router.push({ pathname: "/(app)/detail", params: { ticker } });
   };
 
-  /* Filtered categories for search */
   const filteredCategories = useMemo(() => {
     if (!searchQuery) return investCategories;
     const q = searchQuery.toLowerCase();
     return investCategories.filter(
       (c) =>
         c.title.toLowerCase().includes(q) ||
-        c.tickers.some((t) => t.ticker.toLowerCase().includes(q))
+        c.tickers.some((t) => t.ticker.toLowerCase().includes(q) || t.name.toLowerCase().includes(q))
     );
   }, [searchQuery]);
 
-  /* Filtered assets for search results */
   const filteredAssets = useMemo(() => {
     if (!searchQuery) return [];
     const q = searchQuery.toLowerCase();
@@ -250,56 +241,63 @@ export default function ExploreScreen() {
       >
         {/* Top bar */}
         <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-          <Text style={s.screenTitle}>Explorar</Text>
+          <View style={s.row}>
+            <Text style={s.screenTitle}>Explorar</Text>
+            <Ionicons name="information-circle-outline" size={20} color={colors.text.muted} style={{ marginLeft: 6 }} />
+          </View>
           <View style={s.topBarRight}>
-            <Pressable onPress={openSearch}>
+            <Pressable onPress={openSearch} hitSlop={10}>
               <Ionicons name="search" size={24} color={colors.text.primary} />
             </Pressable>
-            <Pressable>
+            <Pressable onPress={() => router.push("/(app)/notifications")} hitSlop={10}>
               <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
             </Pressable>
           </View>
         </View>
 
-        {/* ── Market indices row ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.indicesScroll}
-        >
-          {marketIndices.map((idx) => {
+        {/* ── Market indices (3 columns) ── */}
+        <View style={s.indicesRow}>
+          {marketIndices.map((idx, i) => {
             const isUp = idx.change >= 0;
             return (
-              <View key={idx.name} style={s.indexCard}>
+              <View
+                key={idx.name}
+                style={[
+                  s.indexCol,
+                  i < marketIndices.length - 1 && s.indexColBorder,
+                ]}
+              >
                 <Text style={s.indexName}>{idx.name}</Text>
                 <Text style={s.indexValue}>{idx.value}</Text>
                 <Text style={[s.indexChange, { color: isUp ? colors.brand[500] : colors.red }]}>
-                  {isUp ? "+" : ""}{idx.change.toFixed(2)}%
+                  {isUp ? "\u25B2" : "\u25BC"}{Math.abs(idx.change).toFixed(2)}%
                 </Text>
               </View>
             );
           })}
-        </ScrollView>
+        </View>
+
+        {/* ── Snacks summary card ── */}
+        <View style={s.snacksCard}>
+          <View style={s.snacksHeader}>
+            <Ionicons name="time-outline" size={14} color={colors.text.muted} />
+            <Text style={s.snacksTime}>{marketSummary.time}</Text>
+          </View>
+          <Text style={s.snacksText}>{marketSummary.text}</Text>
+        </View>
 
         {/* ── Divider ── */}
-        <View style={s.divider} />
+        <View style={s.thickDivider} />
 
         {/* ── News section ── */}
         <View style={s.section}>
-          <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitle}>Noticias</Text>
-            <Pressable>
-              <Text style={s.sectionAction}>Ver más</Text>
-            </Pressable>
-          </View>
-
           {newsItems.map((item, idx) => (
             <View key={item.id}>
               <Pressable style={s.newsRow}>
                 <View style={s.newsContent}>
                   <View style={s.newsMeta}>
+                    <Ionicons name="newspaper-outline" size={12} color={colors.text.muted} />
                     <Text style={s.newsSource}>{item.source}</Text>
-                    <Text style={s.newsDot}>·</Text>
                     <Text style={s.newsTime}>{item.time}</Text>
                   </View>
                   <Text style={s.newsHeadline} numberOfLines={3}>
@@ -312,17 +310,10 @@ export default function ExploreScreen() {
                         return (
                           <Pressable
                             key={rt.ticker}
-                            style={s.newsTickerPill}
                             onPress={() => openDetail(rt.ticker)}
                           >
-                            <Text style={s.newsTickerName}>{rt.ticker}</Text>
-                            <Text
-                              style={[
-                                s.newsTickerChange,
-                                { color: isUp ? colors.brand[500] : colors.red },
-                              ]}
-                            >
-                              {isUp ? "+" : ""}{rt.change.toFixed(2)}%
+                            <Text style={[s.newsTickerText, { color: isUp ? colors.brand[500] : colors.red }]}>
+                              {rt.ticker} {isUp ? "+" : ""}{rt.change.toFixed(2)}%
                             </Text>
                           </Pressable>
                         );
@@ -330,18 +321,18 @@ export default function ExploreScreen() {
                     </View>
                   )}
                 </View>
-                {/* News image placeholder */}
-                <View style={s.newsImagePlaceholder}>
-                  <Ionicons name="newspaper-outline" size={24} color={colors.text.muted} />
+                {/* Image placeholder */}
+                <View style={s.newsImage}>
+                  <Ionicons name="image-outline" size={24} color={colors.text.muted} />
                 </View>
               </Pressable>
-              {idx < newsItems.length - 1 && <View style={s.newsItemDivider} />}
+              {idx < newsItems.length - 1 && <View style={s.thinDivider} />}
             </View>
           ))}
         </View>
 
         {/* ── Divider ── */}
-        <View style={s.divider} />
+        <View style={s.thickDivider} />
 
         {/* ── Daily Movers ── */}
         <View style={s.section}>
@@ -365,7 +356,6 @@ export default function ExploreScreen() {
                   style={s.moverCard}
                   onPress={() => openDetail(m.ticker)}
                 >
-                  {/* Icon circle */}
                   <View style={[s.moverIcon, { backgroundColor: isUp ? colors.accentDim : colors.redDim }]}>
                     <Text style={s.moverIconText}>
                       {m.ticker.substring(0, 2)}
@@ -373,9 +363,25 @@ export default function ExploreScreen() {
                   </View>
                   <Text style={s.moverTicker}>{m.ticker}</Text>
                   <Text style={s.moverName} numberOfLines={1}>{m.name}</Text>
-                  {/* Mini chart placeholder */}
+                  {/* Mini chart bars */}
                   <View style={s.moverChartArea}>
-                    <View style={[s.moverChartLine, { backgroundColor: isUp ? colors.brand[500] : colors.red }]} />
+                    <View style={s.moverChartBars}>
+                      {[0, 1, 2, 3, 4, 5].map((j) => {
+                        const h = 4 + Math.abs(Math.sin(m.change * 10 + j * 1.2)) * 20;
+                        return (
+                          <View
+                            key={j}
+                            style={{
+                              width: 3,
+                              height: h,
+                              backgroundColor: isUp ? colors.brand[500] : colors.red,
+                              borderRadius: 1.5,
+                              opacity: 0.6,
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
                   </View>
                   <Text style={[s.moverChange, { color: isUp ? colors.brand[500] : colors.red }]}>
                     {isUp ? "+" : ""}{m.change.toFixed(2)}%
@@ -387,7 +393,7 @@ export default function ExploreScreen() {
         </View>
 
         {/* ── Divider ── */}
-        <View style={s.divider} />
+        <View style={s.thickDivider} />
 
         {/* ── Find investments preview ── */}
         <View style={s.section}>
@@ -398,12 +404,11 @@ export default function ExploreScreen() {
 
           <Pressable style={s.findSearchBar} onPress={openSearch}>
             <Ionicons name="search" size={18} color={colors.text.muted} />
-            <Text style={s.findSearchPlaceholder}>Buscar activos...</Text>
+            <Text style={s.findSearchPlaceholder}>Buscar acciones y bonos</Text>
           </Pressable>
 
-          {/* Category previews */}
           {investCategories.slice(0, 4).map((cat) => (
-            <Pressable key={cat.title} style={s.categoryRow}>
+            <Pressable key={cat.title} style={s.categoryRow} onPress={openSearch}>
               <View style={s.categoryIconWrap}>
                 <Ionicons name={cat.icon} size={20} color={colors.brand[500]} />
               </View>
@@ -421,35 +426,39 @@ export default function ExploreScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Search overlay ── */}
+      {/* ── Search overlay (Find investments) ── */}
       {showSearch && (
         <Animated.View style={[s.searchOverlay, { opacity: searchFade, paddingTop: insets.top }]}>
-          {/* Search header */}
-          <View style={s.searchHeader}>
+          {/* Header */}
+          <View style={s.searchTopRow}>
             <Pressable style={s.searchCloseBtn} onPress={closeSearch}>
-              <Ionicons name="close" size={24} color={colors.text.primary} />
+              <Ionicons name="close" size={28} color={colors.brand[500]} />
             </Pressable>
-            <View style={s.searchInputWrap}>
-              <Ionicons name="search" size={18} color={colors.text.muted} />
-              <TextInput
-                ref={searchInputRef}
-                style={s.searchInput}
-                placeholder="Buscar activos..."
-                placeholderTextColor={colors.text.muted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-                </Pressable>
-              )}
-            </View>
           </View>
 
-          {/* Search results */}
+          <Text style={s.searchTitle}>Encontrá inversiones</Text>
+
+          {/* Search bar */}
+          <View style={s.searchInputWrap}>
+            <Ionicons name="search" size={18} color={colors.text.muted} />
+            <TextInput
+              ref={searchInputRef}
+              style={s.searchInput}
+              placeholder="Buscar acciones y bonos"
+              placeholderTextColor={colors.text.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* Results */}
           <ScrollView
             style={s.searchResults}
             contentContainerStyle={{ paddingBottom: 100 }}
@@ -459,17 +468,14 @@ export default function ExploreScreen() {
             {/* Direct asset matches */}
             {filteredAssets.length > 0 && (
               <View style={s.searchSection}>
-                <Text style={s.searchSectionTitle}>Activos</Text>
+                <Text style={s.searchSectionLabel}>Activos</Text>
                 {filteredAssets.map((a) => {
                   const isUp = a.change >= 0;
                   return (
                     <Pressable
                       key={a.ticker}
                       style={s.searchAssetRow}
-                      onPress={() => {
-                        closeSearch();
-                        openDetail(a.ticker);
-                      }}
+                      onPress={() => { closeSearch(); openDetail(a.ticker); }}
                     >
                       <View style={s.searchAssetIcon}>
                         <Text style={s.searchAssetIconText}>
@@ -492,34 +498,33 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {/* Categories */}
+            {/* Categories with ticker cards */}
             {filteredCategories.map((cat) => (
-              <View key={cat.title} style={s.searchCategoryBlock}>
-                <View style={s.searchCategoryHeader}>
-                  <View style={s.searchCategoryIconWrap}>
+              <View key={cat.title} style={s.searchCatBlock}>
+                <View style={s.searchCatHeader}>
+                  <View style={s.searchCatIconWrap}>
                     <Ionicons name={cat.icon} size={18} color={colors.brand[500]} />
                   </View>
-                  <View style={s.searchCategoryHeaderInfo}>
-                    <Text style={s.searchCategoryTitle}>{cat.title}</Text>
-                    <Text style={s.searchCategoryDesc}>{cat.description}</Text>
+                  <View style={s.searchCatHeaderInfo}>
+                    <Text style={s.searchCatTitle}>{cat.title}</Text>
+                    <Text style={s.searchCatDesc} numberOfLines={2}>{cat.description}</Text>
                   </View>
                 </View>
+                {/* Ticker cards (Robinhood style: vertical cards) */}
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={s.tickerPillsScroll}
+                  contentContainerStyle={s.tickerCardsScroll}
                 >
                   {cat.tickers.map((t) => (
                     <Pressable
                       key={t.ticker}
-                      style={s.tickerPill}
-                      onPress={() => {
-                        closeSearch();
-                        openDetail(t.ticker);
-                      }}
+                      style={s.tickerCard}
+                      onPress={() => { closeSearch(); openDetail(t.ticker); }}
                     >
-                      <Text style={s.tickerPillTicker}>{t.ticker}</Text>
-                      <Text style={s.tickerPillPrice}>{formatARS(t.price)}</Text>
+                      <Text style={s.tickerCardTicker}>{t.ticker}</Text>
+                      <Text style={s.tickerCardName} numberOfLines={2}>{t.name}</Text>
+                      <Text style={s.tickerCardPrice}>{formatARS(t.price)}</Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -542,6 +547,7 @@ export default function ExploreScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface[0] },
   mainScroll: { flex: 1 },
+  row: { flexDirection: "row", alignItems: "center" },
 
   /* Top bar */
   topBar: {
@@ -552,36 +558,41 @@ const s = StyleSheet.create({
     paddingBottom: 12,
   },
   screenTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: "300",
     color: colors.text.secondary,
     letterSpacing: -0.5,
   },
   topBarRight: { flexDirection: "row", gap: 20 },
 
-  /* Market indices */
-  indicesScroll: {
-    paddingHorizontal: 16,
-    gap: 10,
-    paddingBottom: 16,
-  },
-  indexCard: {
-    backgroundColor: colors.card,
+  /* Market indices — 3 columns like Robinhood */
+  indicesRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    backgroundColor: colors.surface[100],
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: 130,
+    overflow: "hidden",
+  },
+  indexCol: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  indexColBorder: {
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
   },
   indexName: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
     color: colors.text.secondary,
     marginBottom: 4,
   },
   indexValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: colors.text.primary,
     marginBottom: 2,
@@ -591,15 +602,47 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* Shared */
-  divider: {
+  /* Snacks summary card */
+  snacksCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    backgroundColor: colors.surface[100],
+    borderRadius: 12,
+    padding: 16,
+  },
+  snacksHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  snacksTime: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text.muted,
+  },
+  snacksText: {
+    fontSize: 14,
+    color: colors.text.primary,
+    lineHeight: 21,
+  },
+
+  /* Dividers */
+  thickDivider: {
     height: 6,
     backgroundColor: colors.surface[100],
-    marginVertical: 4,
+    marginTop: 8,
   },
+  thinDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+
+  /* Shared */
   section: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -608,7 +651,7 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: colors.text.primary,
     letterSpacing: -0.3,
@@ -623,71 +666,48 @@ const s = StyleSheet.create({
   /* News */
   newsRow: {
     flexDirection: "row",
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 14,
   },
-  newsContent: {
-    flex: 1,
-  },
+  newsContent: { flex: 1 },
   newsMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginBottom: 6,
+    gap: 6,
+    marginBottom: 8,
   },
   newsSource: {
     fontSize: 12,
     fontWeight: "600",
     color: colors.text.secondary,
   },
-  newsDot: {
-    fontSize: 12,
-    color: colors.text.muted,
-  },
   newsTime: {
     fontSize: 12,
     color: colors.text.muted,
   },
   newsHeadline: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
     color: colors.text.primary,
-    lineHeight: 21,
+    lineHeight: 22,
+    letterSpacing: -0.2,
   },
   newsTickerRow: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 10,
+    gap: 16,
+    marginTop: 12,
   },
-  newsTickerPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.surface[100],
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  newsTickerName: {
-    fontSize: 12,
+  newsTickerText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: colors.text.primary,
   },
-  newsTickerChange: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  newsImagePlaceholder: {
-    width: 72,
-    height: 72,
+  newsImage: {
+    width: 80,
+    height: 80,
     borderRadius: 10,
-    backgroundColor: colors.surface[100],
+    backgroundColor: colors.surface[200],
     alignItems: "center",
     justifyContent: "center",
-  },
-  newsItemDivider: {
-    height: 1,
-    backgroundColor: colors.border,
   },
 
   /* Daily Movers */
@@ -735,10 +755,11 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 8,
   },
-  moverChartLine: {
-    height: 1.5,
-    borderRadius: 1,
-    opacity: 0.7,
+  moverChartBars: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-around",
+    height: "100%",
   },
   moverChange: {
     fontSize: 14,
@@ -785,9 +806,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginRight: 14,
   },
-  categoryInfo: {
-    flex: 1,
-  },
+  categoryInfo: { flex: 1 },
   categoryTitle: {
     fontSize: 15,
     fontWeight: "700",
@@ -814,46 +833,52 @@ const s = StyleSheet.create({
     backgroundColor: colors.surface[0],
     zIndex: 100,
   },
-  searchHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+  searchTopRow: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 8,
   },
   searchCloseBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
+  searchTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: colors.text.primary,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
   searchInputWrap: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface[100],
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    gap: 10,
+    marginBottom: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.text.primary,
     padding: 0,
   },
-  searchResults: {
-    flex: 1,
-  },
+  searchResults: { flex: 1 },
+
+  /* Search asset results */
   searchSection: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 8,
   },
-  searchSectionTitle: {
+  searchSectionLabel: {
     fontSize: 13,
     fontWeight: "700",
     color: colors.text.muted,
@@ -864,7 +889,7 @@ const s = StyleSheet.create({
   searchAssetRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 12,
   },
   searchAssetIcon: {
@@ -880,89 +905,91 @@ const s = StyleSheet.create({
     fontWeight: "800",
     color: colors.text.primary,
   },
-  searchAssetInfo: {
-    flex: 1,
-  },
+  searchAssetInfo: { flex: 1 },
   searchAssetTicker: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     color: colors.text.primary,
   },
   searchAssetName: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.text.secondary,
-    marginTop: 1,
+    marginTop: 2,
   },
-  searchAssetPriceCol: {
-    alignItems: "flex-end",
-  },
+  searchAssetPriceCol: { alignItems: "flex-end" },
   searchAssetPrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
     color: colors.text.primary,
   },
   searchAssetChange: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
-    marginTop: 1,
+    marginTop: 2,
   },
 
-  /* Search categories */
-  searchCategoryBlock: {
+  /* Search categories with ticker cards */
+  searchCatBlock: {
     paddingTop: 20,
     paddingBottom: 8,
   },
-  searchCategoryHeader: {
+  searchCatHeader: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     gap: 12,
     marginBottom: 14,
   },
-  searchCategoryIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  searchCatIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.accentDim,
     alignItems: "center",
     justifyContent: "center",
   },
-  searchCategoryHeaderInfo: {
-    flex: 1,
-  },
-  searchCategoryTitle: {
-    fontSize: 16,
+  searchCatHeaderInfo: { flex: 1 },
+  searchCatTitle: {
+    fontSize: 17,
     fontWeight: "700",
     color: colors.text.primary,
   },
-  searchCategoryDesc: {
-    fontSize: 12,
+  searchCatDesc: {
+    fontSize: 13,
     color: colors.text.secondary,
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 18,
   },
-  tickerPillsScroll: {
+  tickerCardsScroll: {
     paddingHorizontal: 20,
-    gap: 8,
+    gap: 10,
   },
-  tickerPill: {
+  tickerCard: {
+    width: 130,
     backgroundColor: colors.surface[100],
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    padding: 14,
+    justifyContent: "space-between",
+    minHeight: 110,
   },
-  tickerPillTicker: {
-    fontSize: 13,
+  tickerCardTicker: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  tickerCardName: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  tickerCardPrice: {
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text.primary,
-  },
-  tickerPillPrice: {
-    fontSize: 13,
-    color: colors.text.secondary,
   },
 
   /* No results */

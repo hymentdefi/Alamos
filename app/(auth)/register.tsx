@@ -74,6 +74,7 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [inputFocused, setInputFocused] = useState(true);
 
   const inputRef = useRef<TextInput>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -141,28 +142,19 @@ export default function RegisterScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={s.flex}
     >
-      {/* Header: back + progress */}
+      {/* Header: back / close */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={s.backBtn} onPress={goBack}>
+        <Pressable
+          style={s.backBtn}
+          onPress={goBack}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           {currentStep === 0 ? (
-            <Ionicons name="close" size={24} color={colors.text.primary} />
+            <Ionicons name="close" size={28} color={colors.text.primary} />
           ) : (
-            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+            <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
           )}
         </Pressable>
-
-        {/* Progress bar */}
-        <View style={s.progressBar}>
-          {steps.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                s.progressSegment,
-                i <= currentStep && s.progressSegmentActive,
-              ]}
-            />
-          ))}
-        </View>
       </View>
 
       {/* Content */}
@@ -174,7 +166,10 @@ export default function RegisterScreen() {
         <View style={s.inputWrap}>
           <TextInput
             ref={inputRef}
-            style={s.input}
+            style={[
+              s.input,
+              inputFocused && s.inputFocused,
+            ]}
             placeholder={step.placeholder}
             placeholderTextColor={colors.text.muted}
             value={value}
@@ -183,6 +178,8 @@ export default function RegisterScreen() {
             autoCapitalize={step.autoCapitalize ?? "sentences"}
             secureTextEntry={step.secureTextEntry && !showPassword}
             autoFocus
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             onSubmitEditing={goNext}
             returnKeyType={isLast ? "done" : "next"}
           />
@@ -205,13 +202,30 @@ export default function RegisterScreen() {
         {/* Legal text on first step */}
         {currentStep === 0 && (
           <Text style={s.legal}>
-            Al continuar, aceptás los Términos y Condiciones y la Política de Privacidad de Álamos Capital.
+            Al continuar, aceptás los{" "}
+            <Text style={s.legalLink}>Términos y Condiciones</Text> y la{" "}
+            <Text style={s.legalLink}>Política de Privacidad</Text> de Álamos
+            Capital.
           </Text>
         )}
       </Animated.View>
 
-      {/* Continue button */}
+      {/* Bottom: progress + button */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
+        {/* Step indicator */}
+        <View style={s.stepIndicator}>
+          {steps.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                s.dot,
+                i === currentStep && s.dotActive,
+                i < currentStep && s.dotDone,
+              ]}
+            />
+          ))}
+        </View>
+
         <Pressable
           onPress={goNext}
           disabled={!isValid || loading}
@@ -232,56 +246,48 @@ export default function RegisterScreen() {
 
 const s = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface[0] },
+
+  /* Header */
   header: {
     paddingHorizontal: 16,
-    gap: 12,
     paddingBottom: 4,
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  progressBar: {
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.surface[200],
-  },
-  progressSegmentActive: {
-    backgroundColor: colors.text.primary,
-  },
+
+  /* Content */
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 32,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "800",
     color: colors.text.primary,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 10,
     letterSpacing: -0.5,
+    lineHeight: 38,
   },
   subtitle: {
     fontSize: 15,
     color: colors.text.secondary,
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 40,
+    marginBottom: 48,
   },
+
+  /* Input */
   inputWrap: {
     position: "relative",
   },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.surface[200],
     borderRadius: 16,
     paddingHorizontal: 20,
@@ -290,6 +296,9 @@ const s = StyleSheet.create({
     color: colors.text.primary,
     textAlign: "center",
   },
+  inputFocused: {
+    borderColor: colors.text.primary,
+  },
   eyeBtn: {
     position: "absolute",
     right: 16,
@@ -297,26 +306,58 @@ const s = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
   },
+
   error: {
     color: colors.red,
     fontSize: 14,
     textAlign: "center",
     marginTop: 16,
   },
+
+  /* Legal */
   legal: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.text.muted,
     textAlign: "center",
-    marginTop: 24,
-    lineHeight: 18,
-    paddingHorizontal: 12,
+    marginTop: 28,
+    lineHeight: 20,
+    paddingHorizontal: 8,
   },
+  legalLink: {
+    textDecorationLine: "underline",
+    color: colors.text.secondary,
+  },
+
+  /* Bottom */
   bottom: {
     paddingHorizontal: 24,
+    gap: 16,
   },
+
+  /* Step dots */
+  stepIndicator: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surface[200],
+  },
+  dotActive: {
+    backgroundColor: colors.brand[500],
+    width: 24,
+  },
+  dotDone: {
+    backgroundColor: colors.brand[700],
+  },
+
+  /* Button */
   btn: {
-    height: 52,
-    borderRadius: 26,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -327,7 +368,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.surface[200],
   },
   btnText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
     color: "#000",
   },

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  View, Text, ScrollView, Pressable, Modal, StyleSheet, Dimensions,
+  View, Text, ScrollView, Pressable, Modal, StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +8,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 
-const { width: SCREEN_W } = Dimensions.get("window");
 const timeFilters = ["1D", "1S", "1M", "3M", "1A", "5A"];
 
 /* ─── Mock company info by ticker ─── */
@@ -160,18 +159,18 @@ export default function DetailScreen() {
     <View style={s.container}>
       {/* ── Sticky header ── */}
       <View style={[s.header, { paddingTop: insets.top + 4 }]}>
-        <Pressable style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color={colors.text.primary} />
+        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={s.headerPrice}>{formatARS(asset.price)}</Text>
           <Text style={s.headerTicker}>{asset.ticker}</Text>
         </View>
         <View style={s.headerRight}>
-          <Pressable>
+          <Pressable hitSlop={10}>
             <Ionicons name="notifications-outline" size={22} color={colors.text.primary} />
           </Pressable>
-          <Pressable>
+          <Pressable hitSlop={10}>
             <Ionicons name="add-circle-outline" size={22} color={colors.text.primary} />
           </Pressable>
         </View>
@@ -199,28 +198,54 @@ export default function DetailScreen() {
 
         {/* ── Chart area ── */}
         <View style={s.chartArea}>
-          <View style={s.chartGrid}>
-            <View style={[s.chartGridLine, { top: "0%" }]} />
-            <View style={[s.chartGridLine, { top: "33%" }]} />
-            <View style={[s.chartGridLine, { top: "66%" }]} />
-            <View style={[s.chartGridLine, { top: "100%" }]} />
+          {/* Dotted baseline */}
+          <View style={s.chartBaseline} />
+          {/* Chart line segments */}
+          <View style={s.chartContent}>
+            {(() => {
+              const pts = [40, 38, 42, 50, 48, 55, 52, 58, 55, 62, 58, 65, 60, 68, 72, 70, 66, 74, 70, 75];
+              return pts.map((p, i) => {
+                if (i === 0) return null;
+                const prev = pts[i - 1];
+                const segW = 100 / (pts.length - 1);
+                const minP = Math.min(...pts);
+                const maxP = Math.max(...pts);
+                const range = maxP - minP || 1;
+                const y1 = 100 - ((prev - minP) / range) * 100;
+                const y2 = 100 - ((p - minP) / range) * 100;
+                const midY = (y1 + y2) / 2;
+                return (
+                  <View
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      left: `${(i - 1) * segW}%`,
+                      width: `${segW}%`,
+                      top: `${midY}%`,
+                      height: 2,
+                      backgroundColor: chartColor,
+                      borderRadius: 1,
+                    }}
+                  />
+                );
+              });
+            })()}
           </View>
-          <View style={[s.chartLineMain, { backgroundColor: chartColor }]} />
           {/* Fullscreen button */}
           <Pressable style={s.fullscreenBtn}>
             <Ionicons name="expand-outline" size={18} color={colors.text.secondary} />
           </Pressable>
         </View>
 
-        {/* ── Time filters ── */}
+        {/* ── Time filters (filled pill for active) ── */}
         <View style={s.timeFilters}>
           {timeFilters.map((t) => (
             <Pressable
               key={t}
-              style={[s.timeBtn, activeTime === t && [s.timeBtnActive, { borderColor: chartColor }]]}
+              style={[s.timeBtn, activeTime === t && s.timeBtnActive]}
               onPress={() => setActiveTime(t)}
             >
-              <Text style={[s.timeBtnText, activeTime === t && { color: colors.text.primary }]}>
+              <Text style={[s.timeBtnText, activeTime === t && s.timeBtnTextActive]}>
                 {t}
               </Text>
             </Pressable>
@@ -453,8 +478,8 @@ const s = StyleSheet.create({
     paddingBottom: 8,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -483,14 +508,14 @@ const s = StyleSheet.create({
     paddingBottom: 4,
   },
   tickerLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.text.secondary,
     fontWeight: "500",
     marginBottom: 2,
   },
   companyName: {
-    fontSize: 28,
-    fontWeight: "800",
+    fontSize: 30,
+    fontWeight: "300",
     color: colors.text.primary,
     letterSpacing: -0.5,
     marginBottom: 4,
@@ -500,7 +525,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   price: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: "800",
     color: colors.text.primary,
     letterSpacing: -1,
@@ -508,37 +533,34 @@ const s = StyleSheet.create({
   changeLine: {
     fontSize: 14,
     fontWeight: "600",
-    marginTop: 4,
+    marginTop: 6,
   },
 
   /* Chart */
   chartArea: {
-    height: 220,
+    height: 240,
     paddingHorizontal: 4,
-    marginTop: 8,
+    marginTop: 12,
     position: "relative",
     justifyContent: "center",
   },
-  chartGrid: {
+  chartBaseline: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    top: 20,
-    bottom: 20,
-  },
-  chartGridLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+    left: 20,
+    right: 20,
+    top: "50%",
     height: 1,
-    backgroundColor: colors.border,
+    borderStyle: "dashed",
+    borderWidth: 0.5,
+    borderColor: colors.text.muted,
     opacity: 0.3,
   },
-  chartLineMain: {
-    height: 2,
-    marginHorizontal: 20,
-    borderRadius: 1,
-    opacity: 0.6,
+  chartContent: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    top: 20,
+    bottom: 20,
   },
   fullscreenBtn: {
     position: "absolute",
@@ -562,19 +584,20 @@ const s = StyleSheet.create({
   },
   timeBtn: {
     flex: 1,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "transparent",
   },
   timeBtnActive: {
-    borderWidth: 1,
+    backgroundColor: colors.surface[200],
   },
   timeBtnText: {
     fontSize: 13,
     fontWeight: "600",
     color: colors.text.muted,
+  },
+  timeBtnTextActive: {
+    color: colors.text.primary,
   },
 
   /* Shared section */
@@ -700,15 +723,17 @@ const s = StyleSheet.create({
     width: "50%",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingRight: 20,
+    paddingVertical: 12,
+    paddingRight: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.text.secondary,
   },
   statValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text.primary,
   },
@@ -768,27 +793,27 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   bottomBarLeft: {},
   volumeLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text.primary,
   },
   volumeValue: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.text.secondary,
-    marginTop: 1,
+    marginTop: 2,
   },
   tradeBtn: {
     backgroundColor: colors.brand[500],
-    borderRadius: 24,
-    paddingHorizontal: 40,
-    paddingVertical: 14,
+    borderRadius: 28,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
   },
   tradeBtnText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
     color: "#000",
   },
