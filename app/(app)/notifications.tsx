@@ -120,20 +120,17 @@ export default function NotificationsScreen() {
      ════════════════════════════════════════ */
   if (!selected) {
     return (
-      <View style={[s.container, { paddingTop: insets.top }]}>
-        {/* Header */}
-        <View style={s.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
-          </Pressable>
+      <View style={s.container}>
+        <View style={[s.fixedTop, { paddingTop: insets.top }]}>
+          <View style={s.header}>
+            <Text style={s.title}>Actividad</Text>
+          </View>
         </View>
-
-        <Text style={s.title}>Notificaciones</Text>
 
         <FlatList
           data={notifications}
           keyExtractor={(n) => n.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingTop: insets.top + 64, paddingBottom: 100 }}
           renderItem={({ item }) => (
             <Pressable style={s.notifRow} onPress={() => setSelected(item)}>
               {/* Unread dot */}
@@ -173,27 +170,26 @@ export default function NotificationsScreen() {
      DETAIL VIEW (Chat-style)
      ════════════════════════════════════════ */
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.detailHeader}>
-        <Pressable onPress={() => setSelected(null)} hitSlop={12}>
-          <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
-        </Pressable>
-        <View style={s.detailHeaderCenter}>
-          <View style={[s.detailHeaderIcon, { borderColor: selected.iconColor }]}>
-            <Ionicons name={selected.icon} size={18} color={selected.iconColor} />
+    <View style={s.container}>
+      <View style={[s.fixedTop, { paddingTop: insets.top }]}>
+        <View style={s.detailHeader}>
+          <Pressable onPress={() => setSelected(null)} hitSlop={12}>
+            <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
+          </Pressable>
+          <View style={s.detailHeaderCenter}>
+            <View style={[s.detailHeaderIcon, { borderColor: selected.iconColor }]}>
+              <Ionicons name={selected.icon} size={18} color={selected.iconColor} />
+            </View>
+            <Text style={s.detailHeaderTitle}>{selected.category}</Text>
           </View>
-          <Text style={s.detailHeaderTitle}>{selected.category}</Text>
+          <View style={{ width: 26 }} />
         </View>
-        <View style={{ width: 26 }} />
+        <View style={s.detailDivider} />
       </View>
-
-      {/* Divider */}
-      <View style={s.detailDivider} />
 
       {/* Messages */}
       <ScrollView
-        contentContainerStyle={s.messagesContainer}
+        contentContainerStyle={[s.messagesContainer, { paddingTop: insets.top + 78 }]}
         showsVerticalScrollIndicator={false}
       >
         {selected.messages.map((msg, i) => (
@@ -231,19 +227,26 @@ export default function NotificationsScreen() {
 /* ─── Styles ─── */
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface[0] },
+  fixedTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    backgroundColor: colors.surface[0],
+  },
 
   /* Header */
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   title: {
     fontSize: 32,
     fontWeight: "800",
     color: colors.text.primary,
     letterSpacing: -0.5,
-    paddingHorizontal: 20,
-    marginBottom: 16,
   },
 
   /* Notification rows */

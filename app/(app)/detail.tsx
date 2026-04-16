@@ -1,464 +1,391 @@
 import { useState } from "react";
 import {
-  View, Text, ScrollView, Pressable, Modal, StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Modal,
+  StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
+import { useTheme } from "../../lib/theme";
 
-const timeFilters = ["1D", "1S", "1M", "3M", "1A", "5A"];
+const timeFilters = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 
-/* ─── Mock company info by ticker ─── */
 interface CompanyInfo {
+  shortName: string;
   description: string;
-  ceo: string;
-  founded: string;
-  employees: string;
-  headquarters: string;
   sector: string;
+  market: string;
+  risk: string;
 }
 
 const companyInfo: Record<string, CompanyInfo> = {
   YPFD: {
-    description: "YPF S.A. es la principal empresa de energía de Argentina. Se dedica a la exploración, producción, refinación, transporte y comercialización de petróleo y gas natural, así como a la generación de energía eléctrica.",
-    ceo: "Horacio Marín",
-    founded: "1922",
-    employees: "21.500",
-    headquarters: "Buenos Aires, Argentina",
-    sector: "Energía",
+    shortName: "YPF",
+    description: "Principal empresa de energia de Argentina, con exposicion a petroleo, gas y refinacion.",
+    sector: "Energia",
+    market: "Acciones AR",
+    risk: "Media",
   },
   GD30: {
-    description: "Bono Global de la República Argentina con vencimiento en 2030. Denominado en dólares estadounidenses, paga intereses semestrales y fue emitido en el marco de la reestructuración de deuda de 2020.",
-    ceo: "—",
-    founded: "2020",
-    employees: "—",
-    headquarters: "Buenos Aires, Argentina",
-    sector: "Bonos soberanos",
+    shortName: "GD30",
+    description: "Bono soberano en dolares emitido por Argentina con vencimiento en 2030.",
+    sector: "Bonos",
+    market: "Renta fija",
+    risk: "Alta",
   },
   ALUA: {
-    description: "Aluar Aluminio Argentino S.A.I.C. es el mayor productor de aluminio primario de Argentina. Opera una planta de fundición en Puerto Madryn, Chubut, y comercializa productos de aluminio para diversas industrias.",
-    ceo: "Javier Madanes Quintanilla",
-    founded: "1970",
-    employees: "2.800",
-    headquarters: "Buenos Aires, Argentina",
+    shortName: "Aluar",
+    description: "Productor argentino de aluminio con fuerte sensibilidad al ciclo industrial local.",
     sector: "Materiales",
+    market: "Acciones AR",
+    risk: "Media",
   },
   "AAPL.BA": {
-    description: "CEDEAR de Apple Inc. Apple diseña, fabrica y comercializa smartphones, computadoras personales, tablets, wearables y accesorios, además de servicios digitales como iCloud, Apple Music y Apple TV+.",
-    ceo: "Tim Cook",
-    founded: "1976",
-    employees: "164.000",
-    headquarters: "Cupertino, California",
-    sector: "Tecnología",
+    shortName: "Apple",
+    description: "CEDEAR de Apple, una de las companias tecnologicas mas grandes del mundo.",
+    sector: "Tecnologia",
+    market: "CEDEAR",
+    risk: "Media",
   },
   "MSFT.BA": {
-    description: "CEDEAR de Microsoft Corporation. Microsoft desarrolla y licencia software, servicios en la nube (Azure), dispositivos y soluciones empresariales. Es una de las empresas más valiosas del mundo.",
-    ceo: "Satya Nadella",
-    founded: "1975",
-    employees: "221.000",
-    headquarters: "Redmond, Washington",
-    sector: "Tecnología",
+    shortName: "Microsoft",
+    description: "CEDEAR de Microsoft, con exposicion a software, nube e inteligencia artificial.",
+    sector: "Tecnologia",
+    market: "CEDEAR",
+    risk: "Media",
   },
 };
 
 const defaultInfo: CompanyInfo = {
-  description: "Información detallada no disponible para este activo. Consultá la página de la CNV para más información.",
-  ceo: "—",
-  founded: "—",
-  employees: "—",
-  headquarters: "Argentina",
+  shortName: "Activo",
+  description: "Activo disponible para invertir desde Alamos.",
   sector: "General",
+  market: "Mercado",
+  risk: "Media",
 };
 
-/* ─── Mock "people also own" ─── */
-interface AlsoOwn {
-  name: string;
-  ticker: string;
-  change: number;
+const relatedByTicker: Record<string, string[]> = {
+  YPFD: ["PAMP", "ALUA", "TXAR"],
+  ALUA: ["TXAR", "YPFD", "PAMP"],
+  "AAPL.BA": ["MSFT.BA", "AMZN.BA", "TSLA.BA"],
+  default: ["YPFD", "GD30", "AAPL.BA"],
+};
+
+function chartPoints(period: (typeof timeFilters)[number], positive: boolean): number[] {
+  const rising: Record<(typeof timeFilters)[number], number[]> = {
+    "1D": [38, 40, 39, 43, 46, 44, 48, 50, 49, 52, 55, 57, 56, 60, 63, 62, 66, 68, 70, 73],
+    "1S": [45, 44, 46, 48, 47, 49, 50, 52, 54, 53, 55, 57, 59, 60, 62, 61, 63, 64, 66, 68],
+    "1M": [32, 35, 37, 36, 40, 43, 42, 46, 44, 48, 50, 49, 52, 54, 57, 56, 60, 62, 64, 67],
+    "3M": [25, 28, 30, 34, 33, 37, 40, 42, 41, 45, 47, 50, 52, 55, 57, 60, 62, 64, 67, 70],
+    "1A": [20, 22, 25, 29, 31, 35, 34, 39, 41, 45, 49, 48, 53, 56, 59, 61, 64, 68, 70, 74],
+    "MAX": [12, 16, 20, 24, 28, 32, 31, 36, 40, 44, 49, 52, 56, 60, 63, 67, 70, 74, 77, 82],
+  };
+
+  const falling: Record<(typeof timeFilters)[number], number[]> = {
+    "1D": [62, 60, 58, 59, 55, 53, 54, 51, 48, 47, 45, 43, 44, 40, 38, 36, 37, 34, 35, 33],
+    "1S": [66, 64, 62, 63, 61, 59, 58, 56, 55, 54, 52, 53, 50, 49, 47, 46, 45, 43, 44, 42],
+    "1M": [72, 70, 68, 66, 67, 64, 61, 60, 58, 56, 57, 53, 50, 49, 46, 45, 43, 41, 39, 38],
+    "3M": [78, 75, 73, 70, 68, 66, 63, 61, 60, 57, 55, 53, 50, 49, 46, 44, 42, 39, 37, 35],
+    "1A": [86, 82, 79, 75, 72, 69, 66, 62, 60, 57, 54, 51, 48, 45, 43, 41, 38, 36, 34, 32],
+    "MAX": [92, 88, 84, 80, 77, 72, 68, 64, 61, 57, 54, 50, 47, 43, 40, 37, 34, 31, 29, 27],
+  };
+
+  return positive ? rising[period] : falling[period];
 }
-
-const peopleAlsoOwn: Record<string, AlsoOwn[]> = {
-  YPFD: [
-    { name: "Pampa Energía", ticker: "PAMP", change: -0.45 },
-    { name: "Ternium Argentina", ticker: "TXAR", change: 3.15 },
-    { name: "Aluar Aluminio", ticker: "ALUA", change: -1.33 },
-  ],
-  ALUA: [
-    { name: "Ternium Argentina", ticker: "TXAR", change: 3.15 },
-    { name: "YPF S.A.", ticker: "YPFD", change: 4.21 },
-    { name: "Pampa Energía", ticker: "PAMP", change: -0.45 },
-  ],
-  "AAPL.BA": [
-    { name: "Microsoft (CEDEAR)", ticker: "MSFT.BA", change: 0.43 },
-    { name: "Amazon (CEDEAR)", ticker: "AMZN.BA", change: 1.52 },
-    { name: "Tesla (CEDEAR)", ticker: "TSLA.BA", change: -2.17 },
-  ],
-  default: [
-    { name: "YPF S.A.", ticker: "YPFD", change: 4.21 },
-    { name: "Bono Global 2030", ticker: "GD30", change: 1.87 },
-    { name: "Apple (CEDEAR)", ticker: "AAPL.BA", change: 0.78 },
-  ],
-};
 
 export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeTime, setActiveTime] = useState("1D");
-  const [showMore, setShowMore] = useState(false);
-  const [tradeVisible, setTradeVisible] = useState(false);
+  const { c } = useTheme();
 
-  const asset = assets.find((a) => a.ticker === ticker);
+  const [activeTime, setActiveTime] = useState<(typeof timeFilters)[number]>("1D");
+  const [showTradeSheet, setShowTradeSheet] = useState(false);
+
+  const asset = assets.find((item) => item.ticker === ticker);
   if (!asset) return null;
 
-  const isPositive = asset.change >= 0;
-  const sign = isPositive ? "+" : "";
-  const changeAmt = Math.round(asset.price * Math.abs(asset.change) / 100);
-  const chartColor = isPositive ? colors.brand[500] : colors.red;
-
   const info = companyInfo[asset.ticker] || defaultInfo;
-  const alsoOwn = peopleAlsoOwn[asset.ticker] || peopleAlsoOwn.default;
+  const related = (relatedByTicker[asset.ticker] || relatedByTicker.default)
+    .map((code) => assets.find((item) => item.ticker === code))
+    .filter(Boolean);
 
-  /* Derived stats */
-  const open = asset.price - Math.round(asset.price * asset.change / 200);
-  const hi = asset.price + Math.round(asset.price * 0.018);
-  const lo = asset.price - Math.round(asset.price * 0.022);
-  const hi52 = Math.round(asset.price * 1.35);
-  const lo52 = Math.round(asset.price * 0.72);
-  const vol = Math.round(120000 + Math.random() * 500000);
-  const avgVol = Math.round(vol * 1.4);
-  const mktCap = asset.price > 10000
-    ? `${(asset.price * 380 / 1e6).toFixed(1)}B`
-    : `${(asset.price * 15000 / 1e6).toFixed(1)}M`;
-
-  /* Position mock */
-  const held = asset.held;
+  const isPositive = asset.change >= 0;
+  const chartColor = isPositive ? c.green : c.red;
+  const points = chartPoints(activeTime, isPositive);
+  const priceChangeAmount = Math.round(asset.price * Math.abs(asset.change) / 100);
+  const held = asset.held && !!asset.qty;
   const qty = asset.qty || 0;
-  const marketVal = asset.price * qty;
-  const avgCost = Math.round(asset.price * 0.92);
-  const todayReturn = Math.round(changeAmt * qty);
-  const totalReturn = Math.round((asset.price - avgCost) * qty);
-  const totalReturnPct = avgCost > 0 ? ((asset.price - avgCost) / avgCost * 100).toFixed(2) : "0";
+  const positionValue = asset.price * qty;
+  const portfolioShare = ((positionValue / 4287430) * 100).toFixed(1);
+  const averageCost = Math.round(asset.price * 0.91);
+  const totalReturn = (asset.price - averageCost) * qty;
+  const totalReturnPct = averageCost > 0 ? (((asset.price - averageCost) / averageCost) * 100).toFixed(2) : "0.00";
 
-  const stats = [
-    { label: "Apertura", value: formatARS(open) },
-    { label: "Volumen", value: vol.toLocaleString("es-AR") },
-    { label: "Máximo", value: formatARS(hi) },
-    { label: "Vol. prom.", value: avgVol.toLocaleString("es-AR") },
-    { label: "Mínimo", value: formatARS(lo) },
-    { label: "Cap. mercado", value: mktCap },
-    { label: "Máx. 52 sem.", value: formatARS(hi52) },
-    { label: "P/E ratio", value: "—" },
-    { label: "Mín. 52 sem.", value: formatARS(lo52) },
-    { label: "Div/rend.", value: "—" },
+  const statCards = [
+    { label: "Mercado", value: info.market },
+    { label: "Sector", value: info.sector },
+    { label: "Riesgo", value: info.risk },
   ];
 
   return (
-    <View style={s.container}>
-      {/* ── Sticky header ── */}
-      <View style={[s.header, { paddingTop: insets.top + 4 }]}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
-        </Pressable>
-        <View style={s.headerCenter}>
-          <Text style={s.headerPrice}>{formatARS(asset.price)}</Text>
-          <Text style={s.headerTicker}>{asset.ticker}</Text>
-        </View>
-        <View style={s.headerRight}>
-          <Pressable hitSlop={10}>
-            <Ionicons name="notifications-outline" size={22} color={colors.text.primary} />
+    <View style={[s.container, { backgroundColor: c.bg }]}>
+      <View
+        style={[
+          s.fixedTop,
+          {
+            backgroundColor: c.bg,
+            borderBottomColor: c.bg,
+            paddingTop: insets.top + 6,
+          },
+        ]}
+      >
+        <View style={s.headerRow}>
+          <Pressable
+            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+            onPress={() => router.back()}
+            hitSlop={12}
+          >
+            <Ionicons name="chevron-back" size={20} color={c.text} />
           </Pressable>
-          <Pressable hitSlop={10}>
-            <Ionicons name="add-circle-outline" size={22} color={colors.text.primary} />
+          <View style={s.headerTitleWrap}>
+            <Text style={[s.headerTicker, { color: c.text }]}>{asset.ticker}</Text>
+            <Text style={[s.headerName, { color: c.textSecondary }]}>{info.shortName}</Text>
+          </View>
+          <Pressable
+            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+            onPress={() => router.push("/(app)/notifications")}
+            hitSlop={12}
+          >
+            <Ionicons name="notifications-outline" size={18} color={c.text} />
           </Pressable>
         </View>
       </View>
 
-      {/* ── Scrollable content ── */}
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
+        style={{ backgroundColor: c.bg }}
+        contentContainerStyle={{ paddingTop: insets.top + 78, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Name & Price ── */}
-        <View style={s.priceSection}>
-          <Text style={s.tickerLabel}>{asset.ticker}</Text>
-          <Text style={s.companyName}>{asset.name}</Text>
-          <View style={s.priceRow}>
-            <Text style={s.price}>{formatARS(asset.price)}</Text>
-            <Pressable>
-              <Ionicons name="open-outline" size={16} color={colors.text.muted} style={{ marginLeft: 6, marginTop: 4 }} />
-            </Pressable>
-          </View>
+        <View style={s.hero}>
+          <Text style={[s.companyName, { color: c.text }]}>{asset.name}</Text>
+          <Text style={[s.price, { color: c.text }]}>{formatARS(asset.price)}</Text>
           <Text style={[s.changeLine, { color: chartColor }]}>
-            {isPositive ? "▲" : "▼"} {sign}{formatARS(changeAmt)} ({sign}{asset.change.toFixed(2)}%) Hoy
+            {isPositive ? "+" : "-"}
+            {formatARS(priceChangeAmount)} ({isPositive ? "+" : ""}
+            {asset.change.toFixed(2)}%) {activeTime === "1D" ? "hoy" : "en " + activeTime.toLowerCase()}
           </Text>
         </View>
 
-        {/* ── Chart area ── */}
         <View style={s.chartArea}>
-          {/* Dotted baseline */}
-          <View style={s.chartBaseline} />
-          {/* Chart line segments */}
-          <View style={s.chartContent}>
-            {(() => {
-              const pts = [40, 38, 42, 50, 48, 55, 52, 58, 55, 62, 58, 65, 60, 68, 72, 70, 66, 74, 70, 75];
-              return pts.map((p, i) => {
-                if (i === 0) return null;
-                const prev = pts[i - 1];
-                const segW = 100 / (pts.length - 1);
-                const minP = Math.min(...pts);
-                const maxP = Math.max(...pts);
-                const range = maxP - minP || 1;
-                const y1 = 100 - ((prev - minP) / range) * 100;
-                const y2 = 100 - ((p - minP) / range) * 100;
-                const midY = (y1 + y2) / 2;
-                return (
-                  <View
-                    key={i}
-                    style={{
-                      position: "absolute",
-                      left: `${(i - 1) * segW}%`,
-                      width: `${segW}%`,
-                      top: `${midY}%`,
-                      height: 2,
-                      backgroundColor: chartColor,
-                      borderRadius: 1,
-                    }}
-                  />
-                );
-              });
-            })()}
+          <View style={[s.chartContent, { borderBottomColor: chartColor }]}>
+            {points.map((point, index) => {
+              if (index === 0) return null;
+              const previous = points[index - 1];
+              const segmentWidth = 100 / (points.length - 1);
+              const minimum = Math.min(...points);
+              const maximum = Math.max(...points);
+              const range = maximum - minimum || 1;
+              const y1 = 100 - ((previous - minimum) / range) * 100;
+              const y2 = 100 - ((point - minimum) / range) * 100;
+
+              return (
+                <View
+                  key={index}
+                  style={{
+                    position: "absolute",
+                    left: `${(index - 1) * segmentWidth}%`,
+                    width: `${segmentWidth}%`,
+                    top: `${(y1 + y2) / 2}%`,
+                    height: 2,
+                    backgroundColor: chartColor,
+                    borderRadius: 999,
+                    transform: [{ rotate: `${Math.atan2(y2 - y1, segmentWidth) * 0.3}rad` }],
+                  }}
+                />
+              );
+            })}
           </View>
-          {/* Fullscreen button */}
-          <Pressable style={s.fullscreenBtn}>
-            <Ionicons name="expand-outline" size={18} color={colors.text.secondary} />
-          </Pressable>
         </View>
 
-        {/* ── Time filters (filled pill for active) ── */}
-        <View style={s.timeFilters}>
-          {timeFilters.map((t) => (
-            <Pressable
-              key={t}
-              style={[s.timeBtn, activeTime === t && s.timeBtnActive]}
-              onPress={() => setActiveTime(t)}
-            >
-              <Text style={[s.timeBtnText, activeTime === t && s.timeBtnTextActive]}>
-                {t}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable style={s.timeBtn}>
-            <Ionicons name="settings-outline" size={16} color={colors.text.muted} />
-          </Pressable>
+        <View style={s.timeRow}>
+          {timeFilters.map((filter) => {
+            const isActive = activeTime === filter;
+            return (
+              <Pressable
+                key={filter}
+                style={[
+                  s.timeButton,
+                  {
+                    backgroundColor: isActive ? chartColor : "transparent",
+                    borderColor: isActive ? chartColor : "transparent",
+                  },
+                ]}
+                onPress={() => setActiveTime(filter)}
+              >
+                <Text style={[s.timeButtonText, { color: isActive ? "#000000" : chartColor }]}>
+                  {filter}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* ── Your position (if held) ── */}
-        {held && qty > 0 && (
-          <>
-            <View style={s.divider} />
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Tu posición</Text>
-              <View style={s.posGrid}>
-                <View style={s.posItem}>
-                  <Text style={s.posLabel}>Cantidad</Text>
-                  <Text style={s.posValue}>{qty}</Text>
-                </View>
-                <View style={s.posItem}>
-                  <Text style={s.posLabel}>Valor de mercado</Text>
-                  <Text style={s.posValue}>{formatARS(marketVal)}</Text>
-                </View>
-                <View style={s.posItem}>
-                  <Text style={s.posLabel}>Costo promedio</Text>
-                  <Text style={s.posValue}>{formatARS(avgCost)}</Text>
-                </View>
-                <View style={s.posItem}>
-                  <Text style={s.posLabel}>Diversif. portfolio</Text>
-                  <View style={s.posDiversity}>
-                    <Text style={s.posValue}>
-                      {(marketVal / 4287430 * 100).toFixed(1)}%
-                    </Text>
-                    <View style={s.miniPie}>
-                      <View style={[s.miniPieSlice, { backgroundColor: colors.text.primary }]} />
-                    </View>
-                  </View>
-                </View>
-                <View style={s.posItemFull}>
-                  <Text style={s.posLabel}>Retorno hoy</Text>
-                  <Text style={[s.posValue, { color: isPositive ? colors.brand[500] : colors.red }]}>
-                    {sign}{formatARS(Math.abs(todayReturn))} ({sign}{asset.change.toFixed(2)}%)
-                  </Text>
-                </View>
-                <View style={s.posItemFull}>
-                  <Text style={s.posLabel}>Retorno total</Text>
-                  <Text style={[s.posValue, { color: totalReturn >= 0 ? colors.brand[500] : colors.red }]}>
-                    {totalReturn >= 0 ? "+" : ""}{formatARS(Math.abs(totalReturn))} ({totalReturn >= 0 ? "+" : ""}{totalReturnPct}%)
-                  </Text>
-                </View>
+        <Pressable
+          style={[s.cashRow, { borderTopColor: c.border, borderBottomColor: c.border }]}
+          onPress={() => router.push("/(app)/cash")}
+        >
+          <Text style={[s.cashLabel, { color: c.text }]}>Efectivo disponible</Text>
+          <View style={s.cashRight}>
+            <Text style={[s.cashValue, { color: c.text }]}>{formatARS(342180)}</Text>
+            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+          </View>
+        </Pressable>
+
+        {held ? (
+          <View style={s.section}>
+            <Text style={[s.sectionTitle, { color: c.text }]}>Tu posicion</Text>
+            <View style={s.positionCard}>
+              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
+                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Tenes</Text>
+                <Text style={[s.positionValue, { color: c.text }]}>{qty} un.</Text>
+              </View>
+              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
+                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Valor actual</Text>
+                <Text style={[s.positionValue, { color: c.text }]}>{formatARS(positionValue)}</Text>
+              </View>
+              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
+                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Costo promedio</Text>
+                <Text style={[s.positionValue, { color: c.text }]}>{formatARS(averageCost)}</Text>
+              </View>
+              <View style={s.positionRow}>
+                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Resultado total</Text>
+                <Text style={[s.positionValue, { color: totalReturn >= 0 ? c.green : c.red }]}>
+                  {totalReturn >= 0 ? "+" : "-"}
+                  {formatARS(Math.abs(totalReturn))} ({totalReturn >= 0 ? "+" : ""}
+                  {totalReturnPct}%)
+                </Text>
               </View>
             </View>
-          </>
-        )}
-
-        {/* ── Recurring investments ── */}
-        <View style={s.divider} />
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Inversiones recurrentes</Text>
-          <Text style={s.sectionBody}>
-            Invertí automáticamente en {asset.ticker} con el calendario que más te convenga.
-          </Text>
-          <Pressable>
-            <Text style={s.greenLink}>
-              Crear inversión recurrente en {asset.ticker}
+            <Text style={[s.positionFootnote, { color: c.textMuted }]}>
+              Representa {portfolioShare}% de tu portfolio.
             </Text>
-          </Pressable>
-        </View>
-
-        {/* ── About company ── */}
-        <View style={s.divider} />
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Acerca de {asset.name}</Text>
-          <Text style={s.aboutText} numberOfLines={showMore ? undefined : 3}>
-            {info.description}
-          </Text>
-          <Pressable onPress={() => setShowMore(!showMore)}>
-            <Text style={s.greenLink}>{showMore ? "Ver menos" : "Ver más"}</Text>
-          </Pressable>
-
-          {/* Company info grid */}
-          <View style={s.infoGrid}>
-            <View style={s.infoItem}>
-              <Text style={s.infoLabel}>CEO</Text>
-              <Text style={s.infoValue}>{info.ceo}</Text>
-            </View>
-            <View style={s.infoItem}>
-              <Text style={s.infoLabel}>Fundada</Text>
-              <Text style={s.infoValue}>{info.founded}</Text>
-            </View>
-            <View style={s.infoItem}>
-              <Text style={s.infoLabel}>Empleados</Text>
-              <Text style={s.infoValue}>{info.employees}</Text>
-            </View>
-            <View style={s.infoItem}>
-              <Text style={s.infoLabel}>Sede</Text>
-              <Text style={s.infoValue}>{info.headquarters}</Text>
+          </View>
+        ) : (
+          <View style={s.section}>
+            <View style={[s.learnCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
+              <Text style={[s.learnTitle, { color: c.text }]}>Todavia no invertiste en este activo</Text>
+              <Text style={[s.learnBody, { color: c.textSecondary }]}>
+                Podes empezar con un monto simple en pesos y sumar despues si te convence.
+              </Text>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* ── Stats ── */}
-        <View style={s.divider} />
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Estadísticas</Text>
-          <View style={s.statsGrid}>
-            {stats.map((stat) => (
-              <View key={stat.label} style={s.statItem}>
-                <Text style={s.statLabel}>{stat.label}</Text>
-                <Text style={s.statValue}>{stat.value}</Text>
+          <Text style={[s.sectionTitle, { color: c.text }]}>Lo importante</Text>
+          <Text style={[s.description, { color: c.textSecondary }]}>{info.description}</Text>
+          <View style={s.statsRow}>
+            {statCards.map((stat) => (
+              <View
+                key={stat.label}
+                style={[s.statCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+              >
+                <Text style={[s.statLabel, { color: c.textMuted }]}>{stat.label}</Text>
+                <Text style={[s.statValue, { color: c.text }]}>{stat.value}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* ── People also own ── */}
-        <View style={s.divider} />
         <View style={s.section}>
-          <Text style={s.sectionTitle}>También invierten en</Text>
-          <Text style={s.sectionBodySm}>
-            Basado en los portfolios de inversores que tienen {asset.ticker}. No es una recomendación de inversión.
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.alsoOwnScroll}
-          >
-            {alsoOwn.map((item) => {
-              const isUp = item.change >= 0;
+          <Text style={[s.sectionTitle, { color: c.text }]}>Tambien miran</Text>
+          <View style={s.relatedList}>
+            {related.map((item) => {
+              if (!item) return null;
+              const up = item.change >= 0;
+
               return (
                 <Pressable
                   key={item.ticker}
-                  style={s.alsoOwnCard}
+                  style={[s.relatedRow, { borderBottomColor: c.border }]}
                   onPress={() => router.push({ pathname: "/(app)/detail", params: { ticker: item.ticker } })}
                 >
-                  <Text style={s.alsoOwnName} numberOfLines={2}>{item.name}</Text>
-                  <View style={s.alsoOwnBottom}>
-                    <Text style={[s.alsoOwnTicker, { color: isUp ? colors.brand[500] : colors.red }]}>
-                      {item.ticker}
-                    </Text>
-                    <Text style={[s.alsoOwnChange, { color: isUp ? colors.brand[500] : colors.red }]}>
-                      {isUp ? "+" : ""}{item.change.toFixed(2)}%
-                    </Text>
+                  <View>
+                    <Text style={[s.relatedTicker, { color: c.text }]}>{item.ticker}</Text>
+                    <Text style={[s.relatedName, { color: c.textSecondary }]}>{item.name}</Text>
                   </View>
+                  <Text style={[s.relatedChange, { color: up ? c.green : c.red }]}>
+                    {up ? "+" : ""}
+                    {item.change.toFixed(2)}%
+                  </Text>
                 </Pressable>
               );
             })}
-          </ScrollView>
-        </View>
-
-        {/* ── Disclaimer ── */}
-        <View style={s.disclaimerSection}>
-          <Text style={s.disclaimerText}>
-            Todas las inversiones implican riesgo, incluyendo la posible pérdida del capital invertido. Valores negociables ofrecidos a través de Álamos Capital S.A., agente registrado ante la CNV. Divulgación completa.
-          </Text>
+          </View>
         </View>
       </ScrollView>
 
-      {/* ── Floating bottom bar ── */}
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
-        <View style={s.bottomBarLeft}>
-          <Text style={s.volumeLabel}>Volumen hoy</Text>
-          <Text style={s.volumeValue}>{vol.toLocaleString("es-AR")}</Text>
-        </View>
-        <Pressable style={s.tradeBtn} onPress={() => setTradeVisible(true)}>
-          <Text style={s.tradeBtnText}>Operar</Text>
+      <View
+        style={[
+          s.bottomBar,
+          {
+            backgroundColor: c.bg,
+            borderTopColor: c.border,
+            paddingBottom: insets.bottom + 8,
+          },
+        ]}
+      >
+        <Pressable
+          style={[s.secondaryButton, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+          onPress={() => router.push("/(app)/explore")}
+        >
+          <Text style={[s.secondaryButtonText, { color: c.text }]}>Explorar</Text>
+        </Pressable>
+        <Pressable
+          style={[s.primaryButton, { backgroundColor: chartColor }]}
+          onPress={() => setShowTradeSheet(true)}
+        >
+          <Text style={s.primaryButtonText}>{held ? "Operar" : "Comprar"}</Text>
         </Pressable>
       </View>
 
-      {/* ── Trade action sheet ── */}
       <Modal
-        visible={tradeVisible}
+        visible={showTradeSheet}
         transparent
         animationType="slide"
-        onRequestClose={() => setTradeVisible(false)}
+        onRequestClose={() => setShowTradeSheet(false)}
       >
-        <Pressable style={s.overlay} onPress={() => setTradeVisible(false)} />
-        <View style={[s.tradeSheet, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable style={s.overlay} onPress={() => setShowTradeSheet(false)} />
+        <View style={[s.sheet, { backgroundColor: c.surfaceRaised, paddingBottom: insets.bottom + 16 }]}>
+          <Text style={[s.sheetTitle, { color: c.text }]}>{asset.ticker}</Text>
           <Pressable
-            style={s.tradeSheetBtn}
+            style={[s.sheetButton, { backgroundColor: c.green }]}
             onPress={() => {
-              setTradeVisible(false);
-              router.push({ pathname: "/(app)/options", params: { ticker: asset.ticker } });
-            }}
-          >
-            <Text style={s.tradeSheetBtnText}>Operar opciones</Text>
-          </Pressable>
-          {held && qty > 0 && (
-            <Pressable
-              style={s.tradeSheetBtn}
-              onPress={() => {
-                setTradeVisible(false);
-                router.push({ pathname: "/(app)/buy", params: { ticker: asset.ticker, mode: "sell" } });
-              }}
-            >
-              <Text style={s.tradeSheetBtnText}>Vender</Text>
-            </Pressable>
-          )}
-          <Pressable
-            style={s.tradeSheetBtn}
-            onPress={() => {
-              setTradeVisible(false);
+              setShowTradeSheet(false);
               router.push({ pathname: "/(app)/buy", params: { ticker: asset.ticker, mode: "buy" } });
             }}
           >
-            <Text style={s.tradeSheetBtnText}>Comprar</Text>
+            <Text style={s.sheetPrimaryText}>Comprar</Text>
           </Pressable>
-          <Pressable
-            style={s.tradeSheetCancel}
-            onPress={() => setTradeVisible(false)}
-          >
-            <Ionicons name="close" size={24} color={colors.text.primary} />
+          {held ? (
+            <Pressable
+              style={[s.sheetButton, { backgroundColor: c.surfaceHover, borderColor: c.border, borderWidth: 1 }]}
+              onPress={() => {
+                setShowTradeSheet(false);
+                router.push({ pathname: "/(app)/buy", params: { ticker: asset.ticker, mode: "sell" } });
+              }}
+            >
+              <Text style={[s.sheetSecondaryText, { color: c.text }]}>Vender</Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={s.sheetClose} onPress={() => setShowTradeSheet(false)}>
+            <Ionicons name="close" size={22} color={c.text} />
           </Pressable>
         </View>
       </Modal>
@@ -467,387 +394,273 @@ export default function DetailScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Header */
-  header: {
+  container: {
+    flex: 1,
+  },
+  fixedTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
-  backBtn: {
-    width: 44,
-    height: 44,
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerCenter: {
+  headerTitleWrap: {
     alignItems: "center",
   },
-  headerPrice: {
+  headerTicker: {
     fontSize: 15,
     fontWeight: "700",
-    color: colors.text.primary,
   },
-  headerTicker: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    fontWeight: "500",
+  headerName: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  headerRight: {
-    flexDirection: "row",
-    gap: 16,
-  },
-
-  /* Price section */
-  priceSection: {
+  hero: {
     paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  tickerLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    fontWeight: "500",
-    marginBottom: 2,
+    paddingTop: 8,
   },
   companyName: {
     fontSize: 30,
-    fontWeight: "300",
-    color: colors.text.primary,
+    fontWeight: "500",
     letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  price: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -1,
-  },
-  changeLine: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  /* Chart */
-  chartArea: {
-    height: 240,
-    paddingHorizontal: 4,
-    marginTop: 12,
-    position: "relative",
-    justifyContent: "center",
-  },
-  chartBaseline: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: "50%",
-    height: 1,
-    borderStyle: "dashed",
-    borderWidth: 0.5,
-    borderColor: colors.text.muted,
-    opacity: 0.3,
-  },
-  chartContent: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: 20,
-    bottom: 20,
-  },
-  fullscreenBtn: {
-    position: "absolute",
-    right: 20,
-    top: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  /* Time filters */
-  timeFilters: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 4,
-  },
-  timeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: "center",
-  },
-  timeBtnActive: {
-    backgroundColor: colors.surface[200],
-  },
-  timeBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text.muted,
-  },
-  timeBtnTextActive: {
-    color: colors.text.primary,
-  },
-
-  /* Shared section */
-  divider: {
-    height: 6,
-    backgroundColor: colors.surface[100],
-    marginVertical: 4,
-  },
-  section: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.3,
-    marginBottom: 14,
-  },
-  sectionBody: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 22,
     marginBottom: 10,
   },
-  sectionBodySm: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 19,
-    marginBottom: 14,
+  price: {
+    fontSize: 42,
+    fontWeight: "800",
+    letterSpacing: -1.6,
   },
-  greenLink: {
-    fontSize: 14,
+  changeLine: {
+    fontSize: 15,
     fontWeight: "700",
-    color: colors.brand[500],
-    marginTop: 6,
+    marginTop: 8,
   },
-
-  /* Your position */
-  posGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  chartArea: {
+    height: 290,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    marginTop: 12,
   },
-  posItem: {
-    width: "50%",
-    paddingVertical: 12,
+  chartContent: {
+    height: 240,
+    position: "relative",
+    borderBottomWidth: 0,
   },
-  posItemFull: {
-    width: "100%",
+  timeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  timeButton: {
+    minWidth: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
     alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    justifyContent: "center",
+    borderWidth: 1,
   },
-  posLabel: {
+  timeButtonText: {
     fontSize: 13,
-    color: colors.text.secondary,
-    marginBottom: 4,
+    fontWeight: "800",
   },
-  posValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text.primary,
+  cashRow: {
+    marginHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
   },
-  posDiversity: {
+  cashLabel: {
+    fontSize: 17,
+    fontWeight: "500",
+  },
+  cashRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  miniPie: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.surface[200],
+  cashValue: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.6,
+    marginBottom: 14,
+  },
+  positionCard: {
+    borderRadius: 22,
     overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
   },
-  miniPieSlice: {
-    width: 18,
-    height: 9,
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    position: "absolute",
-    top: 0,
-  },
-
-  /* About */
-  aboutText: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  infoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 20,
-  },
-  infoItem: {
-    width: "50%",
-    paddingVertical: 10,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-
-  /* Stats */
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  statItem: {
-    width: "50%",
+  positionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingRight: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  positionLabel: {
+    fontSize: 14,
+  },
+  positionValue: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  positionFootnote: {
+    fontSize: 13,
+    marginTop: 10,
+  },
+  learnCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+  },
+  learnTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  learnBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
   },
   statLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
+    fontSize: 12,
+    marginBottom: 6,
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
-    color: colors.text.primary,
   },
-
-  /* People also own */
-  alsoOwnScroll: {
-    gap: 12,
-  },
-  alsoOwnCard: {
-    width: 160,
-    backgroundColor: colors.surface[100],
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
+  relatedList: {},
+  relatedRow: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 120,
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  alsoOwnName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
-    marginBottom: 12,
+  relatedTicker: {
+    fontSize: 15,
+    fontWeight: "700",
   },
-  alsoOwnBottom: {},
-  alsoOwnTicker: {
+  relatedName: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  relatedChange: {
     fontSize: 14,
     fontWeight: "700",
-    marginBottom: 2,
   },
-  alsoOwnChange: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  /* Disclaimer */
-  disclaimerSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: colors.text.muted,
-    lineHeight: 18,
-  },
-
-  /* Floating bottom bar */
   bottomBar: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.surface[0],
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: 20,
+    bottom: 0,
     paddingTop: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
   },
-  bottomBarLeft: {},
-  volumeLabel: {
-    fontSize: 14,
+  secondaryButton: {
+    width: 92,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 15,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
     fontWeight: "700",
-    color: colors.text.primary,
   },
-  volumeValue: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 2,
+  primaryButton: {
+    flex: 1,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 15,
   },
-  tradeBtn: {
-    backgroundColor: colors.brand[500],
-    borderRadius: 28,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
+  primaryButtonText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: "800",
   },
-  tradeBtnText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#000",
-  },
-
-  /* Trade action sheet */
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
-  tradeSheet: {
-    backgroundColor: colors.surface[100],
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
     paddingTop: 20,
     gap: 10,
   },
-  tradeSheetBtn: {
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  sheetButton: {
     height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.brand[500],
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  tradeSheetBtnText: {
+  sheetPrimaryText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  sheetSecondaryText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#000",
   },
-  tradeSheetCancel: {
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: colors.border,
+  sheetClose: {
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },

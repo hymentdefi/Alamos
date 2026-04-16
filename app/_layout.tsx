@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View, Image, StyleSheet, Animated } from "react-native";
+import { View, StyleSheet, Animated } from "react-native";
 import { AuthProvider, useAuth } from "../lib/auth/context";
-import { colors } from "../lib/theme";
+import { ThemeContext, themes, type ThemeMode } from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   const scale = useState(new Animated.Value(0.8))[0];
@@ -65,18 +65,28 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
+  const [mode, setMode] = useState<ThemeMode>("dark");
+
+  const themeValue = useMemo(() => ({
+    mode,
+    c: themes[mode],
+    toggle: () => setMode((m) => (m === "dark" ? "light" : "dark")),
+  }), [mode]);
+
   return (
-    <AuthProvider>
-      <StatusBar style="light" />
-      <AuthGate />
-    </AuthProvider>
+    <ThemeContext.Provider value={themeValue}>
+      <AuthProvider>
+        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+        <AuthGate />
+      </AuthProvider>
+    </ThemeContext.Provider>
   );
 }
 
 const splash = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface[0],
+    backgroundColor: "#000000",
     alignItems: "center",
     justifyContent: "center",
   },

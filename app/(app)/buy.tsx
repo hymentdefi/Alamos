@@ -1,87 +1,91 @@
 import { useState } from "react";
 import {
-  View, Text, Pressable, Modal, StyleSheet,
+  View,
+  Text,
+  Pressable,
+  Modal,
+  StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
+import { useTheme } from "../../lib/theme";
 
-const AVAILABLE = 342180;
+const AVAILABLE_CASH = 342180;
+
+const recurringOptions = [
+  { key: "once", label: "Una vez", hint: "Compra unica" },
+  { key: "weekly", label: "Semanal", hint: "Todos los lunes" },
+  { key: "monthly", label: "Mensual", hint: "El dia 1" },
+] as const;
 
 export default function BuyScreen() {
   const { ticker, mode } = useLocalSearchParams<{ ticker: string; mode?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
+  const asset = assets.find((item) => item.ticker === ticker);
   const isSell = mode === "sell";
-  const asset = assets.find((a) => a.ticker === ticker);
-  if (!asset) return null;
-
-  const heldValue = asset.held ? asset.price * (asset.qty || 1) : 0;
-  const available = isSell ? heldValue : AVAILABLE;
 
   const [amount, setAmount] = useState("0");
-  const [showFreq, setShowFreq] = useState(false);
-  const [frequency, setFrequency] = useState("once");
+  const [frequency, setFrequency] = useState<(typeof recurringOptions)[number]["key"]>("once");
+  const [showFrequency, setShowFrequency] = useState(false);
 
-  const numericAmount = parseFloat(amount) || 0;
-  const hasAmount = numericAmount > 0;
-  const exceedsAvailable = numericAmount > available;
+  if (!asset) return null;
 
-  /* Quick amount suggestions */
+  const available = isSell ? asset.price * (asset.qty || 0) : AVAILABLE_CASH;
+  const parsedAmount = Number.parseFloat(amount) || 0;
+  const hasAmount = parsedAmount > 0;
+  const exceedsAvailable = parsedAmount > available;
+  const estimatedUnits = parsedAmount > 0 ? parsedAmount / asset.price : 0;
+
   const quickAmounts = isSell
     ? [
-        { label: formatARS(Math.round(available * 0.25)), value: Math.round(available * 0.25) },
-        { label: formatARS(Math.round(available * 0.5)), value: Math.round(available * 0.5) },
-        { label: "Vender todo", value: available },
+        { label: "25%", value: Math.round(available * 0.25) },
+        { label: "50%", value: Math.round(available * 0.5) },
+        { label: "Todo", value: Math.round(available) },
       ]
     : [
-        { label: formatARS(1000), value: 1000 },
-        { label: formatARS(10000), value: 10000 },
+        { label: formatARS(5000), value: 5000 },
+        { label: formatARS(20000), value: 20000 },
         { label: formatARS(100000), value: 100000 },
       ];
 
-  const freqLabels: Record<string, string> = {
-    once: "Una vez",
-    daily: "Diario",
-    weekly: "Semanal",
-    biweekly: "Quincenal",
-    monthly: "Mensual",
-  };
+  const selectedFrequency = recurringOptions.find((option) => option.key === frequency);
+  const primaryColor = isSell ? c.red : c.green;
 
-  /* Numpad handler */
   const handleKey = (key: string) => {
     if (key === "back") {
-      setAmount((prev) => {
-        const next = prev.slice(0, -1);
+      setAmount((previous) => {
+        const next = previous.slice(0, -1);
         return next.length === 0 ? "0" : next;
       });
       return;
     }
+
     if (key === ".") {
       if (amount.includes(".")) return;
-      setAmount((prev) => prev + ".");
+      setAmount((previous) => previous + ".");
       return;
     }
-    setAmount((prev) => {
-      if (prev === "0") return key;
-      if (prev.includes(".") && prev.split(".")[1].length >= 2) return prev;
-      return prev + key;
+
+    setAmount((previous) => {
+      if (previous === "0") return key;
+      if (previous.includes(".") && previous.split(".")[1].length >= 2) return previous;
+      return previous + key;
     });
   };
 
-  const handleQuick = (value: number) => {
-    setAmount(String(value));
-  };
+  const handleContinue = () => {
+    if (!hasAmount || exceedsAvailable) return;
 
-  const handleReview = () => {
     router.push({
       pathname: "/(app)/confirm",
       params: {
         ticker: asset.ticker,
-        amount: String(numericAmount),
+        amount: String(parsedAmount),
         mode: isSell ? "sell" : "buy",
         frequency,
       },
@@ -89,144 +93,184 @@ export default function BuyScreen() {
   };
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="close" size={24} color={colors.text.primary} />
-        </Pressable>
-        <Pressable style={s.currencyBtn}>
-          <Text style={s.currencyText}>ARS</Text>
-          <Ionicons name="chevron-down" size={14} color={colors.text.primary} />
-        </Pressable>
-      </View>
-
-      {/* ── Amount display ── */}
-      <View style={s.amountArea}>
-        <View style={s.amountRow}>
-          <Text style={s.amountSign}>$</Text>
-          <Text style={s.amountValue}>{amount === "0" ? "0" : Number(amount).toLocaleString("es-AR")}</Text>
-        </View>
-
-        {/* Frequency picker */}
-        {!isSell && (
-          <Pressable style={s.freqPill} onPress={() => setShowFreq(true)}>
-            <Text style={s.freqText}>{freqLabels[frequency]}</Text>
-            <Ionicons name="chevron-down" size={14} color={colors.text.primary} />
+    <View style={[s.container, { backgroundColor: c.bg }]}>
+      <View
+        style={[
+          s.fixedTop,
+          {
+            backgroundColor: c.bg,
+            paddingTop: insets.top + 8,
+          },
+        ]}
+      >
+        <View style={s.header}>
+          <Pressable
+            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="close" size={20} color={c.text} />
           </Pressable>
-        )}
-      </View>
-
-      {/* ── Bottom section ── */}
-      <View style={[s.bottomSection, { paddingBottom: insets.bottom + 8 }]}>
-        {/* Available */}
-        <View style={s.availableRow}>
-          <Text style={s.availableText}>
-            {isSell ? "Tenés" : "Disponible"}: {formatARS(available)}
-          </Text>
-          <Pressable>
-            <Ionicons name="information-circle-outline" size={16} color={colors.text.muted} />
-          </Pressable>
-        </View>
-
-        {/* Quick amounts or Review button */}
-        {hasAmount && !exceedsAvailable ? (
-          <Pressable style={s.reviewBtn} onPress={handleReview}>
-            <Text style={s.reviewBtnText}>Revisar</Text>
-          </Pressable>
-        ) : (
-          <View style={s.quickRow}>
-            {quickAmounts.map((q) => (
-              <Pressable
-                key={q.label}
-                style={s.quickBtn}
-                onPress={() => handleQuick(q.value)}
-              >
-                <Text style={s.quickBtnText}>{q.label}</Text>
-              </Pressable>
-            ))}
+          <View style={s.headerCenter}>
+            <Text style={[s.headerTitle, { color: c.text }]}>
+              {isSell ? "Vender" : "Comprar"} {asset.ticker}
+            </Text>
+            <Text style={[s.headerSubtitle, { color: c.textSecondary }]}>{asset.name}</Text>
           </View>
-        )}
+          <View style={s.headerGhost} />
+        </View>
+      </View>
 
-        {exceedsAvailable && (
-          <Text style={s.errorText}>El monto supera tu saldo disponible</Text>
-        )}
+      <View style={[s.content, { paddingTop: insets.top + 88, paddingBottom: insets.bottom + 12 }]}>
+        <View style={s.hero}>
+          <Text style={[s.heroLabel, { color: c.textSecondary }]}>
+            {isSell ? "Cuanto queres vender" : "Cuanto queres invertir"}
+          </Text>
+          <View style={s.amountRow}>
+            <Text style={[s.amountSign, { color: c.textMuted }]}>$</Text>
+            <Text style={[s.amountValue, { color: c.text }]}>
+              {amount === "0" ? "0" : Number(amount).toLocaleString("es-AR")}
+            </Text>
+          </View>
+          <Text style={[s.estimate, { color: c.textSecondary }]}>
+            {hasAmount ? `≈ ${estimatedUnits.toFixed(4)} unidades` : "Elegi un monto en pesos"}
+          </Text>
+        </View>
 
-        {/* Number pad */}
-        <View style={s.numpad}>
+        <View style={s.chipsRow}>
+          {quickAmounts.map((option) => (
+            <Pressable
+              key={option.label}
+              style={[s.quickChip, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+              onPress={() => setAmount(String(option.value))}
+            >
+              <Text style={[s.quickChipText, { color: c.text }]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {!isSell ? (
+          <Pressable
+            style={[s.frequencyRow, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
+            onPress={() => setShowFrequency(true)}
+          >
+            <View>
+              <Text style={[s.frequencyLabel, { color: c.textSecondary }]}>Frecuencia</Text>
+              <Text style={[s.frequencyValue, { color: c.text }]}>{selectedFrequency?.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+          </Pressable>
+        ) : null}
+
+        <View style={[s.summaryCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
+          <View style={[s.summaryRow, { borderBottomColor: c.border }]}>
+            <Text style={[s.summaryLabel, { color: c.textSecondary }]}>
+              {isSell ? "Tenes disponible" : "Disponible para invertir"}
+            </Text>
+            <Text style={[s.summaryValue, { color: c.text }]}>{formatARS(available)}</Text>
+          </View>
+          <View style={s.summaryRow}>
+            <Text style={[s.summaryLabel, { color: c.textSecondary }]}>Precio estimado</Text>
+            <Text style={[s.summaryValue, { color: c.text }]}>{formatARS(asset.price)}</Text>
+          </View>
+        </View>
+
+        {exceedsAvailable ? (
+          <Text style={[s.errorText, { color: c.red }]}>
+            El monto supera lo que tenes disponible.
+          </Text>
+        ) : null}
+
+        <View style={s.keypad}>
           {[
             ["1", "2", "3"],
             ["4", "5", "6"],
             ["7", "8", "9"],
             [".", "0", "back"],
-          ].map((row, ri) => (
-            <View key={ri} style={s.numpadRow}>
+          ].map((row, rowIndex) => (
+            <View key={rowIndex} style={s.keypadRow}>
               {row.map((key) => (
                 <Pressable
                   key={key}
-                  style={s.numpadKey}
+                  style={s.keypadKey}
                   onPress={() => handleKey(key)}
                 >
                   {key === "back" ? (
-                    <Ionicons name="backspace-outline" size={26} color={colors.text.primary} />
+                    <Ionicons name="backspace-outline" size={24} color={c.text} />
                   ) : (
-                    <Text style={s.numpadKeyText}>{key}</Text>
+                    <Text style={[s.keypadKeyText, { color: c.text }]}>{key}</Text>
                   )}
                 </Pressable>
               ))}
             </View>
           ))}
         </View>
+
+        <View style={s.footer}>
+          <Pressable
+            style={[
+              s.continueButton,
+              {
+                backgroundColor: hasAmount && !exceedsAvailable ? primaryColor : c.surfaceHover,
+              },
+            ]}
+            onPress={handleContinue}
+            disabled={!hasAmount || exceedsAvailable}
+          >
+            <Text
+              style={[
+                s.continueButtonText,
+                { color: hasAmount && !exceedsAvailable ? "#000000" : c.textMuted },
+              ]}
+            >
+              Revisar
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* ── Frequency modal ── */}
       <Modal
-        visible={showFreq}
+        visible={showFrequency}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowFreq(false)}
+        onRequestClose={() => setShowFrequency(false)}
       >
-        <Pressable style={s.overlay} onPress={() => setShowFreq(false)} />
-        <View style={[s.freqSheet, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={s.freqSheetHeader}>
-            <Pressable onPress={() => setShowFreq(false)}>
-              <Ionicons name="close" size={24} color={colors.text.primary} />
-            </Pressable>
-          </View>
-
-          <Text style={s.freqSheetTitle}>Elegí la frecuencia</Text>
-          <Text style={s.freqSheetSub}>Empieza el próximo día hábil</Text>
-
-          {[
-            { key: "once", label: "Una vez", desc: "" },
-            { key: "daily", label: "Todos los días", desc: "Lunes a viernes" },
-            { key: "weekly", label: "Cada semana", desc: "Los lunes" },
-            { key: "biweekly", label: "Cada dos semanas", desc: "Los lunes" },
-            { key: "monthly", label: "Cada mes", desc: "El día 1" },
-          ].map((opt) => (
-            <Pressable
-              key={opt.key}
-              style={s.freqOption}
-              onPress={() => {
-                setFrequency(opt.key);
-                setShowFreq(false);
-              }}
-            >
-              <View style={s.freqOptionInfo}>
-                <Text style={s.freqOptionLabel}>{opt.label}</Text>
-                {opt.desc ? <Text style={s.freqOptionDesc}>{opt.desc}</Text> : null}
-              </View>
-              <View style={[s.freqRadio, frequency === opt.key && s.freqRadioActive]}>
-                {frequency === opt.key && <View style={s.freqRadioDot} />}
-              </View>
-            </Pressable>
-          ))}
-
-          <Pressable
-            style={[s.freqContinueBtn, { opacity: 1 }]}
-            onPress={() => setShowFreq(false)}
-          >
-            <Text style={s.freqContinueText}>Continuar</Text>
+        <Pressable style={s.overlay} onPress={() => setShowFrequency(false)} />
+        <View
+          style={[
+            s.sheet,
+            {
+              backgroundColor: c.surfaceRaised,
+              paddingBottom: insets.bottom + 16,
+            },
+          ]}
+        >
+          <Text style={[s.sheetTitle, { color: c.text }]}>Elegi la frecuencia</Text>
+          {recurringOptions.map((option) => {
+            const isActive = option.key === frequency;
+            return (
+              <Pressable
+                key={option.key}
+                style={[s.sheetOption, { borderBottomColor: c.border }]}
+                onPress={() => {
+                  setFrequency(option.key);
+                  setShowFrequency(false);
+                }}
+              >
+                <View>
+                  <Text style={[s.sheetOptionTitle, { color: c.text }]}>{option.label}</Text>
+                  <Text style={[s.sheetOptionHint, { color: c.textSecondary }]}>{option.hint}</Text>
+                </View>
+                <View
+                  style={[
+                    s.radio,
+                    { borderColor: isActive ? c.green : c.border, backgroundColor: isActive ? c.green : "transparent" },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+          <Pressable style={s.sheetClose} onPress={() => setShowFrequency(false)}>
+            <Ionicons name="close" size={22} color={c.text} />
           </Pressable>
         </View>
       </Modal>
@@ -235,223 +279,210 @@ export default function BuyScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Header */
+  container: {
+    flex: 1,
+  },
+  fixedTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
   header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
-  currencyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  currencyText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text.primary,
-  },
-
-  /* Amount */
-  amountArea: {
-    flex: 1,
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerCenter: {
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  headerGhost: {
+    width: 38,
+    height: 38,
+  },
+  content: {
+    flex: 1,
     paddingHorizontal: 20,
+  },
+  hero: {
+    alignItems: "center",
+    marginTop: 16,
+  },
+  heroLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 12,
   },
   amountRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
   amountSign: {
-    fontSize: 32,
-    fontWeight: "300",
-    color: colors.text.secondary,
+    fontSize: 34,
     marginTop: 12,
     marginRight: 4,
   },
   amountValue: {
-    fontSize: 72,
-    fontWeight: "700",
-    color: colors.text.primary,
-    letterSpacing: -2,
+    fontSize: 68,
+    fontWeight: "800",
+    letterSpacing: -2.2,
   },
-  freqPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.surface[200],
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 12,
-  },
-  freqText: {
+  estimate: {
     fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
+    marginTop: 8,
   },
-
-  /* Bottom */
-  bottomSection: {
-    paddingHorizontal: 20,
-  },
-  availableRow: {
+  chipsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
+    gap: 8,
+    marginTop: 22,
     marginBottom: 14,
   },
-  availableText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  errorText: {
-    fontSize: 13,
-    color: colors.red,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-
-  /* Quick amounts */
-  quickRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  quickBtn: {
+  quickChip: {
     flex: 1,
-    height: 44,
-    borderRadius: 22,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.text.primary,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  quickBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-
-  /* Review button */
-  reviewBtn: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.text.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  reviewBtnText: {
-    fontSize: 16,
+  quickChipText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: colors.surface[0],
   },
-
-  /* Numpad */
-  numpad: {
-    gap: 4,
-  },
-  numpadRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  numpadKey: {
-    flex: 1,
-    height: 60,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  numpadKeyText: {
-    fontSize: 28,
-    fontWeight: "400",
-    color: colors.text.primary,
-  },
-
-  /* Overlay */
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-
-  /* Frequency sheet */
-  freqSheet: {
-    backgroundColor: colors.surface[0],
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  freqSheetHeader: {
-    marginBottom: 16,
-  },
-  freqSheetTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  freqSheetSub: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: 24,
-  },
-  freqOption: {
+  frequencyRow: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginBottom: 12,
   },
-  freqOptionInfo: {},
-  freqOptionLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text.primary,
+  frequencyLabel: {
+    fontSize: 12,
+    marginBottom: 4,
   },
-  freqOptionDesc: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  freqRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.text.muted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  freqRadioActive: {
-    borderColor: colors.text.primary,
-  },
-  freqRadioDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.text.primary,
-  },
-  freqContinueBtn: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surface[200],
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 24,
-  },
-  freqContinueText: {
-    fontSize: 16,
+  frequencyValue: {
+    fontSize: 15,
     fontWeight: "700",
-    color: colors.text.primary,
+  },
+  summaryCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  summaryLabel: {
+    fontSize: 14,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  errorText: {
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 12,
+  },
+  keypad: {
+    marginTop: 18,
+    gap: 6,
+  },
+  keypadRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  keypadKey: {
+    width: "33%",
+    height: 58,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keypadKeyText: {
+    fontSize: 30,
+    fontWeight: "500",
+  },
+  footer: {
+    marginTop: "auto",
+    paddingTop: 8,
+  },
+  continueButton: {
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+  },
+  continueButtonText: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  sheetOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetOptionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  sheetOptionHint: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  sheetClose: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 48,
+    marginTop: 6,
   },
 });

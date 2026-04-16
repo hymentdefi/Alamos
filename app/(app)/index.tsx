@@ -1,648 +1,429 @@
-import { useState } from "react";
-import {
-  View, Text, ScrollView, Pressable, StyleSheet,
-} from "react-native";
-import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme } from "../../lib/theme";
 import { assets, formatARS, type Asset } from "../../lib/data/assets";
+import { useAuth } from "../../lib/auth/context";
 
 const heldAssets = assets.filter((a) => a.held);
-const totalBalance = 4287430;
-const buyingPower = 342180;
+const cashBalance = 342180;
 
-const timeFilters = ["1D", "1S", "1M", "3M", "YTD", "1A", "MAX"];
-const timeLabels: Record<string, string> = {
-  "1D": "Hoy", "1S": "Última semana", "1M": "Último mes",
-  "3M": "Últimos 3 meses", "YTD": "Este año", "1A": "Último año", "MAX": "Histórico",
-};
+const activityItems = [
+  { id: "1", icon: "shopping-cart" as const, title: "Compra GGAL", date: "Hoy, 14:32", amount: -85400, status: "Ejecutada" },
+  { id: "2", icon: "arrow-down-left" as const, title: "Ingreso transferencia", date: "Ayer, 10:15", amount: 250000, status: "Acreditado" },
+  { id: "3", icon: "shopping-cart" as const, title: "Compra AL30", date: "14 abr, 09:45", amount: -120000, status: "Ejecutada" },
+  { id: "4", icon: "arrow-up-right" as const, title: "Venta YPFD", date: "12 abr, 16:20", amount: 94500, status: "Ejecutada" },
+];
 
-const changeByTime: Record<string, { amount: number; pct: number }> = {
-  "1D": { amount: 127650, pct: 3.07 },
-  "1S": { amount: 89430, pct: 2.13 },
-  "1M": { amount: -156200, pct: -3.52 },
-  "3M": { amount: 412300, pct: 10.63 },
-  "YTD": { amount: 287100, pct: 7.17 },
-  "1A": { amount: 1023400, pct: 31.35 },
-  "MAX": { amount: 1287430, pct: 42.93 },
-};
+const timeFilters = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 
-/* Generate fake chart points per period */
-function generateChartPoints(period: string): number[] {
-  const seeds: Record<string, number[]> = {
-    "1D":  [40, 42, 38, 44, 50, 48, 52, 55, 53, 58, 60, 56, 62, 65, 63, 68, 70, 66, 72, 75],
-    "1S":  [50, 48, 45, 47, 52, 55, 50, 48, 53, 58, 62, 60, 57, 55, 58, 63, 65, 60, 58, 62],
-    "1M":  [70, 68, 65, 60, 55, 52, 48, 50, 45, 42, 40, 38, 42, 45, 40, 38, 35, 40, 42, 38],
-    "3M":  [30, 35, 40, 38, 45, 50, 55, 52, 58, 62, 65, 60, 68, 72, 70, 75, 78, 74, 80, 82],
-    "YTD": [40, 45, 50, 48, 55, 52, 58, 62, 60, 65, 68, 64, 70, 72, 68, 75, 78, 74, 72, 76],
-    "1A":  [25, 30, 35, 40, 38, 45, 50, 55, 58, 52, 60, 65, 70, 68, 72, 75, 80, 78, 82, 85],
-    "MAX": [10, 15, 20, 18, 25, 30, 35, 40, 38, 45, 50, 55, 52, 60, 65, 70, 75, 72, 80, 85],
-  };
-  return seeds[period] || seeds["1D"];
+function getGreetingOptions() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return ["Buen dia", "Hola"];
+  if (hour < 19) return ["Buenas tardes", "Hola"];
+  return ["Buenas noches", "Hola", "Cerrando el dia"];
+}
+
+function QuickAction({
+  icon,
+  label,
+  onPress,
+  iconBg,
+  iconColor,
+  textColor,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+  iconBg: string;
+  iconColor: string;
+  textColor: string;
+}) {
+  return (
+    <Pressable style={s.quickAction} onPress={onPress}>
+      <View style={[s.quickActionIcon, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={20} color={iconColor} />
+      </View>
+      <Text style={[s.quickActionText, { color: textColor }]}>{label}</Text>
+    </Pressable>
+  );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeTime, setActiveTime] = useState("1D");
+  const { c } = useTheme();
+  const { user } = useAuth();
+  const [hideBalance, setHideBalance] = useState(false);
+  const [greeting, setGreeting] = useState("Hola");
 
-  const change = changeByTime[activeTime];
-  const isPositive = change.pct >= 0;
-  const chartColor = isPositive ? colors.brand[500] : colors.red;
-  const points = generateChartPoints(activeTime);
+  const firstName = user?.fullName?.split(" ")[0] || "Chris";
+
+  useFocusEffect(
+    useCallback(() => {
+      const options = getGreetingOptions();
+      setGreeting(options[Math.floor(Math.random() * options.length)]);
+    }, [])
+  );
 
   const openDetail = (asset: Asset) => {
     router.push({ pathname: "/(app)/detail", params: { ticker: asset.ticker } });
   };
 
   return (
-    <ScrollView
-      style={s.container}
-      contentContainerStyle={{ paddingBottom: 100 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ── Top bar ── */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={{ flex: 1 }} />
-        <View style={s.topBarRight}>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.fixedTop, { backgroundColor: c.bg, paddingTop: insets.top + 16 }]}>
+        <View style={s.topBar}>
+          <Text style={[s.greeting, { color: c.text }]}>
+            {greeting}, {firstName}
+          </Text>
           <Pressable
-            onPress={() => router.push("/(app)/explore")}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="search" size={24} color={colors.text.primary} />
-          </Pressable>
-          <Pressable
+            style={[s.iconButton, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
             onPress={() => router.push("/(app)/notifications")}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={12}
           >
-            <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
+            <Feather name="bell" size={18} color={c.text} />
           </Pressable>
         </View>
       </View>
 
-      {/* ── Portfolio value ── */}
-      <View style={s.valueSection}>
-        <Text style={s.valueLabel}>Inversiones</Text>
-        <Text style={s.valueAmount}>{formatARS(totalBalance)}</Text>
-        <View style={s.changeRow}>
-          <Text style={[s.changeTriangle, { color: chartColor }]}>
-            {isPositive ? "\u25B2" : "\u25BC"}
-          </Text>
-          <Text style={[s.changeText, { color: chartColor }]}>
-            {" "}{isPositive ? "+" : ""}{formatARS(change.amount)} ({isPositive ? "+" : ""}{change.pct.toFixed(2)}%)
-          </Text>
-          <Text style={s.changePeriod}> {timeLabels[activeTime]}</Text>
-        </View>
-      </View>
-
-      {/* ── Chart ── */}
-      <View style={s.chartArea}>
-        {/* Dotted baseline */}
-        <View style={s.chartBaseline} />
-        {/* SVG-like chart using absolute positioned lines */}
-        <View style={s.chartContent}>
-          {points.map((p, i) => {
-            if (i === 0) return null;
-            const prev = points[i - 1];
-            const segW = 100 / (points.length - 1);
-            const minP = Math.min(...points);
-            const maxP = Math.max(...points);
-            const range = maxP - minP || 1;
-            const y1 = 100 - ((prev - minP) / range) * 100;
-            const y2 = 100 - ((p - minP) / range) * 100;
-            const midY = (y1 + y2) / 2;
-            return (
-              <View
-                key={i}
-                style={{
-                  position: "absolute",
-                  left: `${(i - 1) * segW}%`,
-                  width: `${segW}%`,
-                  top: `${midY}%`,
-                  height: 2,
-                  backgroundColor: chartColor,
-                  borderRadius: 1,
-                  transform: [{ rotate: `${Math.atan2(y2 - y1, segW) * 0.3}rad` }],
-                }}
-              />
-            );
-          })}
-        </View>
-      </View>
-
-      {/* ── Time filters ── */}
-      <View style={s.timeFilters}>
-        {timeFilters.map((t) => (
-          <Pressable
-            key={t}
-            style={[s.timeBtn, activeTime === t && s.timeBtnActive]}
-            onPress={() => setActiveTime(t)}
-          >
-            <Text style={[s.timeBtnText, activeTime === t && s.timeBtnTextActive]}>
-              {t}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* ── Buying power ── */}
-      <View style={s.thinDivider} />
-      <Pressable style={s.buyingPowerRow}>
-        <Text style={s.buyingPowerLabel}>Poder de compra</Text>
-        <View style={s.buyingPowerRight}>
-          <Text style={s.buyingPowerValue}>{formatARS(buyingPower)}</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
-        </View>
-      </Pressable>
-
-      {/* ── Thick divider ── */}
-      <View style={s.thickDivider} />
-
-      {/* ── Cash section ── */}
-      <View style={s.section}>
-        <View style={s.sectionHeaderRow}>
-          <View style={s.row}>
-            <Text style={s.sectionTitle}>Efectivo</Text>
-            <Ionicons name="information-circle-outline" size={18} color={colors.text.muted} style={{ marginLeft: 6 }} />
-          </View>
-          <View style={s.interestBadge}>
-            <Text style={s.interestBadgeText}>TNA 97%</Text>
-          </View>
-        </View>
-
-        {/* Promo card */}
-        <View style={s.promoCard}>
-          <Ionicons name="star" size={18} color={colors.brand[500]} style={{ marginRight: 10 }} />
-          <Text style={s.promoText}>
-            Ganá rendimiento sobre tu efectivo no invertido. Sin tope.
-          </Text>
-          <Pressable hitSlop={8}>
-            <Ionicons name="close" size={18} color={colors.text.muted} />
-          </Pressable>
-        </View>
-
-        {/* Cash detail rows */}
-        <View style={s.cashDetailRow}>
-          <View>
-            <Text style={s.cashDetailLabel}>Interés acumulado este mes</Text>
-            <Text style={s.cashDetailSub}>Próximo pago: 31 de enero</Text>
-          </View>
-          <Text style={s.cashDetailValue}>{formatARS(0)}</Text>
-        </View>
-        <View style={s.cashDetailDivider} />
-
-        <View style={s.cashDetailRow}>
-          <Text style={s.cashDetailLabel}>Interés total cobrado</Text>
-          <Text style={s.cashDetailValue}>{formatARS(15420)}</Text>
-        </View>
-        <View style={s.cashDetailDivider} />
-
-        <View style={s.cashDetailRow}>
-          <View style={s.row}>
-            <Text style={s.cashDetailLabel}>Efectivo generando interés</Text>
-            <Ionicons name="help-circle-outline" size={14} color={colors.text.muted} style={{ marginLeft: 4 }} />
-          </View>
-          <Text style={s.cashDetailValue}>{formatARS(buyingPower)}</Text>
-        </View>
-
-        <Pressable onPress={() => router.push("/(app)/transfer")}>
-          <Text style={s.depositLink}>Depositar efectivo</Text>
-        </Pressable>
-      </View>
-
-      {/* ── Thick divider ── */}
-      <View style={s.thickDivider} />
-
-      {/* ── Stocks section ── */}
-      <View style={s.section}>
-        <View style={s.sectionHeaderRow}>
-          <Text style={s.sectionTitle}>Acciones</Text>
-          <Pressable onPress={() => router.push("/(app)/explore")}>
-            <Text style={s.sectionAction}>Invertir</Text>
-          </Pressable>
-        </View>
-        {heldAssets.map((a, idx) => {
-          const val = a.price * (a.qty || 1);
-          const isUp = a.change >= 0;
-          return (
-            <Pressable key={a.ticker} style={s.stockRow} onPress={() => openDetail(a)}>
-              <View style={s.stockLeft}>
-                <Text style={s.stockTicker}>{a.ticker}</Text>
-                <Text style={s.stockQty}>{a.qty || 1} unidad{(a.qty || 1) > 1 ? "es" : ""}</Text>
+      <ScrollView
+        style={{ backgroundColor: c.bg }}
+        contentContainerStyle={{ paddingTop: insets.top + 88, paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[s.primaryCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
+          <View style={s.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.cardLabel, { color: c.textSecondary }]}>Disponible</Text>
+              <View style={s.balanceRow}>
+                <Text style={[s.mainBalance, { color: c.text }]}>
+                  {hideBalance ? "$ ••••••" : formatARS(cashBalance)}
+                </Text>
+                <Pressable onPress={() => setHideBalance((value) => !value)} hitSlop={12}>
+                  <Feather
+                    name={hideBalance ? "eye-off" : "eye"}
+                    size={20}
+                    color={c.textMuted}
+                  />
+                </Pressable>
               </View>
-              {/* Mini chart */}
-              <View style={s.miniChart}>
-                <View style={s.miniChartInner}>
-                  {[0, 1, 2, 3, 4, 5, 6].map((j) => {
-                    const h = 6 + Math.abs(Math.sin(a.price / 1000 + j * 0.8)) * 16;
-                    return (
-                      <View
-                        key={j}
-                        style={{
-                          width: 2,
-                          height: h,
-                          backgroundColor: isUp ? colors.brand[500] : colors.red,
-                          borderRadius: 1,
-                          opacity: 0.7,
-                        }}
-                      />
-                    );
-                  })}
+              <View style={s.tnaRow}>
+                <View style={[s.tnaBadge, { backgroundColor: c.greenDim }]}>
+                  <Feather name="trending-up" size={12} color={c.green} />
+                  <Text style={[s.tnaBadgeText, { color: c.green }]}>37% TNA</Text>
                 </View>
-              </View>
-              <View style={[s.priceBadge, { backgroundColor: isUp ? "rgba(0,230,118,0.15)" : "rgba(255,68,68,0.15)" }]}>
-                <Text style={[s.priceBadgeText, { color: isUp ? colors.brand[500] : colors.red }]}>
-                  {formatARS(val)}
+                <Text style={[s.tnaHint, { color: c.textSecondary }]}>
+                  Tu saldo rinde automáticamente
                 </Text>
               </View>
-            </Pressable>
-          );
-        })}
-      </View>
+            </View>
+          </View>
 
-      {/* ── Thick divider ── */}
-      <View style={s.thickDivider} />
-
-      {/* ── Discover more section ── */}
-      <View style={s.section}>
-        <View style={s.sectionHeaderRow}>
-          <View style={s.row}>
-            <Text style={s.sectionTitle}>Descubrí más</Text>
-            <Ionicons name="information-circle-outline" size={18} color={colors.text.muted} style={{ marginLeft: 6 }} />
+          <View style={s.quickActionsRow}>
+            <QuickAction
+              icon="arrow-down-left"
+              label="Ingresar"
+              onPress={() => router.push("/(app)/transfer")}
+              iconBg={c.greenDim}
+              iconColor={c.green}
+              textColor={c.text}
+            />
+            <QuickAction
+              icon="repeat"
+              label="Transferir"
+              onPress={() => router.push("/(app)/transfer")}
+              iconBg={c.surfaceHover}
+              iconColor={c.text}
+              textColor={c.text}
+            />
+            <QuickAction
+              icon="trending-up"
+              label="Invertir"
+              onPress={() => router.push("/(app)/explore")}
+              iconBg={c.surfaceHover}
+              iconColor={c.text}
+              textColor={c.text}
+            />
+            <QuickAction
+              icon="at-sign"
+              label="Alias"
+              onPress={() => router.push("/(app)/account")}
+              iconBg={c.surfaceHover}
+              iconColor={c.text}
+              textColor={c.text}
+            />
           </View>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.discoverScroll}>
-          {[
-            { icon: "logo-bitcoin", title: "Crypto", desc: "Comprá Bitcoin, ETH y más", route: "/(app)/crypto", bg: "#2D1F6F" },
-            { icon: "repeat", title: "Recurrente", desc: "Invertí de forma automática", route: "", bg: "#1A3A2A" },
-            { icon: "bar-chart", title: "Dividendos", desc: "Reinvertí tus ganancias", route: "", bg: "#3A2A1A" },
-            { icon: "globe", title: "CEDEARs", desc: "Accedé a empresas globales", route: "", bg: "#1A2A3A" },
-          ].map((item) => (
-            <Pressable
-              key={item.title}
-              style={s.discoverCard}
-              onPress={() => item.route ? router.push(item.route as any) : undefined}
-            >
-              <View style={[s.discoverIconArea, { backgroundColor: item.bg }]}>
-                <Ionicons name={item.icon as any} size={36} color="#fff" />
-              </View>
-              <View style={s.discoverTextArea}>
-                <Text style={s.discoverTitle}>{item.title}</Text>
-                <Text style={s.discoverDesc}>{item.desc}</Text>
-              </View>
+
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionTitle, { color: c.text }]}>Tus inversiones</Text>
+            <Pressable onPress={() => router.push("/(app)/portfolio")}>
+              <Text style={[s.linkText, { color: c.green }]}>Ir a portfolio</Text>
             </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* ── Thick divider ── */}
-      <View style={s.thickDivider} />
-
-      {/* ── Watchlist ── */}
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>Listas</Text>
-        <Pressable style={s.listItem}>
-          <View style={s.listIcon}>
-            <Ionicons name="bulb-outline" size={18} color={colors.brand[500]} />
           </View>
-          <View style={s.listInfo}>
-            <Text style={s.listName}>Mi watchlist</Text>
-            <Text style={s.listCount}>{assets.length} activos</Text>
-          </View>
-          <Ionicons name="chevron-down" size={20} color={colors.text.muted} />
-        </Pressable>
 
-        {/* Show non-held assets as watchlist items */}
-        {assets.filter(a => !a.held).map((a) => {
-          const isUp = a.change >= 0;
-          return (
-            <Pressable key={a.ticker} style={s.stockRow} onPress={() => openDetail(a)}>
-              <View style={s.stockLeft}>
-                <Text style={s.stockTicker}>{a.ticker}</Text>
-                <Text style={s.stockQty}>{a.name}</Text>
-              </View>
-              <View style={s.miniChart}>
-                <View style={s.miniChartInner}>
-                  {[0, 1, 2, 3, 4, 5, 6].map((j) => {
-                    const h = 6 + Math.abs(Math.sin(a.price / 1000 + j * 0.8)) * 16;
-                    return (
-                      <View
-                        key={j}
-                        style={{
-                          width: 2,
-                          height: h,
-                          backgroundColor: isUp ? colors.brand[500] : colors.red,
-                          borderRadius: 1,
-                          opacity: 0.7,
-                        }}
-                      />
-                    );
-                  })}
+          <View style={[s.listCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
+            {heldAssets.slice(0, 3).map((asset, index) => {
+              const value = asset.price * (asset.qty || 1);
+              const isUp = asset.change >= 0;
+
+              return (
+                <Pressable
+                  key={asset.ticker}
+                  style={[
+                    s.assetRow,
+                    index < 2 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                  onPress={() => openDetail(asset)}
+                >
+                  <View style={[s.assetMark, { backgroundColor: c.surfaceHover }]}>
+                    <Text style={[s.assetMarkText, { color: c.text }]}>{asset.ticker.slice(0, 1)}</Text>
+                  </View>
+                  <View style={s.assetInfo}>
+                    <Text style={[s.assetTicker, { color: c.text }]}>{asset.ticker}</Text>
+                    <Text style={[s.assetName, { color: c.textSecondary }]}>
+                      {asset.qty} un. · {asset.name}
+                    </Text>
+                  </View>
+                  <View style={s.assetValues}>
+                    <Text style={[s.assetPrice, { color: c.text }]}>{formatARS(value)}</Text>
+                    <Text style={[s.assetChange, { color: isUp ? c.green : c.red }]}>
+                      {isUp ? "+" : ""}
+                      {asset.change.toFixed(2)}%
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionTitle, { color: c.text }]}>Actividad</Text>
+            <Pressable onPress={() => router.push("/(app)/cash")}>
+              <Text style={[s.linkText, { color: c.green }]}>Ver todo</Text>
+            </Pressable>
+          </View>
+
+          <View style={[s.listCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
+            {activityItems.map((item, index) => {
+              const isPositive = item.amount > 0;
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    s.assetRow,
+                    index < activityItems.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                >
+                  <View style={[s.activityIcon, { backgroundColor: c.surfaceHover }]}>
+                    <Feather name={item.icon} size={18} color={c.textSecondary} />
+                  </View>
+                  <View style={s.assetInfo}>
+                    <Text style={[s.assetTicker, { color: c.text }]}>{item.title}</Text>
+                    <Text style={[s.assetName, { color: c.textSecondary }]}>{item.date}</Text>
+                  </View>
+                  <View style={s.assetValues}>
+                    <Text style={[s.assetPrice, { color: isPositive ? c.green : c.text }]}>
+                      {isPositive ? "+" : ""}
+                      {formatARS(Math.abs(item.amount))}
+                    </Text>
+                    <Text style={[s.assetName, { color: c.textSecondary }]}>{item.status}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={[s.priceBadge, { backgroundColor: isUp ? "rgba(0,230,118,0.15)" : "rgba(255,68,68,0.15)" }]}>
-                <Text style={[s.priceBadgeText, { color: isUp ? colors.brand[500] : colors.red }]}>
-                  {formatARS(a.price)}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </ScrollView>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Top bar */
+  root: {
+    flex: 1,
+  },
+  fixedTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
   topBar: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-  topBarRight: { flexDirection: "row", gap: 20 },
-
-  /* Portfolio value */
-  valueSection: { paddingHorizontal: 20, paddingTop: 4 },
-  valueLabel: {
-    fontSize: 34,
-    fontWeight: "300",
-    color: colors.text.secondary,
-    letterSpacing: -0.5,
-  },
-  valueAmount: {
-    fontSize: 38,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -1,
-    marginTop: -2,
-  },
-  changeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
-  changeTriangle: {
-    fontSize: 12,
-  },
-  changeText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  changePeriod: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-
-  /* Chart */
-  chartArea: {
-    height: 240,
-    paddingHorizontal: 4,
-    marginTop: 12,
-    position: "relative",
-    justifyContent: "center",
-  },
-  chartBaseline: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: "50%",
-    height: 1,
-    borderStyle: "dashed",
-    borderWidth: 0.5,
-    borderColor: colors.text.muted,
-    opacity: 0.3,
-  },
-  chartContent: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: 20,
-    bottom: 20,
-  },
-
-  /* Time filters */
-  timeFilters: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 4,
-  },
-  timeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: "center",
-  },
-  timeBtnActive: {
-    backgroundColor: colors.surface[200],
-  },
-  timeBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text.muted,
-  },
-  timeBtnTextActive: {
-    color: colors.text.primary,
-  },
-
-  /* Dividers */
-  thinDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 20,
-  },
-  thickDivider: {
-    height: 6,
-    backgroundColor: colors.surface[100],
-  },
-
-  /* Buying power */
-  buyingPowerRow: {
-    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 14,
   },
-  buyingPowerLabel: { fontSize: 16, color: colors.text.primary },
-  buyingPowerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  buyingPowerValue: { fontSize: 16, fontWeight: "600", color: colors.text.primary },
-
-  /* Shared */
-  row: { flexDirection: "row", alignItems: "center" },
-  section: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  sectionTitle: {
+  greeting: {
     fontSize: 24,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.3,
-  },
-  sectionAction: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
-    textDecorationLine: "underline",
-  },
-
-  /* Interest badge */
-  interestBadge: {
-    backgroundColor: colors.surface[200],
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  interestBadgeText: {
-    fontSize: 12,
     fontWeight: "700",
-    color: colors.brand[500],
+    letterSpacing: -0.4,
   },
-
-  /* Promo card */
-  promoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface[100],
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-  },
-  promoText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 18,
-  },
-
-  /* Cash detail */
-  cashDetailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  cashDetailLabel: {
-    fontSize: 15,
-    color: colors.text.secondary,
-  },
-  cashDetailSub: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  cashDetailValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-  cashDetailDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  depositLink: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.brand[500],
-    marginTop: 12,
-  },
-
-  /* Stocks */
-  stockRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  stockLeft: { flex: 1 },
-  stockTicker: { fontSize: 16, fontWeight: "700", color: colors.text.primary },
-  stockQty: { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
-  miniChart: {
-    width: 64,
-    height: 32,
-    justifyContent: "center",
-    marginHorizontal: 12,
-  },
-  miniChartInner: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    height: "100%",
-  },
-  priceBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: "flex-end",
-  },
-  priceBadgeText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  /* Discover */
-  discoverScroll: { gap: 12, paddingRight: 20 },
-  discoverCard: {
-    width: 170,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  discoverIconArea: {
-    height: 110,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  discoverTextArea: {
-    padding: 12,
-  },
-  discoverTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text.primary,
-  },
-  discoverDesc: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 3,
-    lineHeight: 16,
-  },
-
-  /* Lists */
-  listItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  listIcon: {
+  iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface[100],
     borderWidth: 1,
-    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryCard: {
+    marginHorizontal: 16,
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 20,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 18,
+  },
+  cardLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  mainBalance: {
+    fontSize: 40,
+    fontWeight: "800",
+    letterSpacing: -1.4,
+  },
+  tnaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 8,
+  },
+  tnaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  tnaBadgeText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  tnaHint: {
+    fontSize: 13,
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: "center",
+    gap: 10,
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  section: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  listCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  assetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  assetMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
-  listInfo: { flex: 1 },
-  listName: { fontSize: 16, fontWeight: "700", color: colors.text.primary },
-  listCount: { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
+  assetMarkText: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  assetInfo: {
+    flex: 1,
+  },
+  assetTicker: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  assetName: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  assetValues: {
+    alignItems: "flex-end",
+  },
+  assetPrice: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  assetChange: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  activityIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
 });
