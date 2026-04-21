@@ -1,405 +1,343 @@
-import { useState } from "react";
-import {
-  View, Text, Pressable, FlatList, ScrollView, StyleSheet,
-} from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 
-/* ─── Mock notifications ─── */
-interface Notification {
+type Category = "ordenes" | "precios" | "movimientos" | "anuncios";
+
+interface Notif {
   id: string;
-  category: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
-  preview: string;
+  category: Category;
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  body: string;
   time: string;
   unread: boolean;
-  messages: NotifMessage[];
 }
 
-interface NotifMessage {
-  text: string;
-  date: string;
-  hasButton?: boolean;
-  buttonLabel?: string;
-}
-
-const notifications: Notification[] = [
+const items: Notif[] = [
   {
-    id: "announcements",
-    category: "Anuncios",
-    icon: "megaphone-outline",
-    iconColor: colors.brand[500],
-    preview: "Hola! Bienvenido a Notificaciones. Acá vas a...",
-    time: "ahora",
+    id: "1",
+    category: "ordenes",
+    icon: "check-circle",
+    title: "Orden ejecutada",
+    body: "Compraste 2 AAPL por $ 48.240 a precio promedio $ 24.120.",
+    time: "hace 12 min",
     unread: true,
-    messages: [
-      {
-        text: "Hola! Bienvenido a Notificaciones. Este es el lugar donde vas a recibir información oportuna y relevante de nuestra parte una vez que empieces a operar.",
-        date: "1 abr a las 10:42",
-        hasButton: true,
-        buttonLabel: "Más información",
-      },
-    ],
   },
   {
-    id: "orders",
-    category: "Órdenes",
-    icon: "swap-vertical-outline",
-    iconColor: "#42A5F5",
-    preview: "Tu orden de YPFD fue ejecutada exitosamente.",
-    time: "hace 2h",
+    id: "2",
+    category: "precios",
+    icon: "trending-up",
+    title: "NVDA superó tu alerta",
+    body: "NVIDIA subió 3,4% en la rueda. Precio actual $ 18.740.",
+    time: "hace 1h",
     unread: true,
-    messages: [
-      {
-        text: "Tu orden de compra de YPFD por $45.200 fue ejecutada exitosamente. Se compraron 2,34 unidades a un precio promedio de $19.316.",
-        date: "1 abr a las 08:30",
-      },
-    ],
   },
   {
-    id: "dividends",
-    category: "Dividendos",
-    icon: "cash-outline",
-    iconColor: "#66BB6A",
-    preview: "Recibiste un dividendo de YPFD por $1.250.",
+    id: "3",
+    category: "movimientos",
+    icon: "arrow-down-left",
+    title: "Transferencia acreditada",
+    body: "Se acreditó un ingreso por $ 250.000 desde Banco Galicia.",
+    time: "ayer",
+    unread: false,
+  },
+  {
+    id: "4",
+    category: "ordenes",
+    icon: "check-circle",
+    title: "Orden de venta ejecutada",
+    body: "Vendiste 1 unidad de AL30 por $ 71.540.",
+    time: "hace 2d",
+    unread: false,
+  },
+  {
+    id: "5",
+    category: "anuncios",
+    icon: "info",
+    title: "Nuevas funciones disponibles",
+    body: "Ahora podés operar en horario extendido de Wall Street hasta las 19hs.",
     time: "hace 3d",
     unread: false,
-    messages: [
-      {
-        text: "Se acreditó un dividendo de YPFD en tu cuenta por $1.250. El monto fue depositado en tu saldo de efectivo disponible.",
-        date: "28 mar a las 14:00",
-      },
-    ],
   },
   {
-    id: "prices",
-    category: "Alertas de precio",
-    icon: "notifications-outline",
-    iconColor: "#FFA726",
-    preview: "ALUA alcanzó tu precio objetivo de $850.",
+    id: "6",
+    category: "movimientos",
+    icon: "dollar-sign",
+    title: "Dividendo acreditado",
+    body: "Recibiste $ 4.280 por dividendos de tus CEDEARs.",
     time: "hace 5d",
     unread: false,
-    messages: [
-      {
-        text: "ALUA alcanzó tu precio objetivo de $850. El precio actual es $852,40. Podés revisar tu posición o configurar una nueva alerta.",
-        date: "26 mar a las 11:15",
-        hasButton: true,
-        buttonLabel: "Ver ALUA",
-      },
-    ],
   },
-  {
-    id: "security",
-    category: "Seguridad",
-    icon: "shield-checkmark-outline",
-    iconColor: "#EF5350",
-    preview: "Nuevo inicio de sesión detectado en tu cuenta.",
-    time: "hace 1sem",
-    unread: false,
-    messages: [
-      {
-        text: "Se detectó un nuevo inicio de sesión en tu cuenta desde iPhone 15 Pro en Buenos Aires, Argentina. Si no fuiste vos, cambiá tu contraseña inmediatamente.",
-        date: "24 mar a las 09:00",
-        hasButton: true,
-        buttonLabel: "Revisar seguridad",
-      },
-    ],
-  },
+];
+
+type Filter = "todas" | Category;
+
+const filters: { id: Filter; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "ordenes", label: "Órdenes" },
+  { id: "precios", label: "Alertas" },
+  { id: "movimientos", label: "Movimientos" },
+  { id: "anuncios", label: "Anuncios" },
 ];
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [selected, setSelected] = useState<Notification | null>(null);
+  const { c } = useTheme();
+  const [filter, setFilter] = useState<Filter>("todas");
 
-  /* ════════════════════════════════════════
-     LIST VIEW
-     ════════════════════════════════════════ */
-  if (!selected) {
-    return (
-      <View style={s.container}>
-        <View style={[s.fixedTop, { paddingTop: insets.top }]}>
-          <View style={s.header}>
-            <Text style={s.title}>Actividad</Text>
-          </View>
-        </View>
+  const visible = useMemo(
+    () =>
+      filter === "todas"
+        ? items
+        : items.filter((n) => n.category === filter),
+    [filter],
+  );
 
-        <FlatList
-          data={notifications}
-          keyExtractor={(n) => n.id}
-          contentContainerStyle={{ paddingTop: insets.top + 64, paddingBottom: 100 }}
-          renderItem={({ item }) => (
-            <Pressable style={s.notifRow} onPress={() => setSelected(item)}>
-              {/* Unread dot */}
-              {item.unread && <View style={s.unreadDot} />}
+  const unreadCount = visible.filter((n) => n.unread).length;
 
-              {/* Icon */}
-              <View style={[s.notifIcon, { borderColor: item.iconColor }]}>
-                <Ionicons name={item.icon} size={20} color={item.iconColor} />
-              </View>
-
-              {/* Content */}
-              <View style={s.notifContent}>
-                <View style={s.notifTopRow}>
-                  <Text style={[s.notifCategory, item.unread && s.notifCategoryUnread]}>
-                    {item.category}
-                  </Text>
-                  <Text style={s.notifTime}>{item.time}</Text>
-                </View>
-                <Text style={s.notifPreview} numberOfLines={1}>
-                  {item.preview}
-                </Text>
-              </View>
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <View style={s.emptyState}>
-              <Ionicons name="notifications-off-outline" size={48} color={colors.text.muted} />
-              <Text style={s.emptyText}>No tenés notificaciones</Text>
-            </View>
-          }
-        />
-      </View>
-    );
-  }
-
-  /* ════════════════════════════════════════
-     DETAIL VIEW (Chat-style)
-     ════════════════════════════════════════ */
   return (
-    <View style={s.container}>
-      <View style={[s.fixedTop, { paddingTop: insets.top }]}>
-        <View style={s.detailHeader}>
-          <Pressable onPress={() => setSelected(null)} hitSlop={12}>
-            <Ionicons name="chevron-back" size={26} color={colors.brand[500]} />
-          </Pressable>
-          <View style={s.detailHeaderCenter}>
-            <View style={[s.detailHeaderIcon, { borderColor: selected.iconColor }]}>
-              <Ionicons name={selected.icon} size={18} color={selected.iconColor} />
-            </View>
-            <Text style={s.detailHeaderTitle}>{selected.category}</Text>
-          </View>
-          <View style={{ width: 26 }} />
-        </View>
-        <View style={s.detailDivider} />
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <Text style={[s.headerTitle, { color: c.text }]}>Notificaciones</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Messages */}
       <ScrollView
-        contentContainerStyle={[s.messagesContainer, { paddingTop: insets.top + 78 }]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.filterContent}
+        style={s.filterRow}
+      >
+        {filters.map((f) => {
+          const active = filter === f.id;
+          return (
+            <Pressable
+              key={f.id}
+              onPress={() => setFilter(f.id)}
+              style={[
+                s.filterPill,
+                {
+                  backgroundColor: active ? c.ink : c.surfaceHover,
+                  borderColor: active ? c.ink : c.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.filterLabel,
+                  { color: active ? c.bg : c.textSecondary },
+                ]}
+              >
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {unreadCount > 0 ? (
+        <View style={s.unreadBanner}>
+          <Text style={[s.unreadText, { color: c.textMuted }]}>
+            {unreadCount} sin leer
+          </Text>
+          <Pressable>
+            <Text style={[s.markRead, { color: c.text }]}>Marcar todas</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {selected.messages.map((msg, i) => (
-          <View key={i} style={s.messageGroup}>
-            {/* Date label */}
-            <Text style={s.messageDate}>{msg.date}</Text>
-
-            {/* Message bubble */}
-            <View style={s.messageBubble}>
-              <Text style={s.messageText}>{msg.text}</Text>
-
-              {msg.hasButton && msg.buttonLabel && (
-                <Pressable style={s.messageBubbleBtn}>
-                  <Text style={s.messageBubbleBtnText}>{msg.buttonLabel}</Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* Pin icon */}
-            <View style={s.pinIcon}>
-              <Ionicons name="pencil-outline" size={14} color={colors.text.muted} />
-            </View>
-
-            {/* Timestamp */}
-            <Text style={s.messageTimestamp}>
-              {msg.date.split(" a las ")[1] || ""}
+        {visible.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={[s.emptyTitle, { color: c.text }]}>
+              Nada por acá
+            </Text>
+            <Text style={[s.emptySub, { color: c.textMuted }]}>
+              Cuando pase algo importante te vamos a avisar.
             </Text>
           </View>
-        ))}
+        ) : (
+          <View style={s.list}>
+            {visible.map((n, i) => (
+              <Pressable
+                key={n.id}
+                style={[
+                  s.item,
+                  i > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: c.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    s.itemIcon,
+                    {
+                      backgroundColor: n.unread ? c.greenDim : c.surfaceHover,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={n.icon}
+                    size={16}
+                    color={n.unread ? c.greenDark : c.text}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={s.itemTitleRow}>
+                    <Text style={[s.itemTitle, { color: c.text }]}>
+                      {n.title}
+                    </Text>
+                    {n.unread ? (
+                      <View style={[s.unreadDot, { backgroundColor: c.green }]} />
+                    ) : null}
+                  </View>
+                  <Text style={[s.itemBody, { color: c.textMuted }]}>
+                    {n.body}
+                  </Text>
+                  <Text style={[s.itemTime, { color: c.textFaint }]}>
+                    {n.time}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-/* ─── Styles ─── */
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    backgroundColor: colors.surface[0],
-  },
-
-  /* Header */
+  root: { flex: 1 },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 14,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.5,
-  },
-
-  /* Notification rows */
-  notifRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    position: "relative",
-  },
-  unreadDot: {
-    position: "absolute",
-    left: 8,
-    top: "50%",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.brand[500],
-    marginTop: -4,
-  },
-  notifIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    backgroundColor: colors.surface[100],
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
-  },
-  notifContent: {
-    flex: 1,
-  },
-  notifTopRow: {
-    flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  notifCategory: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: colors.text.secondary,
-  },
-  notifCategoryUnread: {
-    fontWeight: "700",
-    color: colors.text.primary,
-  },
-  notifTime: {
-    fontSize: 13,
-    color: colors.text.muted,
-  },
-  notifPreview: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 19,
-  },
-
-  /* Empty state */
-  emptyState: {
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 100,
-    gap: 12,
   },
-  emptyText: {
+  headerTitle: {
+    fontFamily: fontFamily[700],
     fontSize: 16,
-    color: colors.text.muted,
+    letterSpacing: -0.3,
   },
-
-  /* ═══ DETAIL VIEW ═══ */
-  detailHeader: {
+  filterRow: {
+    marginBottom: 8,
+  },
+  filterContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+    paddingBottom: 4,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  filterLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  unreadBanner: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    alignItems: "center",
+    paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  detailHeaderCenter: {
-    alignItems: "center",
+  unreadText: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
-  detailHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    backgroundColor: colors.surface[100],
+  markRead: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  list: {
+    paddingHorizontal: 20,
+  },
+  item: {
+    flexDirection: "row",
+    gap: 14,
+    paddingVertical: spacing.lg,
+  },
+  itemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  itemTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 4,
   },
-  detailHeaderTitle: {
+  itemTitle: {
+    fontFamily: fontFamily[700],
     fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
+    letterSpacing: -0.2,
   },
-  detailDivider: {
-    height: 1,
-    backgroundColor: colors.brand[500],
-    marginHorizontal: 20,
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
-
-  /* Messages */
-  messagesContainer: {
-    flexGrow: 1,
-    justifyContent: "flex-end",
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  messageGroup: {
-    marginTop: 16,
-  },
-  messageDate: {
+  itemBody: {
+    fontFamily: fontFamily[500],
     fontSize: 13,
-    color: colors.text.muted,
-    textAlign: "center",
-    marginBottom: 16,
+    lineHeight: 18,
+    letterSpacing: -0.1,
   },
-  messageBubble: {
-    backgroundColor: colors.surface[100],
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    padding: 16,
-    maxWidth: "85%",
-    alignSelf: "flex-end",
+  itemTime: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    marginTop: 6,
+    letterSpacing: -0.05,
   },
-  messageText: {
-    fontSize: 15,
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-  messageBubbleBtn: {
-    marginTop: 12,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
+  empty: {
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 80,
+    paddingHorizontal: 40,
   },
-  messageBubbleBtnText: {
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontFamily: fontFamily[500],
     fontSize: 14,
-    fontWeight: "700",
-    color: colors.text.primary,
-  },
-  pinIcon: {
-    marginTop: 8,
-  },
-  messageTimestamp: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 4,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

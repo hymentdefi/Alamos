@@ -1,307 +1,245 @@
 import { useRef, useState } from "react";
 import {
-  View, Text, Pressable, FlatList, Dimensions, StyleSheet, Animated,
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  Dimensions,
+  StyleSheet,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { AlamosLogo } from "../../lib/components/Logo";
 
 const { width } = Dimensions.get("window");
 
 interface Slide {
-  icon: string;
+  eyebrow: string;
   title: string;
+  accent: string;
   body: string;
+  icon: keyof typeof Feather.glyphMap;
 }
 
 const slides: Slide[] = [
   {
-    icon: "📈",
-    title: "Invertir lleva tiempo",
-    body: "Invertir requiere paciencia. Construir riqueza es un proceso gradual — los inversores más exitosos piensan a largo plazo.",
+    eyebrow: "Mercado local",
+    title: "CEDEARs, bonos y\nfondos",
+    accent: "argentinos",
+    body:
+      "Acceso directo a las inversiones del mercado argentino. Sin intermediarios, sin vueltas.",
+    icon: "trending-up",
   },
   {
-    icon: "🎯",
-    title: "El mercado es lo que vos hagas",
-    body: "Podés usarlo para construir patrimonio a largo plazo o para operar activamente. La estrategia la definís vos.",
+    eyebrow: "Transparencia",
+    title: "Comisión clara de\n0,5% por operación",
+    accent: "sin sorpresas",
+    body:
+      "Sin costo de mantenimiento, sin comisiones ocultas. Lo que ves es lo que pagás.",
+    icon: "eye",
   },
   {
-    icon: "💸",
-    title: "Invertir es más accesible que nunca",
-    body: "Con internet y tu celular, invertir es más fácil y económico. En Álamos podés empezar con lo que quieras, sin comisiones.",
-  },
-  {
-    icon: "🔓",
-    title: "Tu plata no queda atrapada",
-    body: "Cuando invertís, tu plata se convierte en otro activo. Podés vender y retirar tus fondos cuando quieras.",
+    eyebrow: "En minutos",
+    title: "Abrí tu cuenta con\nDNI y CUIL",
+    accent: "100% online",
+    body:
+      "Validamos tu identidad en el momento. Ingresás fondos y empezás a invertir el mismo día.",
+    icon: "zap",
   },
 ];
-
-const RECAP_INDEX = slides.length;
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const flatlistRef = useRef<FlatList>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const { c } = useTheme();
+  const [index, setIndex] = useState(0);
+  const listRef = useRef<FlatList>(null);
 
-  const isRecap = currentIndex === RECAP_INDEX;
-  const totalPages = slides.length + 1; // slides + recap
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (i !== index) setIndex(i);
+  };
 
-  const goNext = () => {
-    const next = currentIndex + 1;
-    if (next < totalPages) {
-      flatlistRef.current?.scrollToIndex({ index: next, animated: true });
-      setCurrentIndex(next);
+  const next = () => {
+    if (index < slides.length - 1) {
+      listRef.current?.scrollToIndex({ index: index + 1 });
+      setIndex(index + 1);
+    } else {
+      router.replace("/(auth)/register");
     }
   };
-
-  const goBack = () => {
-    const prev = currentIndex - 1;
-    if (prev >= 0) {
-      flatlistRef.current?.scrollToIndex({ index: prev, animated: true });
-      setCurrentIndex(prev);
-    }
-  };
-
-  const finish = () => {
-    router.replace("/(app)");
-  };
-
-  const renderSlide = ({ item, index }: { item: Slide | null; index: number }) => {
-    if (index === RECAP_INDEX) {
-      return (
-        <View style={[s.slide, { width }]}>
-          <View style={s.recapIconWrap}>
-            <Text style={{ fontSize: 56 }}>✅</Text>
-          </View>
-          <View style={s.slideContent}>
-            <Text style={s.recapTitle}>¡Listo!</Text>
-            <Text style={s.recapBody}>
-              Aprendiste lo básico sobre invertir. Acá un resumen:
-            </Text>
-            {slides.map((sl, i) => (
-              <View key={i} style={s.recapItem}>
-                <Text style={s.recapBullet}>•</Text>
-                <Text style={s.recapText}>{sl.title}</Text>
-              </View>
-            ))}
-            <Text style={s.riskNote}>
-              Todas las inversiones implican riesgo.
-            </Text>
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View style={[s.slide, { width }]}>
-        <View style={s.emojiArea}>
-          <Text style={s.emoji}>{item!.icon}</Text>
-        </View>
-        <View style={s.slideContent}>
-          <Text style={s.slideTitle}>{item!.title}</Text>
-          <Text style={s.slideBody}>{item!.body}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const data = [...slides, null]; // null = recap
 
   return (
-    <View style={s.container}>
-      {/* Close button */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={finish} style={s.closeBtn}>
-          <Ionicons name="close" size={24} color={colors.text.primary} />
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <AlamosLogo variant="mark" tone="light" size={26} />
+        <Pressable onPress={() => router.replace("/(auth)/register")}>
+          <Text style={[s.skip, { color: c.textMuted }]}>Saltar</Text>
         </Pressable>
       </View>
 
-      {/* Slides */}
       <FlatList
-        ref={flatlistRef}
-        data={data}
-        renderItem={renderSlide}
+        ref={listRef}
+        data={slides}
         horizontal
         pagingEnabled
-        scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => String(i)}
+        onScroll={onScroll}
+        renderItem={({ item }) => <SlideView slide={item} />}
       />
 
-      {/* Bottom controls */}
-      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
-        {!isRecap ? (
-          <>
-            {/* Progress bar */}
-            <View style={s.progressBar}>
-              {data.map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    s.progressDot,
-                    i <= currentIndex && s.progressDotActive,
-                    { flex: 1 },
-                  ]}
-                />
-              ))}
-            </View>
+      <View style={s.dots}>
+        {slides.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              s.dot,
+              {
+                backgroundColor: i === index ? c.ink : c.surfaceSunken,
+                width: i === index ? 24 : 8,
+              },
+            ]}
+          />
+        ))}
+      </View>
 
-            {/* Navigation arrows */}
-            <View style={s.navRow}>
-              <Pressable
-                onPress={goBack}
-                style={[s.arrowBtn, currentIndex === 0 && { opacity: 0.3 }]}
-                disabled={currentIndex === 0}
-              >
-                <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
-              </Pressable>
-              <Pressable onPress={goNext} style={[s.arrowBtn, s.arrowBtnNext]}>
-                <Ionicons name="arrow-forward" size={20} color={colors.text.primary} />
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          <Pressable onPress={finish} style={s.doneBtn}>
-            <Text style={s.doneBtnText}>Empezar</Text>
-          </Pressable>
-        )}
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable
+          style={[s.cta, { backgroundColor: c.ink }]}
+          onPress={next}
+        >
+          <Text style={[s.ctaText, { color: c.bg }]}>
+            {index === slides.length - 1 ? "Crear cuenta" : "Siguiente"}
+          </Text>
+          <Feather name="arrow-right" size={16} color={c.bg} />
+        </Pressable>
+        <Pressable
+          style={s.loginLink}
+          onPress={() => router.replace("/(auth)/login")}
+        >
+          <Text style={[s.loginText, { color: c.textMuted }]}>
+            ¿Ya tenés cuenta?{" "}
+            <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+              Iniciar sesión
+            </Text>
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
 }
 
+function SlideView({ slide }: { slide: Slide }) {
+  const { c } = useTheme();
+  return (
+    <View style={[s.slide, { width }]}>
+      <View style={[s.iconBlock, { backgroundColor: c.surfaceHover }]}>
+        <Feather name={slide.icon} size={32} color={c.ink} />
+      </View>
+      <Text style={[s.eyebrow, { color: c.textMuted }]}>
+        {slide.eyebrow.toUpperCase()}
+      </Text>
+      <Text style={[s.title, { color: c.text }]}>
+        {slide.title}{" "}
+        <Text style={[s.titleAccent, { backgroundColor: c.green }]}>
+          {slide.accent}
+        </Text>
+        .
+      </Text>
+      <Text style={[s.body, { color: c.textMuted }]}>{slide.body}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface[0],
-  },
+  root: { flex: 1 },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-    zIndex: 10,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+  },
+  skip: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   slide: {
     flex: 1,
-  },
-  emojiArea: {
-    height: "35%",
-    backgroundColor: "#1a3a2a",
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  emoji: {
-    fontSize: 72,
-  },
-  slideContent: {
-    flex: 1,
-    paddingHorizontal: 28,
-    paddingTop: 32,
-  },
-  slideTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: colors.text.primary,
-    marginBottom: 14,
-    letterSpacing: -0.5,
-  },
-  slideBody: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    lineHeight: 24,
-  },
-  recapIconWrap: {
-    height: "30%",
-    backgroundColor: "#1a3a2a",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recapTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text.primary,
-    marginBottom: 12,
-  },
-  recapBody: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  recapItem: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
-  },
-  recapBullet: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  recapText: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontWeight: "600",
-    flex: 1,
-  },
-  riskNote: {
-    fontSize: 13,
-    color: colors.brand[500],
-    marginTop: 24,
-  },
-  bottom: {
-    paddingHorizontal: 28,
-  },
-  progressBar: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 20,
-  },
-  progressDot: {
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-  },
-  progressDotActive: {
-    backgroundColor: colors.text.primary,
-  },
-  navRow: {
-    flexDirection: "row",
+    paddingHorizontal: 32,
     justifyContent: "center",
     gap: 16,
   },
-  arrowBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surface[100],
-    borderWidth: 1,
-    borderColor: colors.border,
+  iconBlock: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.xl,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 12,
   },
-  arrowBtnNext: {
-    backgroundColor: colors.text.primary,
+  eyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
-  doneBtn: {
-    backgroundColor: colors.text.primary,
-    borderRadius: 14,
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 44,
+    lineHeight: 46,
+    letterSpacing: -1.8,
+  },
+  titleAccent: {
+    fontFamily: fontFamily[700],
+    paddingHorizontal: 2,
+  },
+  body: {
+    fontFamily: fontFamily[500],
+    fontSize: 17,
+    lineHeight: 24,
+    letterSpacing: -0.2,
+    maxWidth: 360,
+  },
+  dots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 20,
+  },
+  dot: {
+    height: 8,
+    borderRadius: 4,
+  },
+  bottom: {
+    paddingHorizontal: 24,
+  },
+  cta: {
     height: 52,
+    borderRadius: radius.pill,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
-  doneBtnText: {
-    color: colors.surface[0],
-    fontWeight: "700",
+  ctaText: {
+    fontFamily: fontFamily[600],
     fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  loginLink: {
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  loginText: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
 });

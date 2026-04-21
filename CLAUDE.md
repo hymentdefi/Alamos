@@ -39,13 +39,13 @@ lib/
     context.tsx              → AuthProvider, SecureStore para tokens
     manteca.ts               → API client mockeado
   components/
-    Button.tsx               → Botón reutilizable (primary/secondary/accent/ghost)
-    Logo.tsx                 → <AlamosLogo /> — variants: mark/lockup/lockupShort
-    AssetItem.tsx            → Legacy, pendiente refactor
+    Button.tsx               → Botón (primary/secondary/accent/ghost)
+    Logo.tsx                 → <AlamosLogo /> — mark/lockup/lockupShort, light/dark
+    Sparkline.tsx            → Chart reutilizable + pathFromSeed()
   data/
-    assets.ts                → CEDEARs, bonos, FCI + helpers formatARS/formatPct
+    assets.ts                → CEDEARs, bonos, FCI + formatARS/formatPct/assetIconCode
   theme/
-    index.ts                 → Tokens (light + dark), tipografía, radius, spacing
+    index.ts                 → Tokens (light + dark), type, radius, spacing, fontFamily
 
 assets/
   brand-assets/              → Brand pack oficial (app/, empresa/, empresa-mono/)
@@ -113,7 +113,7 @@ Regla: el verde de marca es `#00E676`. No inventar otros verdes.
 
 ## Convenciones
 
-- Estilos: `StyleSheet.create()`, colores via `useTheme()` (preferido) o `colors` export (legacy)
+- Estilos: `StyleSheet.create()` + `useTheme()` para colores, `fontFamily[weight]` para tipografía
 - UI text en español; código en inglés
 - Commits en español: "agregué X", "mejoré Y"
 - Componentes compartidos en `lib/components/`
@@ -129,20 +129,26 @@ npx expo start
 
 ## Estado actual
 
-- ✓ Branding nuevo completo (logo, colores, tipografía)
-- ✓ Theme light-first con tokens del landing
-- ✓ Home rediseñada matching el mockup
-- ✓ Auth (welcome/login/register) con estilo landing
-- ⚠ Otras pantallas (portfolio, explore, detail, buy, perfil, etc.) siguen usando
-  el `colors` legacy (mapeado a light) — funcionan pero falta rediseño
-- ⚠ Pantallas Robinhood (crypto, margin, options, lending, cash) eliminadas
+Rediseño completo terminado (Fases 1, 2 y 3). Toda la app corre con el design
+system nuevo: light-first, Plus Jakarta Sans, tokens del landing.
 
-## Próximos pasos (Fase 2)
+- ✓ Auth: welcome / login / register
+- ✓ Home, Mercado, Cartera, Noticias, Perfil (bottom tabs)
+- ✓ Detalle de activo con stats específicos por tipo (CEDEAR/bono/FCI)
+- ✓ Flow de compra: buy (keypad) → confirm → success
+- ✓ Transferencias (ingresar/extraer)
+- ✓ Notificaciones, Seguridad, Soporte, Acerca de, Datos personales
+- ✓ Preferencias de app (tema, idioma, moneda, notifs)
+- ✓ Onboarding con 3 slides
+- ✓ Pantallas Robinhood eliminadas (crypto, margin, options, lending, cash)
+- ✓ Legacy `colors` export eliminado — todas las pantallas usan `useTheme()`
+- ✓ Legacy AssetItem component eliminado
 
-- Rediseñar Mercado (explore) con categorías CEDEARs/Bonos/FCI al estilo landing
-- Rediseñar Detalle de activo (tipos distintos: CEDEAR vs bono vs FCI)
-- Rediseñar flow de compra (buy → confirm → success)
-- Rediseñar Cartera (portfolio)
-- Rediseñar Perfil y settings
+## Próximos pasos
+
 - Sacar MOCK_MODE de Manteca y conectar API real
+- Conectar datos reales al hero (precio, holdings, delta del día)
+- Implementar ejecución real de órdenes contra la API
+- Alertas de precio funcionales
 - Explorar modo Alamos Pro (dark + terminal densa)
+- Web build con Expo Web

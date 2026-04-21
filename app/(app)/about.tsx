@@ -1,278 +1,245 @@
-import {
-  View, Text, Pressable, ScrollView, StyleSheet,
-} from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import { AlamosLogo } from "../../lib/components/Logo";
 
-/* ─── Feature sections ─── */
-interface Feature {
-  title: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconBg: string;
-  description: string;
-  learnMore: string;
-  disclosureTitle: string;
-  disclosureText: string;
-}
-
-const features: Feature[] = [
-  {
-    title: "Opciones",
-    icon: "trending-up",
-    iconBg: colors.brand[500],
-    description:
-      "Apostá a la suba de acciones en las que creés y a la baja de las que no. Vos decidís.",
-    learnMore: "Más información",
-    disclosureTitle: "Divulgación de riesgo de opciones",
-    disclosureText:
-      "La operatoria de opciones se ofrece a través de Álamos Capital S.A. La operatoria de opciones conlleva un riesgo significativo y no es apropiada para todos los inversores. Ciertas estrategias complejas de opciones conllevan riesgo adicional. Para conocer más sobre los riesgos asociados con la operatoria de opciones, por favor revisá el documento de divulgación de opciones titulado Características y Riesgos de las Opciones Estandarizadas. Los inversores deben considerar cuidadosamente sus objetivos de inversión y riesgos antes de operar opciones. La documentación de respaldo para cualquier reclamo, si corresponde, será proporcionada a pedido.",
-  },
-  {
-    title: "Premium",
-    icon: "diamond",
-    iconBg: "#FFD54F",
-    description:
-      "Generá 65% TNA de interés sobre tu efectivo no invertido*, obtené depósitos instantáneos más grandes, operá con margen a tasa competitiva**, y accedé a datos de mercado de nivel II y reportes de research — todo por $4.999/mes.",
-    learnMore: "Más información",
-    disclosureTitle: "Divulgación del programa de intereses",
-    disclosureText:
-      "*Se necesita un saldo de efectivo para generar intereses a través del programa de barrido de efectivo. Los clientes que mantengan un saldo de margen no generarán intereses. Las tasas de interés para el programa de barrido de efectivo y la inversión con margen pueden cambiar en cualquier momento.\n\n**No todos los inversores serán elegibles para invertir con margen. Álamos Premium se ofrece a través de Álamos Capital S.A. La tasa de interés de margen cobrada por Álamos Capital puede variar. Las tarifas pueden cambiar sin previo aviso.",
-  },
-  {
-    title: "Crypto",
-    icon: "logo-bitcoin",
-    iconBg: "#7C4DFF",
-    description:
-      "Accedé al mercado de criptomonedas para comprar, mantener y vender Bitcoin, Ethereum, USDT y más, las 24 horas del día, los 7 días de la semana con Álamos Crypto.",
-    learnMore: "Más información",
-    disclosureTitle: "Divulgación de riesgo de crypto",
-    disclosureText:
-      "La operatoria de criptomonedas se ofrece a través de Álamos Capital S.A. La operatoria de criptomonedas conlleva riesgos significativos, incluyendo volatilidad de precios, flash crashes, manipulación del mercado y riesgos de ciberseguridad. Además, los mercados y exchanges de criptomonedas no están regulados con los mismos controles o protecciones al consumidor disponibles en la operatoria de acciones, opciones, futuros o divisas. La operatoria de criptomonedas puede generar pérdidas financieras grandes e inmediatas y es apropiada solo para inversores que puedan soportar dichas pérdidas.",
-  },
+const legalLinks: { id: string; label: string; hint: string }[] = [
+  { id: "terms", label: "Términos y condiciones", hint: "Uso del servicio" },
+  { id: "privacy", label: "Política de privacidad", hint: "Tratamiento de datos" },
+  { id: "risk", label: "Advertencia de riesgos", hint: "Inversiones y variaciones" },
+  { id: "licenses", label: "Licencias open source", hint: "Librerías de terceros" },
 ];
 
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="close" size={24} color={colors.text.primary} />
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
-      </View>
-
-      {/* Tab indicator */}
-      <View style={s.tabIndicator}>
-        <Text style={s.tabText}>Sobre nosotros</Text>
-        <View style={s.tabUnderline} />
+        <Text style={[s.headerTitle, { color: c.text }]}>Acerca de</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Feature sections */}
-        {features.map((feature, i) => (
-          <View key={i} style={s.featureSection}>
-            {/* Title */}
-            <Text style={s.featureTitle}>{feature.title}</Text>
+        <View style={s.hero}>
+          <AlamosLogo variant="mark" tone="light" size={64} />
+          <Text style={[s.heroTitle, { color: c.text }]}>Alamos Capital</Text>
+          <Text style={[s.heroSub, { color: c.textMuted }]}>
+            Inversiones simples y transparentes para el mercado argentino.
+          </Text>
+        </View>
 
-            {/* Illustration placeholder */}
-            <View style={s.illustrationArea}>
-              <View style={[s.illustrationIcon, { backgroundColor: feature.iconBg }]}>
-                <Ionicons name={feature.icon} size={32} color={colors.surface[0]} />
-              </View>
-              {/* Decorative phone */}
-              <View style={s.illustrationPhone}>
-                <View style={s.phoneLine} />
-                <View style={s.phoneLine} />
-                <View style={[s.phoneLine, { width: "60%" }]} />
-              </View>
-            </View>
+        <View
+          style={[
+            s.factsCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <FactRow label="Razón social" value="Alamos Capital ALyC S.A." />
+          <FactRow label="CUIT" value="30-•••••••••-•" />
+          <FactRow label="Matrícula CNV" value="N° 000" />
+          <FactRow label="Domicilio" value="Av. Corrientes ···, CABA" />
+          <FactRow label="Versión de la app" value="1.0.0 (build 1)" last />
+        </View>
 
-            {/* Description */}
-            <Text style={s.featureDesc}>
-              {feature.description}{" "}
-              <Text style={s.learnMore}>{feature.learnMore}</Text>
-            </Text>
-
-            {/* Disclosure */}
-            <Text style={s.disclosureTitle}>{feature.disclosureTitle}</Text>
-            <Text style={s.disclosureText}>{feature.disclosureText}</Text>
+        <View style={s.linksBlock}>
+          <Text style={[s.eyebrow, { color: c.textMuted }]}>Legal</Text>
+          <View
+            style={[
+              s.linksCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            {legalLinks.map((link, i) => (
+              <Pressable
+                key={link.id}
+                style={[
+                  s.linkRow,
+                  i > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: c.border,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.linkLabel, { color: c.text }]}>
+                    {link.label}
+                  </Text>
+                  <Text style={[s.linkHint, { color: c.textMuted }]}>
+                    {link.hint}
+                  </Text>
+                </View>
+                <Feather name="arrow-up-right" size={16} color={c.textFaint} />
+              </Pressable>
+            ))}
           </View>
-        ))}
+        </View>
 
-        {/* ── Divider ── */}
-        <View style={s.divider} />
-
-        {/* ── Disclosures ── */}
-        <View style={s.disclosuresSection}>
-          <Text style={s.disclosuresTitle}>Divulgaciones</Text>
-
-          <Text style={s.disclosuresBody}>
-            Álamos Capital S.A. (miembro del{" "}
-            <Text style={s.disclosuresLink}>Fondo de Garantía CNV</Text>
-            ), es un agente de liquidación y compensación registrado. Álamos Capital S.A. ofrece servicios de clearing y custodia de valores. Álamos Crypto S.A. ofrece servicios de operatoria de criptomonedas. Todas son subsidiarias de Álamos Group S.A. ("Álamos").
+        <View style={s.footer}>
+          <Text style={[s.footerText, { color: c.textMuted }]}>
+            Los valores expresados en la app tienen carácter informativo. Las
+            inversiones están sujetas a riesgo de mercado. Rendimientos pasados
+            no garantizan rendimientos futuros.
           </Text>
-
-          <Text style={s.copyright}>
-            © 2026 Álamos Group S.A. Álamos® es una marca registrada de Álamos Group S.A. Todos los derechos reservados.
-          </Text>
-
-          <Text style={s.refNumber}>Referencia N° 2440042</Text>
+          <AlamosLogo
+            variant="lockup"
+            tone="light"
+            size={22}
+            style={{ marginTop: 20 }}
+          />
         </View>
       </ScrollView>
     </View>
   );
 }
 
-/* ─── Styles ─── */
+function FactRow({
+  label,
+  value,
+  last,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        s.factRow,
+        !last && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: c.border,
+        },
+      ]}
+    >
+      <Text style={[s.factLabel, { color: c.textMuted }]}>{label}</Text>
+      <Text style={[s.factValue, { color: c.text }]}>{value}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Header */
+  root: { flex: 1 },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-
-  /* Tab indicator */
-  tabIndicator: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  tabUnderline: {
-    height: 2,
-    width: 100,
-    backgroundColor: colors.brand[500],
-    borderRadius: 1,
-  },
-
-  /* Feature sections */
-  featureSection: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-  featureTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.5,
-    marginBottom: 20,
-  },
-
-  /* Illustration */
-  illustrationArea: {
-    height: 160,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    marginBottom: 20,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  illustrationIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
-  illustrationPhone: {
-    width: 70,
-    height: 120,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
-    backgroundColor: colors.surface[100],
-    padding: 12,
-    justifyContent: "center",
-    gap: 8,
-  },
-  phoneLine: {
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.surface[200],
-    width: "80%",
-  },
-
-  /* Description */
-  featureDesc: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  learnMore: {
-    color: colors.text.secondary,
-    textDecorationLine: "underline",
-  },
-
-  /* Disclosure */
-  disclosureTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text.primary,
-    marginBottom: 10,
-  },
-  disclosureText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-
-  /* Divider */
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 20,
-    marginVertical: 24,
-  },
-
-  /* Disclosures section */
-  disclosuresSection: {
-    paddingHorizontal: 20,
-  },
-  disclosuresTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.text.primary,
+  headerTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
     letterSpacing: -0.3,
-    marginBottom: 16,
   },
-  disclosuresBody: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 21,
-    marginBottom: 20,
+  hero: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 16,
+    paddingBottom: 28,
+    gap: 12,
   },
-  disclosuresLink: {
-    fontWeight: "700",
-    textDecorationLine: "underline",
+  heroTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
-  copyright: {
+  heroSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.15,
+    textAlign: "center",
+    maxWidth: 300,
+  },
+  factsCard: {
+    marginHorizontal: 20,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+  },
+  factRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.md + 2,
+  },
+  factLabel: {
+    fontFamily: fontFamily[500],
     fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 19,
-    marginBottom: 16,
+    letterSpacing: -0.1,
   },
-  refNumber: {
+  factValue: {
+    fontFamily: fontFamily[600],
     fontSize: 13,
-    color: colors.text.muted,
+    letterSpacing: -0.1,
+  },
+  linksBlock: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+  },
+  eyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
+  linksCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: spacing.md + 4,
+  },
+  linkLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  linkHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.1,
+  },
+  footer: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 36,
+    paddingBottom: 20,
+  },
+  footerText: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+    letterSpacing: -0.05,
   },
 });

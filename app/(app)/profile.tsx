@@ -46,6 +46,12 @@ export default function ProfileScreen() {
           label: "Notificaciones",
           path: "/(app)/notifications",
         },
+        {
+          icon: "sliders",
+          label: "Preferencias de la app",
+          hint: "Tema, idioma, alertas",
+          path: "/(app)/settings",
+        },
       ],
     },
     {

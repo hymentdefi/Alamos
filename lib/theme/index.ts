@@ -136,19 +136,3 @@ export const ThemeContext = createContext<ThemeContextValue>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-/* ─── Legacy compat ───
-   Pantallas que aún no fueron migradas a useTheme() usan este export.
-   Apunta al tema LIGHT para que la app no se rompa mientras se migra todo.
-*/
-export const colors = {
-  brand: { 500: brand.green, 700: brand.greenDark },
-  surface: { 0: light.bg, 50: light.bgWarm, 100: light.surface, 200: light.surfaceHover },
-  text: { primary: light.text, secondary: light.textSecondary, muted: light.textMuted },
-  accent: { positive: brand.green, negative: light.red },
-  card: light.surface,
-  cardHover: light.surfaceHover,
-  border: light.border,
-  red: light.red,
-  redDim: light.redDim,
-  accentDim: light.greenDim,
-} as const;
