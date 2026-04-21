@@ -170,12 +170,6 @@ export default function ProfileScreen() {
         label="Reinversión de dividendos"
         onPress={() => setSub("drip")}
       />
-      <MenuNavItem
-        icon="trending-up-outline"
-        label="Inversión con margen"
-        onPress={() => router.push("/(app)/margin")}
-      />
-
       <View style={s.menuDivider} />
 
       {/* ── Support ── */}

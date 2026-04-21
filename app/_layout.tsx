@@ -1,12 +1,20 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View, StyleSheet, Animated } from "react-native";
+import { View, StyleSheet, Animated, Text } from "react-native";
+import {
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from "@expo-google-fonts/plus-jakarta-sans";
 import { AuthProvider, useAuth } from "../lib/auth/context";
-import { ThemeContext, themes, type ThemeMode } from "../lib/theme";
+import { ThemeContext, themes, type ThemeMode, brand, fontFamily } from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
-  const scale = useState(new Animated.Value(0.8))[0];
+  const scale = useState(new Animated.Value(0.85))[0];
   const opacity = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
@@ -19,12 +27,12 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
         }),
         Animated.spring(scale, {
           toValue: 1,
-          tension: 50,
-          friction: 7,
+          tension: 60,
+          friction: 8,
           useNativeDriver: true,
         }),
       ]),
-      Animated.delay(1200),
+      Animated.delay(900),
       Animated.timing(opacity, {
         toValue: 0,
         duration: 300,
@@ -36,7 +44,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
   return (
     <View style={splash.container}>
       <Animated.Image
-        source={require("../assets/logo-mark.png")}
+        source={require("../assets/brand-assets/empresa/png/brand-isotipo-1024.png")}
         style={[splash.logo, { opacity, transform: [{ scale }] }]}
         resizeMode="contain"
       />
@@ -65,18 +73,38 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
-  const [mode, setMode] = useState<ThemeMode>("dark");
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+
+  const [mode, setMode] = useState<ThemeMode>("light");
 
   const themeValue = useMemo(() => ({
     mode,
     c: themes[mode],
-    toggle: () => setMode((m) => (m === "dark" ? "light" : "dark")),
+    toggle: () => setMode((m) => (m === "light" ? "dark" : "light")),
   }), [mode]);
+
+  if (!fontsLoaded) {
+    return <View style={splash.container} />;
+  }
+
+  const defaultText = Text as unknown as { defaultProps?: { style?: unknown } };
+  if (!defaultText.defaultProps?.style) {
+    defaultText.defaultProps = {
+      ...(defaultText.defaultProps ?? {}),
+      style: { fontFamily: fontFamily[500] },
+    };
+  }
 
   return (
     <ThemeContext.Provider value={themeValue}>
       <AuthProvider>
-        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+        <StatusBar style={mode === "light" ? "dark" : "light"} />
         <AuthGate />
       </AuthProvider>
     </ThemeContext.Provider>
@@ -86,12 +114,12 @@ export default function RootLayout() {
 const splash = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: brand.bg,
     alignItems: "center",
     justifyContent: "center",
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 96,
+    height: 96,
   },
 });

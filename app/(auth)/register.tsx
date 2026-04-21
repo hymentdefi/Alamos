@@ -1,21 +1,29 @@
 import { useRef, useState } from "react";
 import {
-  View, Text, TextInput, Pressable, ActivityIndicator,
-  KeyboardAvoidingView, Platform, StyleSheet, Animated,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Animated,
   type TextInputProps,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useAuth } from "../../lib/auth/context";
-import { colors } from "../../lib/theme";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { AlamosLogo } from "../../lib/components/Logo";
 
-/* ─── step definitions ─── */
 interface Step {
   key: string;
   title: string;
   subtitle: string;
   placeholder: string;
+  label: string;
   keyboard: TextInputProps["keyboardType"];
   autoCapitalize?: TextInputProps["autoCapitalize"];
   secureTextEntry?: boolean;
@@ -27,6 +35,7 @@ const steps: Step[] = [
     key: "email",
     title: "¿Cuál es tu email?",
     subtitle: "Lo vas a usar para iniciar sesión.",
+    label: "Email",
     placeholder: "tu@email.com",
     keyboard: "email-address",
     autoCapitalize: "none",
@@ -35,8 +44,9 @@ const steps: Step[] = [
   {
     key: "password",
     title: "Elegí una contraseña",
-    subtitle: "Mínimo 8 caracteres.",
-    placeholder: "Contraseña",
+    subtitle: "Mínimo 8 caracteres, con una mayúscula y un número.",
+    label: "Contraseña",
+    placeholder: "••••••••",
     keyboard: "default",
     secureTextEntry: true,
     validate: (v) => v.length >= 8,
@@ -44,15 +54,18 @@ const steps: Step[] = [
   {
     key: "fullName",
     title: "¿Cómo te llamás?",
-    subtitle: "Usá tu nombre como aparece en tu DNI.",
-    placeholder: "Nombre completo",
+    subtitle: "Usá tu nombre como aparece en el DNI.",
+    label: "Nombre completo",
+    placeholder: "Martín García",
     keyboard: "default",
+    autoCapitalize: "words",
     validate: (v) => v.trim().split(" ").length >= 2,
   },
   {
     key: "cuilCuit",
     title: "¿Cuál es tu CUIL?",
-    subtitle: "Lo necesitamos por regulación de la CNV.",
+    subtitle: "Lo pide la CNV por regulación.",
+    label: "CUIL / CUIT",
     placeholder: "20-12345678-9",
     keyboard: "number-pad",
     validate: (v) => v.replace(/\D/g, "").length >= 10,
@@ -63,6 +76,7 @@ export default function RegisterScreen() {
   const { register } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({
@@ -74,29 +88,29 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [inputFocused, setInputFocused] = useState(true);
+  const [focused, setFocused] = useState(true);
 
   const inputRef = useRef<TextInput>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const fade = useRef(new Animated.Value(1)).current;
 
   const step = steps[currentStep];
   const value = values[step.key];
   const isValid = step.validate(value);
   const isLast = currentStep === steps.length - 1;
 
-  const animateTransition = (cb: () => void) => {
-    Animated.timing(fadeAnim, {
+  const animate = (cb: () => void) => {
+    Animated.timing(fade, {
       toValue: 0,
       duration: 120,
       useNativeDriver: true,
     }).start(() => {
       cb();
-      Animated.timing(fadeAnim, {
+      Animated.timing(fade, {
         toValue: 1,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }).start(() => {
-        setTimeout(() => inputRef.current?.focus(), 100);
+        setTimeout(() => inputRef.current?.focus(), 80);
       });
     });
   };
@@ -104,7 +118,6 @@ export default function RegisterScreen() {
   const goNext = async () => {
     if (!isValid) return;
     setError("");
-
     if (isLast) {
       setLoading(true);
       try {
@@ -120,8 +133,7 @@ export default function RegisterScreen() {
       }
       return;
     }
-
-    animateTransition(() => setCurrentStep((s) => s + 1));
+    animate(() => setCurrentStep((s) => s + 1));
   };
 
   const goBack = () => {
@@ -130,113 +142,138 @@ export default function RegisterScreen() {
       return;
     }
     setError("");
-    animateTransition(() => setCurrentStep((s) => s - 1));
+    animate(() => setCurrentStep((s) => s - 1));
   };
 
-  const updateValue = (text: string) => {
-    setValues((prev) => ({ ...prev, [step.key]: text }));
-  };
+  const progress = (currentStep + 1) / steps.length;
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={s.flex}
+      style={[s.flex, { backgroundColor: c.bg }]}
     >
-      {/* Header: back / close */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={s.backBtn}
+          style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
           onPress={goBack}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={12}
         >
-          {currentStep === 0 ? (
-            <Ionicons name="close" size={28} color={colors.text.primary} />
-          ) : (
-            <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
-          )}
+          <Feather
+            name={currentStep === 0 ? "x" : "arrow-left"}
+            size={18}
+            color={c.text}
+          />
         </Pressable>
+        <AlamosLogo variant="mark" tone="light" size={26} />
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Content */}
-      <Animated.View style={[s.content, { opacity: fadeAnim }]}>
-        <Text style={s.title}>{step.title}</Text>
-        <Text style={s.subtitle}>{step.subtitle}</Text>
+      <View style={s.progressWrap}>
+        <View style={[s.progressBg, { backgroundColor: c.surfaceHover }]} />
+        <View
+          style={[
+            s.progressFg,
+            {
+              backgroundColor: c.ink,
+              width: `${progress * 100}%`,
+            },
+          ]}
+        />
+      </View>
 
-        {/* Input */}
-        <View style={s.inputWrap}>
-          <TextInput
-            ref={inputRef}
-            style={[
-              s.input,
-              inputFocused && s.inputFocused,
-            ]}
-            placeholder={step.placeholder}
-            placeholderTextColor={colors.text.muted}
-            value={value}
-            onChangeText={updateValue}
-            keyboardType={step.keyboard}
-            autoCapitalize={step.autoCapitalize ?? "sentences"}
-            secureTextEntry={step.secureTextEntry && !showPassword}
-            autoFocus
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => setInputFocused(false)}
-            onSubmitEditing={goNext}
-            returnKeyType={isLast ? "done" : "next"}
-          />
-          {step.secureTextEntry && (
-            <Pressable
-              style={s.eyeBtn}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={colors.text.muted}
-              />
-            </Pressable>
-          )}
+      <Animated.View style={[s.content, { opacity: fade }]}>
+        <Text style={[s.stepCounter, { color: c.textMuted }]}>
+          Paso {currentStep + 1} de {steps.length}
+        </Text>
+        <Text style={[s.title, { color: c.text }]}>{step.title}</Text>
+        <Text style={[s.subtitle, { color: c.textMuted }]}>{step.subtitle}</Text>
+
+        <View
+          style={[
+            s.field,
+            {
+              backgroundColor: c.surface,
+              borderColor: focused ? c.ink : c.border,
+            },
+          ]}
+        >
+          <Text style={[s.fieldLabel, { color: c.textMuted }]}>{step.label}</Text>
+          <View style={s.fieldRow}>
+            <TextInput
+              ref={inputRef}
+              style={[s.input, { color: c.text, flex: 1 }]}
+              placeholder={step.placeholder}
+              placeholderTextColor={c.textFaint}
+              value={value}
+              onChangeText={(t) => setValues((p) => ({ ...p, [step.key]: t }))}
+              keyboardType={step.keyboard}
+              autoCapitalize={step.autoCapitalize ?? "sentences"}
+              secureTextEntry={step.secureTextEntry && !showPassword}
+              autoFocus
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onSubmitEditing={goNext}
+              returnKeyType={isLast ? "done" : "next"}
+            />
+            {step.secureTextEntry ? (
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={12}
+              >
+                <Feather
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={18}
+                  color={c.textMuted}
+                />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
-        {error ? <Text style={s.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={[s.error, { color: c.red }]}>{error}</Text>
+        ) : null}
 
-        {/* Legal text on first step */}
-        {currentStep === 0 && (
-          <Text style={s.legal}>
-            Al continuar, aceptás los{" "}
-            <Text style={s.legalLink}>Términos y Condiciones</Text> y la{" "}
-            <Text style={s.legalLink}>Política de Privacidad</Text> de Álamos
-            Capital.
+        {currentStep === 0 ? (
+          <Text style={[s.legal, { color: c.textMuted }]}>
+            Al continuar aceptás los{" "}
+            <Text style={[s.legalLink, { color: c.text }]}>Términos</Text> y la{" "}
+            <Text style={[s.legalLink, { color: c.text }]}>Política de Privacidad</Text>{" "}
+            de Alamos Capital.
           </Text>
-        )}
+        ) : null}
       </Animated.View>
 
-      {/* Bottom: progress + button */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
-        {/* Step indicator */}
-        <View style={s.stepIndicator}>
-          {steps.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                s.dot,
-                i === currentStep && s.dotActive,
-                i < currentStep && s.dotDone,
-              ]}
-            />
-          ))}
-        </View>
-
         <Pressable
           onPress={goNext}
           disabled={!isValid || loading}
-          style={[s.btn, isValid ? s.btnActive : s.btnDisabled]}
+          style={[
+            s.cta,
+            {
+              backgroundColor: isValid ? c.ink : c.surfaceHover,
+              opacity: loading ? 0.8 : 1,
+            },
+          ]}
         >
           {loading ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color={c.bg} />
           ) : (
-            <Text style={[s.btnText, !isValid && s.btnTextDisabled]}>
-              {isLast ? "Crear cuenta" : "Continuar"}
-            </Text>
+            <>
+              <Text
+                style={[
+                  s.ctaText,
+                  { color: isValid ? c.bg : c.textMuted },
+                ]}
+              >
+                {isLast ? "Crear cuenta" : "Continuar"}
+              </Text>
+              <Feather
+                name="arrow-right"
+                size={16}
+                color={isValid ? c.bg : c.textMuted}
+              />
+            </>
           )}
         </Pressable>
       </View>
@@ -245,134 +282,120 @@ export default function RegisterScreen() {
 }
 
 const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Header */
+  flex: { flex: 1 },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   backBtn: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  /* Content */
+  progressWrap: {
+    marginHorizontal: 24,
+    marginTop: 4,
+    height: 3,
+  },
+  progressBg: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  progressFg: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 32,
   },
+  stepCounter: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
   title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: colors.text.primary,
-    textAlign: "center",
-    marginBottom: 10,
-    letterSpacing: -0.5,
-    lineHeight: 38,
+    fontFamily: fontFamily[700],
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -1,
+    marginBottom: 8,
   },
   subtitle: {
+    fontFamily: fontFamily[500],
     fontSize: 15,
-    color: colors.text.secondary,
-    textAlign: "center",
     lineHeight: 22,
-    marginBottom: 48,
+    letterSpacing: -0.15,
+    marginBottom: 28,
   },
-
-  /* Input */
-  inputWrap: {
-    position: "relative",
+  field: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  fieldLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  fieldRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    fontSize: 17,
-    color: colors.text.primary,
-    textAlign: "center",
+    fontFamily: fontFamily[500],
+    fontSize: 16,
+    letterSpacing: -0.2,
+    paddingVertical: 4,
   },
-  inputFocused: {
-    borderColor: colors.text.primary,
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: 16,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-
   error: {
-    color: colors.red,
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 16,
-  },
-
-  /* Legal */
-  legal: {
+    fontFamily: fontFamily[500],
     fontSize: 13,
-    color: colors.text.muted,
-    textAlign: "center",
-    marginTop: 28,
-    lineHeight: 20,
-    paddingHorizontal: 8,
+    marginTop: 12,
+  },
+  legal: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 20,
+    letterSpacing: -0.1,
   },
   legalLink: {
-    textDecorationLine: "underline",
-    color: colors.text.secondary,
+    fontFamily: fontFamily[700],
   },
-
-  /* Bottom */
   bottom: {
     paddingHorizontal: 24,
-    gap: 16,
   },
-
-  /* Step dots */
-  stepIndicator: {
+  cta: {
+    height: 52,
+    borderRadius: radius.pill,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.surface[200],
-  },
-  dotActive: {
-    backgroundColor: colors.brand[500],
-    width: 24,
-  },
-  dotDone: {
-    backgroundColor: colors.brand[700],
-  },
-
-  /* Button */
-  btn: {
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnActive: {
-    backgroundColor: "#FFFFFF",
-  },
-  btnDisabled: {
-    backgroundColor: colors.surface[200],
-  },
-  btnText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#000",
-  },
-  btnTextDisabled: {
-    color: colors.text.muted,
+  ctaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 16,
+    letterSpacing: -0.2,
   },
 });

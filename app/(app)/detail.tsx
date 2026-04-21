@@ -236,16 +236,12 @@ export default function DetailScreen() {
           })}
         </View>
 
-        <Pressable
-          style={[s.cashRow, { borderTopColor: c.border, borderBottomColor: c.border }]}
-          onPress={() => router.push("/(app)/cash")}
-        >
+        <View style={[s.cashRow, { borderTopColor: c.border, borderBottomColor: c.border }]}>
           <Text style={[s.cashLabel, { color: c.text }]}>Efectivo disponible</Text>
           <View style={s.cashRight}>
             <Text style={[s.cashValue, { color: c.text }]}>{formatARS(342180)}</Text>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </View>
-        </Pressable>
+        </View>
 
         {held ? (
           <View style={s.section}>

@@ -1,72 +1,73 @@
-import { useCallback, useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme } from "../../lib/theme";
-import { assets, formatARS, type Asset } from "../../lib/data/assets";
+import Svg, {
+  Defs,
+  LinearGradient,
+  Path,
+  Stop,
+} from "react-native-svg";
+import { useTheme, type, radius, spacing, fontFamily } from "../../lib/theme";
+import {
+  assets,
+  assetIconCode,
+  formatARS,
+  formatPct,
+  type Asset,
+} from "../../lib/data/assets";
 import { useAuth } from "../../lib/auth/context";
+import { AlamosLogo } from "../../lib/components/Logo";
 
 const heldAssets = assets.filter((a) => a.held);
-const cashBalance = 342180;
 
-const activityItems = [
-  { id: "1", icon: "shopping-cart" as const, title: "Compra GGAL", date: "Hoy, 14:32", amount: -85400, status: "Ejecutada" },
-  { id: "2", icon: "arrow-down-left" as const, title: "Ingreso transferencia", date: "Ayer, 10:15", amount: 250000, status: "Acreditado" },
-  { id: "3", icon: "shopping-cart" as const, title: "Compra AL30", date: "14 abr, 09:45", amount: -120000, status: "Ejecutada" },
-  { id: "4", icon: "arrow-up-right" as const, title: "Venta YPFD", date: "12 abr, 16:20", amount: 94500, status: "Ejecutada" },
+const totalHoldings = heldAssets.reduce(
+  (sum, a) => sum + a.price * (a.qty ?? 1),
+  0,
+);
+const deltaPct = 1.96;
+const deltaAmount = Math.round((totalHoldings * deltaPct) / 100);
+
+const newsItems = [
+  {
+    id: "1",
+    category: "Mercado",
+    title: "Bonos en dólares suben fuerte tras datos de reservas",
+    time: "hace 2h",
+  },
+  {
+    id: "2",
+    category: "CEDEARs",
+    title: "NVIDIA cierra en máximos históricos, acompañada por el sector tech",
+    time: "hace 4h",
+  },
+  {
+    id: "3",
+    category: "Macro",
+    title: "Inflación de marzo se ubicaría por debajo del 3% según privados",
+    time: "hace 6h",
+  },
 ];
 
-const timeFilters = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
-
-function getGreetingOptions() {
-  const hour = new Date().getHours();
-
-  if (hour < 12) return ["Buen dia", "Hola"];
-  if (hour < 19) return ["Buenas tardes", "Hola"];
-  return ["Buenas noches", "Hola", "Cerrando el dia"];
-}
-
-function QuickAction({
-  icon,
-  label,
-  onPress,
-  iconBg,
-  iconColor,
-  textColor,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  onPress: () => void;
-  iconBg: string;
-  iconColor: string;
-  textColor: string;
-}) {
-  return (
-    <Pressable style={s.quickAction} onPress={onPress}>
-      <View style={[s.quickActionIcon, { backgroundColor: iconBg }]}>
-        <Feather name={icon} size={20} color={iconColor} />
-      </View>
-      <Text style={[s.quickActionText, { color: textColor }]}>{label}</Text>
-    </Pressable>
-  );
-}
+type TabId = "cartera" | "mercado" | "noticias";
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user } = useAuth();
-  const [hideBalance, setHideBalance] = useState(false);
-  const [greeting, setGreeting] = useState("Hola");
+  const [tab, setTab] = useState<TabId>("cartera");
 
-  const firstName = user?.fullName?.split(" ")[0] || "Chris";
+  const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
-  useFocusEffect(
-    useCallback(() => {
-      const options = getGreetingOptions();
-      setGreeting(options[Math.floor(Math.random() * options.length)]);
-    }, [])
+  const marketAssets = useMemo(
+    () =>
+      [...assets]
+        .filter((a) => !a.held)
+        .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+        .slice(0, 5),
+    [],
   );
 
   const openDetail = (asset: Asset) => {
@@ -75,355 +76,403 @@ export default function HomeScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <View style={[s.fixedTop, { backgroundColor: c.bg, paddingTop: insets.top + 16 }]}>
-        <View style={s.topBar}>
-          <Text style={[s.greeting, { color: c.text }]}>
-            {greeting}, {firstName}
-          </Text>
-          <Pressable
-            style={[s.iconButton, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-            onPress={() => router.push("/(app)/notifications")}
-            hitSlop={12}
-          >
-            <Feather name="bell" size={18} color={c.text} />
-          </Pressable>
-        </View>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <AlamosLogo variant="mark" tone="light" size={28} />
+        <Pressable
+          style={s.bellButton}
+          hitSlop={12}
+          onPress={() => router.push("/(app)/notifications")}
+        >
+          <Feather name="bell" size={20} color={c.text} />
+        </Pressable>
       </View>
 
       <ScrollView
-        style={{ backgroundColor: c.bg }}
-        contentContainerStyle={{ paddingTop: insets.top + 88, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[s.primaryCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
-          <View style={s.cardHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.cardLabel, { color: c.textSecondary }]}>Disponible</Text>
-              <View style={s.balanceRow}>
-                <Text style={[s.mainBalance, { color: c.text }]}>
-                  {hideBalance ? "$ ••••••" : formatARS(cashBalance)}
-                </Text>
-                <Pressable onPress={() => setHideBalance((value) => !value)} hitSlop={12}>
-                  <Feather
-                    name={hideBalance ? "eye-off" : "eye"}
-                    size={20}
-                    color={c.textMuted}
-                  />
-                </Pressable>
-              </View>
-              <View style={s.tnaRow}>
-                <View style={[s.tnaBadge, { backgroundColor: c.greenDim }]}>
-                  <Feather name="trending-up" size={12} color={c.green} />
-                  <Text style={[s.tnaBadgeText, { color: c.green }]}>37% TNA</Text>
-                </View>
-                <Text style={[s.tnaHint, { color: c.textSecondary }]}>
-                  Tu saldo rinde automáticamente
-                </Text>
-              </View>
-            </View>
+        <View style={s.heroBlock}>
+          <Text style={[s.greet, { color: c.textMuted }]}>Hola, {firstName}</Text>
+          <Text style={[s.balance, { color: c.text }]}>{formatARS(totalHoldings)}</Text>
+          <View style={s.deltaRow}>
+            <Text style={[s.deltaTriangle, { color: c.greenDark }]}>▲</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              {formatARS(deltaAmount)}
+            </Text>
+            <Text style={[s.deltaSep, { color: c.greenDark }]}>·</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              {formatPct(deltaPct)} hoy
+            </Text>
           </View>
 
-          <View style={s.quickActionsRow}>
-            <QuickAction
-              icon="arrow-down-left"
-              label="Ingresar"
-              onPress={() => router.push("/(app)/transfer")}
-              iconBg={c.greenDim}
-              iconColor={c.green}
-              textColor={c.text}
-            />
-            <QuickAction
-              icon="repeat"
-              label="Transferir"
-              onPress={() => router.push("/(app)/transfer")}
-              iconBg={c.surfaceHover}
-              iconColor={c.text}
-              textColor={c.text}
-            />
-            <QuickAction
-              icon="trending-up"
-              label="Invertir"
-              onPress={() => router.push("/(app)/explore")}
-              iconBg={c.surfaceHover}
-              iconColor={c.text}
-              textColor={c.text}
-            />
-            <QuickAction
-              icon="at-sign"
-              label="Alias"
-              onPress={() => router.push("/(app)/account")}
-              iconBg={c.surfaceHover}
-              iconColor={c.text}
-              textColor={c.text}
-            />
-          </View>
+          <Sparkline color={c.greenDark} />
         </View>
 
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={[s.sectionTitle, { color: c.text }]}>Tus inversiones</Text>
-            <Pressable onPress={() => router.push("/(app)/portfolio")}>
-              <Text style={[s.linkText, { color: c.green }]}>Ir a portfolio</Text>
-            </Pressable>
-          </View>
+        <View style={s.tabsWrap}>
+          <TabStrip tab={tab} onChange={setTab} />
+        </View>
 
-          <View style={[s.listCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
-            {heldAssets.slice(0, 3).map((asset, index) => {
-              const value = asset.price * (asset.qty || 1);
-              const isUp = asset.change >= 0;
-
-              return (
-                <Pressable
+        <View style={s.listBlock}>
+          {tab === "cartera" && (
+            <View>
+              {heldAssets.map((asset, i) => (
+                <AssetRow
                   key={asset.ticker}
-                  style={[
-                    s.assetRow,
-                    index < 2 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    },
-                  ]}
+                  asset={asset}
                   onPress={() => openDetail(asset)}
-                >
-                  <View style={[s.assetMark, { backgroundColor: c.surfaceHover }]}>
-                    <Text style={[s.assetMarkText, { color: c.text }]}>{asset.ticker.slice(0, 1)}</Text>
-                  </View>
-                  <View style={s.assetInfo}>
-                    <Text style={[s.assetTicker, { color: c.text }]}>{asset.ticker}</Text>
-                    <Text style={[s.assetName, { color: c.textSecondary }]}>
-                      {asset.qty} un. · {asset.name}
-                    </Text>
-                  </View>
-                  <View style={s.assetValues}>
-                    <Text style={[s.assetPrice, { color: c.text }]}>{formatARS(value)}</Text>
-                    <Text style={[s.assetChange, { color: isUp ? c.green : c.red }]}>
-                      {isUp ? "+" : ""}
-                      {asset.change.toFixed(2)}%
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                  first={i === 0}
+                />
+              ))}
+              <Pressable
+                style={s.seeAll}
+                onPress={() => router.push("/(app)/portfolio")}
+              >
+                <Text style={[s.seeAllText, { color: c.text }]}>Ver toda la cartera</Text>
+                <Feather name="arrow-right" size={16} color={c.text} />
+              </Pressable>
+            </View>
+          )}
 
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={[s.sectionTitle, { color: c.text }]}>Actividad</Text>
-            <Pressable onPress={() => router.push("/(app)/cash")}>
-              <Text style={[s.linkText, { color: c.green }]}>Ver todo</Text>
-            </Pressable>
-          </View>
+          {tab === "mercado" && (
+            <View>
+              {marketAssets.map((asset, i) => (
+                <AssetRow
+                  key={asset.ticker}
+                  asset={asset}
+                  onPress={() => openDetail(asset)}
+                  first={i === 0}
+                  showPrice
+                />
+              ))}
+              <Pressable
+                style={s.seeAll}
+                onPress={() => router.push("/(app)/explore")}
+              >
+                <Text style={[s.seeAllText, { color: c.text }]}>Ver todo el mercado</Text>
+                <Feather name="arrow-right" size={16} color={c.text} />
+              </Pressable>
+            </View>
+          )}
 
-          <View style={[s.listCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
-            {activityItems.map((item, index) => {
-              const isPositive = item.amount > 0;
-              return (
-                <View
-                  key={item.id}
+          {tab === "noticias" && (
+            <View>
+              {newsItems.map((n, i) => (
+                <Pressable
+                  key={n.id}
                   style={[
-                    s.assetRow,
-                    index < activityItems.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    },
+                    s.newsRow,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
                   ]}
+                  onPress={() => router.push("/(app)/news")}
                 >
-                  <View style={[s.activityIcon, { backgroundColor: c.surfaceHover }]}>
-                    <Feather name={item.icon} size={18} color={c.textSecondary} />
-                  </View>
-                  <View style={s.assetInfo}>
-                    <Text style={[s.assetTicker, { color: c.text }]}>{item.title}</Text>
-                    <Text style={[s.assetName, { color: c.textSecondary }]}>{item.date}</Text>
-                  </View>
-                  <View style={s.assetValues}>
-                    <Text style={[s.assetPrice, { color: isPositive ? c.green : c.text }]}>
-                      {isPositive ? "+" : ""}
-                      {formatARS(Math.abs(item.amount))}
-                    </Text>
-                    <Text style={[s.assetName, { color: c.textSecondary }]}>{item.status}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
+                  <Text style={[s.newsCategory, { color: c.textMuted }]}>
+                    {n.category.toUpperCase()} · {n.time}
+                  </Text>
+                  <Text style={[s.newsTitle, { color: c.text }]}>{n.title}</Text>
+                </Pressable>
+              ))}
+              <Pressable style={s.seeAll} onPress={() => router.push("/(app)/news")}>
+                <Text style={[s.seeAllText, { color: c.text }]}>Ver todas las noticias</Text>
+                <Feather name="arrow-right" size={16} color={c.text} />
+              </Pressable>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
   );
 }
 
+function TabStrip({
+  tab,
+  onChange,
+}: {
+  tab: TabId;
+  onChange: (t: TabId) => void;
+}) {
+  const { c } = useTheme();
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "cartera", label: "Cartera" },
+    { id: "mercado", label: "Mercado" },
+    { id: "noticias", label: "Noticias" },
+  ];
+
+  return (
+    <View style={[s.tabGroup, { backgroundColor: c.surfaceHover }]}>
+      {tabs.map((t) => {
+        const active = tab === t.id;
+        return (
+          <Pressable
+            key={t.id}
+            style={[
+              s.tab,
+              active && [
+                s.tabActive,
+                { backgroundColor: c.surface, shadowColor: c.ink },
+              ],
+            ]}
+            onPress={() => onChange(t.id)}
+          >
+            <Text
+              style={[
+                s.tabLabel,
+                { color: active ? c.text : c.textMuted },
+              ]}
+            >
+              {t.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function AssetRow({
+  asset,
+  onPress,
+  first,
+  showPrice = false,
+}: {
+  asset: Asset;
+  onPress: () => void;
+  first?: boolean;
+  showPrice?: boolean;
+}) {
+  const { c } = useTheme();
+  const value = showPrice ? asset.price : asset.price * (asset.qty ?? 1);
+  const up = asset.change >= 0;
+  const dark = asset.iconTone === "dark";
+
+  return (
+    <Pressable
+      style={[
+        s.row,
+        !first && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        },
+      ]}
+      onPress={onPress}
+    >
+      <View
+        style={[
+          s.icon,
+          {
+            backgroundColor: dark ? c.ink : c.surfaceSunken,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            s.iconText,
+            { color: dark ? c.bg : c.textSecondary },
+          ]}
+        >
+          {assetIconCode(asset)}
+        </Text>
+      </View>
+      <View style={s.rowMiddle}>
+        <Text style={[s.rowTicker, { color: c.text }]}>{asset.ticker}</Text>
+        <Text style={[s.rowSub, { color: c.textMuted }]}>{asset.subLabel}</Text>
+      </View>
+      <View style={s.rowRight}>
+        <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
+        <Text
+          style={[
+            s.rowChange,
+            { color: up ? c.greenDark : c.red },
+          ]}
+        >
+          {formatPct(asset.change)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function Sparkline({ color }: { color: string }) {
+  return (
+    <View style={s.sparkWrap}>
+      <Svg width="100%" height="100%" viewBox="0 0 260 90" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity={0.24} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Path
+          d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10 L260,90 L0,90 Z"
+          fill="url(#sparkFill)"
+        />
+        <Path
+          d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10"
+          stroke={color}
+          strokeWidth={2.4}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
+  root: { flex: 1 },
   topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  greeting: {
-    fontSize: 24,
-    fontWeight: "700",
-    letterSpacing: -0.4,
-  },
-  iconButton: {
+  bellButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryCard: {
-    marginHorizontal: 16,
-    borderRadius: 28,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 20,
+  heroBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 18,
+  greet: {
+    ...type.body,
+    marginBottom: 6,
   },
-  cardLabel: {
-    fontSize: 14,
-    fontWeight: "600",
+  balance: {
+    fontFamily: fontFamily[700],
+    fontSize: 46,
+    lineHeight: 50,
+    letterSpacing: -2,
     marginBottom: 8,
   },
-  balanceRow: {
+  deltaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  mainBalance: {
-    fontSize: 40,
-    fontWeight: "800",
-    letterSpacing: -1.4,
-  },
-  tnaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-    gap: 8,
-  },
-  tnaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  tnaBadgeText: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  tnaHint: {
-    fontSize: 13,
-  },
-  linkText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  quickActionsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  quickAction: {
-    flex: 1,
-    alignItems: "center",
-    gap: 10,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  section: {
-    paddingHorizontal: 16,
+    gap: 6,
     marginBottom: 20,
   },
-  sectionHeader: {
+  deltaTriangle: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    lineHeight: 14,
+  },
+  deltaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  deltaSep: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  sparkWrap: {
+    height: 110,
+    marginTop: 6,
+    marginHorizontal: -4,
+  },
+  tabsWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 14,
+  },
+  tabGroup: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    padding: 4,
+    borderRadius: radius.md,
+    gap: 4,
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  listCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  assetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  assetMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  assetMarkText: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  assetInfo: {
+  tab: {
     flex: 1,
-  },
-  assetTicker: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  assetName: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  assetValues: {
-    alignItems: "flex-end",
-  },
-  assetPrice: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  assetChange: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  activityIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    borderRadius: radius.sm,
+  },
+  tabActive: {
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  tabLabel: {
+    ...type.smallStrong,
+  },
+  listBlock: {
+    paddingHorizontal: 20,
+    marginTop: 4,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    gap: 14,
+  },
+  icon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.3,
+  },
+  rowMiddle: { flex: 1 },
+  rowTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  rowSub: {
+    ...type.small,
+    marginTop: 2,
+  },
+  rowRight: { alignItems: "flex-end" },
+  rowPrice: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  rowChange: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.1,
+  },
+  newsRow: {
+    paddingVertical: spacing.lg,
+  },
+  newsCategory: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  newsTitle: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  seeAll: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "transparent",
+  },
+  seeAllText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
 });

@@ -1,24 +1,32 @@
 import { useState } from "react";
 import {
-  View, Text, TextInput, Pressable, ActivityIndicator, Image,
-  KeyboardAvoidingView, Platform, Modal, StyleSheet,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useAuth } from "../../lib/auth/context";
-import { colors } from "../../lib/theme";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { AlamosLogo } from "../../lib/components/Logo";
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [helpVisible, setHelpVisible] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
@@ -40,270 +48,249 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={s.flex}
+      style={[s.flex, { backgroundColor: c.bg }]}
     >
-      {/* Header — green X */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={s.closeBtn}
+          style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.back()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={12}
         >
-          <Ionicons name="close" size={28} color={colors.brand[500]} />
+          <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
+        <AlamosLogo variant="mark" tone="light" size={26} />
+        <View style={{ width: 36 }} />
       </View>
 
       <View style={s.content}>
-        {/* Logo mark */}
-        <View style={s.logoWrap}>
-          <Image
-            source={require("../../assets/logo-mark.png")}
-            style={s.logo}
-            resizeMode="contain"
-          />
-        </View>
+        <Text style={[s.title, { color: c.text }]}>Iniciá sesión</Text>
+        <Text style={[s.subtitle, { color: c.textMuted }]}>
+          Ingresá con tu cuenta de Alamos.
+        </Text>
 
-        {/* Inputs */}
-        <View style={s.inputWrap}>
-          <TextInput
-            style={[s.input, emailFocused && s.inputFocused]}
-            placeholder="Email"
-            placeholderTextColor={colors.text.muted}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoFocus
-            onFocus={() => setEmailFocused(true)}
-            onBlur={() => setEmailFocused(false)}
-          />
-        </View>
-
-        <View style={s.inputWrap}>
-          <TextInput
-            style={[s.input, passwordFocused && s.inputFocused]}
-            placeholder="Contraseña"
-            placeholderTextColor={colors.text.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            onSubmitEditing={handleLogin}
-            returnKeyType="go"
-            onFocus={() => setPasswordFocused(true)}
-            onBlur={() => setPasswordFocused(false)}
-          />
-          <Pressable
-            style={s.inputIconRight}
-            onPress={() => setShowPassword(!showPassword)}
+        <View style={s.fields}>
+          <View
+            style={[
+              s.field,
+              {
+                backgroundColor: c.surface,
+                borderColor: emailFocused ? c.ink : c.border,
+              },
+            ]}
           >
-            <Ionicons
-              name={showPassword ? "eye-off-outline" : "eye-outline"}
-              size={20}
-              color={colors.text.muted}
+            <Text style={[s.fieldLabel, { color: c.textMuted }]}>Email</Text>
+            <TextInput
+              style={[s.input, { color: c.text }]}
+              placeholder="tu@email.com"
+              placeholderTextColor={c.textFaint}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              autoFocus
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
             />
+          </View>
+
+          <View
+            style={[
+              s.field,
+              {
+                backgroundColor: c.surface,
+                borderColor: passwordFocused ? c.ink : c.border,
+              },
+            ]}
+          >
+            <Text style={[s.fieldLabel, { color: c.textMuted }]}>Contraseña</Text>
+            <View style={s.pwRow}>
+              <TextInput
+                style={[s.input, { color: c.text, flex: 1 }]}
+                placeholder="••••••••"
+                placeholderTextColor={c.textFaint}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                onSubmitEditing={handleLogin}
+                returnKeyType="go"
+                autoComplete="current-password"
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
+              />
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={12}
+              >
+                <Feather
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={18}
+                  color={c.textMuted}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {error ? (
+            <Text style={[s.error, { color: c.red }]}>{error}</Text>
+          ) : null}
+
+          <Pressable style={s.forgot}>
+            <Text style={[s.forgotText, { color: c.textSecondary }]}>
+              Olvidé mi contraseña
+            </Text>
           </Pressable>
         </View>
-
-        {error ? <Text style={s.error}>{error}</Text> : null}
       </View>
 
-      {/* Bottom buttons */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
           onPress={handleLogin}
           disabled={!isValid || loading}
-          style={[s.btnPrimary, !isValid && s.btnPrimaryDisabled]}
+          style={[
+            s.cta,
+            {
+              backgroundColor: isValid ? c.ink : c.surfaceHover,
+              opacity: loading ? 0.8 : 1,
+            },
+          ]}
         >
           {loading ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color={c.bg} />
           ) : (
-            <Text style={[s.btnPrimaryText, !isValid && s.btnPrimaryTextDisabled]}>
-              Iniciar sesión
-            </Text>
+            <>
+              <Text
+                style={[
+                  s.ctaText,
+                  { color: isValid ? c.bg : c.textMuted },
+                ]}
+              >
+                Iniciar sesión
+              </Text>
+              <Feather
+                name="arrow-right"
+                size={16}
+                color={isValid ? c.bg : c.textMuted}
+              />
+            </>
           )}
         </Pressable>
 
         <Pressable
-          style={s.btnSecondary}
-          onPress={() => setHelpVisible(true)}
+          style={s.register}
+          onPress={() => router.replace("/(auth)/register")}
         >
-          <Text style={s.btnSecondaryText}>Necesito ayuda</Text>
+          <Text style={[s.registerText, { color: c.textMuted }]}>
+            ¿Primera vez en Alamos?{" "}
+            <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+              Crear cuenta
+            </Text>
+          </Text>
         </Pressable>
       </View>
-
-      {/* Help bottom sheet */}
-      <Modal
-        visible={helpVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setHelpVisible(false)}
-      >
-        <Pressable style={s.overlay} onPress={() => setHelpVisible(false)} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={s.sheetTitle}>Necesito ayuda</Text>
-
-          <Pressable style={s.sheetItem}>
-            <Text style={s.sheetItemText}>¿Olvidaste tu contraseña?</Text>
-          </Pressable>
-          <Pressable style={s.sheetItem}>
-            <Text style={s.sheetItemText}>¿Olvidaste tu email?</Text>
-          </Pressable>
-          <Pressable style={s.sheetItem}>
-            <Text style={s.sheetItemText}>Otra consulta</Text>
-          </Pressable>
-
-          <Pressable
-            style={s.sheetCancel}
-            onPress={() => setHelpVisible(false)}
-          >
-            <Text style={s.sheetCancelText}>Cancelar</Text>
-          </Pressable>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.surface[0] },
-
-  /* Header */
+  flex: { flex: 1 },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
-  closeBtn: {
-    width: 44,
-    height: 44,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  /* Content */
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 24,
   },
-  logoWrap: {
-    alignItems: "center",
-    marginTop: 32,
-    marginBottom: 48,
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
+    marginBottom: 8,
   },
-  logo: {
-    width: 60,
-    height: 60,
+  subtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 16,
+    letterSpacing: -0.2,
+    marginBottom: 32,
   },
-
-  /* Inputs */
-  inputWrap: {
-    position: "relative",
-    marginBottom: 12,
+  fields: {
+    gap: 12,
+  },
+  field: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  fieldLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
+    marginBottom: 2,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    fontSize: 17,
-    color: colors.text.primary,
+    fontFamily: fontFamily[500],
+    fontSize: 16,
+    letterSpacing: -0.2,
+    paddingVertical: 4,
   },
-  inputFocused: {
-    borderColor: colors.text.primary,
+  pwRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  inputIconRight: {
-    position: "absolute",
-    right: 16,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-
   error: {
-    color: colors.red,
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 12,
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    marginTop: 4,
   },
-
-  /* Bottom */
+  forgot: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+  },
+  forgotText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
   bottom: {
     paddingHorizontal: 24,
     gap: 12,
   },
-  btnPrimary: {
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.brand[500],
+  cta: {
+    height: 52,
+    borderRadius: radius.pill,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
-  btnPrimaryDisabled: {
-    backgroundColor: colors.surface[200],
-  },
-  btnPrimaryText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#000",
-  },
-  btnPrimaryTextDisabled: {
-    color: colors.text.muted,
-  },
-  btnSecondary: {
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnSecondaryText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-
-  /* Help sheet */
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  sheet: {
-    backgroundColor: colors.surface[100],
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  sheetTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.text.primary,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  sheetItem: {
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  sheetItemText: {
+  ctaText: {
+    fontFamily: fontFamily[600],
     fontSize: 16,
-    color: colors.text.primary,
-    fontWeight: "500",
+    letterSpacing: -0.2,
   },
-  sheetCancel: {
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: colors.surface[200],
+  register: {
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 24,
+    paddingVertical: 10,
   },
-  sheetCancelText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: colors.text.primary,
+  registerText: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
 });

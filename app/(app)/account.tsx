@@ -257,28 +257,6 @@ export default function AccountScreen() {
       <View style={s.thickDivider} />
 
       {/* ══════════════════════════════════════
-          SECTION 6: Stock Lending
-          ══════════════════════════════════════ */}
-      <View style={s.section}>
-        <Text style={s.subSectionLabel}>Préstamo de títulos</Text>
-        <Text style={s.healthStatus}>{lendingEnabled ? "Activado" : "Desactivado"}</Text>
-        <Text style={s.valueDesc}>
-          Con el préstamo de títulos, podés generar ingresos extra sobre tu portafolio prestando tus acciones y bonos a otros participantes del mercado.
-        </Text>
-
-        <Pressable
-          style={s.outlineBtn}
-          onPress={() => router.push("/(app)/lending")}
-        >
-          <Text style={s.outlineBtnText}>
-            {lendingEnabled ? "Desactivar préstamo" : "Activar préstamo de títulos"}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={s.thickDivider} />
-
-      {/* ══════════════════════════════════════
           SECTION 7: Cash / Efectivo
           ══════════════════════════════════════ */}
       <View style={s.section}>

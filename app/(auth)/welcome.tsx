@@ -1,44 +1,53 @@
-import { View, Text, Image, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
 import Button from "../../lib/components/Button";
+import { AlamosLogo } from "../../lib/components/Logo";
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   return (
-    <View style={s.container}>
-      {/* Top bar: X close + Log in */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={{ width: 44 }} />
-        <Pressable onPress={() => router.push("/(auth)/login")}>
-          <Text style={s.loginLink}>Iniciar sesión</Text>
+    <View style={[s.container, { backgroundColor: c.bg }]}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <AlamosLogo variant="lockup" tone="light" size={26} />
+        <Pressable
+          style={[s.loginPill, { borderColor: c.border }]}
+          onPress={() => router.push("/(auth)/login")}
+        >
+          <Text style={[s.loginText, { color: c.text }]}>Iniciar sesión</Text>
         </Pressable>
       </View>
 
-      {/* Center content */}
       <View style={s.center}>
-        <Image
-          source={require("../../assets/logo-mark.png")}
-          style={s.logo}
-          resizeMode="contain"
-        />
-        <Text style={s.title}>Invertí sin comisiones</Text>
-        <Text style={s.subtitle}>
-          Acciones, CEDEARs y bonos argentinos.{"\n"}Empezá con lo que quieras.
+        <View style={[s.eyebrow, { backgroundColor: c.surfaceHover, borderColor: c.border }]}>
+          <View style={[s.eyebrowDot, { backgroundColor: c.green }]} />
+          <Text style={[s.eyebrowText, { color: c.textSecondary }]}>Lanzamiento 2026</Text>
+        </View>
+
+        <Text style={[s.display, { color: c.text }]}>
+          Inversiones,{" "}
+          <Text style={[s.displayAccent, { backgroundColor: c.green }]}>simples</Text>
+          {"\n"}y transparentes.
+        </Text>
+
+        <Text style={[s.lede, { color: c.textMuted }]}>
+          CEDEARs, bonos soberanos y fondos comunes de inversión. Diseñados para el mercado argentino.
         </Text>
       </View>
 
-      {/* Bottom CTA */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
         <Button
-          title="Crear cuenta gratis"
+          title="Solicitar acceso"
           onPress={() => router.push("/(auth)/register")}
+          right={<Feather name="arrow-right" size={16} color={c.bg} />}
         />
-        <Text style={s.disclaimer}>
-          Todas las inversiones implican riesgo.
+        <Text style={[s.disclaimer, { color: c.textMuted }]}>
+          Alamos Capital · Todas las inversiones implican riesgo.
         </Text>
       </View>
     </View>
@@ -46,10 +55,7 @@ export default function WelcomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface[0],
-  },
+  container: { flex: 1 },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -57,43 +63,69 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 8,
   },
-  loginLink: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.brand[500],
+  loginPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  loginText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   center: {
     flex: 1,
-    alignItems: "center",
+    paddingHorizontal: 28,
     justifyContent: "center",
-    paddingHorizontal: 32,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 32,
+  eyebrow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 24,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: colors.text.primary,
-    textAlign: "center",
-    marginBottom: 12,
-    letterSpacing: -0.5,
+  eyebrowDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    textAlign: "center",
-    lineHeight: 23,
+  eyebrowText: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  display: {
+    fontFamily: fontFamily[700],
+    fontSize: 52,
+    lineHeight: 54,
+    letterSpacing: -2.2,
+    marginBottom: 20,
+  },
+  displayAccent: {
+    fontFamily: fontFamily[700],
+    paddingHorizontal: 2,
+  },
+  lede: {
+    fontFamily: fontFamily[500],
+    fontSize: 17,
+    lineHeight: 25,
+    letterSpacing: -0.2,
+    maxWidth: 380,
   },
   bottom: {
     paddingHorizontal: 24,
   },
   disclaimer: {
+    fontFamily: fontFamily[500],
     fontSize: 12,
-    color: colors.text.muted,
     textAlign: "center",
     marginTop: 12,
+    letterSpacing: -0.1,
   },
 });
