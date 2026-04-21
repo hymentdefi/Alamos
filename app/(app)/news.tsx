@@ -1,369 +1,338 @@
-import { useState, useRef } from "react";
-import {
-  View, Text, ScrollView, Pressable, StyleSheet, Animated,
-} from "react-native";
-import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
-import { colors } from "../../lib/theme";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 
-/* ─── Categories ─── */
-const tabs = [
-  { id: "all", label: "Todas" },
-  { id: "local", label: "Mercado local" },
-  { id: "dolar", label: "Dólar" },
-  { id: "cedears", label: "CEDEARs" },
-  { id: "bonos", label: "Bonos" },
-  { id: "crypto", label: "Crypto" },
-  { id: "politica", label: "Política económica" },
-] as const;
-
-type TabId = (typeof tabs)[number]["id"];
-
-/* ─── News data ─── */
 interface NewsItem {
   id: string;
-  category: TabId;
-  tag: string;
-  headline: string;
-  summary: string;
+  category: "mercado" | "cedears" | "bonos" | "macro" | "fci";
+  categoryLabel: string;
   source: string;
   time: string;
-  tickers?: { ticker: string; change: number }[];
+  title: string;
+  summary: string;
+  featured?: boolean;
 }
 
-const allNews: NewsItem[] = [
+const feed: NewsItem[] = [
   {
-    id: "1", category: "local", tag: "MERVAL",
-    headline: "El MERVAL alcanzó un nuevo máximo histórico impulsado por acciones energéticas y bancarias",
-    summary: "YPF lideró las subas con +4.2% tras reportar resultados trimestrales por encima de las expectativas. El sector bancario acompañó con Galicia subiendo 3.1%.",
-    source: "Ámbito Financiero", time: "Hace 2h",
-    tickers: [{ ticker: "YPFD", change: 4.21 }, { ticker: "GGAL", change: 3.15 }],
+    id: "1",
+    category: "mercado",
+    categoryLabel: "Mercado",
+    source: "Ámbito",
+    time: "hace 1h",
+    title: "Bonos en dólares suben fuerte y el riesgo país perfora los 750 pb",
+    summary:
+      "El Bonar 2030 avanzó más de 2% en la rueda. Inversores interpretan los datos de reservas como señal de recompra futura.",
+    featured: true,
   },
   {
-    id: "2", category: "local", tag: "Energía",
-    headline: "Pampa Energía anuncia plan de inversión de USD 500M para los próximos 3 años",
-    summary: "La compañía enfocará las inversiones en generación eólica y la expansión de su capacidad de producción de gas en Vaca Muerta.",
-    source: "El Cronista", time: "Hace 4h",
-    tickers: [{ ticker: "PAMP", change: -0.45 }],
+    id: "2",
+    category: "cedears",
+    categoryLabel: "CEDEARs",
+    source: "Reuters",
+    time: "hace 3h",
+    title: "NVIDIA cierra en máximos históricos, NASDAQ arriba casi 2%",
+    summary:
+      "La expectativa por los resultados del próximo trimestre impulsó al sector tecnológico. Los CEDEARs locales replicaron la suba.",
   },
   {
-    id: "3", category: "dolar", tag: "Dólar CCL",
-    headline: "El dólar CCL retrocede y la brecha cambiaria se ubica por debajo del 15%",
-    summary: "La demanda de divisas se mantiene contenida mientras el BCRA acumula reservas. El MEP también operó a la baja.",
-    source: "Infobae Economía", time: "Hace 3h",
-    tickers: [{ ticker: "GD30", change: 1.87 }, { ticker: "AL30", change: 0.62 }],
+    id: "3",
+    category: "macro",
+    categoryLabel: "Macro",
+    source: "Clarín",
+    time: "hace 5h",
+    title: "La inflación de marzo se ubicaría por debajo del 3% según privados",
+    summary:
+      "Consultoras como Eco Go y Orlando Ferreres proyectan IPC entre 2,6% y 2,9%. Sería el menor registro desde diciembre.",
   },
   {
-    id: "4", category: "dolar", tag: "Dólar MEP",
-    headline: "El dólar MEP perfora los $1.200 y marca mínimos de los últimos 2 meses",
-    summary: "La estabilidad cambiaria se consolida con la entrada de dólares del agro y el cumplimiento de metas del FMI.",
-    source: "Bloomberg Línea", time: "Hace 7h",
+    id: "4",
+    category: "bonos",
+    categoryLabel: "Bonos",
+    source: "El Cronista",
+    time: "hace 8h",
+    title: "Licitación del Tesoro: qué instrumentos ofrecen mejor rendimiento",
+    summary:
+      "LECAPs de corto plazo pagan entre 36% y 38% TNA. Analistas recomiendan diversificar con bonos CER en carteras conservadoras.",
   },
   {
-    id: "5", category: "cedears", tag: "Tech",
-    headline: "Apple reportó ingresos récord y los CEDEARs tecnológicos suben con fuerza",
-    summary: "Los CEDEARs de Apple y Microsoft lideran el volumen del día en el mercado local. Nvidia también registró fuerte demanda.",
-    source: "Bloomberg Línea", time: "Hace 6h",
-    tickers: [{ ticker: "AAPL.BA", change: 0.78 }, { ticker: "MSFT.BA", change: 0.43 }],
+    id: "5",
+    category: "fci",
+    categoryLabel: "Fondos",
+    source: "iProfesional",
+    time: "ayer",
+    title: "Los fondos money market mantienen flujo positivo por cuarto mes",
+    summary:
+      "Los FCI de pesos líquidos superaron los $12 billones en patrimonio administrado. Siguen siendo el instrumento preferido para el ahorro de corto plazo.",
   },
   {
-    id: "6", category: "cedears", tag: "Autos",
-    headline: "Tesla cae 2% tras reportar entregas por debajo de lo esperado en el primer trimestre",
-    summary: "El CEDEAR de Tesla fue el más operado en la rueda con ventas netas. Los analistas recortan precios objetivo.",
-    source: "Reuters", time: "Hace 8h",
-    tickers: [{ ticker: "TSLA.BA", change: -2.17 }],
-  },
-  {
-    id: "7", category: "bonos", tag: "Riesgo país",
-    headline: "Los bonos soberanos en dólares extienden su rally: el riesgo país perforó los 800 puntos",
-    summary: "La compresión del riesgo país se aceleró después de que el gobierno cumpliera con las metas fiscales del primer trimestre.",
-    source: "La Nación", time: "Hace 5h",
-    tickers: [{ ticker: "GD30", change: 1.87 }, { ticker: "AL30", change: 0.62 }],
-  },
-  {
-    id: "8", category: "bonos", tag: "Bonos AR",
-    headline: "Argentina emite un nuevo bono en dólares a 10 años con una tasa del 7.8%",
-    summary: "La emisión tuvo una demanda 3 veces superior a la oferta, reflejando la mejora en la percepción de riesgo del país.",
-    source: "El Cronista", time: "Hace 10h",
-  },
-  {
-    id: "9", category: "crypto", tag: "Bitcoin",
-    headline: "Bitcoin supera los USD 68.000 y se acerca a su máximo histórico",
-    summary: "La aprobación de ETFs spot en EEUU sigue atrayendo flujos institucionales. El halving se aproxima y los analistas esperan volatilidad.",
-    source: "CoinDesk", time: "Hace 1h",
-  },
-  {
-    id: "10", category: "crypto", tag: "Ethereum",
-    headline: "Ethereum sube 5% anticipando la actualización Dencun y la posible aprobación de un ETF spot",
-    summary: "El volumen de transacciones en la red alcanzó máximos de 6 meses. Los fondos crypto registran entradas por USD 2.4B en la semana.",
-    source: "The Block", time: "Hace 3h",
-  },
-  {
-    id: "11", category: "politica", tag: "Cepo",
-    headline: "Milei confirmó que el cepo cambiario se levantará antes de fin de año",
-    summary: "El mercado reaccionó con optimismo. Los ADRs argentinos subieron hasta 5% en Wall Street tras las declaraciones del presidente.",
-    source: "Infobae", time: "Hace 5h",
-    tickers: [{ ticker: "GGAL", change: 3.15 }],
-  },
-  {
-    id: "12", category: "politica", tag: "FMI",
-    headline: "El FMI aprobó un desembolso de USD 4.700M tras el cumplimiento de metas fiscales",
-    summary: "El directorio del organismo destacó los avances en el frente fiscal y la reducción del déficit. Las reservas del BCRA superan los USD 30.000M.",
-    source: "La Nación", time: "Hace 9h",
+    id: "6",
+    category: "mercado",
+    categoryLabel: "Mercado",
+    source: "La Nación",
+    time: "ayer",
+    title: "MERVAL en pesos vuelve a máximos con fuerte volumen",
+    summary:
+      "El índice líder subió 1,8% impulsado por bancos y energéticas. El volumen operado superó los $120.000 millones.",
   },
 ];
 
+type Filter = "todas" | NewsItem["category"];
+
+const filters: { id: Filter; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "mercado", label: "Mercado" },
+  { id: "cedears", label: "CEDEARs" },
+  { id: "bonos", label: "Bonos" },
+  { id: "fci", label: "Fondos" },
+  { id: "macro", label: "Macro" },
+];
+
 export default function NewsScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<TabId>("all");
-  const scrollRef = useRef<ScrollView>(null);
+  const { c } = useTheme();
+  const [filter, setFilter] = useState<Filter>("todas");
 
-  const filtered = activeTab === "all"
-    ? allNews
-    : allNews.filter((n) => n.category === activeTab);
+  const visible = useMemo(
+    () =>
+      filter === "todas" ? feed : feed.filter((n) => n.category === filter),
+    [filter],
+  );
 
-  const openDetail = (ticker: string) => {
-    router.push({ pathname: "/(app)/detail", params: { ticker } });
-  };
+  const featured = visible.find((n) => n.featured);
+  const rest = visible.filter((n) => !n.featured);
 
   return (
-    <View style={s.root}>
-      <View style={[s.fixedTop, { paddingTop: insets.top + 12 }]}>
-        <View style={s.header}>
-          <View style={s.titleRow}>
-            <Text style={s.title}>News</Text>
-            <View style={s.aiBadge}>
-              <Feather name="cpu" size={10} color="#000" />
-              <Text style={s.aiBadgeText}>IA</Text>
-            </View>
-          </View>
-        </View>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Text style={[s.title, { color: c.text }]}>Noticias</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.filterContent}
+          style={s.filterRow}
+        >
+          {filters.map((f) => {
+            const active = filter === f.id;
+            return (
+              <Pressable
+                key={f.id}
+                onPress={() => setFilter(f.id)}
+                style={[
+                  s.filterPill,
+                  {
+                    backgroundColor: active ? c.ink : c.surfaceHover,
+                    borderColor: active ? c.ink : c.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    s.filterLabel,
+                    { color: active ? c.bg : c.textSecondary },
+                  ]}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Category tabs */}
       <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.tabsScroll}
-        style={[s.tabsContainer, { marginTop: insets.top + 64 }]}
-      >
-        {tabs.map((tab) => (
-          <Pressable
-            key={tab.id}
-            style={[s.tab, activeTab === tab.id && s.tabActive]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <Text style={[s.tabText, activeTab === tab.id && s.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* News list */}
-      <ScrollView
-        style={s.list}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        {filtered.map((item, idx) => (
-          <View key={item.id}>
-            <View style={s.newsCard}>
-              <View style={s.newsTop}>
-                <View style={s.newsTagRow}>
-                  <Text style={s.newsTag}>{item.tag}</Text>
-                </View>
-                <Text style={s.newsTime}>{item.time}</Text>
+        {featured ? (
+          <Pressable
+            style={[s.featuredCard, { backgroundColor: c.ink }]}
+          >
+            <View style={s.featuredBadges}>
+              <View
+                style={[
+                  s.featuredTag,
+                  { backgroundColor: "rgba(0,230,118,0.2)" },
+                ]}
+              >
+                <Text style={[s.featuredTagText, { color: c.green }]}>
+                  {featured.categoryLabel}
+                </Text>
               </View>
-              <Text style={s.newsHeadline}>{item.headline}</Text>
-              <Text style={s.newsSummary}>{item.summary}</Text>
-              <View style={s.newsBottom}>
-                {item.tickers && item.tickers.length > 0 && (
-                  <View style={s.tickerChips}>
-                    {item.tickers.map((t) => {
-                      const up = t.change >= 0;
-                      return (
-                        <Pressable
-                          key={t.ticker}
-                          style={[s.chip, { backgroundColor: up ? "rgba(0,230,118,0.10)" : "rgba(255,68,68,0.10)" }]}
-                          onPress={() => openDetail(t.ticker)}
-                        >
-                          <Text style={[s.chipText, { color: up ? colors.brand[500] : colors.red }]}>
-                            {t.ticker} {up ? "+" : ""}{t.change.toFixed(2)}%
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-                <Text style={s.newsSource}>{item.source}</Text>
-              </View>
+              <Text style={[s.featuredMeta, { color: "rgba(250,250,247,0.6)" }]}>
+                {featured.source} · {featured.time}
+              </Text>
             </View>
-            {idx < filtered.length - 1 && <View style={s.cardDivider} />}
-          </View>
-        ))}
+            <Text style={[s.featuredTitle, { color: c.bg }]}>
+              {featured.title}
+            </Text>
+            <Text
+              style={[s.featuredSummary, { color: "rgba(250,250,247,0.72)" }]}
+            >
+              {featured.summary}
+            </Text>
+          </Pressable>
+        ) : null}
 
-        {filtered.length === 0 && (
+        <View style={s.list}>
+          {rest.map((n, i) => (
+            <Pressable
+              key={n.id}
+              style={[
+                s.item,
+                i > 0 && {
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: c.border,
+                },
+              ]}
+            >
+              <View style={s.itemMeta}>
+                <Text style={[s.itemCategory, { color: c.textSecondary }]}>
+                  {n.categoryLabel.toUpperCase()}
+                </Text>
+                <Text style={[s.itemSource, { color: c.textMuted }]}>
+                  {n.source} · {n.time}
+                </Text>
+              </View>
+              <Text style={[s.itemTitle, { color: c.text }]}>{n.title}</Text>
+              <Text style={[s.itemSummary, { color: c.textMuted }]}>
+                {n.summary}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {visible.length === 0 ? (
           <View style={s.empty}>
-            <Feather name="inbox" size={40} color="rgba(255,255,255,0.08)" />
-            <Text style={s.emptyText}>No hay noticias en esta categoría</Text>
+            <Text style={[s.emptyTitle, { color: c.text }]}>Sin novedades</Text>
+            <Text style={[s.emptySub, { color: c.textMuted }]}>
+              Cambiá de categoría para ver más.
+            </Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000000" },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    backgroundColor: "#000000",
-  },
-
-  /* Header */
+  root: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
+    marginBottom: 16,
+  },
+  filterRow: {
+    marginHorizontal: -20,
+  },
+  filterContent: {
+    paddingHorizontal: 20,
     gap: 8,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.8,
-  },
-  aiBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: colors.brand[500],
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  aiBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#000",
-  },
-
-  /* Tabs */
-  tabsContainer: {
-    maxHeight: 44,
-  },
-  tabsScroll: {
-    paddingHorizontal: 16,
-    gap: 6,
-    paddingBottom: 12,
-  },
-  tab: {
-    paddingHorizontal: 16,
+  filterPill: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  tabActive: {
-    backgroundColor: colors.text.primary,
+  filterLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.muted,
+  featuredCard: {
+    marginHorizontal: 20,
+    borderRadius: radius.xl,
+    padding: 20,
+    marginTop: 16,
   },
-  tabTextActive: {
-    color: "#000",
-  },
-
-  /* List */
-  list: { flex: 1 },
-
-  /* News card */
-  newsCard: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  newsTop: {
+  featuredBadges: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+  },
+  featuredTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  featuredTagText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  featuredMeta: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+  },
+  featuredTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    lineHeight: 26,
+    letterSpacing: -0.6,
     marginBottom: 10,
   },
-  newsTagRow: {
+  featuredSummary: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.15,
+  },
+  list: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+  },
+  item: {
+    paddingVertical: spacing.lg,
+  },
+  itemMeta: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  newsTag: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.brand[500],
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  newsTime: {
-    fontSize: 12,
-    color: colors.text.muted,
-  },
-  newsHeadline: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text.primary,
-    lineHeight: 24,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  newsSummary: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 21,
-  },
-  newsBottom: {
-    marginTop: 14,
-    gap: 10,
-  },
-  tickerChips: {
-    flexDirection: "row",
     gap: 8,
-    flexWrap: "wrap",
+    marginBottom: 6,
   },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+  itemCategory: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 1,
   },
-  chipText: {
-    fontSize: 12,
-    fontWeight: "700",
+  itemSource: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
   },
-  newsSource: {
-    fontSize: 12,
-    color: colors.text.muted,
+  itemTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.3,
+    marginBottom: 6,
   },
-  cardDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginHorizontal: 20,
+  itemSummary: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.1,
   },
-
-  /* Empty */
   empty: {
     alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
+    paddingVertical: 60,
   },
-  emptyText: {
-    fontSize: 15,
-    color: colors.text.muted,
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
   },
 });

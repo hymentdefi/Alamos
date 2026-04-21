@@ -1,663 +1,531 @@
-import { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Modal,
-  StyleSheet,
-} from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { assets, formatARS } from "../../lib/data/assets";
-import { useTheme } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import {
+  assets,
+  assetIconCode,
+  formatARS,
+  formatPct,
+  type AssetCategory,
+} from "../../lib/data/assets";
+import { Sparkline, pathFromSeed } from "../../lib/components/Sparkline";
 
-const timeFilters = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
-
-interface CompanyInfo {
-  shortName: string;
-  description: string;
-  sector: string;
-  market: string;
-  risk: string;
-}
-
-const companyInfo: Record<string, CompanyInfo> = {
-  YPFD: {
-    shortName: "YPF",
-    description: "Principal empresa de energia de Argentina, con exposicion a petroleo, gas y refinacion.",
-    sector: "Energia",
-    market: "Acciones AR",
-    risk: "Media",
-  },
-  GD30: {
-    shortName: "GD30",
-    description: "Bono soberano en dolares emitido por Argentina con vencimiento en 2030.",
-    sector: "Bonos",
-    market: "Renta fija",
-    risk: "Alta",
-  },
-  ALUA: {
-    shortName: "Aluar",
-    description: "Productor argentino de aluminio con fuerte sensibilidad al ciclo industrial local.",
-    sector: "Materiales",
-    market: "Acciones AR",
-    risk: "Media",
-  },
-  "AAPL.BA": {
-    shortName: "Apple",
-    description: "CEDEAR de Apple, una de las companias tecnologicas mas grandes del mundo.",
-    sector: "Tecnologia",
-    market: "CEDEAR",
-    risk: "Media",
-  },
-  "MSFT.BA": {
-    shortName: "Microsoft",
-    description: "CEDEAR de Microsoft, con exposicion a software, nube e inteligencia artificial.",
-    sector: "Tecnologia",
-    market: "CEDEAR",
-    risk: "Media",
-  },
-};
-
-const defaultInfo: CompanyInfo = {
-  shortName: "Activo",
-  description: "Activo disponible para invertir desde Alamos.",
-  sector: "General",
-  market: "Mercado",
-  risk: "Media",
-};
-
-const relatedByTicker: Record<string, string[]> = {
-  YPFD: ["PAMP", "ALUA", "TXAR"],
-  ALUA: ["TXAR", "YPFD", "PAMP"],
-  "AAPL.BA": ["MSFT.BA", "AMZN.BA", "TSLA.BA"],
-  default: ["YPFD", "GD30", "AAPL.BA"],
-};
-
-function chartPoints(period: (typeof timeFilters)[number], positive: boolean): number[] {
-  const rising: Record<(typeof timeFilters)[number], number[]> = {
-    "1D": [38, 40, 39, 43, 46, 44, 48, 50, 49, 52, 55, 57, 56, 60, 63, 62, 66, 68, 70, 73],
-    "1S": [45, 44, 46, 48, 47, 49, 50, 52, 54, 53, 55, 57, 59, 60, 62, 61, 63, 64, 66, 68],
-    "1M": [32, 35, 37, 36, 40, 43, 42, 46, 44, 48, 50, 49, 52, 54, 57, 56, 60, 62, 64, 67],
-    "3M": [25, 28, 30, 34, 33, 37, 40, 42, 41, 45, 47, 50, 52, 55, 57, 60, 62, 64, 67, 70],
-    "1A": [20, 22, 25, 29, 31, 35, 34, 39, 41, 45, 49, 48, 53, 56, 59, 61, 64, 68, 70, 74],
-    "MAX": [12, 16, 20, 24, 28, 32, 31, 36, 40, 44, 49, 52, 56, 60, 63, 67, 70, 74, 77, 82],
-  };
-
-  const falling: Record<(typeof timeFilters)[number], number[]> = {
-    "1D": [62, 60, 58, 59, 55, 53, 54, 51, 48, 47, 45, 43, 44, 40, 38, 36, 37, 34, 35, 33],
-    "1S": [66, 64, 62, 63, 61, 59, 58, 56, 55, 54, 52, 53, 50, 49, 47, 46, 45, 43, 44, 42],
-    "1M": [72, 70, 68, 66, 67, 64, 61, 60, 58, 56, 57, 53, 50, 49, 46, 45, 43, 41, 39, 38],
-    "3M": [78, 75, 73, 70, 68, 66, 63, 61, 60, 57, 55, 53, 50, 49, 46, 44, 42, 39, 37, 35],
-    "1A": [86, 82, 79, 75, 72, 69, 66, 62, 60, 57, 54, 51, 48, 45, 43, 41, 38, 36, 34, 32],
-    "MAX": [92, 88, 84, 80, 77, 72, 68, 64, 61, 57, 54, 50, 47, 43, 40, 37, 34, 31, 29, 27],
-  };
-
-  return positive ? rising[period] : falling[period];
-}
+const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
+type Range = (typeof ranges)[number];
 
 export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const [range, setRange] = useState<Range>("1D");
 
-  const [activeTime, setActiveTime] = useState<(typeof timeFilters)[number]>("1D");
-  const [showTradeSheet, setShowTradeSheet] = useState(false);
-
-  const asset = assets.find((item) => item.ticker === ticker);
+  const asset = useMemo(() => assets.find((a) => a.ticker === ticker), [ticker]);
   if (!asset) return null;
 
-  const info = companyInfo[asset.ticker] || defaultInfo;
-  const related = (relatedByTicker[asset.ticker] || relatedByTicker.default)
-    .map((code) => assets.find((item) => item.ticker === code))
-    .filter(Boolean);
+  const up = asset.change >= 0;
+  const color = up ? c.greenDark : c.red;
+  const chartPath = useMemo(
+    () => pathFromSeed(`${asset.ticker}-${range}`, up ? "up" : "down"),
+    [asset.ticker, range, up],
+  );
 
-  const isPositive = asset.change >= 0;
-  const chartColor = isPositive ? c.green : c.red;
-  const points = chartPoints(activeTime, isPositive);
-  const priceChangeAmount = Math.round(asset.price * Math.abs(asset.change) / 100);
-  const held = asset.held && !!asset.qty;
-  const qty = asset.qty || 0;
-  const positionValue = asset.price * qty;
-  const portfolioShare = ((positionValue / 4287430) * 100).toFixed(1);
-  const averageCost = Math.round(asset.price * 0.91);
-  const totalReturn = (asset.price - averageCost) * qty;
-  const totalReturnPct = averageCost > 0 ? (((asset.price - averageCost) / averageCost) * 100).toFixed(2) : "0.00";
-
-  const statCards = [
-    { label: "Mercado", value: info.market },
-    { label: "Sector", value: info.sector },
-    { label: "Riesgo", value: info.risk },
-  ];
+  const position = asset.held && asset.qty ? asset.qty : 0;
+  const positionValue = position * asset.price;
 
   return (
-    <View style={[s.container, { backgroundColor: c.bg }]}>
-      <View
-        style={[
-          s.fixedTop,
-          {
-            backgroundColor: c.bg,
-            borderBottomColor: c.bg,
-            paddingTop: insets.top + 6,
-          },
-        ]}
-      >
-        <View style={s.headerRow}>
-          <Pressable
-            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-            onPress={() => router.back()}
-            hitSlop={12}
-          >
-            <Ionicons name="chevron-back" size={20} color={c.text} />
-          </Pressable>
-          <View style={s.headerTitleWrap}>
-            <Text style={[s.headerTicker, { color: c.text }]}>{asset.ticker}</Text>
-            <Text style={[s.headerName, { color: c.textSecondary }]}>{info.shortName}</Text>
-          </View>
-          <Pressable
-            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-            onPress={() => router.push("/(app)/notifications")}
-            hitSlop={12}
-          >
-            <Ionicons name="notifications-outline" size={18} color={c.text} />
-          </Pressable>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <View style={s.topCenter}>
+          <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>
+          <Text style={[s.topSub, { color: c.textMuted }]} numberOfLines={1}>
+            {asset.subLabel}
+          </Text>
         </View>
+        <Pressable style={[s.iconBtn, { backgroundColor: c.surfaceHover }]} hitSlop={12}>
+          <Feather name="bookmark" size={18} color={c.text} />
+        </Pressable>
       </View>
 
       <ScrollView
-        style={{ backgroundColor: c.bg }}
-        contentContainerStyle={{ paddingTop: insets.top + 78, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.hero}>
-          <Text style={[s.companyName, { color: c.text }]}>{asset.name}</Text>
-          <Text style={[s.price, { color: c.text }]}>{formatARS(asset.price)}</Text>
-          <Text style={[s.changeLine, { color: chartColor }]}>
-            {isPositive ? "+" : "-"}
-            {formatARS(priceChangeAmount)} ({isPositive ? "+" : ""}
-            {asset.change.toFixed(2)}%) {activeTime === "1D" ? "hoy" : "en " + activeTime.toLowerCase()}
-          </Text>
-        </View>
-
-        <View style={s.chartArea}>
-          <View style={[s.chartContent, { borderBottomColor: chartColor }]}>
-            {points.map((point, index) => {
-              if (index === 0) return null;
-              const previous = points[index - 1];
-              const segmentWidth = 100 / (points.length - 1);
-              const minimum = Math.min(...points);
-              const maximum = Math.max(...points);
-              const range = maximum - minimum || 1;
-              const y1 = 100 - ((previous - minimum) / range) * 100;
-              const y2 = 100 - ((point - minimum) / range) * 100;
-
-              return (
-                <View
-                  key={index}
-                  style={{
-                    position: "absolute",
-                    left: `${(index - 1) * segmentWidth}%`,
-                    width: `${segmentWidth}%`,
-                    top: `${(y1 + y2) / 2}%`,
-                    height: 2,
-                    backgroundColor: chartColor,
-                    borderRadius: 999,
-                    transform: [{ rotate: `${Math.atan2(y2 - y1, segmentWidth) * 0.3}rad` }],
-                  }}
-                />
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.timeRow}>
-          {timeFilters.map((filter) => {
-            const isActive = activeTime === filter;
-            return (
-              <Pressable
-                key={filter}
+        <View style={s.heroBlock}>
+          <View style={s.identRow}>
+            <View
+              style={[
+                s.identIcon,
+                {
+                  backgroundColor:
+                    asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
+                },
+              ]}
+            >
+              <Text
                 style={[
-                  s.timeButton,
-                  {
-                    backgroundColor: isActive ? chartColor : "transparent",
-                    borderColor: isActive ? chartColor : "transparent",
-                  },
+                  s.identIconText,
+                  { color: asset.iconTone === "dark" ? c.bg : c.textSecondary },
                 ]}
-                onPress={() => setActiveTime(filter)}
               >
-                <Text style={[s.timeButtonText, { color: isActive ? "#000000" : chartColor }]}>
-                  {filter}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={[s.cashRow, { borderTopColor: c.border, borderBottomColor: c.border }]}>
-          <Text style={[s.cashLabel, { color: c.text }]}>Efectivo disponible</Text>
-          <View style={s.cashRight}>
-            <Text style={[s.cashValue, { color: c.text }]}>{formatARS(342180)}</Text>
-          </View>
-        </View>
-
-        {held ? (
-          <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: c.text }]}>Tu posicion</Text>
-            <View style={s.positionCard}>
-              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
-                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Tenes</Text>
-                <Text style={[s.positionValue, { color: c.text }]}>{qty} un.</Text>
-              </View>
-              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
-                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Valor actual</Text>
-                <Text style={[s.positionValue, { color: c.text }]}>{formatARS(positionValue)}</Text>
-              </View>
-              <View style={[s.positionRow, { borderBottomColor: c.border }]}>
-                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Costo promedio</Text>
-                <Text style={[s.positionValue, { color: c.text }]}>{formatARS(averageCost)}</Text>
-              </View>
-              <View style={s.positionRow}>
-                <Text style={[s.positionLabel, { color: c.textSecondary }]}>Resultado total</Text>
-                <Text style={[s.positionValue, { color: totalReturn >= 0 ? c.green : c.red }]}>
-                  {totalReturn >= 0 ? "+" : "-"}
-                  {formatARS(Math.abs(totalReturn))} ({totalReturn >= 0 ? "+" : ""}
-                  {totalReturnPct}%)
-                </Text>
-              </View>
+                {assetIconCode(asset)}
+              </Text>
             </View>
-            <Text style={[s.positionFootnote, { color: c.textMuted }]}>
-              Representa {portfolioShare}% de tu portfolio.
-            </Text>
-          </View>
-        ) : (
-          <View style={s.section}>
-            <View style={[s.learnCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
-              <Text style={[s.learnTitle, { color: c.text }]}>Todavia no invertiste en este activo</Text>
-              <Text style={[s.learnBody, { color: c.textSecondary }]}>
-                Podes empezar con un monto simple en pesos y sumar despues si te convence.
+            <View style={{ flex: 1 }}>
+              <Text style={[s.identName, { color: c.text }]}>{asset.name}</Text>
+              <Text style={[s.identLabel, { color: c.textMuted }]}>
+                {categoryLabel(asset.category)}
               </Text>
             </View>
           </View>
-        )}
 
-        <View style={s.section}>
-          <Text style={[s.sectionTitle, { color: c.text }]}>Lo importante</Text>
-          <Text style={[s.description, { color: c.textSecondary }]}>{info.description}</Text>
-          <View style={s.statsRow}>
-            {statCards.map((stat) => (
-              <View
-                key={stat.label}
-                style={[s.statCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-              >
-                <Text style={[s.statLabel, { color: c.textMuted }]}>{stat.label}</Text>
-                <Text style={[s.statValue, { color: c.text }]}>{stat.value}</Text>
-              </View>
-            ))}
+          <Text style={[s.price, { color: c.text }]}>{formatARS(asset.price)}</Text>
+          <View style={s.deltaRow}>
+            <Text style={[s.deltaTri, { color }]}>{up ? "▲" : "▼"}</Text>
+            <Text style={[s.deltaText, { color }]}>{formatPct(asset.change)}</Text>
+            <Text style={[s.deltaSep, { color }]}>·</Text>
+            <Text style={[s.deltaText, { color }]}>{rangeLabel(range)}</Text>
           </View>
-        </View>
 
-        <View style={s.section}>
-          <Text style={[s.sectionTitle, { color: c.text }]}>Tambien miran</Text>
-          <View style={s.relatedList}>
-            {related.map((item) => {
-              if (!item) return null;
-              const up = item.change >= 0;
+          <Sparkline
+            color={color}
+            path={chartPath}
+            height={160}
+            style={{ marginTop: 20 }}
+          />
 
+          <View style={s.rangeRow}>
+            {ranges.map((r) => {
+              const active = r === range;
               return (
                 <Pressable
-                  key={item.ticker}
-                  style={[s.relatedRow, { borderBottomColor: c.border }]}
-                  onPress={() => router.push({ pathname: "/(app)/detail", params: { ticker: item.ticker } })}
+                  key={r}
+                  onPress={() => setRange(r)}
+                  style={[
+                    s.rangePill,
+                    active && { backgroundColor: c.surfaceHover },
+                  ]}
                 >
-                  <View>
-                    <Text style={[s.relatedTicker, { color: c.text }]}>{item.ticker}</Text>
-                    <Text style={[s.relatedName, { color: c.textSecondary }]}>{item.name}</Text>
-                  </View>
-                  <Text style={[s.relatedChange, { color: up ? c.green : c.red }]}>
-                    {up ? "+" : ""}
-                    {item.change.toFixed(2)}%
+                  <Text
+                    style={[
+                      s.rangeText,
+                      { color: active ? c.text : c.textMuted },
+                    ]}
+                  >
+                    {r}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
         </View>
+
+        {position > 0 ? (
+          <View
+            style={[
+              s.positionCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <Text style={[s.cardEyebrow, { color: c.textMuted }]}>Tu posición</Text>
+            <View style={s.positionRow}>
+              <View>
+                <Text style={[s.positionLabel, { color: c.textMuted }]}>
+                  Valor
+                </Text>
+                <Text style={[s.positionValue, { color: c.text }]}>
+                  {formatARS(positionValue)}
+                </Text>
+              </View>
+              <View>
+                <Text
+                  style={[
+                    s.positionLabel,
+                    { color: c.textMuted, textAlign: "right" },
+                  ]}
+                >
+                  Unidades
+                </Text>
+                <Text
+                  style={[
+                    s.positionValue,
+                    { color: c.text, textAlign: "right" },
+                  ]}
+                >
+                  {position}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        <View
+          style={[
+            s.statsCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <Text style={[s.cardEyebrow, { color: c.textMuted }]}>Información</Text>
+          {stats(asset).map((row, i, arr) => (
+            <View
+              key={row.label}
+              style={[
+                s.statRow,
+                i < arr.length - 1 && {
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: c.border,
+                },
+              ]}
+            >
+              <Text style={[s.statLabel, { color: c.textMuted }]}>{row.label}</Text>
+              <Text style={[s.statValue, { color: c.text }]}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={[
+            s.aboutCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <Text style={[s.cardEyebrow, { color: c.textMuted }]}>
+            Sobre {asset.name}
+          </Text>
+          <Text style={[s.aboutText, { color: c.textSecondary }]}>
+            {aboutText(asset.category)}
+          </Text>
+        </View>
       </ScrollView>
 
-      <View
-        style={[
-          s.bottomBar,
-          {
-            backgroundColor: c.bg,
-            borderTopColor: c.border,
-            paddingBottom: insets.bottom + 8,
-          },
-        ]}
-      >
+      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 14 }]}>
         <Pressable
-          style={[s.secondaryButton, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-          onPress={() => router.push("/(app)/explore")}
+          style={[s.btn, { backgroundColor: c.surfaceHover }]}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/buy",
+              params: { ticker: asset.ticker, mode: "sell" },
+            })
+          }
+          disabled={position === 0}
         >
-          <Text style={[s.secondaryButtonText, { color: c.text }]}>Explorar</Text>
+          <Text
+            style={[
+              s.btnText,
+              { color: position > 0 ? c.text : c.textMuted },
+            ]}
+          >
+            Vender
+          </Text>
         </Pressable>
         <Pressable
-          style={[s.primaryButton, { backgroundColor: chartColor }]}
-          onPress={() => setShowTradeSheet(true)}
+          style={[s.btn, { backgroundColor: c.ink }]}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/buy",
+              params: { ticker: asset.ticker, mode: "buy" },
+            })
+          }
         >
-          <Text style={s.primaryButtonText}>{held ? "Operar" : "Comprar"}</Text>
+          <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
         </Pressable>
       </View>
-
-      <Modal
-        visible={showTradeSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowTradeSheet(false)}
-      >
-        <Pressable style={s.overlay} onPress={() => setShowTradeSheet(false)} />
-        <View style={[s.sheet, { backgroundColor: c.surfaceRaised, paddingBottom: insets.bottom + 16 }]}>
-          <Text style={[s.sheetTitle, { color: c.text }]}>{asset.ticker}</Text>
-          <Pressable
-            style={[s.sheetButton, { backgroundColor: c.green }]}
-            onPress={() => {
-              setShowTradeSheet(false);
-              router.push({ pathname: "/(app)/buy", params: { ticker: asset.ticker, mode: "buy" } });
-            }}
-          >
-            <Text style={s.sheetPrimaryText}>Comprar</Text>
-          </Pressable>
-          {held ? (
-            <Pressable
-              style={[s.sheetButton, { backgroundColor: c.surfaceHover, borderColor: c.border, borderWidth: 1 }]}
-              onPress={() => {
-                setShowTradeSheet(false);
-                router.push({ pathname: "/(app)/buy", params: { ticker: asset.ticker, mode: "sell" } });
-              }}
-            >
-              <Text style={[s.sheetSecondaryText, { color: c.text }]}>Vender</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={s.sheetClose} onPress={() => setShowTradeSheet(false)}>
-            <Ionicons name="close" size={22} color={c.text} />
-          </Pressable>
-        </View>
-      </Modal>
     </View>
   );
 }
 
+function categoryLabel(cat: AssetCategory): string {
+  const labels: Record<AssetCategory, string> = {
+    cedears: "CEDEAR",
+    bonos: "Bono soberano",
+    fci: "Fondo común de inversión",
+    acciones: "Acción argentina",
+    obligaciones: "Obligación negociable",
+    letras: "Letra del Tesoro",
+    caucion: "Caución bursátil",
+  };
+  return labels[cat];
+}
+
+function rangeLabel(r: Range): string {
+  switch (r) {
+    case "1D":
+      return "hoy";
+    case "1S":
+      return "esta semana";
+    case "1M":
+      return "este mes";
+    case "3M":
+      return "estos 3 meses";
+    case "1A":
+      return "este año";
+    case "MAX":
+      return "histórico";
+  }
+}
+
+function stats(asset: ReturnType<typeof useMemo<any>> | any): { label: string; value: string }[] {
+  const rows = [
+    { label: "Precio actual", value: formatARS(asset.price) },
+    { label: "Variación", value: formatPct(asset.change) },
+  ];
+  switch (asset.category as AssetCategory) {
+    case "cedears":
+      rows.push(
+        { label: "Mercado de origen", value: "NASDAQ / NYSE" },
+        { label: "Ratio de conversión", value: "10:1" },
+        { label: "Moneda origen", value: "USD" },
+      );
+      break;
+    case "bonos":
+      rows.push(
+        { label: "Ley aplicable", value: asset.subLabel.includes("NY") ? "Nueva York" : "Argentina" },
+        { label: "Moneda", value: "USD" },
+        { label: "Vencimiento", value: "2030" },
+      );
+      break;
+    case "fci":
+      rows.push(
+        { label: "Tipo de fondo", value: asset.subLabel.includes("Variable") ? "Renta variable" : "Renta fija" },
+        { label: "Moneda", value: "Pesos" },
+        { label: "Horizonte sugerido", value: "Corto plazo" },
+      );
+      break;
+    case "obligaciones":
+      rows.push(
+        { label: "Emisor", value: asset.name.split(" ON")[0] },
+        { label: "Moneda", value: "USD" },
+      );
+      break;
+    case "letras":
+      rows.push({ label: "Vencimiento", value: "Corto plazo" });
+      break;
+    case "caucion":
+      rows.push({ label: "Plazo", value: "Según contrato" });
+      break;
+    default:
+      rows.push({ label: "Tipo", value: categoryLabel(asset.category) });
+  }
+  return rows;
+}
+
+function aboutText(cat: AssetCategory): string {
+  switch (cat) {
+    case "cedears":
+      return "Certificado de depósito argentino que representa acciones de empresas del exterior. Operan en pesos en BYMA.";
+    case "bonos":
+      return "Título de deuda emitido por el Tesoro Nacional. Paga intereses periódicos y devuelve el capital al vencimiento.";
+    case "fci":
+      return "Fondo común de inversión administrado por una gestora local. Invertí un monto mínimo bajo y podés rescatar cuando quieras.";
+    case "acciones":
+      return "Acción de una empresa argentina que cotiza en BYMA. Te convertís en accionista y participás de los resultados de la compañía.";
+    case "obligaciones":
+      return "Título de deuda privado emitido por una empresa. Suele rendir más que los bonos del Tesoro.";
+    case "letras":
+      return "Letra capitalizable del Tesoro. Corto plazo, rendimiento fijo.";
+    case "caucion":
+      return "Préstamo de corto plazo entre inversores con garantía en títulos públicos. Rinde pesos a tasa de mercado.";
+  }
+}
+
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
-  headerRow: {
+  root: { flex: 1 },
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 12,
   },
-  headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitleWrap: {
+  topCenter: {
+    flex: 1,
     alignItems: "center",
   },
-  headerTicker: {
+  topTicker: {
+    fontFamily: fontFamily[700],
     fontSize: 15,
-    fontWeight: "700",
+    letterSpacing: -0.2,
   },
-  headerName: {
-    fontSize: 12,
+  topSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    marginTop: 1,
+  },
+  heroBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  identRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  identIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  identIconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.3,
+  },
+  identName: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+  },
+  identLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
     marginTop: 2,
   },
-  hero: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  companyName: {
-    fontSize: 30,
-    fontWeight: "500",
-    letterSpacing: -0.5,
-    marginBottom: 10,
-  },
   price: {
+    fontFamily: fontFamily[700],
     fontSize: 42,
-    fontWeight: "800",
-    letterSpacing: -1.6,
+    letterSpacing: -1.8,
   },
-  changeLine: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  chartArea: {
-    height: 290,
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    marginTop: 12,
-  },
-  chartContent: {
-    height: 240,
-    position: "relative",
-    borderBottomWidth: 0,
-  },
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingHorizontal: 20,
-    marginBottom: 14,
-  },
-  timeButton: {
-    minWidth: 44,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  timeButtonText: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  cashRow: {
-    marginHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 18,
-  },
-  cashLabel: {
-    fontSize: 17,
-    fontWeight: "500",
-  },
-  cashRight: {
+  deltaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    marginTop: 6,
   },
-  cashValue: {
-    fontSize: 16,
-    fontWeight: "700",
+  deltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
   },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
+  deltaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: -0.6,
-    marginBottom: 14,
+  deltaSep: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  rangeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    marginHorizontal: -4,
+  },
+  rangePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  rangeText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: 0.4,
   },
   positionCard: {
-    borderRadius: 22,
-    overflow: "hidden",
+    marginHorizontal: 20,
+    marginTop: 24,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 18,
+  },
+  cardEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 12,
   },
   positionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   positionLabel: {
-    fontSize: 14,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginBottom: 4,
   },
   positionValue: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.7,
   },
-  positionFootnote: {
-    fontSize: 13,
-    marginTop: 10,
+  statsCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 18,
+    paddingTop: 16,
   },
-  learnCard: {
-    borderRadius: 24,
+  statRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: spacing.md,
+  },
+  statLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  statValue: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  aboutCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 18,
   },
-  learnTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  learnBody: {
+  aboutText: {
+    fontFamily: fontFamily[500],
     fontSize: 14,
     lineHeight: 20,
-  },
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 14,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-  },
-  statLabel: {
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  statValue: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  relatedList: {},
-  relatedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  relatedTicker: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  relatedName: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  relatedChange: {
-    fontSize: 14,
-    fontWeight: "700",
+    letterSpacing: -0.15,
   },
   bottomBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
     flexDirection: "row",
     gap: 10,
-  },
-  secondaryButton: {
-    width: 92,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 15,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  primaryButton: {
-    flex: 1,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 15,
-  },
-  primaryButtonText: {
-    color: "#000000",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 10,
+    paddingTop: 12,
   },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  sheetButton: {
+  btn: {
+    flex: 1,
     height: 52,
-    borderRadius: 18,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  sheetPrimaryText: {
-    color: "#000000",
+  btnText: {
+    fontFamily: fontFamily[600],
     fontSize: 16,
-    fontWeight: "800",
-  },
-  sheetSecondaryText: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  sheetClose: {
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
+    letterSpacing: -0.2,
   },
 });

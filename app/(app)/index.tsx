@@ -3,13 +3,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import Svg, {
-  Defs,
-  LinearGradient,
-  Path,
-  Stop,
-} from "react-native-svg";
 import { useTheme, type, radius, spacing, fontFamily } from "../../lib/theme";
+import { Sparkline } from "../../lib/components/Sparkline";
 import {
   assets,
   assetIconCode,
@@ -105,7 +100,7 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <Sparkline color={c.greenDark} />
+          <Sparkline color={c.greenDark} style={{ marginTop: 6 }} />
         </View>
 
         <View style={s.tabsWrap}>
@@ -291,33 +286,6 @@ function AssetRow({
   );
 }
 
-function Sparkline({ color }: { color: string }) {
-  return (
-    <View style={s.sparkWrap}>
-      <Svg width="100%" height="100%" viewBox="0 0 260 90" preserveAspectRatio="none">
-        <Defs>
-          <LinearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={color} stopOpacity={0.24} />
-            <Stop offset="1" stopColor={color} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
-        <Path
-          d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10 L260,90 L0,90 Z"
-          fill="url(#sparkFill)"
-        />
-        <Path
-          d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10"
-          stroke={color}
-          strokeWidth={2.4}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
@@ -370,11 +338,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 14,
     opacity: 0.6,
-  },
-  sparkWrap: {
-    height: 110,
-    marginTop: 6,
-    marginHorizontal: -4,
   },
   tabsWrap: {
     paddingHorizontal: 20,

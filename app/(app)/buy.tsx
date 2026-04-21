@@ -1,47 +1,44 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  StyleSheet,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { assets, formatARS } from "../../lib/data/assets";
-import { useTheme } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { assets, assetIconCode, formatARS } from "../../lib/data/assets";
 
 const AVAILABLE_CASH = 342180;
 
-const recurringOptions = [
-  { key: "once", label: "Una vez", hint: "Compra unica" },
-  { key: "weekly", label: "Semanal", hint: "Todos los lunes" },
-  { key: "monthly", label: "Mensual", hint: "El dia 1" },
+const keys = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  [".", "0", "back"],
 ] as const;
 
 export default function BuyScreen() {
-  const { ticker, mode } = useLocalSearchParams<{ ticker: string; mode?: string }>();
+  const { ticker, mode } = useLocalSearchParams<{
+    ticker: string;
+    mode?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
 
-  const asset = assets.find((item) => item.ticker === ticker);
+  const asset = assets.find((a) => a.ticker === ticker);
   const isSell = mode === "sell";
-
   const [amount, setAmount] = useState("0");
-  const [frequency, setFrequency] = useState<(typeof recurringOptions)[number]["key"]>("once");
-  const [showFrequency, setShowFrequency] = useState(false);
 
   if (!asset) return null;
 
-  const available = isSell ? asset.price * (asset.qty || 0) : AVAILABLE_CASH;
-  const parsedAmount = Number.parseFloat(amount) || 0;
-  const hasAmount = parsedAmount > 0;
-  const exceedsAvailable = parsedAmount > available;
-  const estimatedUnits = parsedAmount > 0 ? parsedAmount / asset.price : 0;
+  const available = isSell
+    ? asset.price * (asset.qty ?? 0)
+    : AVAILABLE_CASH;
+  const parsed = Number.parseFloat(amount) || 0;
+  const hasAmount = parsed > 0;
+  const exceeds = parsed > available;
+  const estUnits = parsed / asset.price;
 
-  const quickAmounts = isSell
+  const quick = isSell
     ? [
         { label: "25%", value: Math.round(available * 0.25) },
         { label: "50%", value: Math.round(available * 0.5) },
@@ -53,436 +50,329 @@ export default function BuyScreen() {
         { label: formatARS(100000), value: 100000 },
       ];
 
-  const selectedFrequency = recurringOptions.find((option) => option.key === frequency);
-  const primaryColor = isSell ? c.red : c.green;
-
-  const handleKey = (key: string) => {
-    if (key === "back") {
-      setAmount((previous) => {
-        const next = previous.slice(0, -1);
-        return next.length === 0 ? "0" : next;
-      });
+  const handleKey = (k: string) => {
+    if (k === "back") {
+      setAmount((p) => (p.length <= 1 ? "0" : p.slice(0, -1)));
       return;
     }
-
-    if (key === ".") {
+    if (k === ".") {
       if (amount.includes(".")) return;
-      setAmount((previous) => previous + ".");
+      setAmount((p) => p + ".");
       return;
     }
-
-    setAmount((previous) => {
-      if (previous === "0") return key;
-      if (previous.includes(".") && previous.split(".")[1].length >= 2) return previous;
-      return previous + key;
+    setAmount((p) => {
+      if (p === "0") return k;
+      if (p.includes(".") && p.split(".")[1].length >= 2) return p;
+      return p + k;
     });
   };
 
-  const handleContinue = () => {
-    if (!hasAmount || exceedsAvailable) return;
-
+  const onContinue = () => {
+    if (!hasAmount || exceeds) return;
     router.push({
       pathname: "/(app)/confirm",
       params: {
         ticker: asset.ticker,
-        amount: String(parsedAmount),
+        amount: String(parsed),
         mode: isSell ? "sell" : "buy",
-        frequency,
       },
     });
   };
 
   return (
-    <View style={[s.container, { backgroundColor: c.bg }]}>
-      <View
-        style={[
-          s.fixedTop,
-          {
-            backgroundColor: c.bg,
-            paddingTop: insets.top + 8,
-          },
-        ]}
-      >
-        <View style={s.header}>
-          <Pressable
-            style={[s.headerIcon, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="close" size={20} color={c.text} />
-          </Pressable>
-          <View style={s.headerCenter}>
-            <Text style={[s.headerTitle, { color: c.text }]}>
-              {isSell ? "Vender" : "Comprar"} {asset.ticker}
-            </Text>
-            <Text style={[s.headerSubtitle, { color: c.textSecondary }]}>{asset.name}</Text>
-          </View>
-          <View style={s.headerGhost} />
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <View style={s.headerCenter}>
+          <Text style={[s.headerTitle, { color: c.text }]}>
+            {isSell ? "Vender" : "Comprar"} {asset.ticker}
+          </Text>
+          <Text style={[s.headerSub, { color: c.textMuted }]}>
+            {isSell
+              ? `${asset.qty ?? 0} unidades disponibles`
+              : `Efectivo ${formatARS(available)}`}
+          </Text>
         </View>
+        <View style={{ width: 36 }} />
       </View>
 
-      <View style={[s.content, { paddingTop: insets.top + 88, paddingBottom: insets.bottom + 12 }]}>
-        <View style={s.hero}>
-          <Text style={[s.heroLabel, { color: c.textSecondary }]}>
-            {isSell ? "Cuanto queres vender" : "Cuanto queres invertir"}
-          </Text>
-          <View style={s.amountRow}>
-            <Text style={[s.amountSign, { color: c.textMuted }]}>$</Text>
-            <Text style={[s.amountValue, { color: c.text }]}>
-              {amount === "0" ? "0" : Number(amount).toLocaleString("es-AR")}
-            </Text>
-          </View>
-          <Text style={[s.estimate, { color: c.textSecondary }]}>
-            {hasAmount ? `≈ ${estimatedUnits.toFixed(4)} unidades` : "Elegi un monto en pesos"}
-          </Text>
-        </View>
-
-        <View style={s.chipsRow}>
-          {quickAmounts.map((option) => (
-            <Pressable
-              key={option.label}
-              style={[s.quickChip, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-              onPress={() => setAmount(String(option.value))}
-            >
-              <Text style={[s.quickChipText, { color: c.text }]}>{option.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {!isSell ? (
-          <Pressable
-            style={[s.frequencyRow, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}
-            onPress={() => setShowFrequency(true)}
-          >
-            <View>
-              <Text style={[s.frequencyLabel, { color: c.textSecondary }]}>Frecuencia</Text>
-              <Text style={[s.frequencyValue, { color: c.text }]}>{selectedFrequency?.label}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </Pressable>
-        ) : null}
-
-        <View style={[s.summaryCard, { backgroundColor: c.surfaceRaised, borderColor: c.border }]}>
-          <View style={[s.summaryRow, { borderBottomColor: c.border }]}>
-            <Text style={[s.summaryLabel, { color: c.textSecondary }]}>
-              {isSell ? "Tenes disponible" : "Disponible para invertir"}
-            </Text>
-            <Text style={[s.summaryValue, { color: c.text }]}>{formatARS(available)}</Text>
-          </View>
-          <View style={s.summaryRow}>
-            <Text style={[s.summaryLabel, { color: c.textSecondary }]}>Precio estimado</Text>
-            <Text style={[s.summaryValue, { color: c.text }]}>{formatARS(asset.price)}</Text>
-          </View>
-        </View>
-
-        {exceedsAvailable ? (
-          <Text style={[s.errorText, { color: c.red }]}>
-            El monto supera lo que tenes disponible.
-          </Text>
-        ) : null}
-
-        <View style={s.keypad}>
-          {[
-            ["1", "2", "3"],
-            ["4", "5", "6"],
-            ["7", "8", "9"],
-            [".", "0", "back"],
-          ].map((row, rowIndex) => (
-            <View key={rowIndex} style={s.keypadRow}>
-              {row.map((key) => (
-                <Pressable
-                  key={key}
-                  style={s.keypadKey}
-                  onPress={() => handleKey(key)}
-                >
-                  {key === "back" ? (
-                    <Ionicons name="backspace-outline" size={24} color={c.text} />
-                  ) : (
-                    <Text style={[s.keypadKeyText, { color: c.text }]}>{key}</Text>
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          ))}
-        </View>
-
-        <View style={s.footer}>
-          <Pressable
+      <View style={s.amountSection}>
+        <Text style={[s.amountLabel, { color: c.textMuted }]}>
+          Monto en pesos
+        </Text>
+        <View style={s.amountRow}>
+          <Text style={[s.amountSign, { color: c.textMuted }]}>$</Text>
+          <Text
             style={[
-              s.continueButton,
+              s.amountValue,
+              { color: exceeds ? c.red : c.text },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {Number.parseFloat(amount || "0").toLocaleString("es-AR", {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            })}
+            {amount.endsWith(".") ? "," : ""}
+          </Text>
+        </View>
+        <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
+          {exceeds
+            ? `Supera lo disponible (${formatARS(available)})`
+            : hasAmount
+            ? `≈ ${estUnits.toFixed(4)} unidades de ${asset.ticker}`
+            : " "}
+        </Text>
+      </View>
+
+      <View style={s.quickRow}>
+        {quick.map((q) => (
+          <Pressable
+            key={q.label}
+            onPress={() => setAmount(String(q.value))}
+            style={[
+              s.quickPill,
+              { backgroundColor: c.surfaceHover, borderColor: c.border },
+            ]}
+          >
+            <Text style={[s.quickText, { color: c.text }]}>{q.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={s.keypad}>
+        {keys.map((row, ri) => (
+          <View key={ri} style={s.keyRow}>
+            {row.map((k) => (
+              <Pressable
+                key={k}
+                onPress={() => handleKey(k)}
+                style={s.keyBtn}
+                android_ripple={{ color: c.surfaceHover, borderless: true }}
+              >
+                {k === "back" ? (
+                  <Feather name="delete" size={22} color={c.text} />
+                ) : (
+                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        ))}
+      </View>
+
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
+        <View style={s.assetStrip}>
+          <View
+            style={[
+              s.stripIcon,
               {
-                backgroundColor: hasAmount && !exceedsAvailable ? primaryColor : c.surfaceHover,
+                backgroundColor:
+                  asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
               },
             ]}
-            onPress={handleContinue}
-            disabled={!hasAmount || exceedsAvailable}
           >
             <Text
               style={[
-                s.continueButtonText,
-                { color: hasAmount && !exceedsAvailable ? "#000000" : c.textMuted },
+                s.stripIconText,
+                { color: asset.iconTone === "dark" ? c.bg : c.textSecondary },
               ]}
             >
-              Revisar
+              {assetIconCode(asset)}
             </Text>
-          </Pressable>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.stripTicker, { color: c.text }]}>{asset.ticker}</Text>
+            <Text style={[s.stripSub, { color: c.textMuted }]}>
+              {asset.subLabel}
+            </Text>
+          </View>
+          <Text style={[s.stripPrice, { color: c.text }]}>
+            {formatARS(asset.price)}
+          </Text>
         </View>
-      </View>
 
-      <Modal
-        visible={showFrequency}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowFrequency(false)}
-      >
-        <Pressable style={s.overlay} onPress={() => setShowFrequency(false)} />
-        <View
+        <Pressable
           style={[
-            s.sheet,
+            s.cta,
             {
-              backgroundColor: c.surfaceRaised,
-              paddingBottom: insets.bottom + 16,
+              backgroundColor:
+                hasAmount && !exceeds ? c.ink : c.surfaceHover,
             },
           ]}
+          onPress={onContinue}
+          disabled={!hasAmount || exceeds}
         >
-          <Text style={[s.sheetTitle, { color: c.text }]}>Elegi la frecuencia</Text>
-          {recurringOptions.map((option) => {
-            const isActive = option.key === frequency;
-            return (
-              <Pressable
-                key={option.key}
-                style={[s.sheetOption, { borderBottomColor: c.border }]}
-                onPress={() => {
-                  setFrequency(option.key);
-                  setShowFrequency(false);
-                }}
-              >
-                <View>
-                  <Text style={[s.sheetOptionTitle, { color: c.text }]}>{option.label}</Text>
-                  <Text style={[s.sheetOptionHint, { color: c.textSecondary }]}>{option.hint}</Text>
-                </View>
-                <View
-                  style={[
-                    s.radio,
-                    { borderColor: isActive ? c.green : c.border, backgroundColor: isActive ? c.green : "transparent" },
-                  ]}
-                />
-              </Pressable>
-            );
-          })}
-          <Pressable style={s.sheetClose} onPress={() => setShowFrequency(false)}>
-            <Ionicons name="close" size={22} color={c.text} />
-          </Pressable>
-        </View>
-      </Modal>
+          <Text
+            style={[
+              s.ctaText,
+              {
+                color: hasAmount && !exceeds ? c.bg : c.textMuted,
+              },
+            ]}
+          >
+            Revisar orden
+          </Text>
+          <Feather
+            name="arrow-right"
+            size={16}
+            color={hasAmount && !exceeds ? c.bg : c.textMuted}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
+  root: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 12,
   },
-  headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerCenter: {
-    alignItems: "center",
-  },
+  headerCenter: { flex: 1, alignItems: "center" },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  headerGhost: {
-    width: 38,
-    height: 38,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  hero: {
-    alignItems: "center",
-    marginTop: 16,
-  },
-  heroLabel: {
+    fontFamily: fontFamily[700],
     fontSize: 15,
-    fontWeight: "600",
+    letterSpacing: -0.2,
+  },
+  headerSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    marginTop: 1,
+  },
+  amountSection: {
+    alignItems: "center",
+    paddingTop: 32,
+    paddingBottom: 12,
+  },
+  amountLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
     marginBottom: 12,
   },
   amountRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "baseline",
+    paddingHorizontal: 24,
   },
   amountSign: {
-    fontSize: 34,
-    marginTop: 12,
-    marginRight: 4,
+    fontFamily: fontFamily[700],
+    fontSize: 32,
+    marginRight: 6,
   },
   amountValue: {
-    fontSize: 68,
-    fontWeight: "800",
-    letterSpacing: -2.2,
+    fontFamily: fontFamily[700],
+    fontSize: 58,
+    letterSpacing: -2.4,
   },
-  estimate: {
-    fontSize: 14,
+  amountHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
     marginTop: 8,
   },
-  chipsRow: {
+  quickRow: {
     flexDirection: "row",
+    justifyContent: "center",
     gap: 8,
-    marginTop: 22,
-    marginBottom: 14,
-  },
-  quickChip: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  frequencyRow: {
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  frequencyLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  frequencyValue: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  summaryCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  summaryLabel: {
-    fontSize: 14,
-  },
-  summaryValue: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  errorText: {
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: 12,
-  },
-  keypad: {
-    marginTop: 18,
-    gap: 6,
-  },
-  keypadRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  keypadKey: {
-    width: "33%",
-    height: 58,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  keypadKeyText: {
-    fontSize: 30,
-    fontWeight: "500",
-  },
-  footer: {
-    marginTop: "auto",
+    paddingHorizontal: 20,
     paddingTop: 8,
   },
-  continueButton: {
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
+  quickPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: radius.pill,
   },
-  continueButtonText: {
-    fontSize: 16,
-    fontWeight: "800",
+  quickText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  keypad: {
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  sheetOption: {
+  keyRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    justifyContent: "space-around",
   },
-  sheetOptionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  sheetOptionHint: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1,
-  },
-  sheetClose: {
+  keyBtn: {
+    flex: 1,
+    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
-    height: 48,
-    marginTop: 6,
+  },
+  keyText: {
+    fontFamily: fontFamily[600],
+    fontSize: 26,
+    letterSpacing: -0.5,
+  },
+  bottom: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  assetStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+  stripIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stripIconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+  },
+  stripTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  stripSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    marginTop: 1,
+  },
+  stripPrice: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  cta: {
+    height: 52,
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  ctaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 16,
+    letterSpacing: -0.2,
   },
 });

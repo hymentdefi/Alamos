@@ -1,7 +1,8 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 
 export default function SuccessScreen() {
@@ -13,6 +14,7 @@ export default function SuccessScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   const isSell = mode === "sell";
   const asset = assets.find((a) => a.ticker === ticker);
@@ -20,178 +22,160 @@ export default function SuccessScreen() {
   const numQty = Number(qty) || 0;
 
   const rows = [
-    {
-      label: "Monto en ARS",
-      value: formatARS(numAmount),
-      underline: true,
-    },
+    { label: "Activo", value: asset?.name ?? "—" },
+    { label: "Monto", value: formatARS(numAmount) },
     {
       label: "Precio de ejecución",
       value: asset ? formatARS(asset.price) : "—",
     },
     {
-      label: isSell ? `${ticker} vendidos` : `${ticker} comprados`,
-      value: `${numQty.toFixed(6)} ${ticker}`,
-    },
-    {
-      label: `Nueva posición ${ticker}`,
-      value: `${numQty.toFixed(6)} ${ticker}`,
+      label: isSell ? "Unidades vendidas" : "Unidades compradas",
+      value: `${numQty.toFixed(4)} ${ticker}`,
     },
   ];
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      {/* Top gradient area */}
-      <View style={s.gradientArea} />
-
-      {/* Card */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>
-          Orden de {ticker} completada
+    <View
+      style={[
+        s.root,
+        { backgroundColor: c.bg, paddingTop: insets.top + 24 },
+      ]}
+    >
+      <View style={s.heroBlock}>
+        <View
+          style={[s.checkCircle, { backgroundColor: c.green }]}
+        >
+          <Feather name="check" size={36} color={c.ink} strokeWidth={3} />
+        </View>
+        <Text style={[s.title, { color: c.text }]}>
+          Orden {isSell ? "de venta" : "de compra"} enviada
         </Text>
-        <Text style={s.cardDesc}>
-          Tu orden de mercado para {isSell ? "vender" : "comprar"} {formatARS(numAmount)} de {ticker} fue ejecutada.
+        <Text style={[s.subtitle, { color: c.textMuted }]}>
+          Tu orden de mercado por {formatARS(numAmount)} de{" "}
+          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+            {ticker}
+          </Text>{" "}
+          fue ejecutada correctamente.
         </Text>
+      </View>
 
+      <View
+        style={[
+          s.card,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
         {rows.map((row, i) => (
-          <View key={i}>
-            <View style={s.cardRow}>
-              <Text style={[s.cardRowLabel, row.underline && s.cardRowLabelUnderline]}>
-                {row.label}
-              </Text>
-              <Text style={s.cardRowValue}>{row.value}</Text>
-            </View>
-            {i < rows.length - 1 && <View style={s.cardDivider} />}
+          <View
+            key={row.label}
+            style={[
+              s.row,
+              i < rows.length - 1 && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: c.border,
+              },
+            ]}
+          >
+            <Text style={[s.rowLabel, { color: c.textMuted }]}>{row.label}</Text>
+            <Text style={[s.rowValue, { color: c.text }]}>{row.value}</Text>
           </View>
         ))}
       </View>
 
-      {/* Buttons */}
-      <View style={[s.buttons, { paddingBottom: insets.bottom + 20 }]}>
-        <Pressable
-          style={s.doneBtn}
-          onPress={() => router.replace("/(app)")}
-        >
-          <Text style={s.doneBtnText}>Listo</Text>
-        </Pressable>
+      <View style={{ flex: 1 }} />
 
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <Pressable
-          style={s.viewOrderBtn}
+          style={[s.cta, { backgroundColor: c.ink }]}
           onPress={() => router.replace("/(app)")}
         >
-          <Text style={s.viewOrderBtnText}>Ver orden</Text>
+          <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+        </Pressable>
+        <Pressable
+          style={s.secondary}
+          onPress={() => router.replace("/(app)/portfolio")}
+        >
+          <Text style={[s.secondaryText, { color: c.textSecondary }]}>
+            Ver mi cartera
+          </Text>
         </Pressable>
       </View>
-
-      {/* Bottom gradient decoration */}
-      <View style={s.bottomGradient} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface[0],
-    justifyContent: "flex-end",
+  root: { flex: 1 },
+  heroBlock: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
-
-  /* Top gradient */
-  gradientArea: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 180,
-    backgroundColor: "#1a0a1a",
-    opacity: 0.3,
-  },
-
-  /* Card */
-  card: {
-    backgroundColor: colors.surface[100],
-    borderRadius: 20,
-    marginHorizontal: 20,
-    padding: 24,
+  checkCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 24,
   },
-  cardTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.5,
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -1.1,
+    textAlign: "center",
     marginBottom: 10,
   },
-  cardDesc: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 20,
-    marginBottom: 24,
+  subtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.15,
+    textAlign: "center",
   },
-  cardRow: {
+  card: {
+    marginHorizontal: 20,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+  },
+  row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: spacing.md,
   },
-  cardRowLabel: {
+  rowLabel: {
+    fontFamily: fontFamily[500],
     fontSize: 14,
-    color: colors.text.secondary,
   },
-  cardRowLabelUnderline: {
-    textDecorationLine: "underline",
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-  cardRowValue: {
+  rowValue: {
+    fontFamily: fontFamily[600],
     fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.primary,
+    letterSpacing: -0.15,
   },
-  cardDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-
-  /* Buttons */
-  buttons: {
+  bottom: {
     paddingHorizontal: 20,
-    gap: 10,
+    gap: 4,
   },
-  doneBtn: {
+  cta: {
     height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.text.primary,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  doneBtnText: {
+  ctaText: {
+    fontFamily: fontFamily[600],
     fontSize: 16,
-    fontWeight: "700",
-    color: colors.surface[0],
+    letterSpacing: -0.2,
   },
-  viewOrderBtn: {
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: colors.surface[200],
+  secondary: {
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 12,
   },
-  viewOrderBtnText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-
-  /* Bottom gradient */
-  bottomGradient: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: "#0a0a1a",
-    opacity: 0.15,
+  secondaryText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
   },
 });

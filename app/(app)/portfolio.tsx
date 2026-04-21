@@ -1,534 +1,463 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { colors } from "../../lib/theme";
-import { assets, formatARS, type Asset } from "../../lib/data/assets";
+import { Feather } from "@expo/vector-icons";
+import { useTheme, fontFamily, radius, spacing, type ThemeColors } from "../../lib/theme";
+import {
+  assets,
+  assetIconCode,
+  formatARS,
+  formatPct,
+  type Asset,
+  type AssetCategory,
+} from "../../lib/data/assets";
+import { Sparkline } from "../../lib/components/Sparkline";
 
-const heldAssets = assets.filter((a) => a.held);
-const totalValue = heldAssets.reduce((s, a) => s + a.price * (a.qty || 1), 0);
+const CASH = 342180;
 
-const timeFilters = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
-const timeLabels: Record<(typeof timeFilters)[number], string> = {
-  "1D": "hoy",
-  "1S": "esta semana",
-  "1M": "este mes",
-  "3M": "estos 3 meses",
-  "1A": "este ano",
-  "MAX": "desde el inicio",
+const categoryLabels: Record<AssetCategory, string> = {
+  cedears: "CEDEARs",
+  bonos: "Bonos",
+  fci: "Fondos",
+  acciones: "Acciones AR",
+  obligaciones: "Obligaciones",
+  letras: "Letras",
+  caucion: "Caución",
 };
-
-const changeByTime: Record<(typeof timeFilters)[number], { amount: number; pct: number }> = {
-  "1D": { amount: 127650, pct: 3.07 },
-  "1S": { amount: 89430, pct: 2.13 },
-  "1M": { amount: -156200, pct: -3.52 },
-  "3M": { amount: 412300, pct: 10.63 },
-  "1A": { amount: 1023400, pct: 31.35 },
-  "MAX": { amount: 1287430, pct: 42.93 },
-};
-
-const tabs = ["Acciones", "Bonos", "CEDEARs"] as const;
-type Tab = (typeof tabs)[number];
-
-const categoryMap: Record<Tab, Asset["category"]> = {
-  Acciones: "acciones",
-  Bonos: "bonos",
-  CEDEARs: "cedears",
-};
-
-const donutColors = {
-  Acciones: "#FFFFFF",
-  Bonos: "#8E8E93",
-  CEDEARs: "#2C2C2E",
-} as const;
-
-const DONUT_SEGMENTS = 72;
-
-function chartPoints(period: (typeof timeFilters)[number]): number[] {
-  const series: Record<(typeof timeFilters)[number], number[]> = {
-    "1D": [38, 42, 39, 45, 48, 46, 52, 54, 53, 57, 59, 58, 62, 64, 63, 67, 69, 68, 72, 76],
-    "1S": [44, 43, 45, 47, 49, 48, 50, 52, 51, 53, 56, 55, 57, 60, 59, 61, 63, 62, 65, 67],
-    "1M": [70, 66, 64, 60, 56, 58, 54, 50, 48, 45, 44, 42, 43, 41, 40, 38, 39, 37, 38, 36],
-    "3M": [28, 31, 35, 38, 36, 41, 44, 47, 45, 50, 53, 56, 54, 58, 62, 61, 65, 68, 70, 74],
-    "1A": [22, 25, 30, 34, 33, 38, 42, 47, 45, 50, 55, 58, 56, 61, 66, 69, 72, 76, 79, 82],
-    "MAX": [12, 17, 20, 24, 29, 33, 36, 40, 44, 47, 51, 56, 59, 63, 67, 70, 74, 79, 84, 88],
-  };
-
-  return series[period];
-}
-
-function getCategoryValue(cat: Asset["category"]) {
-  return heldAssets
-    .filter((a) => a.category === cat)
-    .reduce((s, a) => s + a.price * (a.qty || 1), 0);
-}
 
 export default function PortfolioScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<Tab>("Acciones");
-  const [activeTime, setActiveTime] = useState<(typeof timeFilters)[number]>("1D");
+  const { c } = useTheme();
 
-  const change = changeByTime[activeTime];
-  const positive = change.pct >= 0;
-  const accentColor = positive ? colors.brand[500] : colors.red;
-  const points = chartPoints(activeTime);
+  const held = useMemo(() => assets.filter((a) => a.held), []);
 
-  const filteredAssets = heldAssets.filter((a) => a.category === categoryMap[activeTab]);
-  const donutData = tabs.map((tab) => {
-    const value = getCategoryValue(categoryMap[tab]);
-    const pct = totalValue > 0 ? (value / totalValue) * 100 : 0;
+  const { byCategory, totalHoldings } = useMemo(() => {
+    const map = new Map<AssetCategory, { total: number; items: Asset[] }>();
+    let totalH = 0;
+    for (const a of held) {
+      const v = a.price * (a.qty ?? 1);
+      totalH += v;
+      const entry = map.get(a.category) ?? { total: 0, items: [] };
+      entry.total += v;
+      entry.items.push(a);
+      map.set(a.category, entry);
+    }
     return {
-      tab,
-      value,
-      pct,
-      color: donutColors[tab],
+      byCategory: [...map.entries()].sort((a, b) => b[1].total - a[1].total),
+      totalHoldings: totalH,
     };
-  });
-  const activeSlice = donutData.find((slice) => slice.tab === activeTab)!;
-  const donutSegments = donutData
-    .flatMap((slice) => {
-      const count = Math.max(1, Math.round((slice.pct / 100) * DONUT_SEGMENTS));
-      return Array.from({ length: count }, () => ({
-        tab: slice.tab,
-        color: slice.color,
-        active: slice.tab === activeTab,
-      }));
-    })
-    .slice(0, DONUT_SEGMENTS);
+  }, [held]);
 
-  while (donutSegments.length < DONUT_SEGMENTS) {
-    const fallback = donutData[donutData.length - 1];
-    donutSegments.push({
-      tab: fallback.tab,
-      color: fallback.color,
-      active: fallback.tab === activeTab,
-    });
-  }
-
-  const openDetail = (asset: Asset) => {
-    router.push({ pathname: "/(app)/detail", params: { ticker: asset.ticker } });
-  };
-
-  const glowColor = positive ? "rgba(0,230,118," : "rgba(255,68,68,";
+  const totalEquity = totalHoldings + CASH;
+  const dayDelta = 24830;
+  const dayPct = 1.96;
 
   return (
-    <View style={s.container}>
-      {/* ── Glow effect from top ── */}
-      <LinearGradient
-        colors={[glowColor + "0.30)", glowColor + "0.12)", glowColor + "0.0)"]}
-        locations={[0, 0.45, 1]}
-        style={s.glowGradient}
-        pointerEvents="none"
-      />
-
-      <View style={[s.fixedTop, { paddingTop: insets.top + 8 }]}>
-        <View style={s.topBar}>
-          <Text style={s.topBarTitle}>Portfolio</Text>
-          <View style={s.topBarRight}>
-            <Pressable onPress={() => router.push("/(app)/explore")} hitSlop={10}>
-              <Ionicons name="search" size={24} color={colors.text.primary} />
-            </Pressable>
-            <Pressable onPress={() => router.push("/(app)/notifications")} hitSlop={10}>
-              <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
+    <View style={[s.root, { backgroundColor: c.bg }]}>
       <ScrollView
-        style={s.container}
-        contentContainerStyle={{ paddingTop: insets.top + 64, paddingBottom: 100 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingBottom: 140,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.heroSection}>
-          <Text style={s.overline}>Tu portfolio</Text>
-          <Text style={s.heroAmount}>{formatARS(totalValue)}</Text>
-          <Text style={[s.heroChange, { color: accentColor }]}>
-            {positive ? "+" : ""}
-            {formatARS(change.amount)} ({positive ? "+" : ""}
-            {change.pct.toFixed(2)}%) {timeLabels[activeTime]}
+        <View style={s.header}>
+          <Text style={[s.title, { color: c.text }]}>Cartera</Text>
+          <Pressable
+            onPress={() => router.push("/(app)/transfer")}
+            style={[s.headerBtn, { backgroundColor: c.surfaceHover }]}
+            hitSlop={8}
+          >
+            <Feather name="plus" size={18} color={c.text} />
+          </Pressable>
+        </View>
+
+        <View style={s.summaryBlock}>
+          <Text style={[s.summaryLabel, { color: c.textMuted }]}>
+            Patrimonio total
           </Text>
+          <Text style={[s.summaryValue, { color: c.text }]}>
+            {formatARS(totalEquity)}
+          </Text>
+          <View style={s.deltaRow}>
+            <Text style={[s.deltaTri, { color: c.greenDark }]}>▲</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              {formatARS(dayDelta)}
+            </Text>
+            <Text style={[s.deltaSep, { color: c.greenDark }]}>·</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              {formatPct(dayPct)} hoy
+            </Text>
+          </View>
+          <Sparkline color={c.greenDark} style={{ marginTop: 16 }} />
+        </View>
 
-          <View style={s.chart}>
-            {points.map((point, index) => {
-              if (index === 0) return null;
-              const previous = points[index - 1];
-              const segmentWidth = 100 / (points.length - 1);
-              const minimum = Math.min(...points);
-              const maximum = Math.max(...points);
-              const range = maximum - minimum || 1;
-              const y1 = 100 - ((previous - minimum) / range) * 100;
-              const y2 = 100 - ((point - minimum) / range) * 100;
+        <View style={s.splitRow}>
+          <View
+            style={[
+              s.splitCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <Text style={[s.splitLabel, { color: c.textMuted }]}>Inversiones</Text>
+            <Text style={[s.splitValue, { color: c.text }]}>
+              {formatARS(totalHoldings)}
+            </Text>
+            <Text style={[s.splitSub, { color: c.textMuted }]}>
+              {held.length} posiciones
+            </Text>
+          </View>
+          <View
+            style={[
+              s.splitCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <Text style={[s.splitLabel, { color: c.textMuted }]}>Efectivo</Text>
+            <Text style={[s.splitValue, { color: c.text }]}>{formatARS(CASH)}</Text>
+            <Text style={[s.splitSub, { color: c.textMuted }]}>
+              Disponible para operar
+            </Text>
+          </View>
+        </View>
 
+        <View style={s.allocBlock}>
+          <Text style={[s.eyebrow, { color: c.textMuted }]}>Distribución</Text>
+
+          <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
+            {byCategory.map(([cat, data], i) => {
+              const pct = (data.total / totalHoldings) * 100;
               return (
                 <View
-                  key={index}
+                  key={cat}
                   style={{
-                    position: "absolute",
-                    left: `${(index - 1) * segmentWidth}%`,
-                    width: `${segmentWidth}%`,
-                    top: `${(y1 + y2) / 2}%`,
-                    height: 2,
-                    backgroundColor: accentColor,
-                    borderRadius: 999,
-                    transform: [{ rotate: `${Math.atan2(y2 - y1, segmentWidth) * 0.32}rad` }],
+                    width: `${pct}%`,
+                    backgroundColor: allocationColor(cat, c),
+                    borderTopLeftRadius: i === 0 ? radius.pill : 0,
+                    borderBottomLeftRadius: i === 0 ? radius.pill : 0,
+                    borderTopRightRadius:
+                      i === byCategory.length - 1 ? radius.pill : 0,
+                    borderBottomRightRadius:
+                      i === byCategory.length - 1 ? radius.pill : 0,
                   }}
                 />
               );
             })}
           </View>
 
-          <View style={s.timeRow}>
-            {timeFilters.map((filter) => {
-              const isActive = activeTime === filter;
+          <View style={s.legend}>
+            {byCategory.map(([cat, data]) => {
+              const pct = (data.total / totalHoldings) * 100;
               return (
-                <Pressable
-                  key={filter}
-                  style={[
-                    s.timeButton,
-                    {
-                      backgroundColor: isActive ? accentColor : "transparent",
-                      borderColor: isActive ? accentColor : "transparent",
-                    },
-                  ]}
-                  onPress={() => setActiveTime(filter)}
-                >
-                  <Text style={[s.timeButtonText, { color: isActive ? "#000000" : accentColor }]}>
-                    {filter}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Posiciones</Text>
-          {filteredAssets.map((asset) => {
-            const value = asset.price * (asset.qty || 1);
-            const isUp = asset.change >= 0;
-            return (
-              <Pressable key={asset.ticker} style={s.positionRow} onPress={() => openDetail(asset)}>
-                <View style={s.positionIcon}>
-                  <Text style={s.positionIconText}>{asset.ticker.substring(0, 2)}</Text>
-                </View>
-                <View style={s.positionInfo}>
-                  <Text style={s.positionTicker}>{asset.ticker}</Text>
-                  <Text style={s.positionQty}>
-                    {asset.qty || 1} unidad{(asset.qty || 1) > 1 ? "es" : ""}
-                  </Text>
-                </View>
-                <View style={s.positionValues}>
-                  <Text style={s.positionValue}>{formatARS(value)}</Text>
-                  <Text style={[s.positionChange, { color: isUp ? colors.brand[500] : colors.red }]}>
-                    {isUp ? "+" : ""}
-                    {asset.change.toFixed(2)}%
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={s.thickDivider} />
-
-        <View style={s.donutSection}>
-          <View style={s.donutWrap}>
-            <View style={s.donutBase} />
-            {donutSegments.map((segment, index) => {
-              const angle = (index / donutSegments.length) * Math.PI * 2;
-              const radius = 104;
-              const x = Math.cos(angle - Math.PI / 2) * radius;
-              const y = Math.sin(angle - Math.PI / 2) * radius;
-
-              return (
-                <View
-                  key={`${segment.tab}-${index}`}
-                  style={[
-                    s.donutSegment,
-                    {
-                      backgroundColor: segment.color,
-                      transform: [
-                        { translateX: x },
-                        { translateY: y },
-                        { rotate: `${angle}rad` },
-                        { scaleY: segment.active ? 1.22 : 1 },
-                      ],
-                      opacity: segment.active ? 1 : 0.95,
-                    },
-                  ]}
-                />
-              );
-            })}
-
-            <View style={s.donutHole}>
-              <Text style={s.categoryTotalLabel}>{activeTab}</Text>
-              <Text style={s.categoryTotalValue}>{formatARS(activeSlice.value)}</Text>
-              <Text style={s.categoryTotalPct}>
-                {activeSlice.pct.toFixed(1)}% del portfolio
-              </Text>
-            </View>
-          </View>
-
-          <View style={s.tabsRow}>
-            {donutData.map((slice) => {
-              const active = slice.tab === activeTab;
-              return (
-                <Pressable
-                  key={slice.tab}
-                  onPress={() => setActiveTab(slice.tab)}
-                  style={[
-                    s.tabPill,
-                    active && {
-                      backgroundColor: slice.color,
-                      borderColor: slice.color,
-                    },
-                  ]}
-                >
+                <View key={cat} style={s.legendRow}>
                   <View
                     style={[
-                      s.tabDot,
-                      { backgroundColor: active ? "#000000" : slice.color },
+                      s.legendDot,
+                      { backgroundColor: allocationColor(cat, c) },
                     ]}
                   />
-                  <Text
-                    style={[
-                      s.tabPillText,
-                      {
-                        color: active
-                          ? slice.tab === "Acciones"
-                            ? "#000000"
-                            : "#FFFFFF"
-                          : colors.text.primary,
-                      },
-                    ]}
-                  >
-                    {slice.tab}
+                  <Text style={[s.legendLabel, { color: c.text }]}>
+                    {categoryLabels[cat]}
                   </Text>
-                </Pressable>
+                  <Text style={[s.legendPct, { color: c.textMuted }]}>
+                    {pct.toFixed(1)}%
+                  </Text>
+                  <Text style={[s.legendValue, { color: c.text }]}>
+                    {formatARS(data.total)}
+                  </Text>
+                </View>
               );
             })}
           </View>
         </View>
+
+        {byCategory.map(([cat, data]) => (
+          <View key={cat} style={s.groupBlock}>
+            <View style={s.groupHeader}>
+              <Text style={[s.groupTitle, { color: c.text }]}>
+                {categoryLabels[cat]}
+              </Text>
+              <Text style={[s.groupValue, { color: c.textMuted }]}>
+                {formatARS(data.total)}
+              </Text>
+            </View>
+            {data.items.map((asset, i) => (
+              <HeldRow
+                key={asset.ticker}
+                asset={asset}
+                first={i === 0}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/detail",
+                    params: { ticker: asset.ticker },
+                  })
+                }
+              />
+            ))}
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
 }
 
+function HeldRow({
+  asset,
+  first,
+  onPress,
+}: {
+  asset: Asset;
+  first?: boolean;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const value = asset.price * (asset.qty ?? 1);
+  const up = asset.change >= 0;
+  const dark = asset.iconTone === "dark";
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.row,
+        !first && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        },
+      ]}
+    >
+      <View
+        style={[s.rowIcon, { backgroundColor: dark ? c.ink : c.surfaceSunken }]}
+      >
+        <Text style={[s.rowIconText, { color: dark ? c.bg : c.textSecondary }]}>
+          {assetIconCode(asset)}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowTicker, { color: c.text }]}>{asset.ticker}</Text>
+        <Text style={[s.rowSub, { color: c.textMuted }]}>
+          {asset.qty} {asset.qty === 1 ? "unidad" : "unidades"} ·{" "}
+          {formatARS(asset.price)}
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
+        <Text style={[s.rowChange, { color: up ? c.greenDark : c.red }]}>
+          {formatPct(asset.change)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function allocationColor(cat: AssetCategory, c: ThemeColors): string {
+  switch (cat) {
+    case "cedears":
+      return c.ink;
+    case "bonos":
+      return c.green;
+    case "fci":
+      return c.greenDark;
+    case "acciones":
+      return c.textSecondary;
+    case "obligaciones":
+      return c.textMuted;
+    default:
+      return c.borderStrong;
+  }
+}
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface[0] },
-  glowGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 280,
-    zIndex: 1,
-  },
-  fixedTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 40,
-  },
-  topBar: {
+  root: { flex: 1 },
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 8,
   },
-  topBarTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.3,
-  },
-  topBarRight: { flexDirection: "row", gap: 20 },
-  heroSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  overline: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  heroAmount: {
-    fontSize: 38,
-    fontWeight: "800",
-    color: colors.text.primary,
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 32,
     letterSpacing: -1.2,
   },
-  heroChange: {
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  chart: {
-    height: 300,
-    position: "relative",
-    marginTop: 12,
-  },
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 12,
-  },
-  timeButton: {
-    minWidth: 42,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 999,
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
-  timeButtonText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  donutSection: {
-    alignItems: "center",
-    paddingTop: 10,
+  summaryBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
     paddingBottom: 24,
+  },
+  summaryLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    marginBottom: 6,
+    letterSpacing: -0.15,
+  },
+  summaryValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 42,
+    letterSpacing: -1.8,
+    marginBottom: 8,
+  },
+  deltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  deltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+  },
+  deltaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+  },
+  deltaSep: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  splitRow: {
+    flexDirection: "row",
+    gap: 12,
     paddingHorizontal: 20,
   },
-  donutWrap: {
-    width: 280,
-    height: 280,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  donutBase: {
-    position: "absolute",
-    width: 236,
-    height: 236,
-    borderRadius: 118,
-    borderWidth: 22,
-    borderColor: colors.surface[200],
-  },
-  donutSegment: {
-    position: "absolute",
-    width: 10,
-    height: 22,
-    borderRadius: 999,
-  },
-  donutHole: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor: colors.surface[0],
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  tabsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 10,
-  },
-  tabPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: colors.surface[100],
+  splitCard: {
+    flex: 1,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    padding: 16,
   },
-  tabDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  tabPillText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  categoryTotalLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
+  splitLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
     marginBottom: 4,
   },
-  categoryTotalValue: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.5,
+  splitValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 20,
+    letterSpacing: -0.6,
+    marginBottom: 4,
   },
-  categoryTotalPct: {
-    fontSize: 13,
-    color: colors.text.muted,
-    marginTop: 4,
-    textAlign: "center",
+  splitSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
-  thickDivider: {
-    height: 6,
-    backgroundColor: colors.surface[100],
-  },
-  section: {
+  allocBlock: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 32,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.text.primary,
-    letterSpacing: -0.3,
+  eyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
     marginBottom: 14,
   },
-  positionRow: {
+  barTrack: {
+    height: 10,
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+  legend: {
+    gap: 10,
+  },
+  legendRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 12,
+    gap: 10,
   },
-  positionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surface[200],
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  legendPct: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    minWidth: 46,
+    textAlign: "right",
+  },
+  legendValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    minWidth: 92,
+    textAlign: "right",
+    letterSpacing: -0.15,
+  },
+  groupBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 28,
+  },
+  groupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 4,
+  },
+  groupTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+  },
+  groupValue: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    gap: 14,
+  },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  positionIconText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.text.primary,
+  rowIconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
   },
-  positionInfo: { flex: 1 },
-  positionTicker: {
+  rowTicker: {
+    fontFamily: fontFamily[700],
     fontSize: 16,
-    fontWeight: "700",
-    color: colors.text.primary,
+    letterSpacing: -0.3,
   },
-  positionQty: {
-    fontSize: 13,
-    color: colors.text.secondary,
+  rowSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
     marginTop: 2,
   },
-  positionValues: { alignItems: "flex-end" },
-  positionValue: {
+  rowPrice: {
+    fontFamily: fontFamily[700],
     fontSize: 15,
-    fontWeight: "600",
-    color: colors.text.primary,
+    letterSpacing: -0.2,
   },
-  positionChange: {
-    fontSize: 13,
-    fontWeight: "600",
+  rowChange: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
     marginTop: 2,
   },
 });
