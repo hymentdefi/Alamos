@@ -1,0 +1,1590 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alamos Capital — Inversiones para Argentina</title>
+  <meta name="description" content="Alamos Capital. Inversiones en CEDEARs, bonos y fondos desde una app mobile. Diseñada para el mercado argentino." />
+  <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #FAFAF7;
+      --bg-2: #F2F1EB;
+      --ink: #0E0F0C;
+      --ink-2: #2A2B27;
+      --ink-3: #6B6C66;
+      --ink-4: #B8B8B0;
+      --line: #E5E4DC;
+      --green: #00E676;
+      --green-dark: #00B85C;
+      --radius: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 400;
+      font-size: 17px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::selection { background: var(--green); color: var(--ink); }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ——— NAV ——— */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250, 250, 247, 0.82);
+      backdrop-filter: saturate(180%) blur(14px);
+      -webkit-backdrop-filter: saturate(180%) blur(14px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s;
+    }
+    .nav.scrolled { border-bottom-color: var(--line); }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 72px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; letter-spacing: -0.03em; font-size: 19px;
+    }
+    .brand svg { width: 28px; height: 28px; display: block; }
+    .nav-right { display: flex; align-items: center; gap: 28px; }
+    .nav-links { display: flex; gap: 28px; font-size: 15px; color: var(--ink-2); }
+    .nav-links a { transition: color .15s; }
+    .nav-links a:hover { color: var(--ink); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px;
+      padding: 11px 18px;
+      font-size: 15px; font-weight: 600;
+      border-radius: 999px;
+      border: none; cursor: pointer;
+      transition: transform .15s ease, background .15s;
+      letter-spacing: -0.01em;
+    }
+    .btn-primary {
+      background: var(--ink); color: var(--bg);
+    }
+    .btn-primary:hover { background: #000; transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: var(--ink); padding: 11px 14px;
+    }
+    .btn-ghost:hover { background: rgba(14,15,12,0.05); }
+    .btn svg { width: 14px; height: 14px; }
+
+    @media (max-width: 720px) {
+      .nav-links { display: none; }
+    }
+
+    /* ——— HERO ——— */
+    .hero {
+      padding: 80px 0 120px;
+      position: relative;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 64px;
+      align-items: center;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px 6px 8px;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 13px; font-weight: 500;
+      color: var(--ink-2);
+      margin-bottom: 28px;
+      letter-spacing: -0.005em;
+    }
+    .eyebrow-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(0, 230, 118, 0.18);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(0,230,118,0.18); }
+      50% { box-shadow: 0 0 0 7px rgba(0,230,118,0.06); }
+    }
+
+    h1.display {
+      font-size: clamp(44px, 7vw, 88px);
+      font-weight: 700;
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      margin: 0 0 28px;
+      text-wrap: balance;
+    }
+    h1 .accent { color: var(--ink); }
+    h1 .accent em {
+      font-style: normal;
+      display: inline-block;
+      position: relative;
+    }
+    h1 .accent em::after {
+      content: '';
+      position: absolute; left: -0.02em; right: -0.02em; bottom: 0.08em;
+      height: 0.22em;
+      background: var(--green);
+      z-index: -1;
+      border-radius: 1px;
+    }
+    .lede {
+      font-size: 19px;
+      line-height: 1.5;
+      color: var(--ink-3);
+      max-width: 520px;
+      margin: 0 0 40px;
+      text-wrap: pretty;
+    }
+
+    .hero-cta {
+      display: flex; align-items: center; gap: 16px;
+      flex-wrap: wrap;
+    }
+    .hero-cta .hint {
+      font-size: 13px; color: var(--ink-3);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ——— PHONE MOCK ——— */
+    .phone-stage {
+      position: relative;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 560px;
+    }
+    .phone {
+      position: relative;
+      width: 286px; height: 580px;
+      background: var(--ink);
+      border-radius: 46px;
+      padding: 8px;
+      box-shadow:
+        0 1px 2px rgba(0,0,0,.04),
+        0 24px 48px -12px rgba(14,15,12,.22),
+        0 40px 80px -20px rgba(0,230,118,.08);
+      transform: rotate(-3deg);
+    }
+    .phone-screen {
+      width: 100%; height: 100%;
+      background: #FAFAF7;
+      border-radius: 38px;
+      overflow: hidden;
+      position: relative;
+      display: flex; flex-direction: column;
+    }
+    .phone-notch {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      width: 92px; height: 26px; background: var(--ink); border-radius: 14px;
+      z-index: 5;
+    }
+    .ps-status {
+      padding: 16px 24px 0; display: flex; justify-content: space-between;
+      font-size: 12px; font-weight: 600; color: var(--ink);
+    }
+    .ps-body { padding: 48px 22px 22px; flex: 1; display: flex; flex-direction: column; }
+    .ps-greet { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+    .ps-balance { font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin-top: 2px; }
+    .ps-delta { font-size: 12px; font-weight: 600; color: var(--green-dark); margin-top: 2px; }
+    .ps-chart {
+      margin-top: 18px;
+      height: 86px;
+      position: relative;
+    }
+    .ps-chart svg { width: 100%; height: 100%; display: block; }
+
+    .ps-tabs {
+      display: flex; gap: 6px; margin-top: 18px;
+      background: var(--bg-2); border-radius: 10px; padding: 3px;
+    }
+    .ps-tab {
+      flex: 1; text-align: center;
+      font-size: 11px; font-weight: 600;
+      padding: 7px 0; border-radius: 8px;
+      color: var(--ink-3);
+    }
+    .ps-tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+
+    .ps-list { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .ps-row { display: flex; align-items: center; justify-content: space-between; }
+    .ps-asset { display: flex; align-items: center; gap: 10px; }
+    .ps-ticker-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--bg-2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: var(--ink-2);
+      letter-spacing: -0.02em;
+    }
+    .ps-ticker-name { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+    .ps-ticker-sub { font-size: 10px; color: var(--ink-3); font-weight: 500; }
+    .ps-ticker-price { font-size: 13px; font-weight: 600; text-align: right; letter-spacing: -0.01em; }
+    .ps-ticker-chg { font-size: 10px; font-weight: 600; text-align: right; }
+    .ps-ticker-chg.up { color: var(--green-dark); }
+    .ps-ticker-chg.dn { color: #C83B3B; }
+
+    /* Pro badge floating */
+    .phone-badge {
+      position: absolute;
+      top: 44px; right: -18px;
+      background: #fff;
+      color: var(--ink-2);
+      padding: 7px 12px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transform: rotate(4deg);
+      box-shadow: 0 6px 16px -6px rgba(14,15,12,.18);
+      border: 1px solid var(--line);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .phone-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+      .phone-stage { min-height: 520px; }
+      .phone { transform: rotate(-2deg) scale(0.92); }
+      .hero { padding: 48px 0 72px; }
+    }
+
+    /* ——— QUÉ HACEMOS ——— */
+    .manifesto {
+      padding: 140px 0 120px;
+      border-top: 1px solid var(--line);
+    }
+    .manifesto-inner {
+      max-width: 920px;
+    }
+    .section-eyebrow {
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink-3);
+      margin-bottom: 28px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-eyebrow::before {
+      content: ''; width: 18px; height: 1px; background: var(--ink-3);
+    }
+    .manifesto-h {
+      font-size: clamp(36px, 5.2vw, 64px);
+      font-weight: 700;
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      margin: 0;
+      text-wrap: balance;
+    }
+    .manifesto-h .muted { color: var(--ink-4); }
+    .manifesto-h .hl { color: var(--ink); }
+
+    /* ——— PRODUCTOS ——— */
+    .products {
+      padding: 80px 0 140px;
+    }
+    .products-head {
+      display: flex; align-items: end; justify-content: space-between;
+      margin-bottom: 48px;
+      gap: 32px;
+    }
+    .products-h {
+      font-size: clamp(32px, 4.4vw, 52px);
+      font-weight: 700; letter-spacing: -0.035em; line-height: 1.04;
+      margin: 0;
+      max-width: 720px;
+      text-wrap: balance;
+    }
+
+    .mode-toggle {
+      display: inline-flex;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px;
+      flex-shrink: 0;
+    }
+    .mode-toggle button {
+      padding: 10px 20px;
+      border: none; background: transparent;
+      font-size: 14px; font-weight: 600;
+      border-radius: 999px;
+      color: var(--ink-3);
+      transition: all .2s ease;
+      letter-spacing: -0.01em;
+    }
+    .mode-toggle button.active {
+      background: var(--ink); color: var(--bg);
+    }
+    .mode-toggle button.active.pro {
+      background: var(--ink); color: var(--bg);
+    }
+    .mode-toggle button.active.pro::after {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .product-panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 56px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+      transition: background .3s;
+    }
+    .product-panel.dark {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--bg);
+    }
+    .product-panel.dark .p-title { color: var(--bg); }
+    .product-panel.dark .p-desc { color: rgba(250,250,247,0.68); }
+    .product-panel.dark .p-list li { color: rgba(250,250,247,0.82); }
+    .product-panel.dark .p-list li::before { background: var(--green); }
+    .product-panel.dark .p-tag {
+      background: rgba(0,230,118,0.14); color: var(--green); border-color: rgba(0,230,118,0.3);
+    }
+    .p-tag {
+      display: inline-block;
+      font-size: 12px; font-weight: 600;
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: -0.005em;
+    }
+    .p-title {
+      font-size: 44px; font-weight: 700; letter-spacing: -0.035em;
+      line-height: 1; margin: 0 0 18px;
+    }
+    .p-desc {
+      font-size: 17px; line-height: 1.55; color: var(--ink-3);
+      margin: 0 0 28px;
+      max-width: 440px;
+    }
+    .p-list {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .p-list li {
+      position: relative; padding-left: 22px;
+      font-size: 15px; color: var(--ink-2);
+      line-height: 1.45;
+    }
+    .p-list li::before {
+      content: '';
+      position: absolute; left: 0; top: 8px;
+      width: 10px; height: 2px;
+      background: var(--ink);
+    }
+
+    .p-visual {
+      aspect-ratio: 1 / 1.05;
+      background: var(--bg);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .product-panel.dark .p-visual {
+      background: #17181400;
+      border: 1px solid rgba(250,250,247,0.08);
+    }
+
+    /* Base mode visual — simple balance card */
+    .mock-card {
+      width: 86%;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 18px 40px -18px rgba(14,15,12,0.16);
+    }
+    .product-panel.dark .mock-card { background: #191A16; border-color: rgba(250,250,247,0.08); }
+    .product-panel.dark .mock-card .mc-label { color: rgba(250,250,247,0.56); }
+    .product-panel.dark .mock-card .mc-value { color: var(--bg); }
+    .product-panel.dark .mock-card .mc-sub { color: rgba(250,250,247,0.48); }
+
+    .mc-label { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+    .mc-value { font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin-top: 2px; }
+    .mc-sub { font-size: 12px; color: var(--ink-3); font-weight: 500; margin-top: 2px; }
+    .mc-sub .up { color: var(--green-dark); }
+    .product-panel.dark .mc-sub .up { color: var(--green); }
+
+    .mc-chart {
+      margin-top: 16px; height: 80px;
+    }
+
+    .mc-holdings {
+      margin-top: 18px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .mc-hold-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px;
+    }
+    .mc-hold-left { display: flex; align-items: center; gap: 10px; }
+    .mc-hold-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--bg-2); font-size: 9px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; letter-spacing:-0.02em;
+    }
+    .product-panel.dark .mc-hold-icon { background: rgba(250,250,247,0.08); color: var(--bg); }
+    .mc-hold-tk { font-weight: 600; font-size: 13px; }
+    .mc-hold-val { font-weight: 600; text-align: right; font-size: 13px; }
+
+    /* Pro mode visual — binance-style pro terminal */
+    .pro-visual {
+      display: flex; flex-direction: column; gap: 8px;
+      width: 100%;
+      max-width: 360px;
+      font-variant-numeric: tabular-nums;
+    }
+    .pro-tickers {
+      display: flex; gap: 12px;
+      padding: 10px 12px;
+      background: rgba(250,250,247,0.03);
+      border: 1px solid rgba(250,250,247,0.06);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .pro-ticker {
+      display: flex; flex-direction: column; gap: 2px;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .pro-ticker-sym { color: rgba(250,250,247,0.56); font-weight: 500; letter-spacing: 0.02em; }
+    .pro-ticker-px { color: var(--bg); font-weight: 600; font-size: 11px; }
+    .pro-ticker-ch { font-weight: 600; font-size: 10px; }
+    .pro-ticker-ch.up { color: var(--green); }
+    .pro-ticker-ch.dn { color: #FF7575; }
+    .pro-ticker-divider { width: 1px; background: rgba(250,250,247,0.08); }
+
+    .pro-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px;
+      background: rgba(250,250,247,0.03);
+      border: 1px solid rgba(250,250,247,0.06);
+      border-radius: 10px;
+    }
+    .pro-header-sym { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+    .pro-header-sym .green { color: var(--green); }
+    .pro-header-px { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--green); }
+    .pro-header-right { text-align: right; }
+    .pro-header-ch { font-size: 11px; color: var(--green); font-weight: 600; }
+    .pro-header-stat { display: flex; flex-direction: column; gap: 2px; font-size: 9.5px; }
+    .pro-header-stat-label { color: rgba(250,250,247,0.48); letter-spacing: 0.04em; text-transform: uppercase; }
+    .pro-header-stat-val { color: var(--bg); font-weight: 600; font-size: 11px; }
+
+    .pro-tabs {
+      display: flex; gap: 4px; background: rgba(250,250,247,0.04); border-radius: 8px; padding: 3px;
+      border: 1px solid rgba(250,250,247,0.06);
+    }
+    .pro-tab {
+      flex: 1; text-align: center; font-size: 10px; font-weight: 600;
+      color: rgba(250,250,247,0.52); padding: 6px 0; border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+    .pro-tab.active { background: var(--green); color: var(--ink); }
+    .pro-candles { height: 120px; background: rgba(250,250,247,0.02); border: 1px solid rgba(250,250,247,0.06); border-radius: 10px; padding: 10px; position: relative; }
+    .pro-candles svg { width: 100%; height: 100%; }
+    .pro-candles-label {
+      position: absolute; top: 10px; left: 12px;
+      font-size: 9px; color: rgba(250,250,247,0.52); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600;
+    }
+    .pro-orderbook {
+      background: rgba(250,250,247,0.02);
+      border: 1px solid rgba(250,250,247,0.06);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .pro-ob-head {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      font-size: 9px; color: rgba(250,250,247,0.48);
+      letter-spacing: 0.04em; text-transform: uppercase;
+      padding-bottom: 6px; border-bottom: 1px solid rgba(250,250,247,0.06);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .pro-ob-head > :nth-child(2), .pro-ob-head > :nth-child(3) { text-align: right; }
+    .pro-ob-rows { display: flex; flex-direction: column; gap: 2px; }
+    .pro-ob-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      font-size: 10px; font-weight: 500;
+      padding: 2px 4px; border-radius: 3px;
+      position: relative; overflow: hidden;
+    }
+    .pro-ob-row > :nth-child(2), .pro-ob-row > :nth-child(3) { text-align: right; color: rgba(250,250,247,0.8); }
+    .pro-ob-row .depth {
+      position: absolute; top: 0; bottom: 0; right: 0;
+      z-index: 0;
+    }
+    .pro-ob-row > span { position: relative; z-index: 1; }
+    .pro-ob-row.bid > :first-child { color: var(--green); }
+    .pro-ob-row.bid .depth { background: rgba(0, 230, 118, 0.08); }
+    .pro-ob-row.ask > :first-child { color: #FF7575; }
+    .pro-ob-row.ask .depth { background: rgba(255, 117, 117, 0.08); }
+    .pro-ob-spread {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 4px;
+      font-size: 10px; font-weight: 600;
+      color: var(--green);
+      border-top: 1px dashed rgba(250,250,247,0.1);
+      border-bottom: 1px dashed rgba(250,250,247,0.1);
+      margin: 4px 0;
+    }
+    .pro-ob-spread .lbl { color: rgba(250,250,247,0.48); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 9px; }
+
+    @media (max-width: 900px) {
+      .products-head { flex-direction: column; align-items: flex-start; }
+      .product-panel { grid-template-columns: 1fr; padding: 36px 28px; gap: 40px; }
+      .p-title { font-size: 36px; }
+      .p-visual { order: -1; }
+    }
+
+    /* ——— HOW ——— */
+    .how {
+      padding: 140px 0;
+      border-top: 1px solid var(--line);
+    }
+    .how-h {
+      font-size: clamp(32px, 4.4vw, 48px);
+      font-weight: 700; letter-spacing: -0.035em; line-height: 1.04;
+      margin: 0 0 64px;
+      max-width: 640px;
+      text-wrap: balance;
+    }
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 48px;
+    }
+    .how-step { }
+    .how-num {
+      font-size: 13px; font-weight: 600;
+      color: var(--ink-3);
+      letter-spacing: 0.08em;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-top: 1px solid var(--ink);
+      padding-top: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .how-num .n { font-weight: 700; color: var(--ink); }
+    .how-title {
+      font-size: 24px; font-weight: 700; letter-spacing: -0.025em;
+      margin: 0 0 12px;
+      line-height: 1.1;
+    }
+    .how-desc {
+      font-size: 15px; color: var(--ink-3); line-height: 1.5;
+      margin: 0;
+      text-wrap: pretty;
+    }
+
+    @media (max-width: 720px) {
+      .how-grid { grid-template-columns: 1fr; gap: 32px; }
+      .how { padding: 80px 0; }
+    }
+
+    /* ——— DOWNLOAD / QR ——— */
+    .download {
+      padding: 140px 0;
+      border-top: 1px solid var(--line);
+    }
+    .download-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 64px;
+      align-items: center;
+    }
+    .dl-h {
+      font-size: clamp(40px, 5.2vw, 64px);
+      font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+      margin: 0 0 24px;
+      text-wrap: balance;
+    }
+    .dl-sub {
+      font-size: 18px; color: var(--ink-3); line-height: 1.5;
+      margin: 0 0 36px;
+      max-width: 440px;
+    }
+    .dl-stores { display: flex; gap: 12px; flex-wrap: wrap; }
+    .dl-store {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: var(--ink); color: var(--bg);
+      font-size: 14px; font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: transform .15s, background .15s;
+    }
+    .dl-store:hover { background: #000; transform: translateY(-1px); }
+    .dl-store-sub { font-size: 10px; font-weight: 500; opacity: 0.64; display: block; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; }
+    .dl-store-name { font-size: 15px; font-weight: 700; line-height: 1.15; }
+    .dl-store svg { width: 22px; height: 22px; }
+
+    .dl-qr-wrap {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 40px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 20px;
+    }
+    .dl-qr {
+      width: 220px; height: 220px;
+      background: #fff; border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 18px 40px -18px rgba(14,15,12,0.18);
+      position: relative;
+    }
+    .dl-qr svg { width: 100%; height: 100%; display: block; }
+    .dl-qr-logo {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .dl-qr-logo-inner {
+      width: 44px; height: 44px; background: #fff;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dl-qr-caption { font-size: 13px; color: var(--ink-3); font-weight: 500; text-align: center; }
+    .dl-qr-caption strong { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; font-size: 14px; }
+
+    @media (max-width: 900px) {
+      .download-grid { grid-template-columns: 1fr; gap: 40px; }
+      .download { padding: 80px 0; }
+      .dl-qr-wrap { padding: 32px; }
+    }
+
+    /* ——— FAQ ——— */
+    .faq {
+      padding: 120px 0;
+      border-top: 1px solid var(--line);
+    }
+    .faq-grid {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 80px;
+      align-items: start;
+    }
+    .faq-h {
+      font-size: clamp(36px, 4.6vw, 52px);
+      font-weight: 700; letter-spacing: -0.035em; line-height: 1.04;
+      margin: 0 0 20px;
+      text-wrap: balance;
+    }
+    .faq-sub {
+      font-size: 16px; color: var(--ink-3); line-height: 1.5;
+      margin: 0;
+    }
+    .faq-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+    .faq-item {
+      border-bottom: 1px solid var(--line);
+    }
+    .faq-q {
+      width: 100%;
+      display: flex; justify-content: space-between; align-items: center;
+      text-align: left;
+      padding: 28px 4px;
+      background: transparent; border: none;
+      font-family: inherit; font-size: 19px; font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.015em;
+      cursor: pointer;
+      gap: 20px;
+    }
+    .faq-q-num { font-size: 13px; color: var(--ink-3); font-weight: 600; margin-right: 18px; font-variant-numeric: tabular-nums; }
+    .faq-q-text { flex: 1; }
+    .faq-q-icon {
+      flex-shrink: 0;
+      width: 32px; height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s, border-color .2s, transform .3s;
+    }
+    .faq-q-icon svg { width: 12px; height: 12px; color: var(--ink); transition: transform .3s; }
+    .faq-item.open .faq-q-icon { background: var(--ink); border-color: var(--ink); }
+    .faq-item.open .faq-q-icon svg { color: var(--bg); transform: rotate(45deg); }
+    .faq-a {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .3s ease;
+    }
+    .faq-item.open .faq-a { grid-template-rows: 1fr; }
+    .faq-a-inner { overflow: hidden; }
+    .faq-a-content {
+      padding: 0 4px 28px;
+      font-size: 15px; line-height: 1.6;
+      color: var(--ink-3);
+      max-width: 680px;
+    }
+    .faq-a-content p { margin: 0 0 10px; }
+    .faq-a-content p:last-child { margin-bottom: 0; }
+
+    @media (max-width: 900px) {
+      .faq-grid { grid-template-columns: 1fr; gap: 40px; }
+      .faq { padding: 80px 0; }
+      .faq-q { font-size: 17px; padding: 22px 4px; }
+    }
+
+    /* ——— WAITLIST ——— */
+    .waitlist {
+      padding: 120px 0;
+      background: var(--ink);
+      color: var(--bg);
+      border-radius: 32px;
+      margin: 0 24px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .waitlist::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 85% 20%, rgba(0,230,118,0.14), transparent 60%);
+      pointer-events: none;
+    }
+    .waitlist-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 32px;
+      text-align: center;
+      position: relative;
+    }
+    .wl-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid rgba(250,250,247,0.18);
+      border-radius: 999px;
+      font-size: 13px; font-weight: 500;
+      color: rgba(250,250,247,0.8);
+      margin-bottom: 28px;
+    }
+    .wl-eyebrow .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+      box-shadow: 0 0 0 4px rgba(0,230,118,.18);
+    }
+    .wl-h {
+      font-size: clamp(36px, 5.6vw, 64px);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.02;
+      margin: 0 0 20px;
+      text-wrap: balance;
+    }
+    .wl-h .green { color: var(--green); }
+    .wl-sub {
+      font-size: 18px;
+      color: rgba(250,250,247,0.64);
+      margin: 0 0 44px;
+      max-width: 460px;
+      margin-left: auto; margin-right: auto;
+      text-wrap: pretty;
+    }
+
+    .wl-form {
+      display: flex; flex-direction: column; gap: 14px;
+      max-width: 420px; margin: 0 auto;
+      text-align: left;
+    }
+    .wl-field {
+      position: relative;
+    }
+    .wl-field label {
+      position: absolute;
+      left: 18px; top: 50%; transform: translateY(-50%);
+      color: rgba(250,250,247,0.48);
+      font-size: 15px; font-weight: 500;
+      pointer-events: none;
+      transition: all .15s ease;
+    }
+    .wl-field input:focus + label,
+    .wl-field input:not(:placeholder-shown) + label {
+      top: 10px; transform: translateY(0);
+      font-size: 11px;
+      color: rgba(250,250,247,0.56);
+    }
+    .wl-field input {
+      width: 100%;
+      background: rgba(250,250,247,0.06);
+      border: 1px solid rgba(250,250,247,0.12);
+      border-radius: 12px;
+      padding: 22px 18px 10px;
+      color: var(--bg);
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+      transition: border-color .15s, background .15s;
+    }
+    .wl-field input::placeholder { color: transparent; }
+    .wl-field input:focus {
+      outline: none;
+      border-color: var(--green);
+      background: rgba(250,250,247,0.08);
+    }
+
+    .wl-submit {
+      margin-top: 8px;
+      width: 100%;
+      padding: 18px;
+      background: var(--green);
+      color: var(--ink);
+      border: none;
+      border-radius: 12px;
+      font-size: 16px; font-weight: 700;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: transform .15s ease, background .15s;
+    }
+    .wl-submit:hover { background: #2BED8A; transform: translateY(-1px); }
+    .wl-submit:active { transform: translateY(0); }
+
+    .wl-legal {
+      margin-top: 20px;
+      font-size: 12px;
+      color: rgba(250,250,247,0.44);
+      max-width: 380px; margin-left: auto; margin-right: auto;
+    }
+
+    /* success state */
+    .wl-success {
+      display: none;
+      text-align: center;
+      padding: 32px 0;
+    }
+    .wl-success.show { display: block; animation: fadeUp .5s ease both; }
+    .wl-form.hide { display: none; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .wl-success-icon {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--green);
+      margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .wl-success-icon svg { width: 28px; height: 28px; color: var(--ink); }
+    .wl-success-h {
+      font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .wl-success-p {
+      font-size: 15px; color: rgba(250,250,247,0.64);
+      margin: 0;
+    }
+
+    @media (max-width: 720px) {
+      .waitlist { margin: 0 12px 12px; padding: 72px 0; border-radius: 20px; }
+    }
+
+    /* ——— FOOTER ——— */
+    footer {
+      padding: 56px 0 40px;
+    }
+    .foot {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 20px;
+      font-size: 13px;
+      color: var(--ink-3);
+      flex-wrap: wrap;
+    }
+    .foot-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; letter-spacing: -0.02em; }
+    .foot-brand svg { width: 22px; height: 22px; }
+    .foot-links { display: flex; gap: 24px; }
+    .foot-links a:hover { color: var(--ink); }
+    .foot-legal { font-size: 11px; color: var(--ink-4); max-width: 100%; line-height: 1.5; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a href="#" class="brand" aria-label="Alamos Capital">
+        <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+          <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="7" stroke-linejoin="round" fill="none"></polygon>
+          <polygon points="56,12 29,86 83,86" stroke="#0E0F0C" stroke-width="7" stroke-linejoin="round" fill="none"></polygon>
+        </svg>
+        <span>Alamos</span>
+      </a>
+      <div class="nav-right">
+        <div class="nav-links">
+          <a href="#productos">Productos</a>
+          <a href="#como">Cómo funciona</a>
+          <a href="#app">App</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <a href="#waitlist" class="btn btn-primary">
+          Acceso anticipado
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <h1 class="display">
+          Inversiones, <span class="accent"><em>simples</em></span><br/>
+          y transparentes.
+        </h1>
+        <p class="lede">
+          CEDEARs, bonos soberanos y fondos comunes de inversión, disponibles desde web y mobile. Diseñados para el mercado argentino.
+        </p>
+        <div class="hero-cta">
+          <a href="#waitlist" class="btn btn-primary">
+            Solicitar acceso
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+          <span class="hint">
+            Lanzamiento 2026
+          </span>
+        </div>
+      </div>
+
+      <div class="phone-stage" aria-hidden="true">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="ps-status">
+              <span>9:41</span>
+              <span style="display:flex;gap:4px;align-items:center;">
+                <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor"><rect x="0" y="6" width="2" height="4" rx="0.5"/><rect x="3" y="4" width="2" height="6" rx="0.5"/><rect x="6" y="2" width="2" height="8" rx="0.5"/><rect x="9" y="0" width="2" height="10" rx="0.5"/></svg>
+                <svg width="16" height="10" viewBox="0 0 22 12" fill="none"><rect x="1" y="1" width="18" height="10" rx="2" stroke="currentColor" stroke-width="1"/><rect x="3" y="3" width="14" height="6" rx="1" fill="currentColor"/><rect x="20" y="4" width="1.5" height="4" rx="0.5" fill="currentColor"/></svg>
+              </span>
+            </div>
+            <div class="ps-body">
+              <div class="ps-greet">Hola, Martín</div>
+              <div class="ps-balance">$ 1.284.620</div>
+              <div class="ps-delta">▲ $ 24.830 · +1,96% hoy</div>
+
+              <div class="ps-chart">
+                <svg viewBox="0 0 260 90" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="sparkfill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="#00E676" stop-opacity="0.28"/>
+                      <stop offset="100%" stop-color="#00E676" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10 L260,90 L0,90 Z" fill="url(#sparkfill)"/>
+                  <path d="M0,68 C20,62 38,70 58,58 C78,46 92,54 110,42 C128,30 150,40 170,28 C188,18 206,24 224,14 C240,8 252,12 260,10" fill="none" stroke="#00B85C" stroke-width="2"/>
+                </svg>
+              </div>
+
+              <div class="ps-tabs">
+                <div class="ps-tab active">Cartera</div>
+                <div class="ps-tab">Mercado</div>
+                <div class="ps-tab">Noticias</div>
+              </div>
+
+              <div class="ps-list">
+                <div class="ps-row">
+                  <div class="ps-asset">
+                    <div class="ps-ticker-icon" style="background:#0E0F0C;color:#fff;">AA</div>
+                    <div>
+                      <div class="ps-ticker-name">AAPL</div>
+                      <div class="ps-ticker-sub">Apple · CEDEAR</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ps-ticker-price">$ 24.120</div>
+                    <div class="ps-ticker-chg up">+2,4%</div>
+                  </div>
+                </div>
+                <div class="ps-row">
+                  <div class="ps-asset">
+                    <div class="ps-ticker-icon" style="background:#EBEBE3;">AL</div>
+                    <div>
+                      <div class="ps-ticker-name">AL30</div>
+                      <div class="ps-ticker-sub">Bonar 2030 · Ley AR</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ps-ticker-price">$ 71.540</div>
+                    <div class="ps-ticker-chg up">+0,8%</div>
+                  </div>
+                </div>
+                <div class="ps-row">
+                  <div class="ps-asset">
+                    <div class="ps-ticker-icon" style="background:#EBEBE3;">FC</div>
+                    <div>
+                      <div class="ps-ticker-name">Balanz Ahorro</div>
+                      <div class="ps-ticker-sub">FCI · Pesos</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ps-ticker-price">$ 12.840</div>
+                    <div class="ps-ticker-chg dn">−0,1%</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <div class="phone-badge">
+          <span class="dot"></span>
+          Web · iOS · Android
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MANIFESTO / QUÉ HACEMOS -->
+  <section class="manifesto">
+    <div class="wrap manifesto-inner">
+      <div class="section-eyebrow">Nuestra propuesta</div>
+      <h2 class="manifesto-h">
+        <span class="hl">Acceso transparente al mercado de capitales argentino.</span>
+        <span class="muted">Una plataforma construida sobre principios de simplicidad, claridad operativa y diseño centrado en el inversor.</span>
+      </h2>
+    </div>
+  </section>
+
+  <!-- PRODUCTOS -->
+  <section class="products" id="productos">
+    <div class="wrap">
+      <div class="products-head">
+        <h2 class="products-h">Dos experiencias en una misma plataforma.</h2>
+        <div class="mode-toggle" role="tablist">
+          <button type="button" class="active" data-mode="base" role="tab" aria-selected="true">Alamos</button>
+          <button type="button" class="pro" data-mode="pro" role="tab" aria-selected="false">Alamos Pro</button>
+        </div>
+      </div>
+
+      <!-- BASE -->
+      <div class="product-panel" id="panel-base">
+        <div>
+          <span class="p-tag">Modo estándar</span>
+          <h3 class="p-title">Alamos.</h3>
+          <p class="p-desc">
+            La experiencia principal. Una interfaz clara para construir una cartera diversificada en pesos y dólares.
+          </p>
+          <ul class="p-list">
+            <li>CEDEARs sobre las principales acciones internacionales</li>
+            <li>Bonos soberanos en pesos y dólares</li>
+            <li>Fondos comunes de inversión</li>
+            <li>Suscripción y rescate en pesos o dólar MEP</li>
+          </ul>
+        </div>
+        <div class="p-visual">
+          <div class="mock-card">
+            <div class="mc-label">Mi cartera</div>
+            <div class="mc-value">$ 1.284.620</div>
+            <div class="mc-sub"><span class="up">▲ 12,4%</span> último mes</div>
+            <div class="mc-chart">
+              <svg viewBox="0 0 260 80" preserveAspectRatio="none" width="100%" height="100%">
+                <defs>
+                  <linearGradient id="mcfill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#00E676" stop-opacity="0.22"/>
+                    <stop offset="100%" stop-color="#00E676" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,58 C24,50 44,60 70,48 C94,36 120,50 146,36 C170,22 196,30 222,18 C240,10 254,16 260,14 L260,80 L0,80 Z" fill="url(#mcfill)"/>
+                <path d="M0,58 C24,50 44,60 70,48 C94,36 120,50 146,36 C170,22 196,30 222,18 C240,10 254,16 260,14" fill="none" stroke="#00B85C" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="mc-holdings">
+              <div class="mc-hold-row">
+                <div class="mc-hold-left">
+                  <div class="mc-hold-icon">AA</div>
+                  <div><div class="mc-hold-tk">AAPL</div></div>
+                </div>
+                <div class="mc-hold-val">$ 412k</div>
+              </div>
+              <div class="mc-hold-row">
+                <div class="mc-hold-left">
+                  <div class="mc-hold-icon">AL</div>
+                  <div><div class="mc-hold-tk">AL30</div></div>
+                </div>
+                <div class="mc-hold-val">$ 286k</div>
+              </div>
+              <div class="mc-hold-row">
+                <div class="mc-hold-left">
+                  <div class="mc-hold-icon">FC</div>
+                  <div><div class="mc-hold-tk">FCI Pesos</div></div>
+                </div>
+                <div class="mc-hold-val">$ 184k</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRO -->
+      <div class="product-panel dark" id="panel-pro" style="display:none;">
+        <div>
+          <span class="p-tag">Modo avanzado</span>
+          <h3 class="p-title">Alamos Pro.</h3>
+          <p class="p-desc">
+            Un terminal de trading profesional sobre la misma cuenta. Pensado para inversores que necesitan precisión, velocidad y herramientas de análisis.
+          </p>
+          <ul class="p-list">
+            <li>Gráficos de velas con más de 40 indicadores técnicos</li>
+            <li>Libro de órdenes en tiempo real con profundidad y spread</li>
+            <li>Órdenes límite, stop-loss, take-profit y OCO</li>
+            <li>Panel multi-activo: CEDEARs, acciones locales, bonos, ONs</li>
+            <li>API REST y WebSocket para trading algorítmico</li>
+            <li>Exportación de operaciones a CSV para contabilidad</li>
+          </ul>
+        </div>
+        <div class="p-visual">
+          <div class="pro-visual">
+            <div class="pro-tickers" aria-hidden="true">
+              <div class="pro-ticker">
+                <span class="pro-ticker-sym">AAPL</span>
+                <span class="pro-ticker-px">24.120</span>
+                <span class="pro-ticker-ch up">+2,4%</span>
+              </div>
+              <div class="pro-ticker-divider"></div>
+              <div class="pro-ticker">
+                <span class="pro-ticker-sym">GGAL</span>
+                <span class="pro-ticker-px">8.450</span>
+                <span class="pro-ticker-ch dn">−0,6%</span>
+              </div>
+              <div class="pro-ticker-divider"></div>
+              <div class="pro-ticker">
+                <span class="pro-ticker-sym">AL30</span>
+                <span class="pro-ticker-px">71.540</span>
+                <span class="pro-ticker-ch up">+0,8%</span>
+              </div>
+              <div class="pro-ticker-divider"></div>
+              <div class="pro-ticker">
+                <span class="pro-ticker-sym">MERV</span>
+                <span class="pro-ticker-px">2.184k</span>
+                <span class="pro-ticker-ch up">+1,2%</span>
+              </div>
+            </div>
+
+            <div class="pro-header">
+              <div>
+                <div class="pro-header-sym">AAPL<span class="green"> · ARS</span></div>
+                <div class="pro-header-px">24.120,50</div>
+                <div class="pro-header-ch">+572,30 · +2,43%</div>
+              </div>
+              <div class="pro-header-stat">
+                <span class="pro-header-stat-label">Vol 24h</span>
+                <span class="pro-header-stat-val">$ 184,2M</span>
+              </div>
+            </div>
+
+            <div class="pro-tabs">
+              <div class="pro-tab active">1D</div>
+              <div class="pro-tab">1S</div>
+              <div class="pro-tab">1M</div>
+              <div class="pro-tab">3M</div>
+              <div class="pro-tab">1A</div>
+            </div>
+
+            <div class="pro-candles">
+              <div class="pro-candles-label">AAPL · Vela 15m</div>
+              <svg viewBox="0 0 260 120" preserveAspectRatio="none">
+                <g>
+                  <line x1="12" y1="72" x2="12" y2="96" stroke="#00E676" stroke-width="1"/>
+                  <rect x="8" y="78" width="8" height="12" fill="#00E676"/>
+                  <line x1="28" y1="60" x2="28" y2="88" stroke="#00E676" stroke-width="1"/>
+                  <rect x="24" y="66" width="8" height="16" fill="#00E676"/>
+                  <line x1="44" y1="54" x2="44" y2="80" stroke="#FF7575" stroke-width="1"/>
+                  <rect x="40" y="60" width="8" height="14" fill="#FF7575"/>
+                  <line x1="60" y1="46" x2="60" y2="74" stroke="#00E676" stroke-width="1"/>
+                  <rect x="56" y="52" width="8" height="16" fill="#00E676"/>
+                  <line x1="76" y1="40" x2="76" y2="62" stroke="#00E676" stroke-width="1"/>
+                  <rect x="72" y="44" width="8" height="14" fill="#00E676"/>
+                  <line x1="92" y1="44" x2="92" y2="70" stroke="#FF7575" stroke-width="1"/>
+                  <rect x="88" y="48" width="8" height="16" fill="#FF7575"/>
+                  <line x1="108" y1="32" x2="108" y2="58" stroke="#00E676" stroke-width="1"/>
+                  <rect x="104" y="38" width="8" height="14" fill="#00E676"/>
+                  <line x1="124" y1="24" x2="124" y2="52" stroke="#00E676" stroke-width="1"/>
+                  <rect x="120" y="30" width="8" height="18" fill="#00E676"/>
+                  <line x1="140" y1="28" x2="140" y2="52" stroke="#FF7575" stroke-width="1"/>
+                  <rect x="136" y="32" width="8" height="14" fill="#FF7575"/>
+                  <line x1="156" y1="20" x2="156" y2="48" stroke="#00E676" stroke-width="1"/>
+                  <rect x="152" y="26" width="8" height="16" fill="#00E676"/>
+                  <line x1="172" y1="14" x2="172" y2="40" stroke="#00E676" stroke-width="1"/>
+                  <rect x="168" y="18" width="8" height="18" fill="#00E676"/>
+                  <line x1="188" y1="18" x2="188" y2="44" stroke="#FF7575" stroke-width="1"/>
+                  <rect x="184" y="22" width="8" height="16" fill="#FF7575"/>
+                  <line x1="204" y1="10" x2="204" y2="38" stroke="#00E676" stroke-width="1"/>
+                  <rect x="200" y="14" width="8" height="18" fill="#00E676"/>
+                  <line x1="220" y1="6" x2="220" y2="30" stroke="#00E676" stroke-width="1"/>
+                  <rect x="216" y="12" width="8" height="14" fill="#00E676"/>
+                  <line x1="236" y1="10" x2="236" y2="34" stroke="#FF7575" stroke-width="1"/>
+                  <rect x="232" y="14" width="8" height="16" fill="#FF7575"/>
+                </g>
+                <path d="M0,80 C40,70 80,56 120,42 C160,28 200,22 260,14" fill="none" stroke="#FAFAF7" stroke-width="1" stroke-opacity="0.5" stroke-dasharray="2 3"/>
+              </svg>
+            </div>
+
+            <div class="pro-orderbook">
+              <div class="pro-ob-head"><span>Precio</span><span>Cantidad</span><span>Total</span></div>
+              <div class="pro-ob-rows">
+                <div class="pro-ob-row ask"><span class="depth" style="width:34%"></span><span>24.140</span><span>280</span><span>6.759k</span></div>
+                <div class="pro-ob-row ask"><span class="depth" style="width:68%"></span><span>24.132</span><span>1.140</span><span>27.510k</span></div>
+                <div class="pro-ob-row ask"><span class="depth" style="width:52%"></span><span>24.128</span><span>910</span><span>21.956k</span></div>
+                <div class="pro-ob-row ask"><span class="depth" style="width:28%"></span><span>24.124</span><span>420</span><span>10.132k</span></div>
+              </div>
+              <div class="pro-ob-spread">
+                <span class="lbl">Spread</span>
+                <span>0,02%</span>
+              </div>
+              <div class="pro-ob-rows">
+                <div class="pro-ob-row bid"><span class="depth" style="width:72%"></span><span>24.120</span><span>1.200</span><span>28.944k</span></div>
+                <div class="pro-ob-row bid"><span class="depth" style="width:58%"></span><span>24.118</span><span>820</span><span>19.776k</span></div>
+                <div class="pro-ob-row bid"><span class="depth" style="width:42%"></span><span>24.115</span><span>640</span><span>15.433k</span></div>
+                <div class="pro-ob-row bid"><span class="depth" style="width:26%"></span><span>24.110</span><span>380</span><span>9.161k</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="como">
+    <div class="wrap">
+      <h2 class="how-h">El proceso, en tres pasos.</h2>
+      <div class="how-grid">
+        <div class="how-step">
+          <div class="how-num"><span class="n">01</span><span>Apertura</span></div>
+          <h3 class="how-title">Registro en línea con validación de identidad.</h3>
+          <p class="how-desc">Apertura de cuenta comitente desde la aplicación, sin gestiones presenciales.</p>
+        </div>
+        <div class="how-step">
+          <div class="how-num"><span class="n">02</span><span>Fondeo</span></div>
+          <h3 class="how-title">Acreditación por transferencia bancaria.</h3>
+          <p class="how-desc">Depósitos y retiros por CBU a nombre del titular, sin cargos por operación.</p>
+        </div>
+        <div class="how-step">
+          <div class="how-num"><span class="n">03</span><span>Operar</span></div>
+          <h3 class="how-title">Construí tu cartera de inversión.</h3>
+          <p class="how-desc">Acceso a CEDEARs, bonos y fondos desde montos accesibles, con comisiones transparentes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD / APP -->
+  <section class="download" id="app">
+    <div class="wrap">
+      <div class="download-grid">
+        <div>
+          <h2 class="dl-h">Operá desde donde estés.</h2>
+          <p class="dl-sub">
+            La aplicación de Alamos para iOS y Android estará disponible en el lanzamiento. Misma cuenta, misma información, misma seguridad.
+          </p>
+          <div class="dl-stores">
+            <a class="dl-store" href="#waitlist" aria-label="App Store">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+              <span>
+                <span class="dl-store-sub">Descargar en</span>
+                <span class="dl-store-name">App Store</span>
+              </span>
+            </a>
+            <a class="dl-store" href="#waitlist" aria-label="Google Play">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734c0-.377.234-.7.61-.92zM14.5 12.707l2.62 2.62-11.63 6.668 9.01-9.288zm3.494-3.494l2.833 1.624c.765.438.765 1.543 0 1.98l-2.833 1.624L14.5 11.293l3.494-3.494zM5.49 2.005l11.63 6.668-2.62 2.62-9.01-9.288z"/></svg>
+              <span>
+                <span class="dl-store-sub">Disponible en</span>
+                <span class="dl-store-name">Google Play</span>
+              </span>
+            </a>
+          </div>
+        </div>
+
+        <div class="dl-qr-wrap">
+          <div class="dl-qr" aria-label="QR de descarga">
+            <svg viewBox="0 0 29 29" shape-rendering="crispEdges">
+              <rect width="29" height="29" fill="#fff"/>
+              <g fill="#0E0F0C">
+                <!-- finder top-left -->
+                <path d="M0 0h7v7H0z M1 1v5h5V1z" fill-rule="evenodd"/><rect x="2" y="2" width="3" height="3"/>
+                <!-- finder top-right -->
+                <path d="M22 0h7v7h-7z M23 1v5h5V1z" fill-rule="evenodd"/><rect x="24" y="2" width="3" height="3"/>
+                <!-- finder bottom-left -->
+                <path d="M0 22h7v7H0z M1 23v5h5v-5z" fill-rule="evenodd"/><rect x="2" y="24" width="3" height="3"/>
+                <!-- timing patterns -->
+                <rect x="8" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/><rect x="12" y="6" width="1" height="1"/><rect x="14" y="6" width="1" height="1"/><rect x="16" y="6" width="1" height="1"/><rect x="18" y="6" width="1" height="1"/><rect x="20" y="6" width="1" height="1"/>
+                <rect x="6" y="8" width="1" height="1"/><rect x="6" y="10" width="1" height="1"/><rect x="6" y="12" width="1" height="1"/><rect x="6" y="14" width="1" height="1"/><rect x="6" y="16" width="1" height="1"/><rect x="6" y="18" width="1" height="1"/><rect x="6" y="20" width="1" height="1"/>
+                <!-- random-ish data modules -->
+                <rect x="9" y="1" width="2" height="1"/><rect x="12" y="1" width="1" height="2"/><rect x="15" y="2" width="2" height="1"/><rect x="19" y="1" width="1" height="3"/>
+                <rect x="8" y="3" width="1" height="2"/><rect x="11" y="4" width="3" height="1"/><rect x="16" y="4" width="1" height="2"/><rect x="18" y="5" width="2" height="1"/>
+                <rect x="0" y="8" width="1" height="2"/><rect x="2" y="9" width="2" height="1"/><rect x="4" y="11" width="1" height="2"/><rect x="1" y="13" width="3" height="1"/><rect x="0" y="16" width="2" height="1"/><rect x="3" y="17" width="1" height="2"/><rect x="0" y="20" width="1" height="1"/>
+                <rect x="8" y="8" width="2" height="2"/><rect x="11" y="8" width="1" height="1"/><rect x="13" y="8" width="2" height="1"/><rect x="16" y="9" width="2" height="2"/><rect x="19" y="8" width="1" height="3"/><rect x="21" y="9" width="1" height="1"/>
+                <rect x="22" y="11" width="1" height="2"/><rect x="24" y="9" width="1" height="3"/><rect x="26" y="8" width="2" height="2"/><rect x="28" y="11" width="1" height="2"/>
+                <rect x="9" y="11" width="1" height="1"/><rect x="11" y="12" width="3" height="1"/><rect x="15" y="11" width="1" height="2"/><rect x="17" y="13" width="2" height="1"/><rect x="20" y="12" width="2" height="2"/>
+                <rect x="8" y="14" width="1" height="2"/><rect x="10" y="15" width="3" height="1"/><rect x="14" y="14" width="2" height="2"/><rect x="17" y="16" width="1" height="2"/><rect x="19" y="15" width="2" height="1"/><rect x="22" y="14" width="2" height="2"/><rect x="25" y="15" width="1" height="2"/><rect x="27" y="14" width="1" height="1"/>
+                <rect x="9" y="17" width="2" height="1"/><rect x="12" y="18" width="1" height="2"/><rect x="14" y="17" width="1" height="1"/><rect x="16" y="19" width="2" height="1"/><rect x="19" y="18" width="1" height="2"/><rect x="21" y="17" width="2" height="2"/><rect x="24" y="18" width="1" height="1"/><rect x="26" y="17" width="1" height="2"/><rect x="28" y="18" width="1" height="1"/>
+                <rect x="8" y="20" width="1" height="2"/><rect x="10" y="20" width="2" height="1"/><rect x="13" y="21" width="2" height="1"/><rect x="16" y="20" width="1" height="2"/><rect x="18" y="22" width="3" height="1"/><rect x="22" y="20" width="1" height="3"/><rect x="24" y="21" width="2" height="1"/><rect x="27" y="22" width="1" height="1"/>
+                <rect x="8" y="23" width="2" height="1"/><rect x="11" y="24" width="1" height="2"/><rect x="13" y="23" width="3" height="1"/><rect x="17" y="24" width="2" height="1"/><rect x="20" y="25" width="1" height="2"/><rect x="23" y="24" width="2" height="2"/><rect x="26" y="26" width="2" height="1"/>
+                <rect x="8" y="26" width="1" height="2"/><rect x="10" y="27" width="3" height="1"/><rect x="14" y="26" width="1" height="2"/><rect x="16" y="27" width="2" height="1"/><rect x="19" y="28" width="2" height="1"/><rect x="22" y="27" width="1" height="2"/><rect x="24" y="28" width="3" height="1"/>
+              </g>
+            </svg>
+            <div class="dl-qr-logo">
+              <div class="dl-qr-logo-inner">
+                <svg viewBox="0 0 100 100" width="26" height="26" fill="none">
+                  <polygon points="38,26 16,86 60,86" stroke="#0E0F0C" stroke-width="9" stroke-linejoin="round" fill="none"></polygon>
+                  <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="9" stroke-linejoin="round" fill="none"></polygon>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="dl-qr-caption">
+            <strong>Escaneá para descargar</strong>
+            Disponible para iOS y Android al momento del lanzamiento.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <div class="wrap">
+      <div class="faq-grid">
+        <div>
+          <h2 class="faq-h">Preguntas<br/>frecuentes.</h2>
+          <p class="faq-sub">
+            Las respuestas a las consultas más comunes sobre la plataforma, el proceso de apertura de cuenta y la operatoria.
+          </p>
+        </div>
+        <div class="faq-list" id="faq-list">
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">01</span>
+              <span class="faq-q-text">¿Qué es Alamos Capital?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>Alamos Capital es un Agente de Liquidación y Compensación en proceso de registro ante la Comisión Nacional de Valores (CNV) de la República Argentina. Ofrecemos una plataforma de inversión digital orientada a inversores minoristas que buscan construir una cartera diversificada en instrumentos locales e internacionales.</p>
+              <p>La plataforma está actualmente en etapa de pre-lanzamiento y su disponibilidad comercial está sujeta a las correspondientes autorizaciones regulatorias.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">02</span>
+              <span class="faq-q-text">¿Qué productos podré operar en Alamos?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>Desde Alamos vas a poder operar CEDEARs sobre las principales acciones internacionales, bonos soberanos en pesos y dólares, obligaciones negociables, acciones locales del panel Merval, fondos comunes de inversión y cauciones bursátiles.</p>
+              <p>Los inversores que lo requieran podrán activar Alamos Pro, un terminal avanzado con gráficos profesionales, órdenes límite, stop-loss y profundidad de mercado en tiempo real.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">03</span>
+              <span class="faq-q-text">¿Cómo abro mi cuenta comitente?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>La apertura se realiza íntegramente en línea desde la aplicación móvil o la web. El proceso incluye la validación de identidad mediante documento y prueba de vida, declaración de persona expuesta políticamente, y perfilado del inversor conforme a la Res. Gral. CNV 622/13.</p>
+              <p>El trámite demora aproximadamente 5 minutos y no requiere gestiones presenciales ni documentación física.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">04</span>
+              <span class="faq-q-text">¿Cuánto necesito para empezar a invertir?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>No exigimos monto mínimo de apertura ni saldo mínimo de permanencia. Podés comenzar con el equivalente al precio de una fracción de CEDEAR, y construir tu cartera de forma progresiva.</p>
+              <p>Los fondos comunes de inversión permiten suscripciones desde $ 1.000 y las cauciones desde $ 5.000.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">05</span>
+              <span class="faq-q-text">¿Cuáles son las comisiones?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>Nuestro esquema tarifario es transparente y sin costos ocultos. No cobramos mantenimiento de cuenta, transferencias por CBU, ni custodia de títulos. Las comisiones por operación son competitivas frente al promedio del mercado local y se informan en detalle antes de confirmar cada orden.</p>
+              <p>Al cronograma definitivo lo publicaremos en el momento del lanzamiento comercial.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">06</span>
+              <span class="faq-q-text">¿Cómo se protegen mi dinero y mis títulos?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>Los títulos valores se depositan bajo tu titularidad en Caja de Valores S.A., el depositario central del mercado argentino. Los fondos líquidos se mantienen en cuentas bancarias segregadas a nombre del cliente, separadas del patrimonio de la sociedad.</p>
+              <p>Aplicamos autenticación en dos pasos obligatoria, monitoreo transaccional permanente y cumplimos con las normas de prevención de lavado de activos establecidas por la UIF.</p>
+            </div></div></div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">
+              <span class="faq-q-num">07</span>
+              <span class="faq-q-text">¿Cómo deposito o retiro fondos?</span>
+              <span class="faq-q-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg></span>
+            </button>
+            <div class="faq-a"><div class="faq-a-inner"><div class="faq-a-content">
+              <p>Las acreditaciones se realizan por transferencia bancaria desde una cuenta de tu titularidad, por CBU o CVU. Los retiros se devuelven únicamente a esa misma cuenta bancaria, conforme a las normas de prevención de lavado vigentes.</p>
+              <p>No aplicamos cargos por depósito ni por retiro, y las operaciones suelen acreditarse en el mismo día hábil.</p>
+            </div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WAITLIST -->
+  <section class="waitlist" id="waitlist">
+    <div class="waitlist-inner">
+      <div class="wl-eyebrow"><span class="dot"></span>Lista de acceso anticipado</div>
+      <h2 class="wl-h">
+        Sé de los primeros<br/>
+        en <span class="green">operar.</span>
+      </h2>
+      <p class="wl-sub">
+        Registrate para acceder antes que el público general cuando la plataforma esté disponible.
+      </p>
+
+      <form class="wl-form" id="wl-form" novalidate>
+        <div class="wl-field">
+          <input type="text" id="wl-name" name="name" placeholder="Nombre" required autocomplete="given-name" />
+          <label for="wl-name">Nombre</label>
+        </div>
+        <div class="wl-field">
+          <input type="email" id="wl-email" name="email" placeholder="Email" required autocomplete="email" />
+          <label for="wl-email">Email</label>
+        </div>
+        <button type="submit" class="wl-submit">Solicitar acceso →</button>
+      </form>
+
+      <div class="wl-success" id="wl-success">
+        <div class="wl-success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+        </div>
+        <div class="wl-success-h">Registro confirmado.</div>
+        <p class="wl-success-p">Te contactaremos a <span id="wl-shown-email" style="color:var(--green)"></span> cuando la plataforma esté disponible.</p>
+      </div>
+
+      <p class="wl-legal">
+        Al registrarte, aceptás recibir comunicaciones relacionadas al lanzamiento. No compartiremos tu información con terceros.
+      </p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div class="foot">
+        <div class="foot-brand">
+          <svg viewBox="0 0 100 100" fill="none">
+            <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="7" stroke-linejoin="round" fill="none"></polygon>
+            <polygon points="56,12 29,86 83,86" stroke="#0E0F0C" stroke-width="7" stroke-linejoin="round" fill="none"></polygon>
+          </svg>
+          <span>Alamos Capital</span>
+        </div>
+        <div class="foot-links">
+          <a href="#productos">Productos</a>
+          <a href="#como">Cómo funciona</a>
+          <a href="#app">App</a>
+          <a href="#faq">FAQ</a>
+          <a href="/cdn-cgi/l/email-protection#dcb4b3b0bd9cbdb0bdb1b3aff2bfbdacb5a8bdb0">Contacto</a>
+        </div>
+        <div>© 2026 Alamos Capital</div>
+      </div>
+      <p class="foot-legal">
+        El servicio descrito se encuentra en etapa de pre-lanzamiento y su disponibilidad está sujeta a las correspondientes autorizaciones regulatorias. La información contenida en esta página tiene carácter meramente informativo y no constituye oferta pública de valores negociables en los términos de la Ley 26.831 ni recomendación de inversión. Toda inversión en valores negociables conlleva riesgos; los rendimientos pasados no garantizan resultados futuros.
+      </p>
+    </div>
+  </footer>
+
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    // nav border on scroll
+    const nav = document.getElementById('nav');
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 4);
+    document.addEventListener('scroll', onScroll, { passive: true });
+
+    // mode toggle
+    const modeBtns = document.querySelectorAll('.mode-toggle button');
+    const panelBase = document.getElementById('panel-base');
+    const panelPro  = document.getElementById('panel-pro');
+    modeBtns.forEach(btn => btn.addEventListener('click', () => {
+      modeBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+      btn.classList.add('active'); btn.setAttribute('aria-selected', 'true');
+      const isPro = btn.dataset.mode === 'pro';
+      panelBase.style.display = isPro ? 'none' : 'grid';
+      panelPro.style.display  = isPro ? 'grid' : 'none';
+    }));
+
+    // faq accordion
+    document.querySelectorAll('.faq-q').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.parentElement;
+        const isOpen = item.classList.contains('open');
+        document.querySelectorAll('.faq-item.open').forEach(o => {
+          o.classList.remove('open');
+          o.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
+        });
+        if (!isOpen) {
+          item.classList.add('open');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
+    // waitlist mock submit
+    const form = document.getElementById('wl-form');
+    const success = document.getElementById('wl-success');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('wl-name').value.trim();
+      const email = document.getElementById('wl-email').value.trim();
+      if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) return;
+      // TODO: wire to real backend (Formspree / Airtable / Supabase)
+      console.log('waitlist signup', { name, email });
+      try { localStorage.setItem('alamos-waitlist', JSON.stringify({ name, email, at: Date.now() })); } catch(_) {}
+      document.getElementById('wl-shown-email').textContent = email;
+      form.classList.add('hide');
+      success.classList.add('show');
+    });
+  </script>
+
+</body>
+</html>
