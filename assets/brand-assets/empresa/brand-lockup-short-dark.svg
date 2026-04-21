@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 100" fill="none" width="520" height="200">
+  <g transform="translate(10, 10) scale(0.8)"><polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="5.5" stroke-linejoin="round" fill="none"></polygon>
+  <polygon points="56,12 29,86 83,86" stroke="#FAFAF7" stroke-width="5.5" stroke-linejoin="round" fill="none"></polygon></g>
+  <text x="92" y="64" font-family="Plus Jakarta Sans, -apple-system, system-ui, sans-serif" font-size="40" font-weight="700" letter-spacing="-1.8" fill="#FAFAF7">Alamos</text>
+</svg>
