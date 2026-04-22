@@ -20,7 +20,10 @@ export default function AppLayout() {
       <Stack.Screen name="detail" />
       <Stack.Screen name="trade" />
       <Stack.Screen name="buy" />
-      <Stack.Screen name="confirm" />
+      <Stack.Screen
+        name="confirm"
+        options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen
         name="success"
         options={{ animation: "slide_from_bottom", gestureEnabled: false }}

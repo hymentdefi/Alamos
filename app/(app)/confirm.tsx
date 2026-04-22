@@ -15,14 +15,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, spacing, brand } from "../../lib/theme";
+import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-const SWIPE_THRESHOLD = 180;
-const SWIPE_RANGE = 280;
+const SWIPE_THRESHOLD = 130;
+const SWIPE_RANGE = 240;
 /** Alto de la franja verde en reposo (solo la strip, sin insets). */
 const STRIP_HEIGHT = 70;
 /** Radio de la card blanca en las esquinas inferiores. */
@@ -241,10 +241,11 @@ export default function ConfirmScreen() {
           <View style={[s.header, { paddingTop: insets.top + 10 }]}>
             <Pressable
               onPress={() => router.back()}
-              hitSlop={12}
+              hitSlop={14}
               disabled={phase !== "idle"}
+              style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
             >
-              <Text style={[s.edit, { color: brand.greenDark }]}>Editar</Text>
+              <Feather name="arrow-left" size={18} color={c.text} />
             </Pressable>
           </View>
 
@@ -458,11 +459,15 @@ const s = StyleSheet.create({
   },
   header: {
     paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  edit: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.15,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
   },
   titleBlock: {
     marginTop: 8,
