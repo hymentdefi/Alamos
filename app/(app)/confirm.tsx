@@ -21,12 +21,12 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Distancia mínima que el dedo tiene que subir para ejecutar. */
-const SWIPE_THRESHOLD = 220;
-/** Rango visual de drag (más que threshold para sensación de viaje). */
-const SWIPE_RANGE = 320;
-/** Altura de la franja verde inicial (el bottom bar). */
-const BASE_GREEN_HEIGHT = 110;
+const SWIPE_THRESHOLD = 180;
+const SWIPE_RANGE = 280;
+/** Alto de la franja verde en reposo (solo la strip, sin insets). */
+const STRIP_HEIGHT = 70;
+/** Radio de la card blanca en las esquinas inferiores. */
+const CARD_RADIUS = 28;
 
 const AVAILABLE_ARS = 1272850;
 
@@ -50,19 +50,17 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  /** 0 = reposo, 1 = verde llenó toda la pantalla. */
+  // ─── Animated ───
   const greenProgress = useRef(new Animated.Value(0)).current;
-  /** 0 = logo visible, 1 = checkmark visible. */
   const checkMorph = useRef(new Animated.Value(0)).current;
-  /** Rotación infinita del spinner (0 → 1 → 0 → 1 ...). */
   const spinLoop = useRef(new Animated.Value(0)).current;
-  /** Opacidad del overlay blanco (logo + texto). */
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("Enviando orden");
+  const tickedMid = useRef(false);
 
-  // Spinner loop siempre girando
+  // Spinner loop
   useEffect(() => {
     const loop = Animated.loop(
       Animated.timing(spinLoop, {
@@ -76,11 +74,14 @@ export default function ConfirmScreen() {
     return () => loop.stop();
   }, [spinLoop]);
 
-  // Haptic tick cuando el user cruza el 50%
+  // Haptic tick al cruzar 50%
   useEffect(() => {
     const id = greenProgress.addListener(({ value }) => {
-      if (value > 0.48 && value < 0.52) {
+      if (value > 0.5 && !tickedMid.current) {
+        tickedMid.current = true;
         Haptics.selectionAsync().catch(() => {});
+      } else if (value < 0.3) {
+        tickedMid.current = false;
       }
     });
     return () => greenProgress.removeListener(id);
@@ -88,7 +89,6 @@ export default function ConfirmScreen() {
 
   const runOrderFlow = async () => {
     setPhase("sending");
-    // Fade in overlay white (logo + texto)
     Animated.timing(overlayOpacity, {
       toValue: 1,
       duration: 220,
@@ -96,17 +96,13 @@ export default function ConfirmScreen() {
     }).start();
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-
-    // Estado 1: Enviando
     setStatusText("Enviando orden");
     await wait(900);
 
-    // Estado 2: Recibida
     setStatusText("Orden recibida");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     await wait(900);
 
-    // Estado 3: Ejecutada — logo morphea a check
     setPhase("done");
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success,
@@ -121,7 +117,6 @@ export default function ConfirmScreen() {
 
     await wait(1100);
 
-    // Navegar al success
     router.replace({
       pathname: "/(app)/success",
       params: {
@@ -135,9 +130,10 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     Animated.timing(greenProgress, {
       toValue: 1,
-      duration: 240,
+      duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start(() => {
@@ -145,14 +141,19 @@ export default function ConfirmScreen() {
     });
   };
 
+  // PanResponder en TODA la pantalla — captura cualquier swipe up estando idle
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => phase === "idle",
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
           phase === "idle" &&
-          Math.abs(g.dy) > 4 &&
-          Math.abs(g.dy) > Math.abs(g.dx),
+          g.dy < -4 &&
+          Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
+        onMoveShouldSetPanResponderCapture: (_, g) =>
+          phase === "idle" &&
+          g.dy < -4 &&
+          Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
           if (g.dy < 0) {
@@ -191,13 +192,12 @@ export default function ConfirmScreen() {
 
   if (!asset) return null;
 
-  // Interpolations
   const greenHeight = greenProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [BASE_GREEN_HEIGHT, SCREEN_H + 200],
+    outputRange: [STRIP_HEIGHT + insets.bottom, SCREEN_H + 200],
   });
   const hintOpacity = greenProgress.interpolate({
-    inputRange: [0, 0.3],
+    inputRange: [0, 0.4],
     outputRange: [1, 0],
   });
   const spin = spinLoop.interpolate({
@@ -217,100 +217,117 @@ export default function ConfirmScreen() {
   ];
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* Contenido principal */}
-      <View style={[s.content, { paddingTop: insets.top + 12 }]}>
-        <View style={s.header}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            disabled={phase !== "idle"}
-          >
-            <Text style={[s.edit, { color: c.greenDark }]}>Editar</Text>
-          </Pressable>
-        </View>
-
-        <View style={s.titleBlock}>
-          <Text style={[s.title, { color: c.text }]}>
-            {isSell ? "Vender" : "Comprar"} {asset.ticker}
-          </Text>
-        </View>
-
-        <View style={s.amountBlock}>
-          <Text style={[s.amountLabel, { color: c.textMuted }]}>
-            {isSell ? "Vendés" : "Comprás"}
-          </Text>
-          <AmountDisplay value={numAmount} size={38} />
-          <Text style={[s.available, { color: c.textMuted }]}>
-            {formatARS(AVAILABLE_ARS)} disponibles para operar
-          </Text>
-        </View>
-
-        <View style={[s.rows, { borderColor: c.border }]}>
-          {rows.map((row, i) => (
-            <View
-              key={row.label}
-              style={[
-                s.row,
-                i < rows.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: c.border,
-                },
-              ]}
+    <View
+      style={[s.root, { backgroundColor: brand.green }]}
+      {...panResponder.panHandlers}
+    >
+      {/* Card blanca con contenido. Termina antes de la strip, con
+          esquinas redondeadas abajo. Cuando la strip verde crece, la
+          va tapando. */}
+      <View
+        style={[
+          s.card,
+          {
+            backgroundColor: c.bg,
+            marginBottom: STRIP_HEIGHT + insets.bottom,
+            borderBottomLeftRadius: CARD_RADIUS,
+            borderBottomRightRadius: CARD_RADIUS,
+          },
+        ]}
+      >
+        <View style={s.content}>
+          <View style={[s.header, { paddingTop: insets.top + 10 }]}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              disabled={phase !== "idle"}
             >
-              <Text style={[s.rowLabel, { color: c.textMuted }]}>
-                {row.label}
-              </Text>
-              <Text
+              <Text style={[s.edit, { color: c.greenDark }]}>Editar</Text>
+            </Pressable>
+          </View>
+
+          <View style={s.titleBlock}>
+            <Text style={[s.title, { color: c.text }]}>
+              {isSell ? "Vender" : "Comprar"} {asset.ticker}
+            </Text>
+          </View>
+
+          <View style={s.amountBlock}>
+            <Text style={[s.amountLabel, { color: c.textMuted }]}>
+              {isSell ? "Vendés" : "Comprás"}
+            </Text>
+            <AmountDisplay value={numAmount} size={36} />
+            <Text style={[s.available, { color: c.textMuted }]}>
+              {formatARS(AVAILABLE_ARS)} disponibles para operar
+            </Text>
+          </View>
+
+          <View style={[s.rows, { borderColor: c.border }]}>
+            {rows.map((row, i) => (
+              <View
+                key={row.label}
                 style={[
-                  s.rowValue,
-                  row.strong && s.rowValueStrong,
-                  { color: c.text },
+                  s.row,
+                  i < rows.length - 1 && {
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: c.border,
+                  },
                 ]}
               >
-                {row.value}
-              </Text>
-            </View>
-          ))}
+                <Text style={[s.rowLabel, { color: c.textMuted }]}>
+                  {row.label}
+                </Text>
+                <Text
+                  style={[
+                    s.rowValue,
+                    row.strong && s.rowValueStrong,
+                    { color: c.text },
+                  ]}
+                >
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={s.orderSummary}>
+            <Text style={[s.summaryTitle, { color: c.text }]}>
+              Resumen de orden
+            </Text>
+            <Text style={[s.summaryBody, { color: c.textMuted }]}>
+              Estás enviando una orden a mercado para{" "}
+              {isSell ? "vender" : "comprar"} {formatARS(numAmount)} de{" "}
+              {asset.ticker}. La ejecución se realiza al mejor precio
+              disponible.
+            </Text>
+          </View>
         </View>
 
-        <View style={s.orderSummary}>
-          <Text style={[s.summaryTitle, { color: c.text }]}>
-            Resumen de orden
-          </Text>
-          <Text style={[s.summaryBody, { color: c.textMuted }]}>
-            Estás enviando una orden a mercado para{" "}
-            {isSell ? "vender" : "comprar"} {formatARS(numAmount)} de{" "}
-            {asset.ticker}. La ejecución se realiza al mejor precio disponible.
-          </Text>
+        {/* Chevron al final de la card */}
+        <View style={s.chevronBottom}>
+          <PullChevron color={c.text} />
         </View>
       </View>
 
-      {/* Capa verde que viene desde abajo y come la pantalla */}
+      {/* Franja verde que crece para comer la pantalla */}
       <Animated.View
-        style={[s.greenLayer, { height: greenHeight }]}
-        {...panResponder.panHandlers}
+        style={[
+          s.greenStrip,
+          { height: greenHeight, paddingBottom: insets.bottom },
+        ]}
       >
-        <Animated.View
-          style={[
-            s.pullerHint,
-            { paddingBottom: insets.bottom + 18, opacity: hintOpacity },
-          ]}
-          pointerEvents="none"
-        >
-          <PullChevron />
-          <Text style={s.pullerText}>Deslizá para ejecutar</Text>
+        <Animated.View style={[s.hintWrap, { opacity: hintOpacity }]}>
+          <Text style={s.hintText}>Deslizá para ejecutar</Text>
         </Animated.View>
       </Animated.View>
 
-      {/* Overlay blanco con logo + spinner + texto cuando se ejecuta */}
+      {/* Overlay de ejecución: logo + spinner + texto + check */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
           <View style={s.logoWrap}>
-            {/* Spinner giratorio */}
             {phase !== "done" ? (
               <Animated.View
                 style={[
@@ -341,7 +358,6 @@ export default function ConfirmScreen() {
               </Animated.View>
             ) : null}
 
-            {/* Logo Alamos (visible cuando no es done) */}
             <Animated.View
               style={[
                 s.logoOverlay,
@@ -368,7 +384,6 @@ export default function ConfirmScreen() {
               />
             </Animated.View>
 
-            {/* Checkmark (aparece con scale + opacity cuando done) */}
             <Animated.View
               style={[
                 s.checkOverlay,
@@ -378,7 +393,12 @@ export default function ConfirmScreen() {
                 },
               ]}
             >
-              <Feather name="check" size={88} color="#FFFFFF" strokeWidth={3.5} />
+              <Feather
+                name="check"
+                size={90}
+                color="#FFFFFF"
+                strokeWidth={3.5}
+              />
             </Animated.View>
           </View>
 
@@ -389,13 +409,13 @@ export default function ConfirmScreen() {
   );
 }
 
-function PullChevron() {
+function PullChevron({ color }: { color: string }) {
   const bounce = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(bounce, {
-          toValue: -6,
+          toValue: -4,
           duration: 700,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
@@ -412,8 +432,8 @@ function PullChevron() {
     return () => loop.stop();
   }, [bounce]);
   return (
-    <Animated.View style={{ transform: [{ translateY: bounce }], marginBottom: 6 }}>
-      <Feather name="chevron-up" size={24} color="#FFFFFF" />
+    <Animated.View style={{ transform: [{ translateY: bounce }] }}>
+      <Feather name="chevron-up" size={26} color={color} />
     </Animated.View>
   );
 }
@@ -424,10 +444,15 @@ function wait(ms: number) {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+
+  /* Card blanca */
+  card: {
+    flex: 1,
+    overflow: "hidden",
+  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingBottom: BASE_GREEN_HEIGHT,
   },
   header: {
     paddingVertical: 8,
@@ -439,16 +464,16 @@ const s = StyleSheet.create({
   },
   titleBlock: {
     marginTop: 8,
-    marginBottom: 24,
+    marginBottom: 22,
   },
   title: {
     fontFamily: fontFamily[700],
-    fontSize: 36,
-    letterSpacing: -1.4,
-    lineHeight: 40,
+    fontSize: 34,
+    letterSpacing: -1.2,
+    lineHeight: 38,
   },
   amountBlock: {
-    marginBottom: 28,
+    marginBottom: 24,
   },
   amountLabel: {
     fontFamily: fontFamily[700],
@@ -487,7 +512,7 @@ const s = StyleSheet.create({
     fontSize: 16,
   },
   orderSummary: {
-    marginTop: 28,
+    marginTop: 24,
   },
   summaryTitle: {
     fontFamily: fontFamily[700],
@@ -500,29 +525,35 @@ const s = StyleSheet.create({
     lineHeight: 19,
     letterSpacing: -0.1,
   },
+  chevronBottom: {
+    alignItems: "center",
+    paddingBottom: 18,
+    paddingTop: 8,
+  },
 
-  /* Capa verde + puller */
-  greenLayer: {
+  /* Green strip */
+  greenStrip: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     backgroundColor: brand.green,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  pullerHint: {
     alignItems: "center",
-    paddingTop: 20,
+    justifyContent: "center",
   },
-  pullerText: {
+  hintWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hintText: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontSize: 17,
     color: "#FFFFFF",
     letterSpacing: -0.2,
   },
 
-  /* Overlay de ejecución */
+  /* Execution overlay */
   execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
@@ -534,7 +565,7 @@ const s = StyleSheet.create({
     height: 160,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 60,
+    marginBottom: 56,
   },
   spinnerWrap: {
     position: "absolute",
@@ -549,8 +580,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   logoImg: {
-    width: 64,
-    height: 64,
+    width: 66,
+    height: 66,
     tintColor: "#FFFFFF",
   },
   checkOverlay: {
