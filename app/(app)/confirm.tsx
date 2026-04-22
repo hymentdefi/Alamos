@@ -8,25 +8,29 @@ import {
   Dimensions,
   PanResponder,
   Easing,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
-import {
-  assets,
-  assetIconCode,
-  formatARS,
-} from "../../lib/data/assets";
+import { useTheme, fontFamily, spacing, brand } from "../../lib/theme";
+import { assets, formatARS } from "../../lib/data/assets";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Altura del tramo que el user tiene que subir con el dedo para confirmar. */
-const SWIPE_DISTANCE = 260;
-/** Umbral mínimo para que sea un "swipe válido". */
-const SWIPE_THRESHOLD = 140;
+/** Distancia mínima que el dedo tiene que subir para ejecutar. */
+const SWIPE_THRESHOLD = 220;
+/** Rango visual de drag (más que threshold para sensación de viaje). */
+const SWIPE_RANGE = 320;
+/** Altura de la franja verde inicial (el bottom bar). */
+const BASE_GREEN_HEIGHT = 110;
+
+const AVAILABLE_ARS = 1272850;
+
+type Phase = "idle" | "sending" | "received" | "done";
 
 export default function ConfirmScreen() {
   const { ticker, amount, mode } = useLocalSearchParams<{
@@ -46,56 +50,78 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  // ─── Animated values ───
-  // 0 = reposo, 1 = user subió todo. Se usa para mover el puller arriba
-  // y revelar el splash verde.
-  const progress = useRef(new Animated.Value(0)).current;
-  // 0 = estado normal, 1 = ejecutando (pantalla llena de verde).
-  const splash = useRef(new Animated.Value(0)).current;
-  // Scale del checkmark.
-  const checkScale = useRef(new Animated.Value(0)).current;
-  // Estado visual: "idle" | "confirming" | "done"
-  const [phase, setPhase] = useState<"idle" | "confirming" | "done">("idle");
+  /** 0 = reposo, 1 = verde llenó toda la pantalla. */
+  const greenProgress = useRef(new Animated.Value(0)).current;
+  /** 0 = logo visible, 1 = checkmark visible. */
+  const checkMorph = useRef(new Animated.Value(0)).current;
+  /** Rotación infinita del spinner (0 → 1 → 0 → 1 ...). */
+  const spinLoop = useRef(new Animated.Value(0)).current;
+  /** Opacidad del overlay blanco (logo + texto). */
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  const completeSwipe = async () => {
-    if (phase !== "idle") return;
-    setPhase("confirming");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [statusText, setStatusText] = useState("Enviando orden");
 
-    // haptic inicial fuerte
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+  // Spinner loop siempre girando
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spinLoop, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spinLoop]);
 
-    // 1. El puller termina de subir (completa el arrastre)
-    Animated.timing(progress, {
+  // Haptic tick cuando el user cruza el 50%
+  useEffect(() => {
+    const id = greenProgress.addListener(({ value }) => {
+      if (value > 0.48 && value < 0.52) {
+        Haptics.selectionAsync().catch(() => {});
+      }
+    });
+    return () => greenProgress.removeListener(id);
+  }, [greenProgress]);
+
+  const runOrderFlow = async () => {
+    setPhase("sending");
+    // Fade in overlay white (logo + texto)
+    Animated.timing(overlayOpacity, {
       toValue: 1,
-      duration: 150,
-      easing: Easing.out(Easing.cubic),
+      duration: 220,
       useNativeDriver: true,
     }).start();
 
-    // 2. El splash verde llena la pantalla
-    await wait(120);
-    Animated.timing(splash, {
-      toValue: 1,
-      duration: 420,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
-    // 3. Checkmark pop con haptic success
-    await wait(480);
+    // Estado 1: Enviando
+    setStatusText("Enviando orden");
+    await wait(900);
+
+    // Estado 2: Recibida
+    setStatusText("Orden recibida");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    await wait(900);
+
+    // Estado 3: Ejecutada — logo morphea a check
+    setPhase("done");
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success,
     ).catch(() => {});
-    Animated.spring(checkScale, {
+    Animated.spring(checkMorph, {
       toValue: 1,
       tension: 140,
       friction: 5,
       useNativeDriver: true,
     }).start();
-    setPhase("done");
+    setStatusText("Orden ejecutada");
 
-    // 4. Esperar un toque y navegar al success
     await wait(1100);
+
+    // Navegar al success
     router.replace({
       pathname: "/(app)/success",
       params: {
@@ -107,19 +133,33 @@ export default function ConfirmScreen() {
     });
   };
 
+  const completeSwipe = () => {
+    if (phase !== "idle") return;
+    Animated.timing(greenProgress, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      runOrderFlow();
+    });
+  };
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => phase === "idle",
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dy) > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+          phase === "idle" &&
+          Math.abs(g.dy) > 4 &&
+          Math.abs(g.dy) > Math.abs(g.dx),
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
           if (g.dy < 0) {
-            const v = Math.min(1, -g.dy / SWIPE_DISTANCE);
-            progress.setValue(v);
+            const v = Math.min(1, -g.dy / SWIPE_RANGE);
+            greenProgress.setValue(v);
           } else {
-            progress.setValue(0);
+            greenProgress.setValue(0);
           }
         },
         onPanResponderRelease: (_, g) => {
@@ -127,21 +167,21 @@ export default function ConfirmScreen() {
           if (-g.dy > SWIPE_THRESHOLD || g.vy < -0.8) {
             completeSwipe();
           } else {
-            Animated.spring(progress, {
+            Animated.spring(greenProgress, {
               toValue: 0,
               tension: 180,
               friction: 12,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }).start();
           }
         },
         onPanResponderTerminate: () => {
           if (phase !== "idle") return;
-          Animated.spring(progress, {
+          Animated.spring(greenProgress, {
             toValue: 0,
             tension: 180,
             friction: 12,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }).start();
         },
       }),
@@ -149,38 +189,23 @@ export default function ConfirmScreen() {
     [phase],
   );
 
-  // Haptic "tick" cuando el user está cerca del threshold
-  useEffect(() => {
-    const id = progress.addListener(({ value }) => {
-      if (value > 0.45 && value < 0.55) {
-        Haptics.selectionAsync().catch(() => {});
-      }
-    });
-    return () => progress.removeListener(id);
-  }, [progress]);
-
   if (!asset) return null;
 
-  // ─── Interpolations ───
-  const pullerTranslateY = progress.interpolate({
+  // Interpolations
+  const greenHeight = greenProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -180],
+    outputRange: [BASE_GREEN_HEIGHT, SCREEN_H + 200],
   });
-  const contentOpacity = progress.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 0.6, 0.3],
-  });
-  const splashHeight = splash.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, SCREEN_H + 200],
-  });
-  const hintOpacity = progress.interpolate({
+  const hintOpacity = greenProgress.interpolate({
     inputRange: [0, 0.3],
     outputRange: [1, 0],
   });
+  const spin = spinLoop.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   const rows: { label: string; value: string; strong?: boolean }[] = [
-    { label: "Activo", value: asset.name },
     { label: "Precio estimado", value: formatARS(asset.price) },
     { label: "Cantidad", value: `${estQty.toFixed(4)} unidades` },
     { label: "Comisión (0,5%)", value: formatARS(fee) },
@@ -194,9 +219,7 @@ export default function ConfirmScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       {/* Contenido principal */}
-      <Animated.View
-        style={[s.content, { opacity: contentOpacity, paddingTop: insets.top + 12 }]}
-      >
+      <View style={[s.content, { paddingTop: insets.top + 12 }]}>
         <View style={s.header}>
           <Pressable
             onPress={() => router.back()}
@@ -211,39 +234,16 @@ export default function ConfirmScreen() {
           <Text style={[s.title, { color: c.text }]}>
             {isSell ? "Vender" : "Comprar"} {asset.ticker}
           </Text>
-          <Text style={[s.available, { color: c.textMuted }]}>
-            {formatARS(1272850)} disponibles
-          </Text>
         </View>
 
         <View style={s.amountBlock}>
           <Text style={[s.amountLabel, { color: c.textMuted }]}>
             {isSell ? "Vendés" : "Comprás"}
           </Text>
-          <AmountDisplay value={numAmount} size={36} />
-          <View style={s.assetRow}>
-            <View
-              style={[
-                s.assetIcon,
-                {
-                  backgroundColor:
-                    asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  s.assetIconText,
-                  { color: asset.iconTone === "dark" ? c.bg : c.textSecondary },
-                ]}
-              >
-                {assetIconCode(asset)}
-              </Text>
-            </View>
-            <Text style={[s.assetName, { color: c.textSecondary }]}>
-              {asset.subLabel}
-            </Text>
-          </View>
+          <AmountDisplay value={numAmount} size={38} />
+          <Text style={[s.available, { color: c.textMuted }]}>
+            {formatARS(AVAILABLE_ARS)} disponibles para operar
+          </Text>
         </View>
 
         <View style={[s.rows, { borderColor: c.border }]}>
@@ -284,61 +284,112 @@ export default function ConfirmScreen() {
             {asset.ticker}. La ejecución se realiza al mejor precio disponible.
           </Text>
         </View>
-      </Animated.View>
+      </View>
 
-      {/* Puller: chevron + label que el user arrastra hacia arriba */}
+      {/* Capa verde que viene desde abajo y come la pantalla */}
       <Animated.View
-        style={[
-          s.puller,
-          {
-            paddingBottom: insets.bottom + 22,
-            transform: [{ translateY: pullerTranslateY }],
-          },
-        ]}
+        style={[s.greenLayer, { height: greenHeight }]}
         {...panResponder.panHandlers}
       >
-        <Animated.View style={{ opacity: hintOpacity }}>
-          <PullIndicator color={c.text} />
+        <Animated.View
+          style={[
+            s.pullerHint,
+            { paddingBottom: insets.bottom + 18, opacity: hintOpacity },
+          ]}
+          pointerEvents="none"
+        >
+          <PullChevron />
+          <Text style={s.pullerText}>Deslizá para ejecutar</Text>
         </Animated.View>
-        <Text style={[s.pullerText, { color: c.text }]}>
-          Deslizá para ejecutar
-        </Text>
       </Animated.View>
 
-      {/* Splash verde que crece desde abajo al ejecutar */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          s.splash,
-          {
-            height: splashHeight,
-            backgroundColor: brand.green,
-          },
-        ]}
-      />
-
-      {/* Checkmark flotante en el centro */}
+      {/* Overlay blanco con logo + spinner + texto cuando se ejecuta */}
       {phase !== "idle" ? (
-        <View pointerEvents="none" style={s.checkWrap}>
-          <Animated.View
-            style={{
-              transform: [{ scale: checkScale }],
-              opacity: checkScale,
-            }}
-          >
-            <View style={s.checkCircle}>
-              <Feather name="check" size={72} color={brand.green} strokeWidth={4} />
-            </View>
-          </Animated.View>
-        </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[s.execOverlay, { opacity: overlayOpacity }]}
+        >
+          <View style={s.logoWrap}>
+            {/* Spinner giratorio */}
+            {phase !== "done" ? (
+              <Animated.View
+                style={[
+                  s.spinnerWrap,
+                  { transform: [{ rotate: spin }] },
+                ]}
+              >
+                <Svg width={160} height={160} viewBox="0 0 100 100">
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="rgba(255,255,255,0.22)"
+                    strokeWidth="3"
+                    fill="none"
+                  />
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="#FFFFFF"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeDasharray="60 220"
+                    strokeLinecap="round"
+                  />
+                </Svg>
+              </Animated.View>
+            ) : null}
+
+            {/* Logo Alamos (visible cuando no es done) */}
+            <Animated.View
+              style={[
+                s.logoOverlay,
+                {
+                  opacity: checkMorph.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0],
+                  }),
+                  transform: [
+                    {
+                      scale: checkMorph.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0.4],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Image
+                source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
+                style={s.logoImg}
+                resizeMode="contain"
+              />
+            </Animated.View>
+
+            {/* Checkmark (aparece con scale + opacity cuando done) */}
+            <Animated.View
+              style={[
+                s.checkOverlay,
+                {
+                  opacity: checkMorph,
+                  transform: [{ scale: checkMorph }],
+                },
+              ]}
+            >
+              <Feather name="check" size={88} color="#FFFFFF" strokeWidth={3.5} />
+            </Animated.View>
+          </View>
+
+          <Text style={s.execText}>{statusText}</Text>
+        </Animated.View>
       ) : null}
     </View>
   );
 }
 
-/* ─── Sub-components ─── */
-
-function PullIndicator({ color }: { color: string }) {
+function PullChevron() {
   const bounce = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -362,25 +413,21 @@ function PullIndicator({ color }: { color: string }) {
   }, [bounce]);
   return (
     <Animated.View style={{ transform: [{ translateY: bounce }], marginBottom: 6 }}>
-      <Feather name="chevron-up" size={22} color={color} />
+      <Feather name="chevron-up" size={24} color="#FFFFFF" />
     </Animated.View>
   );
 }
 
-/* ─── Helpers ─── */
-
 function wait(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  return new Promise<void>((r) => setTimeout(r, ms));
 }
-
-/* ─── Styles ─── */
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingBottom: BASE_GREEN_HEIGHT,
   },
   header: {
     paddingVertical: 8,
@@ -392,7 +439,7 @@ const s = StyleSheet.create({
   },
   titleBlock: {
     marginTop: 8,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   title: {
     fontFamily: fontFamily[700],
@@ -400,14 +447,8 @@ const s = StyleSheet.create({
     letterSpacing: -1.4,
     lineHeight: 40,
   },
-  available: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    marginTop: 4,
-    letterSpacing: -0.15,
-  },
   amountBlock: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   amountLabel: {
     fontFamily: fontFamily[700],
@@ -416,26 +457,10 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 8,
   },
-  assetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 12,
-  },
-  assetIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  assetIconText: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-  },
-  assetName: {
+  available: {
     fontFamily: fontFamily[500],
     fontSize: 13,
+    marginTop: 10,
     letterSpacing: -0.1,
   },
   rows: {
@@ -462,7 +487,7 @@ const s = StyleSheet.create({
     fontSize: 16,
   },
   orderSummary: {
-    marginTop: 32,
+    marginTop: 28,
   },
   summaryTitle: {
     fontFamily: fontFamily[700],
@@ -476,47 +501,67 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Puller area */
-  puller: {
+  /* Capa verde + puller */
+  greenLayer: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: 12,
-    alignItems: "center",
+    backgroundColor: brand.green,
+    overflow: "hidden",
     justifyContent: "flex-end",
+  },
+  pullerHint: {
+    alignItems: "center",
+    paddingTop: 20,
   },
   pullerText: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
+    fontSize: 16,
+    color: "#FFFFFF",
     letterSpacing: -0.2,
   },
 
-  /* Splash green */
-  splash: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-
-  /* Check */
-  checkWrap: {
+  /* Overlay de ejecución */
+  execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+    paddingBottom: 40,
   },
-  checkCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "#FFFFFF",
+  logoWrap: {
+    width: 160,
+    height: 160,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 12,
+    marginBottom: 60,
+  },
+  spinnerWrap: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoOverlay: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoImg: {
+    width: 64,
+    height: 64,
+    tintColor: "#FFFFFF",
+  },
+  checkOverlay: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  execText: {
+    fontFamily: fontFamily[700],
+    fontSize: 26,
+    color: "#FFFFFF",
+    letterSpacing: -0.6,
   },
 });
