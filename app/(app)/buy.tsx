@@ -210,54 +210,55 @@ export default function BuyScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Middle — todo el core de input (toggle + monto + pills + teclado)
-          se agrupa y queda centrado verticalmente entre header y bottom. */}
-      <View style={s.middle}>
-        {/* Toggle: Monto en pesos / Cantidad en X */}
-        <View style={s.modeRow}>
-          <View
+      {/* Toggle Monto / Cantidad: va debajo del header, NO centrado con
+          el contenido. */}
+      <View style={s.modeRow}>
+        <View
+          style={[
+            s.modeToggle,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+        >
+          <Tap
+            onPress={() => switchInputMode("amount")}
+            haptic="selection"
             style={[
-              s.modeToggle,
-              { backgroundColor: c.surfaceHover, borderColor: c.border },
+              s.modeBtn,
+              inputMode === "amount" && { backgroundColor: c.ink },
             ]}
           >
-            <Tap
-              onPress={() => switchInputMode("amount")}
-              haptic="selection"
+            <Text
               style={[
-                s.modeBtn,
-                inputMode === "amount" && { backgroundColor: c.ink },
+                s.modeBtnText,
+                { color: inputMode === "amount" ? c.bg : c.textSecondary },
               ]}
             >
-              <Text
-                style={[
-                  s.modeBtnText,
-                  { color: inputMode === "amount" ? c.bg : c.textSecondary },
-                ]}
-              >
-                Monto en pesos
-              </Text>
-            </Tap>
-            <Tap
-              onPress={() => switchInputMode("qty")}
-              haptic="selection"
+              Monto en pesos
+            </Text>
+          </Tap>
+          <Tap
+            onPress={() => switchInputMode("qty")}
+            haptic="selection"
+            style={[
+              s.modeBtn,
+              inputMode === "qty" && { backgroundColor: c.ink },
+            ]}
+          >
+            <Text
               style={[
-                s.modeBtn,
-                inputMode === "qty" && { backgroundColor: c.ink },
+                s.modeBtnText,
+                { color: inputMode === "qty" ? c.bg : c.textSecondary },
               ]}
             >
-              <Text
-                style={[
-                  s.modeBtnText,
-                  { color: inputMode === "qty" ? c.bg : c.textSecondary },
-                ]}
-              >
-                Cantidad en {unitWord}
-              </Text>
-            </Tap>
-          </View>
+              Cantidad en {unitWord}
+            </Text>
+          </Tap>
         </View>
+      </View>
 
+      {/* Middle — el monto, pills y teclado quedan centrados verticalmente
+          entre el toggle (arriba) y la barra bottom (abajo). */}
+      <View style={s.middle}>
         {/* AMOUNT HERO: tamaño fijo, centrado */}
         <View style={s.hero}>
           <Text
@@ -410,6 +411,7 @@ const s = StyleSheet.create({
   },
   modeRow: {
     paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 4,
     alignItems: "center",
   },

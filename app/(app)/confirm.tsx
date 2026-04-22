@@ -21,14 +21,18 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Distancia mínima del swipe para confirmar (px). */
-const SWIPE_THRESHOLD = 240;
+/** Distancia mínima del swipe para confirmar (px). Alta a propósito: un
+ * flick rápido no alcanza. Es una confirmación, no un atajo. */
+const SWIPE_THRESHOLD = 300;
 /** Distancia sobre la que la franja verde alcanza 100%. */
-const SWIPE_RANGE = 320;
+const SWIPE_RANGE = 380;
 /** Primeros N px se descartan para que un tap no active nada. */
-const SWIPE_DEAD_ZONE = 20;
-/** Velocidad mínima para shortcut con flick. */
-const SWIPE_FLICK_VELOCITY = 1.4;
+const SWIPE_DEAD_ZONE = 28;
+/** Velocidad mínima (px/ms) para shortcut con flick. Alta: el flick tiene
+ * que ser deliberadamente rápido, no un roce. */
+const SWIPE_FLICK_VELOCITY = 2.4;
+/** Distancia mínima combinada con flick (fracción del range). */
+const SWIPE_FLICK_MIN_FRACTION = 0.55;
 /** Alto visible de la franja verde en reposo. */
 const STRIP_HEIGHT = 72;
 /** Radio inferior de la card blanca. */
@@ -216,23 +220,27 @@ export default function ConfirmScreen() {
           }
           const effective = Math.max(0, dy - SWIPE_DEAD_ZONE);
           const raw = Math.min(1, effective / (SWIPE_RANGE - SWIPE_DEAD_ZONE));
-          // Curva sutil: arranca lineal, suaviza al final
-          const curved = 1 - Math.pow(1 - raw, 1.8);
+          // EASE-IN fuerte (pow 1.9): al principio la franja casi no sube
+          // aunque el dedo se mueva. Recién al final empieza a acelerar.
+          // Así el swipe rápido/corto NO alcanza — tenés que comprometerte.
+          const curved = Math.pow(raw, 1.9);
           greenProgress.setValue(curved);
         },
         onPanResponderRelease: (_, g) => {
           if (phase !== "idle") return;
           const dy = -g.dy;
           const vy = -g.vy;
-          if (
-            dy > SWIPE_THRESHOLD ||
-            (vy > SWIPE_FLICK_VELOCITY && dy > SWIPE_RANGE * 0.35)
-          ) {
+          const passedDistance = dy > SWIPE_THRESHOLD;
+          const validFlick =
+            vy > SWIPE_FLICK_VELOCITY &&
+            dy > SWIPE_RANGE * SWIPE_FLICK_MIN_FRACTION;
+          if (passedDistance || validFlick) {
             completeSwipe();
           } else {
+            // Spring de vuelta deliberadamente suave: transmite que "no llegaste".
             Animated.spring(greenProgress, {
               toValue: 0,
-              tension: 220,
+              tension: 120,
               friction: 18,
               useNativeDriver: true,
             }).start();
@@ -242,7 +250,7 @@ export default function ConfirmScreen() {
           if (phase !== "idle") return;
           Animated.spring(greenProgress, {
             toValue: 0,
-            tension: 220,
+            tension: 120,
             friction: 18,
             useNativeDriver: true,
           }).start();
@@ -406,7 +414,7 @@ export default function ConfirmScreen() {
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
-          <View style={{ height: SCREEN_H * 0.26 }} />
+          <View style={{ height: SCREEN_H * 0.24 }} />
 
           <View style={s.logoWrap}>
             {phase !== "done" ? (
@@ -480,8 +488,9 @@ export default function ConfirmScreen() {
             </Animated.View>
           </View>
 
-          {/* Gap entre logo y texto: ~10% de la altura. */}
-          <View style={{ height: SCREEN_H * 0.10 }} />
+          {/* Gap entre logo y texto: corto y fijo, así el logo y el texto
+              se leen como UN grupo. */}
+          <View style={{ height: 56 }} />
 
           <Animated.Text style={[s.execText, { opacity: statusOpacity }]}>
             {statusText}
