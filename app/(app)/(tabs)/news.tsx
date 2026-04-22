@@ -17,14 +17,17 @@ import {
   Image,
   Modal,
   ScrollView,
+  RefreshControl,
+  PanResponder,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { useNavigation } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { fontFamily, radius } from "../../../lib/theme";
+import { fontFamily, radius, useTheme } from "../../../lib/theme";
 
 type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "cripto";
 
@@ -220,14 +223,18 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
 
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
+  const navigation = useNavigation();
   const [filter, setFilter] = useState<Category | "todas">("todas");
   const [activeIndex, setActiveIndex] = useState(0);
   const [detail, setDetail] = useState<NewsItem | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [headerH, setHeaderH] = useState(120);
   const listRef = useRef<FlatList>(null);
 
   const { height: screenH } = Dimensions.get("window");
   const tabBarH = Platform.OS === "ios" ? 84 : 68;
-  const cardH = screenH - tabBarH;
+  const cardH = screenH - tabBarH - headerH;
 
   const visible = useMemo(
     () => (filter === "todas" ? feed : feed.filter((n) => n.category === filter)),
@@ -251,42 +258,73 @@ export default function NewsScreen() {
     [activeIndex, cardH],
   );
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+    }, 1100);
+  }, []);
+
+  // Tap en la tab Noticias (cuando ya estás en ella) → scroll top + refresh
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      setTimeout(onRefresh, 250);
+    });
+    return unsub;
+  }, [navigation, onRefresh]);
+
   return (
-    <View style={[s.root, { backgroundColor: "#000" }]}>
-      {/* Header flotante con categorías */}
-      <View style={[s.header, { paddingTop: insets.top + 10 }]}>
-        <FlatList
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      {/* Header sticky con título Noticias + tabs */}
+      <View
+        style={[
+          s.header,
+          { backgroundColor: c.bg, borderBottomColor: c.border },
+        ]}
+        onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
+      >
+        <View style={[s.titleRow, { paddingTop: insets.top + 10 }]}>
+          <Text style={[s.title, { color: c.text }]}>Noticias</Text>
+        </View>
+        <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.catRow}
-          data={categoryTabs}
-          keyExtractor={(t) => t.id}
-          renderItem={({ item: t }) => {
+        >
+          {categoryTabs.map((t) => {
             const active = filter === t.id;
             return (
               <Pressable
+                key={t.id}
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setFilter(t.id);
                 }}
-                style={s.catTab}
+                style={[
+                  s.catPill,
+                  {
+                    backgroundColor: active ? c.ink : c.surfaceHover,
+                    borderColor: active ? c.ink : c.border,
+                  },
+                ]}
               >
                 <Text
                   style={[
-                    s.catLabel,
-                    {
-                      color: active ? "#FFF" : "rgba(255,255,255,0.55)",
-                      fontFamily: fontFamily[active ? 700 : 600],
-                    },
+                    s.catPillText,
+                    { color: active ? c.bg : c.textSecondary },
                   ]}
                 >
                   {t.label}
                 </Text>
-                {active ? <View style={s.catUnderline} /> : null}
               </Pressable>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -299,18 +337,25 @@ export default function NewsScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item, index }) => (
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.textMuted}
+            colors={[c.textMuted]}
+            progressBackgroundColor={c.surface}
+          />
+        }
+        renderItem={({ item }) => (
           <NewsCard
             item={item}
             height={cardH}
-            indexLabel={`${index + 1} de ${visible.length}`}
             onOpenDetail={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
                 () => {},
               );
               setDetail(item);
             }}
-            isLast={index === visible.length - 1}
           />
         )}
         ListEmptyComponent={
@@ -331,15 +376,11 @@ export default function NewsScreen() {
 function NewsCard({
   item,
   height,
-  indexLabel,
   onOpenDetail,
-  isLast,
 }: {
   item: NewsItem;
   height: number;
-  indexLabel: string;
   onOpenDetail: () => void;
-  isLast: boolean;
 }) {
   return (
     <View style={{ height, backgroundColor: "#000" }}>
@@ -349,24 +390,13 @@ function NewsCard({
         resizeMode="cover"
       />
       <LinearGradient
-        colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.95)"]}
+        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.96)"]}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Top: categoría sólida + index */}
-      <View style={card.topRow} pointerEvents="box-none">
-        <View style={[card.catPill, { backgroundColor: item.categoryColor }]}>
-          <View style={card.catDot} />
-          <Text style={card.catPillText}>{item.categoryLabel}</Text>
-        </View>
-        <View style={card.indexPill}>
-          <Text style={card.indexPillText}>{indexLabel}</Text>
-        </View>
-      </View>
-
-      {/* Scroll hint */}
-      {!isLast ? <ScrollHint /> : null}
+      {/* Scroll hint: arriba, centrado, solo icono */}
+      <ScrollHint />
 
       {/* Bottom content */}
       <View style={card.bottom} pointerEvents="box-none">
@@ -389,8 +419,8 @@ function NewsCard({
         ) : null}
 
         <Pressable style={card.readBtn} onPress={onOpenDetail}>
+          <Feather name="chevron-up" size={16} color="#000" />
           <Text style={card.readBtnText}>Leer noticia</Text>
-          <Feather name="arrow-up-right" size={16} color="#000" />
         </Pressable>
       </View>
     </View>
@@ -447,9 +477,13 @@ function ScrollHint() {
         },
       ]}
     >
-      <Feather name="chevron-up" size={16} color="#FFF" />
-      <Feather name="chevron-up" size={16} color="#FFF" style={{ marginTop: -10 }} />
-      <Text style={hint.text}>Seguí deslizando</Text>
+      <Feather name="chevron-up" size={22} color="#FFF" />
+      <Feather
+        name="chevron-up"
+        size={22}
+        color="#FFF"
+        style={{ marginTop: -14, opacity: 0.6 }}
+      />
     </Animated.View>
   );
 }
@@ -464,6 +498,44 @@ function DetailSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(0)).current;
+  const { height: screenH } = Dimensions.get("window");
+
+  // Reset translateY cuando se abre
+  useEffect(() => {
+    if (item) translateY.setValue(0);
+  }, [item, translateY]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+          g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderMove: (_, g) => {
+          if (g.dy > 0) translateY.setValue(g.dy);
+        },
+        onPanResponderRelease: (_, g) => {
+          if (g.dy > 120 || g.vy > 0.8) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+              () => {},
+            );
+            Animated.timing(translateY, {
+              toValue: screenH,
+              duration: 220,
+              useNativeDriver: true,
+            }).start(onClose);
+          } else {
+            Animated.spring(translateY, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 180,
+              friction: 12,
+            }).start();
+          }
+        },
+      }),
+    [screenH, onClose, translateY],
+  );
 
   return (
     <Modal
@@ -475,8 +547,12 @@ function DetailSheet({
     >
       <View style={sheet.wrap}>
         <Pressable style={sheet.backdrop} onPress={onClose} />
-        <View style={sheet.body}>
-          <View style={sheet.handle} />
+        <Animated.View
+          style={[sheet.body, { transform: [{ translateY }] }]}
+        >
+          <View {...panResponder.panHandlers} style={sheet.dragArea}>
+            <View style={sheet.handle} />
+          </View>
           {item ? (
             <ScrollView
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -513,13 +589,7 @@ function DetailSheet({
               </View>
             </ScrollView>
           ) : null}
-          <Pressable
-            style={[sheet.closeBtn, { bottom: insets.bottom + 16 }]}
-            onPress={onClose}
-          >
-            <Feather name="x" size={18} color="#FFF" />
-          </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -530,31 +600,33 @@ function DetailSheet({
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: 10,
   },
+  titleRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 28,
+    letterSpacing: -1,
+  },
   catRow: {
-    paddingHorizontal: 16,
-    gap: 18,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    gap: 8,
+    paddingBottom: 12,
   },
-  catTab: {
-    paddingVertical: 6,
-    alignItems: "center",
+  catPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  catLabel: {
-    fontSize: 14,
+  catPillText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
     letterSpacing: -0.1,
-  },
-  catUnderline: {
-    marginTop: 4,
-    height: 2,
-    width: 16,
-    borderRadius: 1,
-    backgroundColor: "#FFFFFF",
   },
   empty: {
     alignItems: "center",
@@ -575,53 +647,6 @@ const s = StyleSheet.create({
 });
 
 const card = StyleSheet.create({
-  topRow: {
-    position: "absolute",
-    top: 80,
-    left: 20,
-    right: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  catPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  catDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  catPillText: {
-    color: "#000",
-    fontFamily: fontFamily[800],
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
-  indexPill: {
-    backgroundColor: "rgba(0,0,0,0.45)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  indexPillText: {
-    color: "rgba(255,255,255,0.9)",
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
-
   bottom: {
     position: "absolute",
     left: 0,
@@ -691,19 +716,10 @@ const card = StyleSheet.create({
 const hint = StyleSheet.create({
   wrap: {
     position: "absolute",
-    right: 16,
-    bottom: 200,
+    top: 32,
+    left: 0,
+    right: 0,
     alignItems: "center",
-  },
-  text: {
-    color: "rgba(255,255,255,0.9)",
-    fontFamily: fontFamily[600],
-    fontSize: 10,
-    letterSpacing: 0.4,
-    marginTop: 4,
-    transform: [{ rotate: "-90deg" }],
-    width: 100,
-    textAlign: "center",
   },
 });
 
@@ -711,24 +727,28 @@ const sheet = StyleSheet.create({
   wrap: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
   },
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
   body: {
-    backgroundColor: "#0B0E11",
+    backgroundColor: "#FAFAF7",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "92%",
     overflow: "hidden",
   },
+  dragArea: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "rgba(14,15,12,0.25)",
     borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 10,
   },
   image: {
     width: "100%",
@@ -753,7 +773,7 @@ const sheet = StyleSheet.create({
     letterSpacing: 0.2,
   },
   title: {
-    color: "#EAECEF",
+    color: "#0E0F0C",
     fontFamily: fontFamily[700],
     fontSize: 26,
     lineHeight: 30,
@@ -761,14 +781,14 @@ const sheet = StyleSheet.create({
     marginBottom: 8,
   },
   meta: {
-    color: "rgba(234,236,239,0.6)",
+    color: "rgba(14,15,12,0.55)",
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.1,
     marginBottom: 18,
   },
   body_p: {
-    color: "rgba(234,236,239,0.9)",
+    color: "rgba(14,15,12,0.88)",
     fontFamily: fontFamily[500],
     fontSize: 15,
     lineHeight: 24,
@@ -783,25 +803,15 @@ const sheet = StyleSheet.create({
     marginBottom: 20,
   },
   tickerPill: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(14,15,12,0.08)",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.sm,
   },
   tickerText: {
-    color: "#EAECEF",
+    color: "#0E0F0C",
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.2,
-  },
-  closeBtn: {
-    position: "absolute",
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
