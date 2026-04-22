@@ -33,8 +33,12 @@ const SWIPE_FLICK_VELOCITY = 1.4;
 const STRIP_HEIGHT = 72;
 /** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
-/** Delay de cada fase de ejecución — suficiente para que se lea. */
-const PHASE_MS = 1900;
+/** Delay que dura cada texto en pantalla antes de transicionar al siguiente. */
+const PHASE_MS = 2200;
+/** Duración del fade out del texto. */
+const FADE_OUT_MS = 450;
+/** Duración del fade in del texto. */
+const FADE_IN_MS = 550;
 
 const AVAILABLE_ARS = 1272850;
 
@@ -59,27 +63,22 @@ export default function ConfirmScreen() {
   const net = isSell ? numAmount - fee : numAmount + fee;
 
   // ─── Animated values ───
-  // Progreso 0-1 del swipe verde. Animated su transform translateY nativo.
   const greenProgress = useRef(new Animated.Value(0)).current;
-  // 0 = fuera, 1 = dentro (overlay de ejecución).
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  // Rotación del spinner.
   const spinLoop = useRef(new Animated.Value(0)).current;
-  // Morph logo → check (0 = logo, 1 = check).
   const checkMorph = useRef(new Animated.Value(0)).current;
-  // Transición del statusText entre fases.
+  // Texto: solo fade, sin slide. Feel Robinhood.
   const statusOpacity = useRef(new Animated.Value(0)).current;
-  const statusY = useRef(new Animated.Value(20)).current;
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("");
 
-  // Spinner loop
+  // Spinner loop — más lento que antes, feeling calmo.
   useEffect(() => {
     const loop = Animated.loop(
       Animated.timing(spinLoop, {
         toValue: 1,
-        duration: 1100,
+        duration: 1500,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -105,81 +104,57 @@ export default function ConfirmScreen() {
     return () => greenProgress.removeListener(id);
   }, [greenProgress]);
 
-  /** Fade-out del texto actual, swap, fade-in del nuevo. */
+  /** Fade-out del texto, swap, fade-in. Solo opacidad, sin slide. */
   const transitionText = (next: string): Promise<void> => {
     return new Promise((resolve) => {
-      Animated.parallel([
-        Animated.timing(statusOpacity, {
-          toValue: 0,
-          duration: 180,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(statusY, {
-          toValue: -18,
-          duration: 180,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
+      Animated.timing(statusOpacity, {
+        toValue: 0,
+        duration: FADE_OUT_MS,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
         setStatusText(next);
-        statusY.setValue(22);
-        Animated.parallel([
-          Animated.timing(statusOpacity, {
-            toValue: 1,
-            duration: 260,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.spring(statusY, {
-            toValue: 0,
-            tension: 160,
-            friction: 14,
-            useNativeDriver: true,
-          }),
-        ]).start(() => resolve());
+        Animated.timing(statusOpacity, {
+          toValue: 1,
+          duration: FADE_IN_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }).start(() => resolve());
       });
     });
   };
 
   const runOrderFlow = async () => {
     setPhase("sending");
-    // Fade-in del overlay entero
+
+    // Fade-in del overlay entero, un toque lento.
     Animated.timing(overlayOpacity, {
       toValue: 1,
-      duration: 260,
-      easing: Easing.out(Easing.cubic),
+      duration: 420,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
 
-    // Primer texto: desde vacío, fade-in
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    setStatusText("Enviando orden");
-    statusY.setValue(22);
-    Animated.parallel([
-      Animated.timing(statusOpacity, {
-        toValue: 1,
-        duration: 320,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(statusY, {
-        toValue: 0,
-        tension: 160,
-        friction: 14,
-        useNativeDriver: true,
-      }),
-    ]).start();
+
+    // Texto inicial: "Orden Enviada..." aparece con fade in.
+    setStatusText("Orden Enviada...");
+    Animated.timing(statusOpacity, {
+      toValue: 1,
+      duration: FADE_IN_MS + 100,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    }).start();
 
     await wait(PHASE_MS);
 
-    // Transición a "Orden recibida"
+    // Transición a "Orden Recibida..."
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    await transitionText("Orden recibida");
+    await transitionText("Orden Recibida...");
 
     await wait(PHASE_MS);
 
-    // Transición a "Ejecutada" + checkmark morph
+    // Transición a "Orden Ejecutada" + checkmark morph
     setPhase("done");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => {},
@@ -190,9 +165,9 @@ export default function ConfirmScreen() {
       friction: 5,
       useNativeDriver: true,
     }).start();
-    await transitionText("Orden ejecutada");
+    await transitionText("Orden Ejecutada");
 
-    await wait(1400);
+    await wait(1600);
 
     router.replace({
       pathname: "/(app)/success",
@@ -207,12 +182,13 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
-    // "fuim" — haptic heavy + timing punchy al soltar.
+    // Haptic heavy al soltar + curva easeOutExpo para que llegue pulidito,
+    // sin bounce.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     Animated.timing(greenProgress, {
       toValue: 1,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
+      duration: 420,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
     }).start(() => {
       runOrderFlow();
@@ -423,105 +399,102 @@ export default function ConfirmScreen() {
         <Text style={s.hintText}>Deslizá para ejecutar</Text>
       </Animated.View>
 
-      {/* Overlay de ejecución */}
+      {/* Overlay de ejecución — layout estilo Robinhood: logo ~28% del top,
+          texto ~65%, disclaimer al pie. No se centra verticalmente. */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
-          <View style={s.execCenter}>
-            <View style={s.logoWrap}>
-              {phase !== "done" ? (
-                <Animated.View
-                  style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
-                >
-                  <Svg width={160} height={160} viewBox="0 0 100 100">
-                    <Circle
-                      cx="50"
-                      cy="50"
-                      r="44"
-                      stroke="rgba(255,255,255,0.22)"
-                      strokeWidth="3"
-                      fill="none"
-                    />
-                    <Circle
-                      cx="50"
-                      cy="50"
-                      r="44"
-                      stroke="#FFFFFF"
-                      strokeWidth="3"
-                      fill="none"
-                      strokeDasharray="60 220"
-                      strokeLinecap="round"
-                    />
-                  </Svg>
-                </Animated.View>
-              ) : null}
+          <View style={{ height: SCREEN_H * 0.26 }} />
 
+          <View style={s.logoWrap}>
+            {phase !== "done" ? (
               <Animated.View
-                style={[
-                  s.logoOverlay,
-                  {
-                    opacity: checkMorph.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 0],
-                    }),
-                    transform: [
-                      {
-                        scale: checkMorph.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 0.4],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
+                style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
               >
-                <Image
-                  source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
-                  style={s.logoImg}
-                  resizeMode="contain"
-                />
+                <Svg width={140} height={140} viewBox="0 0 100 100">
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="rgba(255,255,255,0.22)"
+                    strokeWidth="3"
+                    fill="none"
+                  />
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="#FFFFFF"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeDasharray="90 186"
+                    strokeLinecap="round"
+                  />
+                </Svg>
               </Animated.View>
+            ) : null}
 
-              <Animated.View
-                style={[
-                  s.checkOverlay,
-                  {
-                    opacity: checkMorph,
-                    transform: [{ scale: checkMorph }],
-                  },
-                ]}
-              >
-                <Feather
-                  name="check"
-                  size={90}
-                  color="#FFFFFF"
-                  strokeWidth={3.5}
-                />
-              </Animated.View>
-            </View>
-
-            {/* Status text con slide + fade entre fases */}
-            <Animated.Text
+            <Animated.View
               style={[
-                s.execText,
+                s.logoOverlay,
                 {
-                  opacity: statusOpacity,
-                  transform: [{ translateY: statusY }],
+                  opacity: checkMorph.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0],
+                  }),
+                  transform: [
+                    {
+                      scale: checkMorph.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0.4],
+                      }),
+                    },
+                  ],
                 },
               ]}
             >
-              {statusText}
-            </Animated.Text>
+              <Image
+                source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
+                style={s.logoImg}
+                resizeMode="contain"
+              />
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                s.checkOverlay,
+                {
+                  opacity: checkMorph,
+                  transform: [{ scale: checkMorph }],
+                },
+              ]}
+            >
+              <Feather
+                name="check"
+                size={78}
+                color="#FFFFFF"
+                strokeWidth={3.5}
+              />
+            </Animated.View>
           </View>
+
+          {/* Gap entre logo y texto: ~10% de la altura. */}
+          <View style={{ height: SCREEN_H * 0.10 }} />
+
+          <Animated.Text style={[s.execText, { opacity: statusOpacity }]}>
+            {statusText}
+          </Animated.Text>
+
+          <View style={{ flex: 1 }} />
 
           <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 22 }]}>
             <Text style={s.disclaimerText}>
               La respuesta del sistema, el precio y velocidad de ejecución, la
               liquidez, los datos del mercado y los tiempos de acceso pueden
-              verse afectados por muchos factores — incluidos la volatilidad,
-              el tamaño y tipo de orden, y las condiciones del mercado.
+              verse afectados por muchos factores, incluidos la volatilidad, el
+              tamaño y tipo de orden, y las condiciones del mercado.
             </Text>
           </View>
         </Animated.View>
@@ -681,29 +654,21 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Execution overlay */
+  /* Execution overlay — layout estilo Robinhood, no vertical-center */
   execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  execCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
   },
   logoWrap: {
-    width: 160,
-    height: 160,
+    width: 140,
+    height: 140,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 44,
   },
   spinnerWrap: {
     position: "absolute",
-    width: 160,
-    height: 160,
+    width: 140,
+    height: 140,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -713,8 +678,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   logoImg: {
-    width: 66,
-    height: 66,
+    width: 58,
+    height: 58,
     tintColor: "#FFFFFF",
   },
   checkOverlay: {
@@ -728,6 +693,7 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: -0.7,
     textAlign: "center",
+    paddingHorizontal: 24,
   },
 
   /* Disclaimer al pie del overlay */

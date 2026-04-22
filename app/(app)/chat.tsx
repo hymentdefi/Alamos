@@ -119,8 +119,8 @@ export default function ChatScreen() {
           topic && topicGreetings[topic]
             ? topicGreetings[topic]
             : urgent
-            ? "Hola {name}, soy {aname} y te atiendo yo ahora mismo. Contame qué pasó con tu cuenta — paso a paso, así actuamos rápido."
-            : "Hola {name}, soy {aname}. Estoy al lado tuyo — contame qué necesitás y vemos cómo te ayudo.";
+            ? "Hola {name}, soy {aname} y te atiendo yo ahora mismo. Contame qué pasó con tu cuenta, paso a paso, así actuamos rápido."
+            : "Hola {name}, soy {aname}. Estoy al lado tuyo. Contame qué necesitás y vemos cómo te ayudo.";
         const greetText = greetTemplate
           .replaceAll("{name}", firstName)
           .replaceAll("{aname}", selectedAgent.name);
@@ -468,10 +468,10 @@ function craftReply(userText: string, agentName: string): string {
     return `Dale. ¿Qué activo estás operando y qué te apareció en pantalla? Si ya mandaste la orden, pasame el número y lo chequeo en vivo.`;
   }
   if (/impuesto|retenc|gan(ancias)?|bienes/.test(lower)) {
-    return `Sí, hay una retención que depende del instrumento. Te paso el certificado de retenciones del último mes o del año que necesites — decime qué período y te lo subo acá mismo.`;
+    return `Sí, hay una retención que depende del instrumento. Te paso el certificado de retenciones del último mes o del año que necesites. Decime qué período y te lo subo acá mismo.`;
   }
   if (/clave|contraseñ|2fa|acceso|robaron|hack/.test(lower)) {
-    return `Primero quedate tranqui — ya puedo bloquear la cuenta desde acá mientras seguimos hablando. ¿Querés que lo haga ahora y después revisamos los movimientos juntos?`;
+    return `Primero quedate tranqui. Ya puedo bloquear la cuenta desde acá mientras seguimos hablando. ¿Querés que lo haga ahora y después revisamos los movimientos juntos?`;
   }
   return `Dame un segundo que lo chequeo en el sistema… ${agentName} no deja a nadie colgado. Contame si necesitás adjuntar algún comprobante y te paso un link seguro para subirlo.`;
 }

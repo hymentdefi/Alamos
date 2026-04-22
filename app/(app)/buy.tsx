@@ -210,108 +210,112 @@ export default function BuyScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Toggle: Monto en pesos / Cantidad en X */}
-      <View style={s.modeRow}>
-        <View
-          style={[
-            s.modeToggle,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
-          ]}
-        >
-          <Tap
-            onPress={() => switchInputMode("amount")}
-            haptic="selection"
+      {/* Middle — todo el core de input (toggle + monto + pills + teclado)
+          se agrupa y queda centrado verticalmente entre header y bottom. */}
+      <View style={s.middle}>
+        {/* Toggle: Monto en pesos / Cantidad en X */}
+        <View style={s.modeRow}>
+          <View
             style={[
-              s.modeBtn,
-              inputMode === "amount" && { backgroundColor: c.ink },
-            ]}
-          >
-            <Text
-              style={[
-                s.modeBtnText,
-                { color: inputMode === "amount" ? c.bg : c.textSecondary },
-              ]}
-            >
-              Monto en pesos
-            </Text>
-          </Tap>
-          <Tap
-            onPress={() => switchInputMode("qty")}
-            haptic="selection"
-            style={[
-              s.modeBtn,
-              inputMode === "qty" && { backgroundColor: c.ink },
-            ]}
-          >
-            <Text
-              style={[
-                s.modeBtnText,
-                { color: inputMode === "qty" ? c.bg : c.textSecondary },
-              ]}
-            >
-              Cantidad en {unitWord}
-            </Text>
-          </Tap>
-        </View>
-      </View>
-
-      {/* AMOUNT HERO — tamaño fijo, centrado, compacto */}
-      <View style={s.hero}>
-        <Text
-          style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.75}
-          allowFontScaling={false}
-        >
-          {heroDisplay}
-        </Text>
-        <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
-          {hint}
-        </Text>
-        <Text style={[s.available, { color: c.textMuted }]}>
-          {availableLabel}
-        </Text>
-      </View>
-
-      <View style={s.quickRow}>
-        {quick.map((q) => (
-          <Tap
-            key={q.label}
-            onPress={() => setQuick(q.value)}
-            haptic="light"
-            style={[
-              s.quickPill,
+              s.modeToggle,
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
-            <Text style={[s.quickText, { color: c.text }]}>{q.label}</Text>
-          </Tap>
-        ))}
-      </View>
-
-      <View style={s.keypad}>
-        {keys.map((row, ri) => (
-          <View key={ri} style={s.keyRow}>
-            {row.map((k) => (
-              <Tap
-                key={k}
-                onPress={() => handleKey(k)}
-                haptic="selection"
-                pressScale={0.92}
-                rippleColor="rgba(14,15,12,0.08)"
-                rippleContained={false}
-                style={s.keyBtn}
+            <Tap
+              onPress={() => switchInputMode("amount")}
+              haptic="selection"
+              style={[
+                s.modeBtn,
+                inputMode === "amount" && { backgroundColor: c.ink },
+              ]}
+            >
+              <Text
+                style={[
+                  s.modeBtnText,
+                  { color: inputMode === "amount" ? c.bg : c.textSecondary },
+                ]}
               >
-                {k === "back" ? (
-                  <Feather name="delete" size={24} color={c.text} />
-                ) : (
-                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
-                )}
-              </Tap>
-            ))}
+                Monto en pesos
+              </Text>
+            </Tap>
+            <Tap
+              onPress={() => switchInputMode("qty")}
+              haptic="selection"
+              style={[
+                s.modeBtn,
+                inputMode === "qty" && { backgroundColor: c.ink },
+              ]}
+            >
+              <Text
+                style={[
+                  s.modeBtnText,
+                  { color: inputMode === "qty" ? c.bg : c.textSecondary },
+                ]}
+              >
+                Cantidad en {unitWord}
+              </Text>
+            </Tap>
           </View>
-        ))}
+        </View>
+
+        {/* AMOUNT HERO: tamaño fijo, centrado */}
+        <View style={s.hero}>
+          <Text
+            style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            allowFontScaling={false}
+          >
+            {heroDisplay}
+          </Text>
+          <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
+            {hint}
+          </Text>
+          <Text style={[s.available, { color: c.textMuted }]}>
+            {availableLabel}
+          </Text>
+        </View>
+
+        <View style={s.quickRow}>
+          {quick.map((q) => (
+            <Tap
+              key={q.label}
+              onPress={() => setQuick(q.value)}
+              haptic="light"
+              style={[
+                s.quickPill,
+                { backgroundColor: c.surfaceHover, borderColor: c.border },
+              ]}
+            >
+              <Text style={[s.quickText, { color: c.text }]}>{q.label}</Text>
+            </Tap>
+          ))}
+        </View>
+
+        <View style={s.keypad}>
+          {keys.map((row, ri) => (
+            <View key={ri} style={s.keyRow}>
+              {row.map((k) => (
+                <Tap
+                  key={k}
+                  onPress={() => handleKey(k)}
+                  haptic="selection"
+                  pressScale={0.92}
+                  rippleColor="rgba(14,15,12,0.08)"
+                  rippleContained={false}
+                  style={s.keyBtn}
+                >
+                  {k === "back" ? (
+                    <Feather name="delete" size={24} color={c.text} />
+                  ) : (
+                    <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                  )}
+                </Tap>
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
@@ -400,9 +404,13 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.25,
   },
+  middle: {
+    flex: 1,
+    justifyContent: "center",
+  },
   modeRow: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingBottom: 4,
     alignItems: "center",
   },
   modeToggle: {
@@ -424,8 +432,8 @@ const s = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 14,
+    paddingBottom: 6,
     paddingHorizontal: 20,
   },
   heroValue: {
