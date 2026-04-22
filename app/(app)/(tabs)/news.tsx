@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 
@@ -226,6 +227,7 @@ export default function NewsScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const [filter, setFilter] = useState<Category | "todas">("todas");
   const [activeIndex, setActiveIndex] = useState(0);
   const [detail, setDetail] = useState<NewsItem | null>(null);
@@ -270,14 +272,15 @@ export default function NewsScreen() {
     }, 1100);
   }, []);
 
-  // Tap en la tab Noticias (cuando ya estás en ella) → scroll top + refresh
+  // Tap en la tab Noticias solo si YA estoy en Noticias → scroll top + refresh
   useEffect(() => {
     const unsub = navigation.addListener("tabPress" as never, () => {
+      if (!isFocused) return;
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
       setTimeout(onRefresh, 250);
     });
     return unsub;
-  }, [navigation, onRefresh]);
+  }, [navigation, onRefresh, isFocused]);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -415,10 +418,10 @@ function NewsCard({
 
   return (
     <View style={{ height, backgroundColor: c.bg }}>
-      {/* Scroll hint arriba */}
+      {/* Scroll hint a la derecha */}
       <ScrollHint />
 
-      {/* Imagen flotante cuadrada */}
+      {/* Imagen que ocupa todo el espacio entre header y contenido */}
       <View style={card.imageWrap}>
         <Animated.View
           style={[
@@ -431,13 +434,13 @@ function NewsCard({
         >
           <Image
             source={{ uri: item.image }}
-            style={card.imageSquare}
+            style={card.image}
             resizeMode="cover"
           />
         </Animated.View>
       </View>
 
-      {/* Contenido debajo */}
+      {/* Contenido debajo — layout normal */}
       <View style={card.bottom}>
         <Text style={[card.source, { color: c.textMuted }]}>
           {item.source} · {item.time}
@@ -703,32 +706,26 @@ const s = StyleSheet.create({
 const card = StyleSheet.create({
   imageWrap: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   imageAnim: {
-    width: "100%",
-    maxWidth: 380,
+    flex: 1,
     borderRadius: 24,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.22,
     shadowRadius: 24,
     elevation: 12,
   },
-  imageSquare: {
+  image: {
+    flex: 1,
     width: "100%",
-    aspectRatio: 1,
     borderRadius: 24,
   },
   bottom: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 32,
     paddingHorizontal: 24,
+    paddingBottom: 28,
   },
   source: {
     fontFamily: fontFamily[600],
