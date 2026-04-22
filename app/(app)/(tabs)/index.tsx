@@ -1,8 +1,17 @@
-import { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  Linking,
+  RefreshControl,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   useTheme,
   fontFamily,
@@ -95,6 +104,18 @@ function BaseHome() {
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+    }, 1100);
+  }, []);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
@@ -196,6 +217,15 @@ function BaseHome() {
         contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.textMuted}
+            colors={[c.textMuted]}
+            progressBackgroundColor={c.surface}
+          />
+        }
       >
         <View style={s.heroBlock}>
           <Text style={[s.greet, { color: c.textMuted }]}>

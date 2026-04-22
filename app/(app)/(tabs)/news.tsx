@@ -487,7 +487,7 @@ function ScrollHint() {
       Animated.parallel([
         Animated.sequence([
           Animated.timing(bounce, {
-            toValue: -10,
+            toValue: 10,
             duration: 700,
             useNativeDriver: true,
           }),
@@ -526,12 +526,17 @@ function ScrollHint() {
         },
       ]}
     >
-      <Feather name="chevron-up" size={20} color={c.textMuted} />
       <Feather
-        name="chevron-up"
+        name="chevron-down"
         size={20}
         color={c.textMuted}
-        style={{ marginTop: -12, opacity: 0.5 }}
+        style={{ opacity: 0.5 }}
+      />
+      <Feather
+        name="chevron-down"
+        size={20}
+        color={c.textMuted}
+        style={{ marginTop: -12 }}
       />
     </Animated.View>
   );
