@@ -23,6 +23,7 @@ import { useAuth } from "../../../lib/auth/context";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -675,11 +676,18 @@ function AssetRow({
         },
       ]}
     >
-      <View style={[s.rowIcon, { backgroundColor: bg }]}>
-        <Text style={[s.rowIconText, { color: fg }]}>
-          {assetIconCode(asset)}
-        </Text>
-      </View>
+      {isCash && (asset.ticker === "ARS" || asset.ticker === "USD") ? (
+        <MoneyIcon
+          variant={asset.ticker === "ARS" ? "ars" : "usd"}
+          size={40}
+        />
+      ) : (
+        <View style={[s.rowIcon, { backgroundColor: bg }]}>
+          <Text style={[s.rowIconText, { color: fg }]}>
+            {assetIconCode(asset)}
+          </Text>
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         <Text style={[s.rowTicker, { color: c.text }]}>
           {isCash ? asset.name : asset.ticker}
