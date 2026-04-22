@@ -31,15 +31,6 @@ function unitWordFor(cat: AssetCategory): string {
   }
 }
 
-function heroFontSizeFor(display: string): number {
-  const n = display.length;
-  if (n <= 7) return 76;
-  if (n <= 9) return 64;
-  if (n <= 11) return 52;
-  if (n <= 13) return 44;
-  return 38;
-}
-
 const AVAILABLE_CASH = 342180;
 
 const keys = [
@@ -79,6 +70,8 @@ export default function BuyScreen() {
 
   const exceeds =
     inputMode === "amount" ? arsAmount > maxCash : qtyAmount > maxQty;
+
+  const unitWord = unitWordFor(asset.category);
 
   const quick = useMemo(() => {
     if (inputMode === "amount") {
@@ -140,9 +133,6 @@ export default function BuyScreen() {
 
   const switchInputMode = (next: InputMode) => {
     if (next === inputMode) return;
-    // Convertir el valor actual al equivalente en el otro modo para que la
-    // continuidad sea intuitiva (si el usuario estaba escribiendo $10.000 y
-    // cambia a cantidad, muestra la cantidad equivalente).
     if (hasInput) {
       if (next === "qty") {
         setInput((parsed / asset.price).toFixed(4).replace(/0+$/, "").replace(/\.$/, "") || "0");
@@ -197,10 +187,9 @@ export default function BuyScreen() {
     ? `≈ ${qtyAmount.toFixed(4)} ${asset.ticker}`
     : `≈ ${formatARS(arsAmount)}`;
 
-  const unitWord = unitWordFor(asset.category);
   const availableLabel = isSell
-    ? `Disponible · ${asset.qty ?? 0} ${asset.ticker}`
-    : `Fondos disponibles para operar · ${formatARS(maxCash)}`;
+    ? `Disponible para vender: ${asset.qty ?? 0} ${asset.ticker}`
+    : `Fondos disponibles para operar: ${formatARS(maxCash)}`;
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -217,16 +206,11 @@ export default function BuyScreen() {
           <Text style={[s.headerTitle, { color: c.text }]}>
             {isSell ? "Vender" : "Comprar"} {asset.ticker}
           </Text>
-          <Text style={[s.headerSub, { color: c.textMuted }]}>
-            {isSell
-              ? `${asset.qty ?? 0} unidades disponibles`
-              : `Efectivo ${formatARS(maxCash)}`}
-          </Text>
         </View>
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Toggle: Monto en pesos / Cantidad */}
+      {/* Toggle: Monto en pesos / Cantidad en X */}
       <View style={s.modeRow}>
         <View
           style={[
@@ -271,28 +255,17 @@ export default function BuyScreen() {
         </View>
       </View>
 
-      {/* AMOUNT HERO — enorme, centrado, lo principal */}
+      {/* AMOUNT HERO — tamaño fijo, centrado, compacto */}
       <View style={s.hero}>
-        {(() => {
-          const fs = heroFontSizeFor(heroDisplay);
-          return (
-            <Text
-              style={[
-                s.heroValue,
-                {
-                  color: exceeds ? c.red : c.text,
-                  fontSize: fs,
-                  lineHeight: fs * 1.08,
-                  letterSpacing: -fs * 0.04,
-                },
-              ]}
-              numberOfLines={1}
-              allowFontScaling={false}
-            >
-              {heroDisplay}
-            </Text>
-          );
-        })()}
+        <Text
+          style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          allowFontScaling={false}
+        >
+          {heroDisplay}
+        </Text>
         <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
           {hint}
         </Text>
@@ -300,8 +273,6 @@ export default function BuyScreen() {
           {availableLabel}
         </Text>
       </View>
-
-      <View style={s.spacer} />
 
       <View style={s.quickRow}>
         {quick.map((q) => (
@@ -426,17 +397,12 @@ const s = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: "center" },
   headerTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  headerSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 16,
+    letterSpacing: -0.25,
   },
   modeRow: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 10,
     alignItems: "center",
   },
   modeToggle: {
@@ -447,52 +413,49 @@ const s = StyleSheet.create({
     gap: 2,
   },
   modeBtn: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: radius.pill,
   },
   modeBtnText: {
     fontFamily: fontFamily[600],
-    fontSize: 12.5,
+    fontSize: 13,
     letterSpacing: -0.1,
   },
   hero: {
     alignItems: "center",
-    paddingTop: 24,
-    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
   },
   heroValue: {
     fontFamily: fontFamily[800],
-    fontSize: 80,
-    letterSpacing: -3.4,
-    lineHeight: 86,
+    fontSize: 56,
+    letterSpacing: -2.2,
+    lineHeight: 62,
     textAlign: "center",
     includeFontPadding: false,
   },
   heroHint: {
     fontFamily: fontFamily[600],
     fontSize: 14,
-    marginTop: 12,
+    marginTop: 10,
     letterSpacing: -0.1,
   },
   available: {
     fontFamily: fontFamily[600],
     fontSize: 12,
-    marginTop: 6,
-    letterSpacing: 0.2,
-    textTransform: "uppercase",
-  },
-  spacer: {
-    flex: 1,
-    minHeight: 8,
+    marginTop: 4,
+    letterSpacing: -0.1,
   },
   quickRow: {
     flexDirection: "row",
     justifyContent: "center",
+    flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 12,
+    paddingBottom: 2,
   },
   quickPill: {
     paddingVertical: 9,
@@ -506,7 +469,7 @@ const s = StyleSheet.create({
   },
   keypad: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 6,
   },
   keyRow: {
     flexDirection: "row",
@@ -514,7 +477,7 @@ const s = StyleSheet.create({
   },
   keyBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
   },

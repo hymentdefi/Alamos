@@ -21,20 +21,20 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Distancia mínima del swipe para confirmar (en px). Más alto = más difícil
- * de activar por accidente. */
-const SWIPE_THRESHOLD = 260;
+/** Distancia mínima del swipe para confirmar (px). */
+const SWIPE_THRESHOLD = 240;
 /** Distancia sobre la que la franja verde alcanza 100%. */
-const SWIPE_RANGE = 340;
-/** Dead-zone inicial: los primeros N px se comen completos para que un tap
- * accidental NO empiece a levantar la franja. */
-const SWIPE_DEAD_ZONE = 24;
-/** Velocidad mínima (px/ms) para shortcutear el completado con un flick. */
+const SWIPE_RANGE = 320;
+/** Primeros N px se descartan para que un tap no active nada. */
+const SWIPE_DEAD_ZONE = 20;
+/** Velocidad mínima para shortcut con flick. */
 const SWIPE_FLICK_VELOCITY = 1.4;
-/** Alto de la franja verde en reposo (solo la strip, sin insets). */
-const STRIP_HEIGHT = 70;
-/** Radio de la card blanca en las esquinas inferiores. */
+/** Alto visible de la franja verde en reposo. */
+const STRIP_HEIGHT = 72;
+/** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
+/** Delay de cada fase de ejecución — suficiente para que se lea. */
+const PHASE_MS = 1900;
 
 const AVAILABLE_ARS = 1272850;
 
@@ -58,14 +58,21 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  // ─── Animated ───
+  // ─── Animated values ───
+  // Progreso 0-1 del swipe verde. Animated su transform translateY nativo.
   const greenProgress = useRef(new Animated.Value(0)).current;
-  const checkMorph = useRef(new Animated.Value(0)).current;
-  const spinLoop = useRef(new Animated.Value(0)).current;
+  // 0 = fuera, 1 = dentro (overlay de ejecución).
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  // Rotación del spinner.
+  const spinLoop = useRef(new Animated.Value(0)).current;
+  // Morph logo → check (0 = logo, 1 = check).
+  const checkMorph = useRef(new Animated.Value(0)).current;
+  // Transición del statusText entre fases.
+  const statusOpacity = useRef(new Animated.Value(0)).current;
+  const statusY = useRef(new Animated.Value(20)).current;
 
   const [phase, setPhase] = useState<Phase>("idle");
-  const [statusText, setStatusText] = useState("Enviando orden");
+  const [statusText, setStatusText] = useState("");
 
   // Spinner loop
   useEffect(() => {
@@ -98,35 +105,94 @@ export default function ConfirmScreen() {
     return () => greenProgress.removeListener(id);
   }, [greenProgress]);
 
+  /** Fade-out del texto actual, swap, fade-in del nuevo. */
+  const transitionText = (next: string): Promise<void> => {
+    return new Promise((resolve) => {
+      Animated.parallel([
+        Animated.timing(statusOpacity, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(statusY, {
+          toValue: -18,
+          duration: 180,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setStatusText(next);
+        statusY.setValue(22);
+        Animated.parallel([
+          Animated.timing(statusOpacity, {
+            toValue: 1,
+            duration: 260,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.spring(statusY, {
+            toValue: 0,
+            tension: 160,
+            friction: 14,
+            useNativeDriver: true,
+          }),
+        ]).start(() => resolve());
+      });
+    });
+  };
+
   const runOrderFlow = async () => {
     setPhase("sending");
+    // Fade-in del overlay entero
     Animated.timing(overlayOpacity, {
       toValue: 1,
       duration: 260,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
 
+    // Primer texto: desde vacío, fade-in
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     setStatusText("Enviando orden");
-    await wait(1200);
+    statusY.setValue(22);
+    Animated.parallel([
+      Animated.timing(statusOpacity, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(statusY, {
+        toValue: 0,
+        tension: 160,
+        friction: 14,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-    setStatusText("Orden recibida");
+    await wait(PHASE_MS);
+
+    // Transición a "Orden recibida"
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    await wait(1100);
+    await transitionText("Orden recibida");
 
+    await wait(PHASE_MS);
+
+    // Transición a "Ejecutada" + checkmark morph
     setPhase("done");
-    Haptics.notificationAsync(
-      Haptics.NotificationFeedbackType.Success,
-    ).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
     Animated.spring(checkMorph, {
       toValue: 1,
       tension: 140,
       friction: 5,
       useNativeDriver: true,
     }).start();
-    setStatusText("Orden ejecutada");
+    await transitionText("Orden ejecutada");
 
-    await wait(1300);
+    await wait(1400);
 
     router.replace({
       pathname: "/(app)/success",
@@ -141,59 +207,47 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
-    // "fuim" — haptic heavy + spring punchy al soltar.
+    // "fuim" — haptic heavy + timing punchy al soltar.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    Animated.spring(greenProgress, {
+    Animated.timing(greenProgress, {
       toValue: 1,
-      tension: 90,
-      friction: 11,
-      velocity: 2.2,
-      useNativeDriver: false,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
     }).start(() => {
       runOrderFlow();
     });
   };
 
-  // PanResponder: swipe hacia arriba con resistencia tipo goma al principio
-  // y fluidez hacia el final. Dead-zone evita que un tap accidental
-  // dispare la franja.
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
-        // Sólo capturamos una vez que el dedo se movió claramente hacia
-        // arriba más allá del dead-zone. Evita falsos positivos.
         onMoveShouldSetPanResponder: (_, g) =>
           phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
         onMoveShouldSetPanResponderCapture: (_, g) =>
           phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
         onPanResponderGrant: () => {
-          // Haptic sutil al empezar — confirma que agarró el gesto
           Haptics.selectionAsync().catch(() => {});
         },
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
-          const dy = -g.dy; // positivo hacia arriba
+          const dy = -g.dy;
           if (dy <= 0) {
             greenProgress.setValue(0);
             return;
           }
-          // Aplicamos curva con resistencia al inicio (ease-in potencia)
-          // Consume los primeros SWIPE_DEAD_ZONE px sin avanzar.
           const effective = Math.max(0, dy - SWIPE_DEAD_ZONE);
           const raw = Math.min(1, effective / (SWIPE_RANGE - SWIPE_DEAD_ZONE));
-          // Curva pow 1.55 — resistencia tipo "goma" fuerte al inicio,
-          // acelera al final. Robinhood-like.
-          const curved = Math.pow(raw, 1.55);
+          // Curva sutil: arranca lineal, suaviza al final
+          const curved = 1 - Math.pow(1 - raw, 1.8);
           greenProgress.setValue(curved);
         },
         onPanResponderRelease: (_, g) => {
           if (phase !== "idle") return;
           const dy = -g.dy;
           const vy = -g.vy;
-          // Completa si se pasó el threshold O si fue un flick rápido
-          // ya habiendo pasado el primer tercio.
           if (
             dy > SWIPE_THRESHOLD ||
             (vy > SWIPE_FLICK_VELOCITY && dy > SWIPE_RANGE * 0.35)
@@ -202,9 +256,9 @@ export default function ConfirmScreen() {
           } else {
             Animated.spring(greenProgress, {
               toValue: 0,
-              tension: 200,
-              friction: 14,
-              useNativeDriver: false,
+              tension: 220,
+              friction: 18,
+              useNativeDriver: true,
             }).start();
           }
         },
@@ -212,9 +266,9 @@ export default function ConfirmScreen() {
           if (phase !== "idle") return;
           Animated.spring(greenProgress, {
             toValue: 0,
-            tension: 200,
-            friction: 14,
-            useNativeDriver: false,
+            tension: 220,
+            friction: 18,
+            useNativeDriver: true,
           }).start();
         },
       }),
@@ -224,9 +278,12 @@ export default function ConfirmScreen() {
 
   if (!asset) return null;
 
-  const greenHeight = greenProgress.interpolate({
+  // Translate del cover verde: en reposo, translateY = SCREEN_H - strip, así
+  // solo se ve la franja al fondo. Al completar swipe, translateY = 0 = cubre.
+  const greenCoverStartY = SCREEN_H - (STRIP_HEIGHT + insets.bottom);
+  const greenCoverY = greenProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [STRIP_HEIGHT + insets.bottom, SCREEN_H + 200],
+    outputRange: [greenCoverStartY, 0],
   });
   const hintOpacity = greenProgress.interpolate({
     inputRange: [0, 0.4],
@@ -253,9 +310,7 @@ export default function ConfirmScreen() {
       style={[s.root, { backgroundColor: brand.green }]}
       {...panResponder.panHandlers}
     >
-      {/* Card blanca con contenido. Termina antes de la strip, con
-          esquinas redondeadas abajo. Cuando la strip verde crece, la
-          va tapando. */}
+      {/* Card blanca con contenido */}
       <View
         style={[
           s.card,
@@ -336,116 +391,137 @@ export default function ConfirmScreen() {
           </View>
         </View>
 
-        {/* Chevron al final de la card */}
         <View style={s.chevronBottom}>
           <PullChevron color={c.text} />
         </View>
       </View>
 
-      {/* Franja verde que crece para comer la pantalla */}
+      {/* Cover verde que sube desde abajo con translateY (nativo, smooth) */}
       <Animated.View
+        pointerEvents="none"
         style={[
-          s.greenStrip,
-          { height: greenHeight, paddingBottom: insets.bottom },
+          s.greenCover,
+          {
+            height: SCREEN_H,
+            transform: [{ translateY: greenCoverY }],
+          },
+        ]}
+      />
+
+      {/* Hint "Deslizá para ejecutar" anclado al bottom, se desvanece al subir */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          s.hintBar,
+          {
+            height: STRIP_HEIGHT + insets.bottom,
+            paddingBottom: insets.bottom,
+            opacity: hintOpacity,
+          },
         ]}
       >
-        <Animated.View style={[s.hintWrap, { opacity: hintOpacity }]}>
-          <Text style={s.hintText}>Deslizá para ejecutar</Text>
-        </Animated.View>
+        <Text style={s.hintText}>Deslizá para ejecutar</Text>
       </Animated.View>
 
-      {/* Overlay de ejecución: logo + spinner + texto + check */}
+      {/* Overlay de ejecución */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
-          <View style={s.logoWrap}>
-            {phase !== "done" ? (
+          <View style={s.execCenter}>
+            <View style={s.logoWrap}>
+              {phase !== "done" ? (
+                <Animated.View
+                  style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
+                >
+                  <Svg width={160} height={160} viewBox="0 0 100 100">
+                    <Circle
+                      cx="50"
+                      cy="50"
+                      r="44"
+                      stroke="rgba(255,255,255,0.22)"
+                      strokeWidth="3"
+                      fill="none"
+                    />
+                    <Circle
+                      cx="50"
+                      cy="50"
+                      r="44"
+                      stroke="#FFFFFF"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeDasharray="60 220"
+                      strokeLinecap="round"
+                    />
+                  </Svg>
+                </Animated.View>
+              ) : null}
+
               <Animated.View
                 style={[
-                  s.spinnerWrap,
-                  { transform: [{ rotate: spin }] },
+                  s.logoOverlay,
+                  {
+                    opacity: checkMorph.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: checkMorph.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0.4],
+                        }),
+                      },
+                    ],
+                  },
                 ]}
               >
-                <Svg width={160} height={160} viewBox="0 0 100 100">
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="rgba(255,255,255,0.22)"
-                    strokeWidth="3"
-                    fill="none"
-                  />
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="#FFFFFF"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeDasharray="60 220"
-                    strokeLinecap="round"
-                  />
-                </Svg>
+                <Image
+                  source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
+                  style={s.logoImg}
+                  resizeMode="contain"
+                />
               </Animated.View>
-            ) : null}
 
-            <Animated.View
+              <Animated.View
+                style={[
+                  s.checkOverlay,
+                  {
+                    opacity: checkMorph,
+                    transform: [{ scale: checkMorph }],
+                  },
+                ]}
+              >
+                <Feather
+                  name="check"
+                  size={90}
+                  color="#FFFFFF"
+                  strokeWidth={3.5}
+                />
+              </Animated.View>
+            </View>
+
+            {/* Status text con slide + fade entre fases */}
+            <Animated.Text
               style={[
-                s.logoOverlay,
+                s.execText,
                 {
-                  opacity: checkMorph.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0],
-                  }),
-                  transform: [
-                    {
-                      scale: checkMorph.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 0.4],
-                      }),
-                    },
-                  ],
+                  opacity: statusOpacity,
+                  transform: [{ translateY: statusY }],
                 },
               ]}
             >
-              <Image
-                source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
-                style={s.logoImg}
-                resizeMode="contain"
-              />
-            </Animated.View>
-
-            <Animated.View
-              style={[
-                s.checkOverlay,
-                {
-                  opacity: checkMorph,
-                  transform: [{ scale: checkMorph }],
-                },
-              ]}
-            >
-              <Feather
-                name="check"
-                size={90}
-                color="#FFFFFF"
-                strokeWidth={3.5}
-              />
-            </Animated.View>
+              {statusText}
+            </Animated.Text>
           </View>
 
-          <Text style={s.execText}>{statusText}</Text>
-
-          <View style={[s.execDisclaimer, { paddingBottom: insets.bottom + 20 }]}>
-            <Text style={s.execDisclaimerText}>
-              Los precios mostrados son estimados. Las órdenes a mercado se
-              enrutan al mejor centro de ejecución disponible y se ejecutan al
-              precio vigente, que puede diferir del mostrado por volatilidad,
-              volumen o liquidez del mercado.
-            </Text>
-            <Text style={s.execDisclaimerFoot}>
-              Alamos Capital S.A. · ALyC registrada en CNV
+          <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 22 }]}>
+            <Text style={s.disclaimerText}>
+              La respuesta del sistema, el precio y velocidad de ejecución, la
+              liquidez, los datos del mercado y los tiempos de acceso pueden
+              verse afectados por muchos factores — incluidos la volatilidad,
+              el tamaño y tipo de orden, y las condiciones del mercado.
             </Text>
           </View>
         </Animated.View>
@@ -580,18 +656,21 @@ const s = StyleSheet.create({
     paddingTop: 8,
   },
 
-  /* Green strip */
-  greenStrip: {
+  /* Green cover (sube sobre la card via translateY) */
+  greenCover: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: brand.green,
+  },
+
+  /* Hint "Deslizá para ejecutar" — fixed bottom strip */
+  hintBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: brand.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hintWrap: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -606,15 +685,20 @@ const s = StyleSheet.create({
   execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  execCenter: {
+    flex: 1,
+    alignItems: "center",
     justifyContent: "center",
-    paddingBottom: 40,
+    paddingHorizontal: 32,
   },
   logoWrap: {
     width: 160,
     height: 160,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 56,
+    marginBottom: 44,
   },
   spinnerWrap: {
     position: "absolute",
@@ -640,32 +724,23 @@ const s = StyleSheet.create({
   },
   execText: {
     fontFamily: fontFamily[700],
-    fontSize: 26,
+    fontSize: 30,
     color: "#FFFFFF",
-    letterSpacing: -0.6,
+    letterSpacing: -0.7,
+    textAlign: "center",
   },
-  execDisclaimer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+
+  /* Disclaimer al pie del overlay */
+  disclaimerWrap: {
     paddingHorizontal: 28,
     alignItems: "center",
   },
-  execDisclaimerText: {
+  disclaimerText: {
     fontFamily: fontFamily[500],
-    fontSize: 11,
-    lineHeight: 16,
-    color: "rgba(255,255,255,0.72)",
+    fontSize: 13,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.82)",
     textAlign: "center",
     letterSpacing: -0.05,
-    marginBottom: 6,
-  },
-  execDisclaimerFoot: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    color: "rgba(255,255,255,0.56)",
-    textAlign: "center",
-    letterSpacing: 0.3,
   },
 });
