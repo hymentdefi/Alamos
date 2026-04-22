@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "../../../lib/auth/context";
@@ -19,6 +21,17 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user, logout } = useAuth();
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (!isFocused) return;
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return unsub;
+  }, [navigation, isFocused]);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
   const initial = (user?.fullName ?? "M").charAt(0).toUpperCase();
@@ -92,6 +105,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{
           paddingBottom: 140,
         }}

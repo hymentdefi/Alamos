@@ -8,6 +8,10 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // Nunca retroceder a una tab "anterior" con el back gesture:
+      // dentro de cada tab el usuario navega con push/back, pero entre
+      // tabs solo se mueve vía el nav bar.
+      backBehavior="none"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,

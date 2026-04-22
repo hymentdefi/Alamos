@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,11 @@ import {
   StyleSheet,
   Linking,
   RefreshControl,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -100,11 +103,15 @@ function BaseHome() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user } = useAuth();
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const [tab, setTab] = useState<TabId>("tenencias");
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -116,6 +123,28 @@ function BaseHome() {
       );
     }, 1100);
   }, []);
+
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollYRef.current = e.nativeEvent.contentOffset.y;
+    },
+    [],
+  );
+
+  // Tap sobre la tab Inicio estando en Inicio:
+  //   · si no estoy arriba → scroll al tope
+  //   · si ya estoy arriba → disparar refresh (con animación de pull-to-refresh)
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (!isFocused) return;
+      if (scrollYRef.current > 8) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      } else if (!refreshing) {
+        onRefresh();
+      }
+    });
+    return unsub;
+  }, [navigation, isFocused, refreshing, onRefresh]);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
@@ -214,9 +243,12 @@ function BaseHome() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -24,7 +24,6 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -37,6 +36,10 @@ import {
   DisclaimerShort,
 } from "../../../lib/components/Disclaimer";
 import { useLegalConsent } from "../../../lib/legal/context";
+import {
+  HorizontalPager,
+  type HorizontalPagerHandle,
+} from "../../../lib/components/HorizontalPager";
 
 type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "cripto";
 
@@ -235,15 +238,17 @@ export default function NewsScreen() {
   const { c } = useTheme();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const [filter, setFilter] = useState<Category | "todas">("todas");
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState(0);
   const [detail, setDetail] = useState<NewsItem | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [headerH, setHeaderH] = useState(120);
   const [footerH, setFooterH] = useState(40);
   const [legalOpen, setLegalOpen] = useState(false);
-  const listRef = useRef<FlatList>(null);
+  const pagerRef = useRef<HorizontalPagerHandle>(null);
   const catScrollRef = useRef<ScrollView>(null);
+  const pageListRefs = useRef<Record<string, FlatList | null>>({});
+  const pageRefSetters = useRef<Record<string, (r: FlatList | null) => void>>(
+    {},
+  );
 
   const { hasAccepted, loading: consentLoading, accept } = useLegalConsent();
   const showOnboarding = !consentLoading && !hasAccepted && isFocused;
@@ -252,163 +257,49 @@ export default function NewsScreen() {
   const tabBarH = Platform.OS === "ios" ? 92 : 78;
   const cardH = screenH - tabBarH - headerH - footerH;
 
-  const visible = useMemo(
-    () => (filter === "todas" ? feed : feed.filter((n) => n.category === filter)),
-    [filter],
+  const filterForTab = useCallback(
+    (t: { id: Category | "todas" }) =>
+      t.id === "todas" ? feed : feed.filter((n) => n.category === t.id),
+    [],
   );
 
+  // Cuando cambia la tab activa, scrolleamos la lista de pills para que la
+  // activa quede cerca del centro.
   useEffect(() => {
-    setActiveIndex(0);
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-    // Scroll la lista de pills para que la activa quede visible
-    const idx = categoryTabs.findIndex((t) => t.id === filter);
     catScrollRef.current?.scrollTo({
-      x: Math.max(0, idx * 92 - 60),
+      x: Math.max(0, activeTab * 92 - 60),
       animated: true,
     });
-  }, [filter]);
+  }, [activeTab]);
 
-  const changeFilterBy = useCallback(
-    (delta: number) => {
-      const idx = categoryTabs.findIndex((t) => t.id === filter);
-      const next = idx + delta;
-      if (next >= 0 && next < categoryTabs.length) {
-        setFilter(categoryTabs[next].id);
-        return true;
-      }
-      return false;
-    },
-    [filter],
-  );
+  const openPill = useCallback((idx: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveTab(idx);
+    pagerRef.current?.scrollToIndex(idx, true);
+  }, []);
 
-  // Animated value para la transición horizontal del contenido.
-  const slideX = useRef(new Animated.Value(0)).current;
-  const transitioning = useRef(false);
-  const { width: screenW } = Dimensions.get("window");
-
-  const animateTransition = useCallback(
-    (direction: 1 | -1) => {
-      if (transitioning.current) return;
-      const idx = categoryTabs.findIndex((t) => t.id === filter);
-      const next = idx + direction;
-      if (next < 0 || next >= categoryTabs.length) {
-        // No hay vecino — rebota
-        Animated.spring(slideX, {
-          toValue: 0,
-          tension: 180,
-          friction: 12,
-          useNativeDriver: true,
-        }).start();
-        return;
-      }
-      transitioning.current = true;
-      Haptics.selectionAsync().catch(() => {});
-      // Fase 1: termina de sacar la pantalla actual hasta fuera
-      Animated.timing(slideX, {
-        toValue: direction * -screenW,
-        duration: 150,
-        useNativeDriver: true,
-      }).start(() => {
-        changeFilterBy(direction);
-        // Fase 2: la nueva pantalla aparece desde el lado opuesto y entra
-        slideX.setValue(direction * screenW);
-        Animated.timing(slideX, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }).start(() => {
-          transitioning.current = false;
-        });
-      });
-    },
-    [filter, slideX, changeFilterBy, screenW],
-  );
-
-  // PanResponder: swipe horizontal ESTRICTO. Durante el drag el contenido
-  // sigue al dedo sin damping. El threshold es 2.5x más horizontal que
-  // vertical para evitar diagonales.
-  const swipePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, g) =>
-          !transitioning.current &&
-          Math.abs(g.dx) > 22 &&
-          Math.abs(g.dx) > Math.abs(g.dy) * 2.5,
-        onMoveShouldSetPanResponderCapture: (_, g) =>
-          !transitioning.current &&
-          Math.abs(g.dx) > 22 &&
-          Math.abs(g.dx) > Math.abs(g.dy) * 2.5,
-        onPanResponderMove: (_, g) => {
-          // Full follow: el contenido se mueve igual que el dedo
-          slideX.setValue(g.dx);
-        },
-        onPanResponderRelease: (_, g) => {
-          const THRESH_DX = screenW * 0.2; // 20% del ancho
-          const THRESH_VX = 0.4;
-          if (g.dx < -THRESH_DX || (g.vx < -THRESH_VX && g.dx < -20)) {
-            animateTransition(1);
-          } else if (g.dx > THRESH_DX || (g.vx > THRESH_VX && g.dx > 20)) {
-            animateTransition(-1);
-          } else {
-            Animated.spring(slideX, {
-              toValue: 0,
-              tension: 180,
-              friction: 12,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(slideX, {
-            toValue: 0,
-            tension: 180,
-            friction: 12,
-            useNativeDriver: true,
-          }).start();
-        },
-      }),
-    [animateTransition, slideX, screenW],
-  );
-
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      const idx = Math.round(y / cardH);
-      if (idx !== activeIndex) {
-        setActiveIndex(idx);
-        Haptics.selectionAsync().catch(() => {});
-      }
-    },
-    [activeIndex, cardH],
-  );
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTimeout(() => {
-      setRefreshing(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => {},
-      );
-    }, 1100);
+  const setPageRef = useCallback((tabId: string) => {
+    if (!pageRefSetters.current[tabId]) {
+      pageRefSetters.current[tabId] = (ref) => {
+        pageListRefs.current[tabId] = ref;
+      };
+    }
+    return pageRefSetters.current[tabId];
   }, []);
 
   // Tap en la tab Noticias solo si YA estoy en Noticias → scroll top + refresh
   useEffect(() => {
     const unsub = navigation.addListener("tabPress" as never, () => {
       if (!isFocused) return;
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
-      setTimeout(onRefresh, 250);
+      const currentId = categoryTabs[activeTab].id;
+      const ref = pageListRefs.current[currentId];
+      ref?.scrollToOffset({ offset: 0, animated: true });
     });
     return unsub;
-  }, [navigation, onRefresh, isFocused]);
+  }, [navigation, isFocused, activeTab]);
 
   return (
-    <View
-      style={[s.root, { backgroundColor: c.bg }]}
-      {...swipePanResponder.panHandlers}
-    >
+    <View style={[s.root, { backgroundColor: c.bg }]}>
       {/* Header sticky con título Noticias + tabs */}
       <View
         style={[
@@ -426,15 +317,12 @@ export default function NewsScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.catRow}
         >
-          {categoryTabs.map((t) => {
-            const active = filter === t.id;
+          {categoryTabs.map((t, i) => {
+            const active = i === activeTab;
             return (
               <Pressable
                 key={t.id}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setFilter(t.id);
-                }}
+                onPress={() => openPill(i)}
                 style={[
                   s.catPill,
                   {
@@ -457,51 +345,26 @@ export default function NewsScreen() {
         </ScrollView>
       </View>
 
-      <Animated.View
-        style={{
-          flex: 1,
-          transform: [{ translateX: slideX }],
-        }}
-      >
-        <FlatList
-          ref={listRef}
-          data={visible}
-          keyExtractor={(n) => n.id}
-          pagingEnabled
-          snapToInterval={cardH}
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={c.textMuted}
-              colors={[c.textMuted]}
-              progressBackgroundColor={c.surface}
-            />
-          }
-          renderItem={({ item }) => (
-            <NewsCard
-              item={item}
-              height={cardH}
-              onOpenDetail={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                  () => {},
-                );
-                setDetail(item);
-              }}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={[s.empty, { height: cardH }]}>
-              <Text style={s.emptyTitle}>Sin noticias</Text>
-              <Text style={s.emptySub}>Probá con otra categoría.</Text>
-            </View>
-          }
-        />
-      </Animated.View>
+      <HorizontalPager
+        ref={pagerRef}
+        items={categoryTabs}
+        index={activeTab}
+        onIndexChange={setActiveTab}
+        keyExtractor={(t) => t.id}
+        renderItem={(t) => (
+          <NewsPage
+            items={filterForTab(t)}
+            cardH={cardH}
+            listRef={setPageRef(t.id)}
+            onOpenDetail={(n) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                () => {},
+              );
+              setDetail(n);
+            }}
+          />
+        )}
+      />
 
       <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
         <DisclaimerFooter onOpen={() => setLegalOpen(true)} />
@@ -514,6 +377,83 @@ export default function NewsScreen() {
       />
       <DisclaimerOnboarding visible={showOnboarding} onAccept={accept} />
     </View>
+  );
+}
+
+/* ─── Página vertical de noticias para una categoría ─── */
+
+function NewsPage({
+  items,
+  cardH,
+  listRef,
+  onOpenDetail,
+}: {
+  items: NewsItem[];
+  cardH: number;
+  listRef: (ref: FlatList | null) => void;
+  onOpenDetail: (n: NewsItem) => void;
+}) {
+  const { c } = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
+  const activeIdxRef = useRef(0);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+    }, 1100);
+  }, []);
+
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = e.nativeEvent.contentOffset.y;
+      const idx = Math.round(y / cardH);
+      if (idx !== activeIdxRef.current) {
+        activeIdxRef.current = idx;
+        Haptics.selectionAsync().catch(() => {});
+      }
+    },
+    [cardH],
+  );
+
+  return (
+    <FlatList
+      ref={listRef}
+      data={items}
+      keyExtractor={(n) => n.id}
+      pagingEnabled
+      snapToInterval={cardH}
+      decelerationRate="fast"
+      showsVerticalScrollIndicator={false}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={c.textMuted}
+          colors={[c.textMuted]}
+          progressBackgroundColor={c.surface}
+        />
+      }
+      renderItem={({ item }) => (
+        <NewsCard
+          item={item}
+          height={cardH}
+          onOpenDetail={() => onOpenDetail(item)}
+        />
+      )}
+      ListEmptyComponent={
+        <View style={[s.empty, { height: cardH }]}>
+          <Text style={s.emptyTitle}>Sin noticias</Text>
+          <Text style={s.emptySub}>Probá con otra categoría.</Text>
+        </View>
+      }
+    />
   );
 }
 

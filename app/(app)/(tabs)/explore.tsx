@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -25,6 +26,10 @@ import {
 import { useFavorites } from "../../../lib/favorites/context";
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 import { useProMode } from "../../../lib/pro/context";
+import {
+  HorizontalPager,
+  type HorizontalPagerHandle,
+} from "../../../lib/components/HorizontalPager";
 
 type Filter = "todo" | AssetCategory;
 
@@ -50,24 +55,20 @@ function BaseExplore() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { favorites, isFavorite } = useFavorites();
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
 
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("todo");
+  const [activeIdx, setActiveIdx] = useState(0);
   const [onlyFavs, setOnlyFavs] = useState(false);
+  const pagerRef = useRef<HorizontalPagerHandle>(null);
+  const filterScrollRef = useRef<ScrollView>(null);
+  const pageRefs = useRef<Record<string, ScrollView | null>>({});
+  const pageRefSetters = useRef<Record<string, (r: ScrollView | null) => void>>(
+    {},
+  );
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return assets.filter((a) => {
-      if (a.category === "efectivo") return false;
-      if (onlyFavs && !favorites.has(a.ticker)) return false;
-      if (filter !== "todo" && a.category !== filter) return false;
-      if (!q) return true;
-      return (
-        a.ticker.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q)
-      );
-    });
-  }, [query, filter, onlyFavs, favorites]);
+  const filter = filters[activeIdx].id;
 
   const topMovers = useMemo(
     () =>
@@ -78,27 +79,59 @@ function BaseExplore() {
     [],
   );
 
-  const openDetail = (asset: Asset) => {
-    router.push({
-      pathname: "/(app)/detail",
-      params: { ticker: asset.ticker },
-    });
-  };
+  const navLock = useRef(false);
+  const openDetail = useCallback(
+    (asset: Asset) => {
+      if (navLock.current) return;
+      navLock.current = true;
+      router.push({
+        pathname: "/(app)/detail",
+        params: { ticker: asset.ticker },
+      });
+      setTimeout(() => {
+        navLock.current = false;
+      }, 700);
+    },
+    [router],
+  );
 
   const toggleFavs = () => {
     setOnlyFavs((v) => !v);
     Haptics.selectionAsync().catch(() => {});
   };
 
-  const eyebrowLabel = query
-    ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
-    : onlyFavs
-    ? filter === "todo"
-      ? "Tus favoritos"
-      : `Favoritos · ${filters.find((f) => f.id === filter)?.label}`
-    : filters.find((f) => f.id === filter)?.label;
+  // Scroll de los pills para centrar el activo
+  useEffect(() => {
+    filterScrollRef.current?.scrollTo({
+      x: Math.max(0, activeIdx * 92 - 60),
+      animated: true,
+    });
+  }, [activeIdx]);
 
-  const showMovers = !query && !onlyFavs && filter === "todo";
+  const openFilter = useCallback((idx: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveIdx(idx);
+    pagerRef.current?.scrollToIndex(idx, true);
+  }, []);
+
+  // Tap sobre la tab Mercado estando en Mercado → scroll al tope de la página activa
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (!isFocused) return;
+      const id = filters[activeIdx].id;
+      pageRefs.current[id]?.scrollTo({ y: 0, animated: true });
+    });
+    return unsub;
+  }, [navigation, isFocused, activeIdx]);
+
+  const setPageRef = useCallback((id: string) => {
+    if (!pageRefSetters.current[id]) {
+      pageRefSetters.current[id] = (ref) => {
+        pageRefs.current[id] = ref;
+      };
+    }
+    return pageRefSetters.current[id];
+  }, []);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -145,17 +178,18 @@ function BaseExplore() {
         </View>
 
         <ScrollView
+          ref={filterScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={s.filterRow}
           contentContainerStyle={s.filterContent}
         >
-          {filters.map((f) => {
-            const active = filter === f.id;
+          {filters.map((f, i) => {
+            const active = i === activeIdx;
             return (
               <Pressable
                 key={f.id}
-                onPress={() => setFilter(f.id)}
+                onPress={() => openFilter(i)}
                 style={[
                   s.filterPill,
                   {
@@ -178,105 +212,176 @@ function BaseExplore() {
         </ScrollView>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 140 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {showMovers ? (
-          <View style={s.moversBlock}>
-            <View style={s.sectionHead}>
-              <Text style={[s.eyebrow, { color: c.textMuted }]}>
-                Destacados del día
-              </Text>
-            </View>
-            <MoversMarquee movers={topMovers} onOpen={openDetail} />
-          </View>
-        ) : null}
+      <HorizontalPager
+        ref={pagerRef}
+        items={filters}
+        index={activeIdx}
+        onIndexChange={setActiveIdx}
+        keyExtractor={(f) => f.id}
+        renderItem={(f) => (
+          <MarketPage
+            filter={f.id}
+            label={f.label}
+            query={query}
+            onlyFavs={onlyFavs}
+            topMovers={topMovers}
+            onOpen={openDetail}
+            isFavorite={isFavorite}
+            listRef={setPageRef(f.id)}
+          />
+        )}
+      />
+    </View>
+  );
+}
 
-        <View style={s.listBlock}>
+/* ─── Página de lista filtrada por categoría ─── */
+
+function MarketPage({
+  filter,
+  label,
+  query,
+  onlyFavs,
+  topMovers,
+  onOpen,
+  isFavorite,
+  listRef,
+}: {
+  filter: Filter;
+  label: string;
+  query: string;
+  onlyFavs: boolean;
+  topMovers: Asset[];
+  onOpen: (a: Asset) => void;
+  isFavorite: (t: string) => boolean;
+  listRef: (ref: ScrollView | null) => void;
+}) {
+  const { c } = useTheme();
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return assets.filter((a) => {
+      if (a.category === "efectivo") return false;
+      if (onlyFavs && !isFavorite(a.ticker)) return false;
+      if (filter !== "todo" && a.category !== filter) return false;
+      if (!q) return true;
+      return (
+        a.ticker.toLowerCase().includes(q) ||
+        a.name.toLowerCase().includes(q)
+      );
+    });
+  }, [query, filter, onlyFavs, isFavorite]);
+
+  const eyebrowLabel = query
+    ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
+    : onlyFavs
+    ? filter === "todo"
+      ? "Tus favoritos"
+      : `Favoritos · ${label}`
+    : label;
+
+  const showMovers = !query && !onlyFavs && filter === "todo";
+
+  return (
+    <ScrollView
+      ref={listRef}
+      contentContainerStyle={{ paddingBottom: 140 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {showMovers ? (
+        <View style={s.moversBlock}>
           <View style={s.sectionHead}>
             <Text style={[s.eyebrow, { color: c.textMuted }]}>
-              {eyebrowLabel}
+              Destacados del día
             </Text>
           </View>
+          <MoversMarquee movers={topMovers} onOpen={onOpen} />
+        </View>
+      ) : null}
 
-          {visible.length === 0 ? (
-            <View style={s.empty}>
-              <Text style={[s.emptyTitle, { color: c.text }]}>
-                {onlyFavs ? "Aún no tenés favoritos" : "Sin resultados"}
-              </Text>
-              <Text style={[s.emptySub, { color: c.textMuted }]}>
-                {onlyFavs
-                  ? "Entrá a un activo y tocá la estrella arriba a la derecha para guardarlo."
-                  : "Probá con otro ticker o categoría."}
-              </Text>
-            </View>
-          ) : (
-            visible.map((asset, i) => {
-              const fav = isFavorite(asset.ticker);
-              return (
-                <Pressable
-                  key={asset.ticker}
-                  onPress={() => openDetail(asset)}
+      <View style={s.listBlock}>
+        <View style={s.sectionHead}>
+          <Text style={[s.eyebrow, { color: c.textMuted }]}>
+            {eyebrowLabel}
+          </Text>
+        </View>
+
+        {visible.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={[s.emptyTitle, { color: c.text }]}>
+              {onlyFavs ? "Aún no tenés favoritos" : "Sin resultados"}
+            </Text>
+            <Text style={[s.emptySub, { color: c.textMuted }]}>
+              {onlyFavs
+                ? "Entrá a un activo y tocá la estrella arriba a la derecha para guardarlo."
+                : "Probá con otro ticker o categoría."}
+            </Text>
+          </View>
+        ) : (
+          visible.map((asset, i) => {
+            const fav = isFavorite(asset.ticker);
+            return (
+              <Pressable
+                key={asset.ticker}
+                onPress={() => onOpen(asset)}
+                style={[
+                  s.row,
+                  i > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: c.border,
+                  },
+                ]}
+              >
+                <View
                   style={[
-                    s.row,
-                    i > 0 && {
-                      borderTopWidth: StyleSheet.hairlineWidth,
-                      borderTopColor: c.border,
+                    s.icon,
+                    {
+                      backgroundColor:
+                        asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
                     },
                   ]}
                 >
-                  <View
+                  <Text
                     style={[
-                      s.icon,
-                      {
-                        backgroundColor:
-                          asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
-                      },
+                      s.iconText,
+                      { color: asset.iconTone === "dark" ? c.bg : c.textSecondary },
                     ]}
                   >
-                    <Text
-                      style={[
-                        s.iconText,
-                        { color: asset.iconTone === "dark" ? c.bg : c.textSecondary },
-                      ]}
-                    >
-                      {assetIconCode(asset)}
+                    {assetIconCode(asset)}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={s.tickerRow}>
+                    <Text style={[s.rowTicker, { color: c.text }]}>
+                      {asset.ticker}
                     </Text>
+                    {fav ? (
+                      <Ionicons name="star" size={12} color={c.greenDark} />
+                    ) : null}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.tickerRow}>
-                      <Text style={[s.rowTicker, { color: c.text }]}>
-                        {asset.ticker}
-                      </Text>
-                      {fav ? (
-                        <Ionicons name="star" size={12} color={c.greenDark} />
-                      ) : null}
-                    </View>
-                    <Text style={[s.rowSub, { color: c.textMuted }]}>
-                      {asset.subLabel}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={[s.rowPrice, { color: c.text }]}>
-                      {formatARS(asset.price)}
-                    </Text>
-                    <Text
-                      style={[
-                        s.rowChange,
-                        { color: asset.change >= 0 ? c.greenDark : c.red },
-                      ]}
-                    >
-                      {formatPct(asset.change)}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })
-          )}
-        </View>
-      </ScrollView>
-    </View>
+                  <Text style={[s.rowSub, { color: c.textMuted }]}>
+                    {asset.subLabel}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={[s.rowPrice, { color: c.text }]}>
+                    {formatARS(asset.price)}
+                  </Text>
+                  <Text
+                    style={[
+                      s.rowChange,
+                      { color: asset.change >= 0 ? c.greenDark : c.red },
+                    ]}
+                  >
+                    {formatPct(asset.change)}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
