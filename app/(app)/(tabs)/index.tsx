@@ -239,83 +239,97 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        <FCICallout onPress={() => router.push("/(app)/explore")} />
+        <FeaturedFunds onOpen={openDetail} onSeeAll={() => router.push("/(app)/explore")} />
         <UniversityCallout />
       </ScrollView>
     </View>
   );
 }
 
-function FCICallout({ onPress }: { onPress: () => void }) {
+function FeaturedFunds({
+  onOpen,
+  onSeeAll,
+}: {
+  onOpen: (a: Asset) => void;
+  onSeeAll: () => void;
+}) {
   const { c } = useTheme();
+  const funds = useMemo(
+    () =>
+      assets
+        .filter((a) => a.category === "fci")
+        .sort((a, b) => b.change - a.change)
+        .slice(0, 3),
+    [],
+  );
+
+  if (funds.length === 0) return null;
+
   return (
-    <View style={[s.fciCard, { backgroundColor: c.ink }]}>
-      <View style={s.fciEyebrow}>
-        <View style={[s.fciDot, { backgroundColor: c.green }]} />
-        <Text style={[s.fciEyebrowText, { color: c.green }]}>
-          PARA TUS PESOS
+    <View style={s.featuredBlock}>
+      <View style={s.featuredHead}>
+        <Text style={[s.featuredEyebrow, { color: c.textMuted }]}>
+          FONDOS POPULARES
+        </Text>
+        <Text style={[s.featuredSub, { color: c.text }]}>
+          Tu plata rinde todos los días, desde $ 1.000.
         </Text>
       </View>
 
-      <Text style={[s.fciTitle, { color: c.bg }]}>
-        Hacé rendir{"\n"}tus pesos.
-      </Text>
-      <Text style={[s.fciBody, { color: "rgba(250,250,247,0.72)" }]}>
-        Los Fondos Comunes de Inversión son una de las formas más elegidas en
-        Argentina. Rinden más que un plazo fijo, tu plata queda líquida y
-        empezás con poco.
-      </Text>
-
-      <View style={s.fciFeatures}>
-        <View
-          style={[
-            s.fciFeature,
-            { borderColor: "rgba(250,250,247,0.12)" },
-          ]}
-        >
-          <Text style={[s.fciFeatureValue, { color: c.bg }]}>$ 1.000</Text>
-          <Text
-            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
-          >
-            mínimo
-          </Text>
-        </View>
-        <View
-          style={[
-            s.fciFeature,
-            { borderColor: "rgba(250,250,247,0.12)" },
-          ]}
-        >
-          <Text style={[s.fciFeatureValue, { color: c.bg }]}>~37% TNA</Text>
-          <Text
-            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
-          >
-            pesos
-          </Text>
-        </View>
-        <View
-          style={[
-            s.fciFeature,
-            { borderColor: "rgba(250,250,247,0.12)" },
-          ]}
-        >
-          <Text style={[s.fciFeatureValue, { color: c.bg }]}>T+0</Text>
-          <Text
-            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
-          >
-            liquidez
-          </Text>
-        </View>
-      </View>
-
-      <Pressable
-        style={[s.fciBtn, { backgroundColor: c.green }]}
-        onPress={onPress}
+      <View
+        style={[
+          s.featuredCard,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
       >
-        <Text style={[s.fciBtnText, { color: c.ink }]}>
-          Explorar fondos
+        {funds.map((f, i) => {
+          const up = f.change >= 0;
+          return (
+            <Pressable
+              key={f.ticker}
+              onPress={() => onOpen(f)}
+              style={[
+                s.featuredRow,
+                i > 0 && {
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: c.border,
+                },
+              ]}
+            >
+              <View style={[s.featuredIcon, { backgroundColor: c.surfaceSunken }]}>
+                <Text style={[s.featuredIconText, { color: c.textSecondary }]}>
+                  {f.iconCode ?? f.ticker.slice(0, 2)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.featuredName, { color: c.text }]}>
+                  {f.name}
+                </Text>
+                <Text style={[s.featuredSubline, { color: c.textMuted }]}>
+                  {f.subLabel}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[s.featuredChange, { color: up ? c.greenDark : c.red }]}>
+                  {formatPct(f.change)}
+                </Text>
+                <Feather
+                  name="chevron-right"
+                  size={16}
+                  color={c.textFaint}
+                  style={{ marginTop: 2 }}
+                />
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Pressable style={s.featuredSeeAll} onPress={onSeeAll}>
+        <Text style={[s.featuredSeeAllText, { color: c.text }]}>
+          Ver todos los fondos
         </Text>
-        <Feather name="arrow-right" size={16} color={c.ink} />
+        <Feather name="arrow-right" size={14} color={c.text} />
       </Pressable>
     </View>
   );
@@ -712,79 +726,75 @@ function allocationColor(cat: AssetCategory, c: ThemeColors): string {
 }
 
 const s = StyleSheet.create({
-  /* ─── FCI Callout ─── */
-  fciCard: {
-    marginHorizontal: 20,
-    marginTop: 36,
-    padding: 22,
-    borderRadius: radius.xl,
+  /* ─── Fondos populares ─── */
+  featuredBlock: {
+    paddingHorizontal: 20,
+    marginTop: 32,
   },
-  fciEyebrow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  featuredHead: {
     marginBottom: 12,
   },
-  fciDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  fciEyebrowText: {
+  featuredEyebrow: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 1.2,
+    marginBottom: 6,
   },
-  fciTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 32,
-    lineHeight: 34,
-    letterSpacing: -1.2,
-    marginBottom: 14,
-  },
-  fciBody: {
+  featuredSub: {
     fontFamily: fontFamily[500],
     fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    marginBottom: 20,
+    letterSpacing: -0.15,
   },
-  fciFeatures: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 18,
-  },
-  fciFeature: {
-    flex: 1,
+  featuredCard: {
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    gap: 2,
+    overflow: "hidden",
   },
-  fciFeatureValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  fciFeatureLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: -0.05,
-  },
-  fciBtn: {
-    height: 48,
-    borderRadius: radius.pill,
+  featuredRow: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: spacing.md + 4,
+    paddingHorizontal: 14,
+  },
+  featuredIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
   },
-  fciBtnText: {
+  featuredIconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.2,
+  },
+  featuredName: {
     fontFamily: fontFamily[700],
     fontSize: 15,
-    letterSpacing: -0.2,
+    letterSpacing: -0.25,
+  },
+  featuredSubline: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+  },
+  featuredChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  featuredSeeAll: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 14,
+  },
+  featuredSeeAllText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
 
   /* ─── University Callout ─── */
