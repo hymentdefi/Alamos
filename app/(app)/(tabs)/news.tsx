@@ -420,14 +420,20 @@ function NewsCard({
 
       {/* Imagen flotante cuadrada */}
       <View style={card.imageWrap}>
-        <Animated.View style={{ transform: [{ translateY }] }}>
-          <View style={[card.imageShadow, { shadowColor: c.ink }]}>
-            <Image
-              source={{ uri: item.image }}
-              style={card.imageSquare}
-              resizeMode="cover"
-            />
-          </View>
+        <Animated.View
+          style={[
+            card.imageAnim,
+            {
+              transform: [{ translateY }],
+              shadowColor: c.ink,
+            },
+          ]}
+        >
+          <Image
+            source={{ uri: item.image }}
+            style={card.imageSquare}
+            resizeMode="cover"
+          />
         </Animated.View>
       </View>
 
@@ -691,21 +697,26 @@ const s = StyleSheet.create({
 
 const card = StyleSheet.create({
   imageWrap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 80,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
-  imageShadow: {
-    borderRadius: 20,
+  imageAnim: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 24,
     shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.22,
     shadowRadius: 24,
     elevation: 12,
   },
   imageSquare: {
-    width: 260,
-    height: 260,
-    borderRadius: 20,
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 24,
   },
   bottom: {
     position: "absolute",
@@ -769,10 +780,11 @@ const card = StyleSheet.create({
 const hint = StyleSheet.create({
   wrap: {
     position: "absolute",
-    top: 32,
-    left: 0,
-    right: 0,
+    top: 0,
+    bottom: 0,
+    right: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
 });
 
@@ -793,15 +805,15 @@ const sheet = StyleSheet.create({
     overflow: "hidden",
   },
   dragArea: {
-    paddingTop: 10,
-    paddingBottom: 8,
+    height: 56,
+    paddingTop: 12,
     alignItems: "center",
   },
   handle: {
-    width: 40,
-    height: 4,
+    width: 44,
+    height: 5,
     backgroundColor: "rgba(14,15,12,0.25)",
-    borderRadius: 2,
+    borderRadius: 3,
   },
   image: {
     width: "100%",
