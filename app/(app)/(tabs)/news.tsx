@@ -281,19 +281,18 @@ export default function NewsScreen() {
     [filter],
   );
 
-  // Animated values para la transición horizontal del contenido.
+  // Animated value para la transición horizontal del contenido.
   const slideX = useRef(new Animated.Value(0)).current;
-  const slideOpacity = useRef(new Animated.Value(1)).current;
   const transitioning = useRef(false);
+  const { width: screenW } = Dimensions.get("window");
 
   const animateTransition = useCallback(
     (direction: 1 | -1) => {
       if (transitioning.current) return;
-      // Validar que existe vecino antes de arrancar
       const idx = categoryTabs.findIndex((t) => t.id === filter);
       const next = idx + direction;
       if (next < 0 || next >= categoryTabs.length) {
-        // Bounce back si no hay vecino
+        // No hay vecino — rebota
         Animated.spring(slideX, {
           toValue: 0,
           tension: 180,
@@ -304,62 +303,52 @@ export default function NewsScreen() {
       }
       transitioning.current = true;
       Haptics.selectionAsync().catch(() => {});
-      Animated.parallel([
-        Animated.timing(slideX, {
-          toValue: direction * -90,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideOpacity, {
-          toValue: 0,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
+      // Fase 1: termina de sacar la pantalla actual hasta fuera
+      Animated.timing(slideX, {
+        toValue: direction * -screenW,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => {
         changeFilterBy(direction);
-        slideX.setValue(direction * 90);
-        Animated.parallel([
-          Animated.timing(slideX, {
-            toValue: 0,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideOpacity, {
-            toValue: 1,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
+        // Fase 2: la nueva pantalla aparece desde el lado opuesto y entra
+        slideX.setValue(direction * screenW);
+        Animated.timing(slideX, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start(() => {
           transitioning.current = false;
         });
       });
     },
-    [filter, slideX, slideOpacity, changeFilterBy],
+    [filter, slideX, changeFilterBy, screenW],
   );
 
-  // PanResponder: durante el drag el contenido sigue el dedo (con damping)
-  // y al soltar se completa la transición si pasó el threshold o se hace
-  // spring back.
+  // PanResponder: swipe horizontal ESTRICTO. Durante el drag el contenido
+  // sigue al dedo sin damping. El threshold es 2.5x más horizontal que
+  // vertical para evitar diagonales.
   const swipePanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
           !transitioning.current &&
-          Math.abs(g.dx) > 18 &&
-          Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+          Math.abs(g.dx) > 22 &&
+          Math.abs(g.dx) > Math.abs(g.dy) * 2.5,
         onMoveShouldSetPanResponderCapture: (_, g) =>
           !transitioning.current &&
-          Math.abs(g.dx) > 18 &&
-          Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+          Math.abs(g.dx) > 22 &&
+          Math.abs(g.dx) > Math.abs(g.dy) * 2.5,
         onPanResponderMove: (_, g) => {
-          slideX.setValue(g.dx * 0.4);
+          // Full follow: el contenido se mueve igual que el dedo
+          slideX.setValue(g.dx);
         },
         onPanResponderRelease: (_, g) => {
-          const THRESH = 60;
-          if (g.dx < -THRESH || (g.vx < -0.4 && g.dx < -20)) {
+          const THRESH_DX = screenW * 0.2; // 20% del ancho
+          const THRESH_VX = 0.4;
+          if (g.dx < -THRESH_DX || (g.vx < -THRESH_VX && g.dx < -20)) {
             animateTransition(1);
-          } else if (g.dx > THRESH || (g.vx > 0.4 && g.dx > 20)) {
+          } else if (g.dx > THRESH_DX || (g.vx > THRESH_VX && g.dx > 20)) {
             animateTransition(-1);
           } else {
             Animated.spring(slideX, {
@@ -379,7 +368,7 @@ export default function NewsScreen() {
           }).start();
         },
       }),
-    [animateTransition, slideX],
+    [animateTransition, slideX, screenW],
   );
 
   const onScroll = useCallback(
@@ -472,7 +461,6 @@ export default function NewsScreen() {
         style={{
           flex: 1,
           transform: [{ translateX: slideX }],
-          opacity: slideOpacity,
         }}
       >
         <FlatList
