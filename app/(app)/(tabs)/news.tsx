@@ -519,29 +519,30 @@ function ScrollHint() {
   }, [bounce, fade]);
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        hint.wrap,
-        {
-          opacity: fade,
-          transform: [{ translateY: bounce }],
-        },
-      ]}
-    >
-      <Feather
-        name="chevron-down"
-        size={20}
-        color={c.textMuted}
-        style={{ opacity: 0.5 }}
-      />
-      <Feather
-        name="chevron-down"
-        size={20}
-        color={c.textMuted}
-        style={{ marginTop: -12 }}
-      />
-    </Animated.View>
+    <View pointerEvents="none" style={hint.wrap}>
+      <View style={hint.pill}>
+        <Animated.View
+          style={{
+            opacity: fade,
+            transform: [{ translateY: bounce }],
+            alignItems: "center",
+          }}
+        >
+          <Feather
+            name="chevron-down"
+            size={18}
+            color="#FFFFFF"
+            style={{ opacity: 0.55 }}
+          />
+          <Feather
+            name="chevron-down"
+            size={18}
+            color="#FFFFFF"
+            style={{ marginTop: -10 }}
+          />
+        </Animated.View>
+      </View>
+    </View>
   );
 }
 
@@ -733,9 +734,9 @@ const s = StyleSheet.create({
 const card = StyleSheet.create({
   imageWrap: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   imageAnim: {
     flex: 1,
@@ -815,6 +816,17 @@ const hint = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 20,
+  },
+  pill: {
+    backgroundColor: "rgba(14,15,12,0.55)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
 
