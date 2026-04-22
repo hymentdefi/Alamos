@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { assets, assetIconCode, formatARS } from "../../lib/data/assets";
+import { Tap } from "../../lib/components/Tap";
 
 const AVAILABLE_CASH = 342180;
 
@@ -82,7 +82,6 @@ export default function BuyScreen() {
   }, [inputMode, isSell, maxCash, maxQty]);
 
   const handleKey = (k: string) => {
-    Haptics.selectionAsync().catch(() => {});
     if (k === "back") {
       setInput((p) => (p.length <= 1 ? "0" : p.slice(0, -1)));
       return;
@@ -103,13 +102,11 @@ export default function BuyScreen() {
   };
 
   const setQuick = (val: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setInput(val);
   };
 
   const switchInputMode = (next: InputMode) => {
     if (next === inputMode) return;
-    Haptics.selectionAsync().catch(() => {});
     // Convertir el valor actual al equivalente en el otro modo para que la
     // continuidad sea intuitiva (si el usuario estaba escribiendo $10.000 y
     // cambia a cantidad, muestra la cantidad equivalente).
@@ -125,7 +122,6 @@ export default function BuyScreen() {
 
   const onContinue = () => {
     if (!hasInput || exceeds) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     router.push({
       pathname: "/(app)/confirm",
       params: {
@@ -152,6 +148,12 @@ export default function BuyScreen() {
   } else {
     bigPrimary = input === "0" ? "0" : input.replace(".", ",");
   }
+
+  const heroDisplay =
+    inputMode === "amount"
+      ? `$${bigPrimary}`
+      : `${bigPrimary} ${asset.ticker}`;
+
   const hint = !hasInput
     ? " "
     : exceeds
@@ -162,16 +164,21 @@ export default function BuyScreen() {
     ? `≈ ${qtyAmount.toFixed(4)} ${asset.ticker}`
     : `≈ ${formatARS(arsAmount)}`;
 
+  const availableLabel = isSell
+    ? `Disponible · ${asset.qty ?? 0} ${asset.ticker}`
+    : `Fondos disponibles · ${formatARS(maxCash)}`;
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable
+        <Tap
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.back()}
           hitSlop={12}
+          haptic="selection"
         >
           <Feather name="arrow-left" size={18} color={c.text} />
-        </Pressable>
+        </Tap>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>
             {isSell ? "Vender" : "Comprar"} {asset.ticker}
@@ -193,8 +200,9 @@ export default function BuyScreen() {
             { backgroundColor: c.surfaceHover, borderColor: c.border },
           ]}
         >
-          <Pressable
+          <Tap
             onPress={() => switchInputMode("amount")}
+            haptic="selection"
             style={[
               s.modeBtn,
               inputMode === "amount" && { backgroundColor: c.ink },
@@ -208,9 +216,10 @@ export default function BuyScreen() {
             >
               Monto en pesos
             </Text>
-          </Pressable>
-          <Pressable
+          </Tap>
+          <Tap
             onPress={() => switchInputMode("qty")}
+            haptic="selection"
             style={[
               s.modeBtn,
               inputMode === "qty" && { backgroundColor: c.ink },
@@ -224,50 +233,26 @@ export default function BuyScreen() {
             >
               Cantidad
             </Text>
-          </Pressable>
+          </Tap>
         </View>
       </View>
 
       {/* AMOUNT HERO — enorme, centrado, lo principal */}
       <View style={s.hero}>
-        <View style={s.heroRow}>
-          {inputMode === "amount" ? (
-            <Text
-              style={[
-                s.heroSign,
-                { color: exceeds ? c.red : c.textMuted },
-              ]}
-            >
-              $
-            </Text>
-          ) : null}
-          <Text
-            style={[
-              s.heroValue,
-              { color: exceeds ? c.red : c.text },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.4}
-          >
-            {bigPrimary}
-          </Text>
-          {inputMode === "qty" ? (
-            <Text
-              style={[
-                s.heroUnit,
-                { color: exceeds ? c.red : c.textMuted },
-              ]}
-              numberOfLines={1}
-            >
-              {asset.ticker}
-            </Text>
-          ) : null}
-        </View>
         <Text
-          style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}
+          style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.3}
+          allowFontScaling={false}
         >
+          {heroDisplay}
+        </Text>
+        <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
           {hint}
+        </Text>
+        <Text style={[s.available, { color: c.textMuted }]}>
+          {availableLabel}
         </Text>
       </View>
 
@@ -275,16 +260,17 @@ export default function BuyScreen() {
 
       <View style={s.quickRow}>
         {quick.map((q) => (
-          <Pressable
+          <Tap
             key={q.label}
             onPress={() => setQuick(q.value)}
+            haptic="light"
             style={[
               s.quickPill,
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
             <Text style={[s.quickText, { color: c.text }]}>{q.label}</Text>
-          </Pressable>
+          </Tap>
         ))}
       </View>
 
@@ -292,18 +278,21 @@ export default function BuyScreen() {
         {keys.map((row, ri) => (
           <View key={ri} style={s.keyRow}>
             {row.map((k) => (
-              <Pressable
+              <Tap
                 key={k}
                 onPress={() => handleKey(k)}
+                haptic="selection"
+                pressScale={0.92}
+                rippleColor="rgba(14,15,12,0.08)"
+                rippleContained={false}
                 style={s.keyBtn}
-                android_ripple={{ color: c.surfaceHover, borderless: true }}
               >
                 {k === "back" ? (
                   <Feather name="delete" size={24} color={c.text} />
                 ) : (
                   <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
                 )}
-              </Pressable>
+              </Tap>
             ))}
           </View>
         ))}
@@ -340,7 +329,7 @@ export default function BuyScreen() {
           </Text>
         </View>
 
-        <Pressable
+        <Tap
           style={[
             s.cta,
             {
@@ -350,6 +339,7 @@ export default function BuyScreen() {
           ]}
           onPress={onContinue}
           disabled={!hasInput || exceeds}
+          haptic="medium"
         >
           <Text
             style={[
@@ -366,7 +356,7 @@ export default function BuyScreen() {
             size={16}
             color={hasInput && !exceeds ? c.bg : c.textMuted}
           />
-        </Pressable>
+        </Tap>
       </View>
     </View>
   );
@@ -423,39 +413,29 @@ const s = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    paddingTop: 28,
-    paddingHorizontal: 16,
-  },
-  heroRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
-  heroSign: {
-    fontFamily: fontFamily[700],
-    fontSize: 56,
-    marginTop: 14,
-    marginRight: 8,
-    letterSpacing: -1.6,
+    paddingTop: 24,
+    paddingHorizontal: 24,
   },
   heroValue: {
     fontFamily: fontFamily[800],
-    fontSize: 96,
-    letterSpacing: -4,
-    lineHeight: 104,
-  },
-  heroUnit: {
-    fontFamily: fontFamily[700],
-    fontSize: 24,
-    marginTop: 28,
-    marginLeft: 10,
-    letterSpacing: -0.4,
+    fontSize: 80,
+    letterSpacing: -3.4,
+    lineHeight: 86,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   heroHint: {
     fontFamily: fontFamily[600],
     fontSize: 14,
-    marginTop: 14,
+    marginTop: 12,
     letterSpacing: -0.1,
+  },
+  available: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    marginTop: 6,
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
   },
   spacer: {
     flex: 1,

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { Tap } from "../../lib/components/Tap";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -89,22 +90,24 @@ export default function DetailScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <Pressable
+        <Tap
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.back()}
           hitSlop={12}
+          haptic="selection"
         >
           <Feather name="arrow-left" size={18} color={c.text} />
-        </Pressable>
+        </Tap>
         <View style={s.topCenter}>
           <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>
           <Text style={[s.topSub, { color: c.textMuted }]} numberOfLines={1}>
             {asset.subLabel}
           </Text>
         </View>
-        <Pressable
+        <Tap
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
           hitSlop={12}
+          haptic="light"
           onPress={() => toggleFav(asset.ticker)}
         >
           <Ionicons
@@ -112,7 +115,7 @@ export default function DetailScreen() {
             size={18}
             color={fav ? c.greenDark : c.text}
           />
-        </Pressable>
+        </Tap>
       </View>
 
       <ScrollView
@@ -172,9 +175,11 @@ export default function DetailScreen() {
             {ranges.map((r) => {
               const active = r === range;
               return (
-                <Pressable
+                <Tap
                   key={r}
                   onPress={() => setRange(r)}
+                  haptic="selection"
+                  pressScale={0.9}
                   style={[
                     s.rangePill,
                     active && { backgroundColor: color },
@@ -189,7 +194,7 @@ export default function DetailScreen() {
                   >
                     {r}
                   </Text>
-                </Pressable>
+                </Tap>
               );
             })}
           </View>
@@ -284,8 +289,9 @@ export default function DetailScreen() {
           },
         ]}
       >
-        <Pressable
+        <Tap
           style={[s.btn, { backgroundColor: c.ink }]}
+          haptic="medium"
           onPress={() =>
             router.push({
               pathname: "/(app)/buy",
@@ -294,9 +300,10 @@ export default function DetailScreen() {
           }
         >
           <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
-        </Pressable>
-        <Pressable
+        </Tap>
+        <Tap
           style={[s.btn, { backgroundColor: c.surfaceHover }]}
+          haptic="light"
           onPress={() =>
             router.push({
               pathname: "/(app)/buy",
@@ -313,7 +320,7 @@ export default function DetailScreen() {
           >
             Vender
           </Text>
-        </Pressable>
+        </Tap>
       </View>
     </View>
   );

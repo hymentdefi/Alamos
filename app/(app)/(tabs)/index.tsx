@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
+import { Tap } from "../../../lib/components/Tap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -205,16 +206,18 @@ function BaseHome() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <Pressable
+        <Tap
           style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => setMenuOpen(true)}
           hitSlop={8}
+          haptic="selection"
         >
           <Feather name="menu" size={18} color={c.text} />
-        </Pressable>
+        </Tap>
         <View style={s.topActions}>
-          <Pressable
+          <Tap
             style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            haptic="light"
             onPress={() =>
               router.push({
                 pathname: "/(app)/transfer",
@@ -225,9 +228,10 @@ function BaseHome() {
           >
             <Feather name="arrow-down-left" size={14} color={c.text} />
             <Text style={[s.topPillText, { color: c.text }]}>Ingresar</Text>
-          </Pressable>
-          <Pressable
+          </Tap>
+          <Tap
             style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            haptic="light"
             onPress={() =>
               router.push({
                 pathname: "/(app)/transfer",
@@ -238,7 +242,7 @@ function BaseHome() {
           >
             <Feather name="arrow-up-right" size={14} color={c.text} />
             <Text style={[s.topPillText, { color: c.text }]}>Retirar</Text>
-          </Pressable>
+          </Tap>
         </View>
       </View>
 

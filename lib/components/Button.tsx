@@ -1,5 +1,4 @@
 import {
-  Pressable,
   Text,
   StyleSheet,
   View,
@@ -7,6 +6,7 @@ import {
   type StyleProp,
 } from "react-native";
 import { useTheme, fontFamily, radius } from "../theme";
+import { Tap } from "./Tap";
 
 type Variant = "primary" | "secondary" | "accent" | "ghost";
 type Size = "md" | "lg";
@@ -54,17 +54,18 @@ export default function Button({
   const padH = size === "lg" ? 22 : 18;
 
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
+      haptic={variant === "primary" || variant === "accent" ? "light" : "selection"}
+      style={[
         s.base,
         {
           height,
           paddingHorizontal: padH,
           backgroundColor: bg,
           borderColor: border,
-          opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
+          opacity: disabled ? 0.45 : 1,
         },
         style,
       ]}
@@ -72,7 +73,7 @@ export default function Button({
       {left ? <View style={{ marginRight: 8 }}>{left}</View> : null}
       <Text style={[s.text, { color: fg }]}>{title}</Text>
       {right ? <View style={{ marginLeft: 8 }}>{right}</View> : null}
-    </Pressable>
+    </Tap>
   );
 }
 

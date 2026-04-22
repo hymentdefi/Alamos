@@ -40,6 +40,7 @@ import {
   HorizontalPager,
   type HorizontalPagerHandle,
 } from "../../../lib/components/HorizontalPager";
+import { Tap } from "../../../lib/components/Tap";
 
 type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "cripto";
 
@@ -320,9 +321,11 @@ export default function NewsScreen() {
           {categoryTabs.map((t, i) => {
             const active = i === activeTab;
             return (
-              <Pressable
+              <Tap
                 key={t.id}
                 onPress={() => openPill(i)}
+                haptic="selection"
+                pressScale={0.93}
                 style={[
                   s.catPill,
                   {
@@ -339,7 +342,7 @@ export default function NewsScreen() {
                 >
                   {t.label}
                 </Text>
-              </Pressable>
+              </Tap>
             );
           })}
         </ScrollView>

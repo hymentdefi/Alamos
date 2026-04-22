@@ -2,8 +2,8 @@ import { createContext, useContext } from "react";
 
 /* ─── Brand constants (from brand-assets README) ─── */
 export const brand = {
-  green: "#00E676",
-  greenDark: "#00B85C",
+  green: "#00C805",
+  greenDark: "#00A304",
   ink: "#0E0F0C",
   bg: "#FAFAF7",
 } as const;
@@ -24,7 +24,7 @@ const light = {
   textFaint: "#B8B8B0",
   green: brand.green,
   greenDark: brand.greenDark,
-  greenDim: "rgba(0,230,118,0.14)",
+  greenDim: "rgba(0,200,5,0.14)",
   red: "#C83B3B",
   redDim: "rgba(200,59,59,0.10)",
   ink: brand.ink,

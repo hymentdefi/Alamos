@@ -21,8 +21,16 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-const SWIPE_THRESHOLD = 130;
-const SWIPE_RANGE = 240;
+/** Distancia mínima del swipe para confirmar (en px). Más alto = más difícil
+ * de activar por accidente. */
+const SWIPE_THRESHOLD = 260;
+/** Distancia sobre la que la franja verde alcanza 100%. */
+const SWIPE_RANGE = 340;
+/** Dead-zone inicial: los primeros N px se comen completos para que un tap
+ * accidental NO empiece a levantar la franja. */
+const SWIPE_DEAD_ZONE = 24;
+/** Velocidad mínima (px/ms) para shortcutear el completado con un flick. */
+const SWIPE_FLICK_VELOCITY = 1.4;
 /** Alto de la franja verde en reposo (solo la strip, sin insets). */
 const STRIP_HEIGHT = 70;
 /** Radio de la card blanca en las esquinas inferiores. */
@@ -141,39 +149,55 @@ export default function ConfirmScreen() {
     });
   };
 
-  // PanResponder en TODA la pantalla — captura cualquier movimiento hacia
-  // arriba desde cualquier punto. Condición muy permisiva para que agarre
-  // al instante.
+  // PanResponder: swipe hacia arriba con resistencia tipo goma al principio
+  // y fluidez hacia el final. Dead-zone evita que un tap accidental
+  // dispare la franja.
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponder: (_, g) => phase === "idle" && g.dy < -2,
+        // Sólo capturamos una vez que el dedo se movió claramente hacia
+        // arriba más allá del dead-zone. Evita falsos positivos.
+        onMoveShouldSetPanResponder: (_, g) =>
+          phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
         onMoveShouldSetPanResponderCapture: (_, g) =>
-          phase === "idle" && g.dy < -2,
+          phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
         onPanResponderGrant: () => {
-          // Pequeño tick al empezar a arrastrar para dar feedback inmediato
+          // Haptic sutil al empezar — confirma que agarró el gesto
           Haptics.selectionAsync().catch(() => {});
         },
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
-          if (g.dy < 0) {
-            const v = Math.min(1, -g.dy / SWIPE_RANGE);
-            greenProgress.setValue(v);
-          } else {
+          const dy = -g.dy; // positivo hacia arriba
+          if (dy <= 0) {
             greenProgress.setValue(0);
+            return;
           }
+          // Aplicamos curva con resistencia al inicio (ease-in potencia)
+          // Consume los primeros SWIPE_DEAD_ZONE px sin avanzar.
+          const effective = Math.max(0, dy - SWIPE_DEAD_ZONE);
+          const raw = Math.min(1, effective / (SWIPE_RANGE - SWIPE_DEAD_ZONE));
+          // Curva pow 1.35 = al inicio se mueve lento, al final se acelera
+          const curved = Math.pow(raw, 1.35);
+          greenProgress.setValue(curved);
         },
         onPanResponderRelease: (_, g) => {
           if (phase !== "idle") return;
-          if (-g.dy > SWIPE_THRESHOLD || g.vy < -0.6) {
+          const dy = -g.dy;
+          const vy = -g.vy;
+          // Completa si se pasó el threshold O si fue un flick rápido
+          // ya habiendo pasado el primer tercio.
+          if (
+            dy > SWIPE_THRESHOLD ||
+            (vy > SWIPE_FLICK_VELOCITY && dy > SWIPE_RANGE * 0.35)
+          ) {
             completeSwipe();
           } else {
             Animated.spring(greenProgress, {
               toValue: 0,
-              tension: 180,
-              friction: 12,
+              tension: 200,
+              friction: 14,
               useNativeDriver: false,
             }).start();
           }
@@ -182,8 +206,8 @@ export default function ConfirmScreen() {
           if (phase !== "idle") return;
           Animated.spring(greenProgress, {
             toValue: 0,
-            tension: 180,
-            friction: 12,
+            tension: 200,
+            friction: 14,
             useNativeDriver: false,
           }).start();
         },
@@ -406,6 +430,17 @@ export default function ConfirmScreen() {
           </View>
 
           <Text style={s.execText}>{statusText}</Text>
+
+          <View style={[s.execDisclaimer, { paddingBottom: insets.bottom + 20 }]}>
+            <Text style={s.execDisclaimerText}>
+              Las órdenes a mercado se ejecutan al mejor precio disponible. El
+              precio final puede diferir de la estimación por volatilidad o
+              liquidez del mercado.
+            </Text>
+            <Text style={s.execDisclaimerFoot}>
+              Alamos Capital S.A. · ALyC registrada en CNV
+            </Text>
+          </View>
         </Animated.View>
       ) : null}
     </View>
@@ -601,5 +636,29 @@ const s = StyleSheet.create({
     fontSize: 26,
     color: "#FFFFFF",
     letterSpacing: -0.6,
+  },
+  execDisclaimer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 28,
+    alignItems: "center",
+  },
+  execDisclaimerText: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center",
+    letterSpacing: -0.05,
+    marginBottom: 6,
+  },
+  execDisclaimerFoot: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    color: "rgba(255,255,255,0.56)",
+    textAlign: "center",
+    letterSpacing: 0.3,
   },
 });

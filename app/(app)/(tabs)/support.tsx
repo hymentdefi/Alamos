@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   Linking,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,9 +12,9 @@ import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
+import { Tap } from "../../../lib/components/Tap";
 
 /* ─── Data ─── */
 
@@ -85,7 +84,6 @@ export default function SupportScreen() {
   }, [navigation, isFocused]);
 
   const openChat = (ctx?: { topic?: string; agent?: string; urgent?: boolean }) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     router.push({
       pathname: "/(app)/chat",
       params: {
@@ -97,17 +95,14 @@ export default function SupportScreen() {
   };
 
   const openWhatsapp = () => {
-    Haptics.selectionAsync().catch(() => {});
     Linking.openURL("https://wa.me/5491100000000").catch(() => {});
   };
 
   const openPhone = () => {
-    Haptics.selectionAsync().catch(() => {});
     Linking.openURL("tel:08003422567").catch(() => {});
   };
 
   const openMail = () => {
-    Haptics.selectionAsync().catch(() => {});
     Linking.openURL("mailto:ayuda@alamos.capital").catch(() => {});
   };
 
@@ -148,8 +143,9 @@ export default function SupportScreen() {
             />
           </View>
 
-          <Pressable
+          <Tap
             onPress={() => openChat()}
+            haptic="medium"
             style={[s.primaryCta, { backgroundColor: c.ink }]}
           >
             <View style={s.ctaLeft}>
@@ -171,7 +167,7 @@ export default function SupportScreen() {
               </View>
             </View>
             <Feather name="chevron-right" size={20} color={c.bg} />
-          </Pressable>
+          </Tap>
         </View>
 
         {/* ── EQUIPO EN LÍNEA ── */}
@@ -208,7 +204,7 @@ export default function SupportScreen() {
           </View>
           <View style={s.topicsGrid}>
             {topics.map((t) => (
-              <Pressable
+              <Tap
                 key={t.id}
                 onPress={() => openChat({ topic: t.id })}
                 style={[
@@ -228,14 +224,15 @@ export default function SupportScreen() {
                 <Text style={[s.topicHint, { color: c.textMuted }]} numberOfLines={1}>
                   {t.hint}
                 </Text>
-              </Pressable>
+              </Tap>
             ))}
           </View>
         </View>
 
         {/* ── URGENCIA / FRAUDE ── */}
-        <Pressable
+        <Tap
           onPress={() => openChat({ urgent: true })}
+          haptic="heavy"
           style={[s.urgent, { borderColor: c.red }]}
         >
           <View style={[s.urgentIcon, { backgroundColor: c.red }]}>
@@ -251,7 +248,7 @@ export default function SupportScreen() {
             </Text>
           </View>
           <Feather name="chevron-right" size={18} color={c.red} />
-        </Pressable>
+        </Tap>
 
         {/* ── OTROS CANALES ── */}
         <View style={s.section}>
@@ -297,7 +294,7 @@ export default function SupportScreen() {
               ]}
             >
               {pastCases.map((pc, i) => (
-                <Pressable
+                <Tap
                   key={pc.id}
                   onPress={() => openChat()}
                   style={[
@@ -344,7 +341,7 @@ export default function SupportScreen() {
                     </View>
                   </View>
                   <Feather name="chevron-right" size={16} color={c.textFaint} />
-                </Pressable>
+                </Tap>
               ))}
             </View>
           </View>
@@ -449,7 +446,7 @@ function AgentCard({
       : "#4A7DFF";
   const toneFg = agent.avatarTone === "green" ? c.ink : "#FFFFFF";
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       style={[
         s.agentCard,
@@ -473,7 +470,7 @@ function AgentCard({
       <Text style={[s.agentRole, { color: c.textMuted }]} numberOfLines={1}>
         {agent.role}
       </Text>
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -490,7 +487,7 @@ function ChannelPill({
 }) {
   const { c } = useTheme();
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       style={[
         s.channelPill,
@@ -506,7 +503,7 @@ function ChannelPill({
           {hint}
         </Text>
       </View>
-    </Pressable>
+    </Tap>
   );
 }
 

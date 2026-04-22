@@ -30,6 +30,7 @@ import {
   HorizontalPager,
   type HorizontalPagerHandle,
 } from "../../../lib/components/HorizontalPager";
+import { Tap } from "../../../lib/components/Tap";
 
 type Filter = "todo" | AssetCategory;
 
@@ -161,9 +162,10 @@ function BaseExplore() {
             ) : null}
           </View>
 
-          <Pressable
+          <Tap
             onPress={toggleFavs}
             hitSlop={8}
+            haptic="light"
             style={[
               s.favBtn,
               { backgroundColor: c.surfaceHover, borderColor: c.border },
@@ -174,7 +176,7 @@ function BaseExplore() {
               size={18}
               color={onlyFavs ? c.greenDark : c.text}
             />
-          </Pressable>
+          </Tap>
         </View>
 
         <ScrollView
@@ -187,9 +189,11 @@ function BaseExplore() {
           {filters.map((f, i) => {
             const active = i === activeIdx;
             return (
-              <Pressable
+              <Tap
                 key={f.id}
                 onPress={() => openFilter(i)}
+                haptic="selection"
+                pressScale={0.93}
                 style={[
                   s.filterPill,
                   {
@@ -206,7 +210,7 @@ function BaseExplore() {
                 >
                   {f.label}
                 </Text>
-              </Pressable>
+              </Tap>
             );
           })}
         </ScrollView>
