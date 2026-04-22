@@ -13,6 +13,7 @@ import {
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
 import { ProProvider } from "../lib/pro/context";
+import { LegalConsentProvider } from "../lib/legal/context";
 import { ThemeContext, themes, type ThemeMode, brand, fontFamily } from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -106,12 +107,14 @@ export default function RootLayout() {
   return (
     <ThemeContext.Provider value={themeValue}>
       <AuthProvider>
-        <FavoritesProvider>
-          <ProProvider>
-            <StatusBar style={mode === "light" ? "dark" : "light"} />
-            <AuthGate />
-          </ProProvider>
-        </FavoritesProvider>
+        <LegalConsentProvider>
+          <FavoritesProvider>
+            <ProProvider>
+              <StatusBar style={mode === "light" ? "dark" : "light"} />
+              <AuthGate />
+            </ProProvider>
+          </FavoritesProvider>
+        </LegalConsentProvider>
       </AuthProvider>
     </ThemeContext.Provider>
   );

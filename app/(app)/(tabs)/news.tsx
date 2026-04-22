@@ -30,6 +30,13 @@ import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
+import {
+  DisclaimerFooter,
+  DisclaimerModal,
+  DisclaimerOnboarding,
+  DisclaimerShort,
+} from "../../../lib/components/Disclaimer";
+import { useLegalConsent } from "../../../lib/legal/context";
 
 type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "cripto";
 
@@ -233,12 +240,17 @@ export default function NewsScreen() {
   const [detail, setDetail] = useState<NewsItem | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [headerH, setHeaderH] = useState(120);
+  const [footerH, setFooterH] = useState(40);
+  const [legalOpen, setLegalOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
   const catScrollRef = useRef<ScrollView>(null);
 
+  const { hasAccepted, loading: consentLoading, accept } = useLegalConsent();
+  const showOnboarding = !consentLoading && !hasAccepted && isFocused;
+
   const { height: screenH } = Dimensions.get("window");
   const tabBarH = Platform.OS === "ios" ? 84 : 68;
-  const cardH = screenH - tabBarH - headerH;
+  const cardH = screenH - tabBarH - headerH - footerH;
 
   const visible = useMemo(
     () => (filter === "todas" ? feed : feed.filter((n) => n.category === filter)),
@@ -416,7 +428,16 @@ export default function NewsScreen() {
         }
       />
 
+      <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
+        <DisclaimerFooter onOpen={() => setLegalOpen(true)} />
+      </View>
+
       <DetailSheet item={detail} onClose={() => setDetail(null)} />
+      <DisclaimerModal
+        visible={legalOpen}
+        onClose={() => setLegalOpen(false)}
+      />
+      <DisclaimerOnboarding visible={showOnboarding} onAccept={accept} />
     </View>
   );
 }
@@ -710,6 +731,9 @@ function DetailSheet({
                 <Text style={sheet.meta}>
                   {item.source} · {item.time}
                 </Text>
+                <View style={sheet.disclaimerBox}>
+                  <DisclaimerShort />
+                </View>
                 {item.body.map((p, i) => (
                   <Text key={i} style={sheet.body_p}>
                     {p}
@@ -945,6 +969,13 @@ const sheet = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.1,
+    marginBottom: 14,
+  },
+  disclaimerBox: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "rgba(14,15,12,0.18)",
     marginBottom: 18,
   },
   body_p: {
