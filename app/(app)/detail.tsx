@@ -12,6 +12,7 @@ import {
   type AssetCategory,
 } from "../../lib/data/assets";
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
+import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useFavorites } from "../../lib/favorites/context";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
@@ -146,7 +147,7 @@ export default function DetailScreen() {
             </View>
           </View>
 
-          <Text style={[s.price, { color: c.text }]}>{formatARS(current)}</Text>
+          <AmountDisplay value={current} size={42} />
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color }]}>{displayUp ? "▲" : "▼"}</Text>
             <Text style={[s.deltaText, { color }]}>

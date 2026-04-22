@@ -22,6 +22,7 @@ import {
 import { useAuth } from "../../../lib/auth/context";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
+import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -171,7 +172,7 @@ export default function HomeScreen() {
           <Text style={[s.greet, { color: c.textMuted }]}>
             Hola, {firstName}
           </Text>
-          <Text style={[s.balance, { color: c.text }]}>{formatARS(current)}</Text>
+          <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color: trendColor }]}>
               {displayIsUp ? "▲" : "▼"}

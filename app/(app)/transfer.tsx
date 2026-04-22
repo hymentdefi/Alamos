@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { formatARS } from "../../lib/data/assets";
+import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const BALANCE = 342180;
 const BANK = {
@@ -53,9 +54,7 @@ export default function TransferScreen() {
           <Text style={[s.balanceLabel, { color: c.textMuted }]}>
             Efectivo disponible
           </Text>
-          <Text style={[s.balanceValue, { color: c.text }]}>
-            {formatARS(BALANCE)}
-          </Text>
+          <AmountDisplay value={BALANCE} size={42} />
         </View>
 
         <View style={s.actionsRow}>

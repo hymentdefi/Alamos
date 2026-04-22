@@ -15,6 +15,7 @@ import {
   assetIconCode,
   formatARS,
 } from "../../lib/data/assets";
+import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 export default function ConfirmScreen() {
   const { ticker, amount, mode } = useLocalSearchParams<{
@@ -90,9 +91,7 @@ export default function ConfirmScreen() {
         <Text style={[s.amountLabel, { color: c.textMuted }]}>
           {isSell ? "Vendés" : "Comprás"}
         </Text>
-        <Text style={[s.amountValue, { color: c.text }]}>
-          {formatARS(numAmount)}
-        </Text>
+        <AmountDisplay value={numAmount} size={42} style={{ marginBottom: 20 }} />
         <View style={s.assetStrip}>
           <View
             style={[

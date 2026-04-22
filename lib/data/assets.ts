@@ -416,6 +416,21 @@ export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");
 }
 
+/**
+ * Separa un monto en sus partes para poder renderizar los decimales más
+ * chicos que la parte entera (estilo Robinhood / apps bancarias).
+ */
+export function formatARSParts(n: number): {
+  sign: string;
+  integer: string;
+  decimals: string;
+} {
+  const abs = Math.abs(n);
+  const [int, dec = "00"] = abs.toFixed(2).split(".");
+  const integerFormatted = Number(int).toLocaleString("es-AR");
+  return { sign: "$", integer: integerFormatted, decimals: dec };
+}
+
 export function formatPct(n: number, withSign = true): string {
   const sign = n > 0 && withSign ? "+" : n < 0 ? "−" : "";
   return `${sign}${Math.abs(n).toFixed(2).replace(".", ",")}%`;
