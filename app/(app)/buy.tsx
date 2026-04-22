@@ -4,8 +4,41 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
-import { assets, assetIconCode, formatARS } from "../../lib/data/assets";
+import {
+  assets,
+  assetIconCode,
+  formatARS,
+  type AssetCategory,
+} from "../../lib/data/assets";
 import { Tap } from "../../lib/components/Tap";
+
+function unitWordFor(cat: AssetCategory): string {
+  switch (cat) {
+    case "cedears":
+    case "acciones":
+      return "acciones";
+    case "bonos":
+    case "letras":
+      return "bonos";
+    case "fci":
+      return "cuotapartes";
+    case "obligaciones":
+      return "ONs";
+    case "cripto":
+      return "monedas";
+    default:
+      return "unidades";
+  }
+}
+
+function heroFontSizeFor(display: string): number {
+  const n = display.length;
+  if (n <= 7) return 76;
+  if (n <= 9) return 64;
+  if (n <= 11) return 52;
+  if (n <= 13) return 44;
+  return 38;
+}
 
 const AVAILABLE_CASH = 342180;
 
@@ -164,9 +197,10 @@ export default function BuyScreen() {
     ? `≈ ${qtyAmount.toFixed(4)} ${asset.ticker}`
     : `≈ ${formatARS(arsAmount)}`;
 
+  const unitWord = unitWordFor(asset.category);
   const availableLabel = isSell
     ? `Disponible · ${asset.qty ?? 0} ${asset.ticker}`
-    : `Fondos disponibles · ${formatARS(maxCash)}`;
+    : `Fondos disponibles para operar · ${formatARS(maxCash)}`;
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -231,7 +265,7 @@ export default function BuyScreen() {
                 { color: inputMode === "qty" ? c.bg : c.textSecondary },
               ]}
             >
-              Cantidad
+              Cantidad en {unitWord}
             </Text>
           </Tap>
         </View>
@@ -239,15 +273,26 @@ export default function BuyScreen() {
 
       {/* AMOUNT HERO — enorme, centrado, lo principal */}
       <View style={s.hero}>
-        <Text
-          style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.3}
-          allowFontScaling={false}
-        >
-          {heroDisplay}
-        </Text>
+        {(() => {
+          const fs = heroFontSizeFor(heroDisplay);
+          return (
+            <Text
+              style={[
+                s.heroValue,
+                {
+                  color: exceeds ? c.red : c.text,
+                  fontSize: fs,
+                  lineHeight: fs * 1.08,
+                  letterSpacing: -fs * 0.04,
+                },
+              ]}
+              numberOfLines={1}
+              allowFontScaling={false}
+            >
+              {heroDisplay}
+            </Text>
+          );
+        })()}
         <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
           {hint}
         </Text>
@@ -402,13 +447,13 @@ const s = StyleSheet.create({
     gap: 2,
   },
   modeBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: radius.pill,
   },
   modeBtnText: {
     fontFamily: fontFamily[600],
-    fontSize: 13,
+    fontSize: 12.5,
     letterSpacing: -0.1,
   },
   hero: {

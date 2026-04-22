@@ -66,7 +66,6 @@ export default function ConfirmScreen() {
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("Enviando orden");
-  const tickedMid = useRef(false);
 
   // Spinner loop
   useEffect(() => {
@@ -82,14 +81,18 @@ export default function ConfirmScreen() {
     return () => loop.stop();
   }, [spinLoop]);
 
-  // Haptic tick al cruzar 50%
+  // Haptic ticks progresivos al 25%, 50%, 75% — feeling Robinhood.
+  const hapticStep = useRef(0);
   useEffect(() => {
     const id = greenProgress.addListener(({ value }) => {
-      if (value > 0.5 && !tickedMid.current) {
-        tickedMid.current = true;
+      const thresholds = [0.25, 0.5, 0.75];
+      const next = thresholds.findIndex((t) => value < t);
+      const crossed = next === -1 ? thresholds.length : next;
+      if (crossed > hapticStep.current) {
+        hapticStep.current = crossed;
         Haptics.selectionAsync().catch(() => {});
-      } else if (value < 0.3) {
-        tickedMid.current = false;
+      } else if (value < 0.1) {
+        hapticStep.current = 0;
       }
     });
     return () => greenProgress.removeListener(id);
@@ -99,17 +102,17 @@ export default function ConfirmScreen() {
     setPhase("sending");
     Animated.timing(overlayOpacity, {
       toValue: 1,
-      duration: 220,
+      duration: 260,
       useNativeDriver: true,
     }).start();
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     setStatusText("Enviando orden");
-    await wait(900);
+    await wait(1200);
 
     setStatusText("Orden recibida");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    await wait(900);
+    await wait(1100);
 
     setPhase("done");
     Haptics.notificationAsync(
@@ -123,7 +126,7 @@ export default function ConfirmScreen() {
     }).start();
     setStatusText("Orden ejecutada");
 
-    await wait(1100);
+    await wait(1300);
 
     router.replace({
       pathname: "/(app)/success",
@@ -138,11 +141,13 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    Animated.timing(greenProgress, {
+    // "fuim" — haptic heavy + spring punchy al soltar.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    Animated.spring(greenProgress, {
       toValue: 1,
-      duration: 260,
-      easing: Easing.out(Easing.cubic),
+      tension: 90,
+      friction: 11,
+      velocity: 2.2,
       useNativeDriver: false,
     }).start(() => {
       runOrderFlow();
@@ -178,8 +183,9 @@ export default function ConfirmScreen() {
           // Consume los primeros SWIPE_DEAD_ZONE px sin avanzar.
           const effective = Math.max(0, dy - SWIPE_DEAD_ZONE);
           const raw = Math.min(1, effective / (SWIPE_RANGE - SWIPE_DEAD_ZONE));
-          // Curva pow 1.35 = al inicio se mueve lento, al final se acelera
-          const curved = Math.pow(raw, 1.35);
+          // Curva pow 1.55 — resistencia tipo "goma" fuerte al inicio,
+          // acelera al final. Robinhood-like.
+          const curved = Math.pow(raw, 1.55);
           greenProgress.setValue(curved);
         },
         onPanResponderRelease: (_, g) => {
@@ -433,9 +439,10 @@ export default function ConfirmScreen() {
 
           <View style={[s.execDisclaimer, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={s.execDisclaimerText}>
-              Las órdenes a mercado se ejecutan al mejor precio disponible. El
-              precio final puede diferir de la estimación por volatilidad o
-              liquidez del mercado.
+              Los precios mostrados son estimados. Las órdenes a mercado se
+              enrutan al mejor centro de ejecución disponible y se ejecutan al
+              precio vigente, que puede diferir del mostrado por volatilidad,
+              volumen o liquidez del mercado.
             </Text>
             <Text style={s.execDisclaimerFoot}>
               Alamos Capital S.A. · ALyC registrada en CNV
