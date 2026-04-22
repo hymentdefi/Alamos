@@ -141,19 +141,21 @@ export default function ConfirmScreen() {
     });
   };
 
-  // PanResponder en TODA la pantalla — captura cualquier swipe up estando idle
+  // PanResponder en TODA la pantalla — captura cualquier movimiento hacia
+  // arriba desde cualquier punto. Condición muy permisiva para que agarre
+  // al instante.
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, g) =>
-          phase === "idle" &&
-          g.dy < -4 &&
-          Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: (_, g) => phase === "idle" && g.dy < -2,
         onMoveShouldSetPanResponderCapture: (_, g) =>
-          phase === "idle" &&
-          g.dy < -4 &&
-          Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
+          phase === "idle" && g.dy < -2,
+        onPanResponderGrant: () => {
+          // Pequeño tick al empezar a arrastrar para dar feedback inmediato
+          Haptics.selectionAsync().catch(() => {});
+        },
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
           if (g.dy < 0) {
@@ -165,7 +167,7 @@ export default function ConfirmScreen() {
         },
         onPanResponderRelease: (_, g) => {
           if (phase !== "idle") return;
-          if (-g.dy > SWIPE_THRESHOLD || g.vy < -0.8) {
+          if (-g.dy > SWIPE_THRESHOLD || g.vy < -0.6) {
             completeSwipe();
           } else {
             Animated.spring(greenProgress, {
@@ -242,7 +244,7 @@ export default function ConfirmScreen() {
               hitSlop={12}
               disabled={phase !== "idle"}
             >
-              <Text style={[s.edit, { color: c.greenDark }]}>Editar</Text>
+              <Text style={[s.edit, { color: brand.greenDark }]}>Editar</Text>
             </Pressable>
           </View>
 
