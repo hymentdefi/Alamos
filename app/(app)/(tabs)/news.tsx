@@ -273,34 +273,113 @@ export default function NewsScreen() {
       const idx = categoryTabs.findIndex((t) => t.id === filter);
       const next = idx + delta;
       if (next >= 0 && next < categoryTabs.length) {
-        Haptics.selectionAsync().catch(() => {});
         setFilter(categoryTabs[next].id);
+        return true;
       }
+      return false;
     },
     [filter],
   );
 
-  // PanResponder para swipe horizontal entre categorías.
-  // Solo captura gestos claramente horizontales — los verticales siguen
-  // yendo al FlatList para el paging de noticias.
+  // Animated values para la transición horizontal del contenido.
+  const slideX = useRef(new Animated.Value(0)).current;
+  const slideOpacity = useRef(new Animated.Value(1)).current;
+  const transitioning = useRef(false);
+
+  const animateTransition = useCallback(
+    (direction: 1 | -1) => {
+      if (transitioning.current) return;
+      // Validar que existe vecino antes de arrancar
+      const idx = categoryTabs.findIndex((t) => t.id === filter);
+      const next = idx + direction;
+      if (next < 0 || next >= categoryTabs.length) {
+        // Bounce back si no hay vecino
+        Animated.spring(slideX, {
+          toValue: 0,
+          tension: 180,
+          friction: 12,
+          useNativeDriver: true,
+        }).start();
+        return;
+      }
+      transitioning.current = true;
+      Haptics.selectionAsync().catch(() => {});
+      Animated.parallel([
+        Animated.timing(slideX, {
+          toValue: direction * -90,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideOpacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        changeFilterBy(direction);
+        slideX.setValue(direction * 90);
+        Animated.parallel([
+          Animated.timing(slideX, {
+            toValue: 0,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideOpacity, {
+            toValue: 1,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          transitioning.current = false;
+        });
+      });
+    },
+    [filter, slideX, slideOpacity, changeFilterBy],
+  );
+
+  // PanResponder: durante el drag el contenido sigue el dedo (con damping)
+  // y al soltar se completa la transición si pasó el threshold o se hace
+  // spring back.
   const swipePanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+          !transitioning.current &&
+          Math.abs(g.dx) > 18 &&
+          Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
         onMoveShouldSetPanResponderCapture: (_, g) =>
-          Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+          !transitioning.current &&
+          Math.abs(g.dx) > 18 &&
+          Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+        onPanResponderMove: (_, g) => {
+          slideX.setValue(g.dx * 0.4);
+        },
         onPanResponderRelease: (_, g) => {
           const THRESH = 60;
           if (g.dx < -THRESH || (g.vx < -0.4 && g.dx < -20)) {
-            changeFilterBy(1); // siguiente categoría
+            animateTransition(1);
           } else if (g.dx > THRESH || (g.vx > 0.4 && g.dx > 20)) {
-            changeFilterBy(-1); // categoría anterior
+            animateTransition(-1);
+          } else {
+            Animated.spring(slideX, {
+              toValue: 0,
+              tension: 180,
+              friction: 12,
+              useNativeDriver: true,
+            }).start();
           }
         },
+        onPanResponderTerminate: () => {
+          Animated.spring(slideX, {
+            toValue: 0,
+            tension: 180,
+            friction: 12,
+            useNativeDriver: true,
+          }).start();
+        },
       }),
-    [changeFilterBy],
+    [animateTransition, slideX],
   );
 
   const onScroll = useCallback(
@@ -389,44 +468,52 @@ export default function NewsScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        ref={listRef}
-        data={visible}
-        keyExtractor={(n) => n.id}
-        pagingEnabled
-        snapToInterval={cardH}
-        decelerationRate="fast"
-        showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={c.textMuted}
-            colors={[c.textMuted]}
-            progressBackgroundColor={c.surface}
-          />
-        }
-        renderItem={({ item }) => (
-          <NewsCard
-            item={item}
-            height={cardH}
-            onOpenDetail={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                () => {},
-              );
-              setDetail(item);
-            }}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={[s.empty, { height: cardH }]}>
-            <Text style={s.emptyTitle}>Sin noticias</Text>
-            <Text style={s.emptySub}>Probá con otra categoría.</Text>
-          </View>
-        }
-      />
+      <Animated.View
+        style={{
+          flex: 1,
+          transform: [{ translateX: slideX }],
+          opacity: slideOpacity,
+        }}
+      >
+        <FlatList
+          ref={listRef}
+          data={visible}
+          keyExtractor={(n) => n.id}
+          pagingEnabled
+          snapToInterval={cardH}
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={c.textMuted}
+              colors={[c.textMuted]}
+              progressBackgroundColor={c.surface}
+            />
+          }
+          renderItem={({ item }) => (
+            <NewsCard
+              item={item}
+              height={cardH}
+              onOpenDetail={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                  () => {},
+                );
+                setDetail(item);
+              }}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={[s.empty, { height: cardH }]}>
+              <Text style={s.emptyTitle}>Sin noticias</Text>
+              <Text style={s.emptySub}>Probá con otra categoría.</Text>
+            </View>
+          }
+        />
+      </Animated.View>
 
       <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
         <DisclaimerFooter onOpen={() => setLegalOpen(true)} />
