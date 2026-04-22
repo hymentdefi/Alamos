@@ -78,13 +78,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="support"
         options={{
-          title: "Perfil",
+          title: "Soporte",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
-              key={`profile-${focused}`}
-              path={tabPaths.profile}
+              key={`support-${focused}`}
+              path={tabPaths.support}
               focused={focused}
               color={color}
             />

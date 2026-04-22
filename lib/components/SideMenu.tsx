@@ -139,8 +139,9 @@ export function SideMenu({ visible, onClose }: Props) {
       title: "AYUDA",
       items: [
         {
-          icon: "help-circle",
-          label: "Centro de ayuda",
+          icon: "message-circle",
+          label: "Centro de soporte",
+          hint: "Chat, teléfono, mail",
           path: "/(app)/support",
         },
         {
