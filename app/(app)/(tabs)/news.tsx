@@ -572,13 +572,20 @@ function DetailSheet({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        // Solo capturamos el gesto si el scroll interno está en el tope y el
-        // user está tirando hacia abajo con intención clara (más vertical que
-        // horizontal).
+        onStartShouldSetPanResponderCapture: () => false,
+        // Capture gana el gesto ANTES que los children (ScrollView).
+        // Condición: scroll interno en el tope + tirando hacia abajo vertical.
+        onMoveShouldSetPanResponderCapture: (_, g) => {
+          return (
+            scrollYRef.current <= 0 &&
+            g.dy > 8 &&
+            Math.abs(g.dy) > Math.abs(g.dx)
+          );
+        },
         onMoveShouldSetPanResponder: (_, g) => {
           return (
             scrollYRef.current <= 0 &&
-            g.dy > 6 &&
+            g.dy > 8 &&
             Math.abs(g.dy) > Math.abs(g.dx)
           );
         },
