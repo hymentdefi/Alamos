@@ -4,7 +4,6 @@ import Svg, { Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 
 interface Props {
-  /** SVG path d attribute (sobre el viewBox dado). */
   path: string;
   focused: boolean;
   color: string;
@@ -14,19 +13,15 @@ interface Props {
   duration?: number;
 }
 
-/** Dash más grande que cualquier path en viewBox 24x24 — lo usamos para simular
- *  el drawing effect sin depender del atributo pathLength (que react-native-svg
- *  no siempre pasa bien al native renderer). */
-const DASH_LEN = 200;
+/** Dash length fijo — mayor que cualquier path en viewBox 24x24. */
+const DASH_LEN = 220;
 
 /**
- * Ícono de tab que se "dibuja solo" al activarse — estilo Binance.
- * Combina:
- *   - scale bounce en el Animated.View (native driver, garantizado)
- *   - strokeDashoffset via state listener (JS driver, actualiza cada frame)
- *
- * Inactivo: path completo visible en `color`
- * Activo: path se redibuja desde el comienzo + pequeño pop de escala + haptic
+ * Ícono de tab que se dibuja al activarse — estilo Binance.
+ * Bypassea Animated.Value para el SVG (que tiene bugs con strokeDashoffset
+ * en algunas versiones de react-native-svg). Usa requestAnimationFrame
+ * directo para drivear el draw via setState, y Animated nativo para la
+ * escala (transform, siempre funciona).
  */
 export function DrawingIcon({
   path,
@@ -34,11 +29,10 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 520,
+  duration = 460,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
-  const drawAnim = useRef(new Animated.Value(0)).current;
-  const [dashOffset, setDashOffset] = useState(0);
+  const [dashOffset, setDashOffset] = useState(focused ? 0 : 0);
 
   useEffect(() => {
     if (!focused) {
@@ -48,34 +42,38 @@ export function DrawingIcon({
 
     Haptics.selectionAsync().catch(() => {});
 
-    // Scale pop (native driver — siempre funciona)
-    scale.setValue(0.55);
+    // Scale pop (native driver, transform — siempre funciona)
+    scale.setValue(0.4);
     Animated.spring(scale, {
       toValue: 1,
-      tension: 150,
+      tension: 140,
       friction: 5,
       useNativeDriver: true,
     }).start();
 
-    // Drawing via listener
+    // Drawing via RAF loop — no depende de Animated/SVG interop
     setDashOffset(DASH_LEN);
-    drawAnim.setValue(1);
-    const listenerId = drawAnim.addListener(({ value }) => {
-      setDashOffset(value * DASH_LEN);
-    });
-    Animated.timing(drawAnim, {
-      toValue: 0,
-      duration,
-      useNativeDriver: false,
-    }).start(() => {
-      drawAnim.removeListener(listenerId);
-      setDashOffset(0);
-    });
+    let start: number | null = null;
+    let raf: number;
+    const tick = (t: number) => {
+      if (start === null) start = t;
+      const elapsed = t - start;
+      const progress = Math.min(1, elapsed / duration);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDashOffset((1 - eased) * DASH_LEN);
+      if (progress < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        setDashOffset(0);
+      }
+    };
+    raf = requestAnimationFrame(tick);
 
     return () => {
-      drawAnim.removeAllListeners();
+      cancelAnimationFrame(raf);
     };
-  }, [focused, duration, scale, drawAnim]);
+  }, [focused, duration, scale]);
 
   return (
     <View style={s.wrap}>
