@@ -16,6 +16,11 @@ interface Props {
 /**
  * Ícono de tab con animación "pop" cuando se activa — como Binance.
  * Cambia de outline a filled + bounce + haptic.
+ *
+ * Nota: expo-router re-monta los tabBarIcon cada vez que cambia el focused,
+ * así que no podemos confiar en useRef para detectar "ya animé antes". En
+ * su lugar, animamos SIEMPRE que focused=true (incluyendo el primer mount
+ * de la tab activa al abrir la app, lo cual es aceptable como welcome).
  */
 export function AnimatedTabIcon({
   outline,
@@ -24,30 +29,25 @@ export function AnimatedTabIcon({
   color,
   size = 22,
 }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const firstRender = useRef(true);
+  const scale = useRef(new Animated.Value(focused ? 1 : 1)).current;
 
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    if (focused) {
-      Haptics.selectionAsync().catch(() => {});
-      Animated.sequence([
-        Animated.timing(scale, {
-          toValue: 1.28,
-          duration: 110,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          tension: 240,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    if (!focused) return;
+    Haptics.selectionAsync().catch(() => {});
+    scale.setValue(1);
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 1.32,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 220,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [focused, scale]);
 
   return (

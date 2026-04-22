@@ -20,6 +20,7 @@ import { useFavorites } from "../../favorites/context";
 import { Sparkline, seriesFromSeed } from "../Sparkline";
 import { SideMenu } from "../SideMenu";
 import { AmountDisplay } from "../AmountDisplay";
+import { EdgeSwipeOpener } from "../EdgeSwipeOpener";
 
 const USDT_RATE = 1200; // ARS per USDT mock
 
@@ -368,6 +369,7 @@ export function ProHome() {
         </View>
       </ScrollView>
 
+      <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
       <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );

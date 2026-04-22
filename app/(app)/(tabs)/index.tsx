@@ -26,6 +26,7 @@ import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { SideMenu } from "../../../lib/components/SideMenu";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
+import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -271,6 +272,7 @@ function BaseHome() {
         <UniversityCallout />
       </ScrollView>
 
+      <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
       <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
