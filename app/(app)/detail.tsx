@@ -261,7 +261,17 @@ export default function DetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 14 }]}>
+      <View
+        style={[
+          s.bottomBar,
+          {
+            backgroundColor: c.surface,
+            borderTopColor: c.border,
+            shadowColor: c.ink,
+            paddingBottom: insets.bottom + 14,
+          },
+        ]}
+      >
         <Pressable
           style={[s.btn, { backgroundColor: c.surfaceHover }]}
           onPress={() =>
@@ -608,7 +618,12 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 16,
   },
   btn: {
     flex: 1,
