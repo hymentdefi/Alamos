@@ -23,6 +23,7 @@ import {
   type AssetCategory,
 } from "../../../lib/data/assets";
 import { useFavorites } from "../../../lib/favorites/context";
+import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 
 type Filter = "todo" | AssetCategory;
 
@@ -38,6 +39,12 @@ const filters: { id: Filter; label: string }[] = [
 ];
 
 export default function ExploreScreen() {
+  const { mode } = useTheme();
+  if (mode === "dark") return <ProMarkets />;
+  return <BaseExplore />;
+}
+
+function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();

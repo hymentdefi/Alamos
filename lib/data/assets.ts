@@ -6,7 +6,10 @@ export type AssetCategory =
   | "obligaciones"
   | "letras"
   | "caucion"
-  | "fci";
+  | "fci"
+  | "cripto"
+  | "futuros"
+  | "opciones";
 
 export interface Asset {
   ticker: string;
@@ -25,6 +28,12 @@ export interface Asset {
   held: boolean;
   qty?: number;
   favorite?: boolean;
+  /** Volumen 24h en unidades de cotización (solo cripto/futuros). */
+  volume24h?: number;
+  /** Apalancamiento máximo disponible (solo futuros). */
+  maxLeverage?: number;
+  /** Funding rate % cada 8h (solo futuros perpetuos). */
+  fundingRate?: number;
 }
 
 export const assets: Asset[] = [
@@ -386,6 +395,190 @@ export const assets: Asset[] = [
     change: 0,
     held: false,
   },
+
+  // ─── Cripto Spot (solo visible en Alamos Pro) ───
+  {
+    ticker: "BTC/USDT",
+    name: "Bitcoin",
+    subLabel: "BTC · Spot",
+    iconCode: "BT",
+    iconTone: "dark",
+    category: "cripto",
+    price: 67432.5,
+    change: 1.24,
+    held: false,
+    volume24h: 42_500_000_000,
+  },
+  {
+    ticker: "ETH/USDT",
+    name: "Ethereum",
+    subLabel: "ETH · Spot",
+    iconCode: "ET",
+    iconTone: "dark",
+    category: "cripto",
+    price: 3284.15,
+    change: -0.91,
+    held: false,
+    volume24h: 12_300_000_000,
+  },
+  {
+    ticker: "SOL/USDT",
+    name: "Solana",
+    subLabel: "SOL · Spot",
+    iconCode: "SO",
+    iconTone: "dark",
+    category: "cripto",
+    price: 142.82,
+    change: 3.22,
+    held: false,
+    volume24h: 2_800_000_000,
+  },
+  {
+    ticker: "BNB/USDT",
+    name: "BNB",
+    subLabel: "BNB · Spot",
+    iconCode: "BN",
+    iconTone: "dark",
+    category: "cripto",
+    price: 584.3,
+    change: 0.74,
+    held: false,
+    volume24h: 1_150_000_000,
+  },
+  {
+    ticker: "XRP/USDT",
+    name: "XRP",
+    subLabel: "XRP · Spot",
+    iconCode: "XR",
+    iconTone: "dark",
+    category: "cripto",
+    price: 0.52,
+    change: -1.15,
+    held: false,
+    volume24h: 980_000_000,
+  },
+  {
+    ticker: "ADA/USDT",
+    name: "Cardano",
+    subLabel: "ADA · Spot",
+    iconCode: "AD",
+    iconTone: "dark",
+    category: "cripto",
+    price: 0.45,
+    change: 1.87,
+    held: false,
+    volume24h: 420_000_000,
+  },
+  {
+    ticker: "LINK/USDT",
+    name: "Chainlink",
+    subLabel: "LINK · Spot",
+    iconCode: "LI",
+    iconTone: "dark",
+    category: "cripto",
+    price: 14.32,
+    change: 2.14,
+    held: false,
+    volume24h: 380_000_000,
+  },
+  {
+    ticker: "AVAX/USDT",
+    name: "Avalanche",
+    subLabel: "AVAX · Spot",
+    iconCode: "AV",
+    iconTone: "dark",
+    category: "cripto",
+    price: 32.41,
+    change: -2.37,
+    held: false,
+    volume24h: 310_000_000,
+  },
+
+  // ─── Futuros perpetuos USDT-M ───
+  {
+    ticker: "BTCUSDT.P",
+    name: "BTC Perpetuo",
+    subLabel: "Futuro USDT-M · 125x",
+    iconCode: "BT",
+    iconTone: "dark",
+    category: "futuros",
+    price: 67445.2,
+    change: 1.28,
+    held: false,
+    volume24h: 82_000_000_000,
+    maxLeverage: 125,
+    fundingRate: 0.0089,
+  },
+  {
+    ticker: "ETHUSDT.P",
+    name: "ETH Perpetuo",
+    subLabel: "Futuro USDT-M · 100x",
+    iconCode: "ET",
+    iconTone: "dark",
+    category: "futuros",
+    price: 3286.4,
+    change: -0.88,
+    held: false,
+    volume24h: 28_500_000_000,
+    maxLeverage: 100,
+    fundingRate: 0.0052,
+  },
+  {
+    ticker: "SOLUSDT.P",
+    name: "SOL Perpetuo",
+    subLabel: "Futuro USDT-M · 50x",
+    iconCode: "SO",
+    iconTone: "dark",
+    category: "futuros",
+    price: 143.05,
+    change: 3.34,
+    held: false,
+    volume24h: 5_200_000_000,
+    maxLeverage: 50,
+    fundingRate: 0.0124,
+  },
+  {
+    ticker: "DOGEUSDT.P",
+    name: "DOGE Perpetuo",
+    subLabel: "Futuro USDT-M · 75x",
+    iconCode: "DO",
+    iconTone: "dark",
+    category: "futuros",
+    price: 0.168,
+    change: 4.22,
+    held: false,
+    volume24h: 2_100_000_000,
+    maxLeverage: 75,
+    fundingRate: 0.018,
+  },
+  {
+    ticker: "ARBUSDT.P",
+    name: "ARB Perpetuo",
+    subLabel: "Futuro USDT-M · 50x",
+    iconCode: "AR",
+    iconTone: "dark",
+    category: "futuros",
+    price: 0.742,
+    change: -2.54,
+    held: false,
+    volume24h: 340_000_000,
+    maxLeverage: 50,
+    fundingRate: -0.0034,
+  },
+  {
+    ticker: "OPUSDT.P",
+    name: "OP Perpetuo",
+    subLabel: "Futuro USDT-M · 50x",
+    iconCode: "OP",
+    iconTone: "dark",
+    category: "futuros",
+    price: 1.85,
+    change: 1.67,
+    held: false,
+    volume24h: 280_000_000,
+    maxLeverage: 50,
+    fundingRate: 0.0041,
+  },
 ];
 
 export const assetCategories = [
@@ -410,7 +603,18 @@ export const categoryLabels: Record<AssetCategory, string> = {
   obligaciones: "Obligaciones",
   letras: "Letras",
   caucion: "Caución",
+  cripto: "Cripto",
+  futuros: "Futuros",
+  opciones: "Opciones",
 };
+
+/** Formatea un volumen grande como "42.5B", "128.3M", etc. */
+export function formatVolume(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return n.toFixed(0);
+}
 
 export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");

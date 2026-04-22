@@ -18,6 +18,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
       <Stack.Screen name="detail" />
+      <Stack.Screen name="trade" />
       <Stack.Screen name="buy" />
       <Stack.Screen name="confirm" />
       <Stack.Screen

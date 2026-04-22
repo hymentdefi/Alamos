@@ -30,26 +30,32 @@ const light = {
   ink: brand.ink,
 } as const;
 
-/* Dark mode — pensado para Alamos Pro. Mismo lenguaje de tokens. */
+/* Dark mode — Alamos Pro. Tokens terminal-style tipo Binance. */
 const dark = {
-  bg: "#0E0F0C",
-  bgWarm: "#17181400",
-  surface: "#17181400",
-  surfaceRaised: "#191A16",
-  surfaceHover: "#1F201B",
-  surfaceSunken: "#0A0B08",
-  border: "rgba(250,250,247,0.08)",
-  borderStrong: "rgba(250,250,247,0.20)",
-  text: "#FAFAF7",
-  textSecondary: "rgba(250,250,247,0.82)",
-  textMuted: "rgba(250,250,247,0.56)",
-  textFaint: "rgba(250,250,247,0.32)",
-  green: brand.green,
-  greenDark: brand.greenDark,
-  greenDim: "rgba(0,230,118,0.18)",
-  red: "#FF7575",
-  redDim: "rgba(255,117,117,0.14)",
-  ink: brand.ink,
+  bg: "#0B0E11",
+  bgWarm: "#14171C",
+  surface: "#1E2329",
+  surfaceRaised: "#252A33",
+  surfaceHover: "#2B3139",
+  surfaceSunken: "#14171C",
+  border: "#2B3139",
+  borderStrong: "#474D57",
+  text: "#EAECEF",
+  textSecondary: "#B7BDC6",
+  textMuted: "#848E9C",
+  textFaint: "#5E6673",
+  green: "#0ECB81",
+  greenDark: "#02A05C",
+  greenDim: "rgba(14,203,129,0.16)",
+  red: "#F6465D",
+  redDim: "rgba(246,70,93,0.14)",
+  ink: "#0B0E11",
+} as const;
+
+/* Accent amarillo Binance — solo disponible en Pro via theme.accent */
+export const proAccent = {
+  yellow: "#FCD535",
+  yellowDim: "rgba(252,213,53,0.14)",
 } as const;
 
 export interface ThemeColors {

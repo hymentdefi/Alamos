@@ -24,6 +24,7 @@ import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { SideMenu } from "../../../lib/components/SideMenu";
+import { ProHome } from "../../../lib/components/pro/ProHome";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -78,6 +79,12 @@ const activityItems = [
 ];
 
 export default function HomeScreen() {
+  const { mode } = useTheme();
+  if (mode === "dark") return <ProHome />;
+  return <BaseHome />;
+}
+
+function BaseHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
