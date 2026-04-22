@@ -234,6 +234,7 @@ export default function NewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [headerH, setHeaderH] = useState(120);
   const listRef = useRef<FlatList>(null);
+  const catScrollRef = useRef<ScrollView>(null);
 
   const { height: screenH } = Dimensions.get("window");
   const tabBarH = Platform.OS === "ios" ? 84 : 68;
@@ -247,7 +248,48 @@ export default function NewsScreen() {
   useEffect(() => {
     setActiveIndex(0);
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    // Scroll la lista de pills para que la activa quede visible
+    const idx = categoryTabs.findIndex((t) => t.id === filter);
+    catScrollRef.current?.scrollTo({
+      x: Math.max(0, idx * 92 - 60),
+      animated: true,
+    });
   }, [filter]);
+
+  const changeFilterBy = useCallback(
+    (delta: number) => {
+      const idx = categoryTabs.findIndex((t) => t.id === filter);
+      const next = idx + delta;
+      if (next >= 0 && next < categoryTabs.length) {
+        Haptics.selectionAsync().catch(() => {});
+        setFilter(categoryTabs[next].id);
+      }
+    },
+    [filter],
+  );
+
+  // PanResponder para swipe horizontal entre categorías.
+  // Solo captura gestos claramente horizontales — los verticales siguen
+  // yendo al FlatList para el paging de noticias.
+  const swipePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+        onMoveShouldSetPanResponderCapture: (_, g) =>
+          Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 1.8,
+        onPanResponderRelease: (_, g) => {
+          const THRESH = 60;
+          if (g.dx < -THRESH || (g.vx < -0.4 && g.dx < -20)) {
+            changeFilterBy(1); // siguiente categoría
+          } else if (g.dx > THRESH || (g.vx > 0.4 && g.dx > 20)) {
+            changeFilterBy(-1); // categoría anterior
+          }
+        },
+      }),
+    [changeFilterBy],
+  );
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -283,7 +325,10 @@ export default function NewsScreen() {
   }, [navigation, onRefresh, isFocused]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
+    <View
+      style={[s.root, { backgroundColor: c.bg }]}
+      {...swipePanResponder.panHandlers}
+    >
       {/* Header sticky con título Noticias + tabs */}
       <View
         style={[
@@ -296,6 +341,7 @@ export default function NewsScreen() {
           <Text style={[s.title, { color: c.text }]}>Noticias</Text>
         </View>
         <ScrollView
+          ref={catScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.catRow}
