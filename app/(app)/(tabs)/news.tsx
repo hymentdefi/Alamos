@@ -249,7 +249,7 @@ export default function NewsScreen() {
   const showOnboarding = !consentLoading && !hasAccepted && isFocused;
 
   const { height: screenH } = Dimensions.get("window");
-  const tabBarH = Platform.OS === "ios" ? 84 : 68;
+  const tabBarH = Platform.OS === "ios" ? 92 : 78;
   const cardH = screenH - tabBarH - headerH - footerH;
 
   const visible = useMemo(
@@ -507,8 +507,8 @@ function NewsCard({
         </Animated.View>
       </Pressable>
 
-      {/* Contenido debajo — layout normal */}
-      <View style={card.bottom}>
+      {/* Contenido debajo — todo tappable para abrir la noticia */}
+      <Pressable style={card.bottom} onPress={onOpenDetail}>
         <Text style={[card.source, { color: c.textMuted }]}>
           {item.source} · {item.time}
         </Text>
@@ -533,14 +533,11 @@ function NewsCard({
           </View>
         ) : null}
 
-        <Pressable
-          style={[card.readBtn, { backgroundColor: c.ink }]}
-          onPress={onOpenDetail}
-        >
+        <View style={[card.readBtn, { backgroundColor: c.ink }]}>
           <Feather name="chevron-up" size={16} color={c.bg} />
           <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
-        </Pressable>
-      </View>
+        </View>
+      </Pressable>
     </View>
   );
 }
