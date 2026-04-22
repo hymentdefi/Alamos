@@ -728,9 +728,6 @@ function DetailSheet({
                 <Text style={sheet.meta}>
                   {item.source} · {item.time}
                 </Text>
-                <View style={sheet.disclaimerBox}>
-                  <DisclaimerShort />
-                </View>
                 {item.body.map((p, i) => (
                   <Text key={i} style={sheet.body_p}>
                     {p}
@@ -745,6 +742,9 @@ function DetailSheet({
                     ))}
                   </View>
                 ) : null}
+                <View style={sheet.disclaimerBox}>
+                  <DisclaimerShort />
+                </View>
               </View>
             </ScrollView>
           ) : null}
@@ -966,14 +966,15 @@ const sheet = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.1,
-    marginBottom: 14,
+    marginBottom: 18,
   },
   disclaimerBox: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderLeftWidth: 3,
     borderLeftColor: "rgba(14,15,12,0.18)",
-    marginBottom: 18,
+    marginTop: 8,
+    marginBottom: 4,
   },
   body_p: {
     color: "rgba(14,15,12,0.88)",
