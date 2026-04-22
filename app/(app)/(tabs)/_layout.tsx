@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
 import { useTheme, fontFamily } from "../../../lib/theme";
-import { AnimatedTabIcon } from "../../../lib/components/AnimatedTabIcon";
+import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
 export default function TabsLayout() {
   const { c } = useTheme();
@@ -36,9 +36,8 @@ export default function TabsLayout() {
         options={{
           title: "Inicio",
           tabBarIcon: ({ focused, color }) => (
-            <AnimatedTabIcon
-              outline="home-outline"
-              filled="home"
+            <DrawingIcon
+              path={tabPaths.home}
               focused={focused}
               color={color}
             />
@@ -50,9 +49,8 @@ export default function TabsLayout() {
         options={{
           title: "Mercado",
           tabBarIcon: ({ focused, color }) => (
-            <AnimatedTabIcon
-              outline="stats-chart-outline"
-              filled="stats-chart"
+            <DrawingIcon
+              path={tabPaths.markets}
               focused={focused}
               color={color}
             />
@@ -64,9 +62,8 @@ export default function TabsLayout() {
         options={{
           title: "Noticias",
           tabBarIcon: ({ focused, color }) => (
-            <AnimatedTabIcon
-              outline="newspaper-outline"
-              filled="newspaper"
+            <DrawingIcon
+              path={tabPaths.news}
               focused={focused}
               color={color}
             />
@@ -78,9 +75,8 @@ export default function TabsLayout() {
         options={{
           title: "Perfil",
           tabBarIcon: ({ focused, color }) => (
-            <AnimatedTabIcon
-              outline="person-outline"
-              filled="person"
+            <DrawingIcon
+              path={tabPaths.profile}
               focused={focused}
               color={color}
             />
