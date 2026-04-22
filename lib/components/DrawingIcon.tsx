@@ -1,9 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 interface Props {
   /** SVG path d attribute (sobre el viewBox dado). */
@@ -16,13 +14,19 @@ interface Props {
   duration?: number;
 }
 
+/** Dash más grande que cualquier path en viewBox 24x24 — lo usamos para simular
+ *  el drawing effect sin depender del atributo pathLength (que react-native-svg
+ *  no siempre pasa bien al native renderer). */
+const DASH_LEN = 200;
+
 /**
- * Ícono de tab que se "dibuja solo" con animación de stroke cuando se
- * activa — estilo Binance. El path se recorre como si una pluma lo
- * escribiera, en `duration` ms, con haptic al arrancar.
+ * Ícono de tab que se "dibuja solo" al activarse — estilo Binance.
+ * Combina:
+ *   - scale bounce en el Animated.View (native driver, garantizado)
+ *   - strokeDashoffset via state listener (JS driver, actualiza cada frame)
  *
- * - Inactivo: path completo visible en `color` (el tabBarInactiveTintColor)
- * - Activo: el path se redraw animando strokeDashoffset de 1 a 0
+ * Inactivo: path completo visible en `color`
+ * Activo: path se redibuja desde el comienzo + pequeño pop de escala + haptic
  */
 export function DrawingIcon({
   path,
@@ -30,40 +34,65 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 480,
+  duration = 520,
 }: Props) {
-  // offset 1 = path invisible, 0 = path visible
-  const offset = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const drawAnim = useRef(new Animated.Value(0)).current;
+  const [dashOffset, setDashOffset] = useState(0);
 
   useEffect(() => {
-    if (focused) {
-      Haptics.selectionAsync().catch(() => {});
-      offset.setValue(1);
-      Animated.timing(offset, {
-        toValue: 0,
-        duration,
-        useNativeDriver: false,
-      }).start();
-    } else {
-      offset.setValue(0);
+    if (!focused) {
+      setDashOffset(0);
+      return;
     }
-  }, [focused, duration, offset]);
+
+    Haptics.selectionAsync().catch(() => {});
+
+    // Scale pop (native)
+    scale.setValue(0.7);
+    Animated.spring(scale, {
+      toValue: 1,
+      tension: 180,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+
+    // Drawing via listener
+    setDashOffset(DASH_LEN);
+    drawAnim.setValue(1);
+    const listenerId = drawAnim.addListener(({ value }) => {
+      setDashOffset(value * DASH_LEN);
+    });
+    Animated.timing(drawAnim, {
+      toValue: 0,
+      duration,
+      useNativeDriver: false,
+    }).start(() => {
+      drawAnim.removeListener(listenerId);
+      setDashOffset(0);
+    });
+
+    return () => {
+      drawAnim.removeAllListeners();
+    };
+  }, [focused, duration, scale, drawAnim]);
 
   return (
     <View style={s.wrap}>
-      <Svg width={size} height={size} viewBox={viewBox}>
-        <AnimatedPath
-          d={path}
-          stroke={color}
-          strokeWidth={2}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray="1"
-          strokeDashoffset={offset}
-          {...({ pathLength: 1 } as object)}
-        />
-      </Svg>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Svg width={size} height={size} viewBox={viewBox}>
+          <Path
+            d={path}
+            stroke={color}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
+            strokeDashoffset={dashOffset}
+          />
+        </Svg>
+      </Animated.View>
     </View>
   );
 }
@@ -77,12 +106,7 @@ const s = StyleSheet.create({
   },
 });
 
-/* ─── Paths SVG para las tabs ───
- * Uso paths estilo Lucide (fork open source de Feather).
- * viewBox estándar 0 0 24 24.
- * Cada path está pensado para dibujarse de forma "natural" (línea
- * continua siempre que es posible).
- */
+/* ─── Paths SVG para las tabs ─── */
 export const tabPaths = {
   home: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z",
   markets: "M3 21 V4 M3 21 H21 M7 17 V13 M12 17 V9 M17 17 V11 M21 17 V7",
