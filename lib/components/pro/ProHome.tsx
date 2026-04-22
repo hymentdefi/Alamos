@@ -78,17 +78,34 @@ export function ProHome() {
         >
           <Feather name="menu" size={18} color={c.text} />
         </Pressable>
-        <View style={s.proBadgeWrap}>
-          <View style={[s.proDot, { backgroundColor: c.green }]} />
-          <Text style={[s.proBadge, { color: c.text }]}>ALAMOS PRO</Text>
+        <View style={s.topActions}>
+          <Pressable
+            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "deposit" },
+              })
+            }
+            hitSlop={8}
+          >
+            <Feather name="arrow-down-left" size={14} color={c.text} />
+            <Text style={[s.topPillText, { color: c.text }]}>Ingresar</Text>
+          </Pressable>
+          <Pressable
+            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "withdraw" },
+              })
+            }
+            hitSlop={8}
+          >
+            <Feather name="arrow-up-right" size={14} color={c.text} />
+            <Text style={[s.topPillText, { color: c.text }]}>Retirar</Text>
+          </Pressable>
         </View>
-        <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => router.push("/(app)/notifications")}
-          hitSlop={8}
-        >
-          <Feather name="bell" size={18} color={c.text} />
-        </Pressable>
       </View>
 
       <ScrollView
@@ -432,20 +449,22 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  proBadgeWrap: {
+  topActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  topPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
   },
-  proDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  proBadge: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
+  topPillText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
 
   /* Hero editorial */

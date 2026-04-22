@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
@@ -21,7 +21,10 @@ export default function TransferScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const [screen, setScreen] = useState<Screen>("hub");
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const initial: Screen =
+    mode === "deposit" || mode === "withdraw" ? mode : "hub";
+  const [screen, setScreen] = useState<Screen>(initial);
 
   if (screen !== "hub") {
     return (

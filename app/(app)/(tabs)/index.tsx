@@ -163,18 +163,30 @@ function BaseHome() {
         </Pressable>
         <View style={s.topActions}>
           <Pressable
-            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-            onPress={() => router.push("/(app)/transfer")}
+            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "deposit" },
+              })
+            }
             hitSlop={8}
           >
-            <Feather name="plus" size={18} color={c.text} />
+            <Feather name="arrow-down-left" size={14} color={c.text} />
+            <Text style={[s.topPillText, { color: c.text }]}>Ingresar</Text>
           </Pressable>
           <Pressable
-            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-            onPress={() => router.push("/(app)/notifications")}
+            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "withdraw" },
+              })
+            }
             hitSlop={8}
           >
-            <Feather name="bell" size={18} color={c.text} />
+            <Feather name="arrow-up-right" size={14} color={c.text} />
+            <Text style={[s.topPillText, { color: c.text }]}>Retirar</Text>
           </Pressable>
         </View>
       </View>
@@ -872,6 +884,19 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+  },
+  topPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+  },
+  topPillText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
   heroBlock: {
     paddingHorizontal: 24,
