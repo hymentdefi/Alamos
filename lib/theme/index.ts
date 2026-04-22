@@ -52,11 +52,6 @@ const dark = {
   ink: "#0B0E11",
 } as const;
 
-/* Accent amarillo Binance — solo disponible en Pro via theme.accent */
-export const proAccent = {
-  yellow: "#FCD535",
-  yellowDim: "rgba(252,213,53,0.14)",
-} as const;
 
 export interface ThemeColors {
   bg: string;

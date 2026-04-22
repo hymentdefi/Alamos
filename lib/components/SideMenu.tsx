@@ -17,6 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing } from "../theme";
 import { useAuth } from "../auth/context";
+import { useProMode } from "../pro/context";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const PANEL_W = Math.min(SCREEN_W * 0.88, 380);
@@ -36,11 +37,12 @@ interface NavItem {
 export function SideMenu({ visible, onClose }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, mode, toggle } = useTheme();
+  const { c } = useTheme();
   const { user, logout } = useAuth();
+  const { isPro, togglePro } = useProMode();
 
   const [rendered, setRendered] = useState(visible);
-  const tx = useRef(new Animated.Value(PANEL_W)).current;
+  const tx = useRef(new Animated.Value(-PANEL_W)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export function SideMenu({ visible, onClose }: Props) {
     } else if (rendered) {
       Animated.parallel([
         Animated.timing(tx, {
-          toValue: PANEL_W,
+          toValue: -PANEL_W,
           duration: 220,
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
@@ -78,15 +80,8 @@ export function SideMenu({ visible, onClose }: Props) {
 
   if (!rendered) return null;
 
-  const isPro = mode === "dark";
-
   const handleTogglePro = () => {
-    Haptics.impactAsync(
-      isPro
-        ? Haptics.ImpactFeedbackStyle.Light
-        : Haptics.ImpactFeedbackStyle.Medium,
-    ).catch(() => {});
-    toggle();
+    togglePro();
   };
 
   const navigateTo = (path: string) => {
@@ -184,6 +179,7 @@ export function SideMenu({ visible, onClose }: Props) {
             width: PANEL_W,
             backgroundColor: c.bg,
             transform: [{ translateX: tx }],
+            shadowOffset: { width: 6, height: 0 },
           },
         ]}
       >
@@ -319,11 +315,10 @@ const s = StyleSheet.create({
   },
   panel: {
     position: "absolute",
-    right: 0,
+    left: 0,
     top: 0,
     bottom: 0,
     shadowColor: "#000",
-    shadowOffset: { width: -6, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 20,

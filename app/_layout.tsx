@@ -12,6 +12,7 @@ import {
 } from "@expo-google-fonts/plus-jakarta-sans";
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
+import { ProProvider } from "../lib/pro/context";
 import { ThemeContext, themes, type ThemeMode, brand, fontFamily } from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -106,8 +107,10 @@ export default function RootLayout() {
     <ThemeContext.Provider value={themeValue}>
       <AuthProvider>
         <FavoritesProvider>
-          <StatusBar style={mode === "light" ? "dark" : "light"} />
-          <AuthGate />
+          <ProProvider>
+            <StatusBar style={mode === "light" ? "dark" : "light"} />
+            <AuthGate />
+          </ProProvider>
         </FavoritesProvider>
       </AuthProvider>
     </ThemeContext.Provider>

@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius, proAccent } from "../../lib/theme";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
 import {
   assets,
   formatPct,
@@ -147,8 +147,8 @@ export default function TradeScreen() {
         <View style={s.topCenter}>
           <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>
           {isFutures ? (
-            <View style={[s.perpBadge, { backgroundColor: proAccent.yellowDim }]}>
-              <Text style={[s.perpBadgeText, { color: proAccent.yellow }]}>
+            <View style={[s.perpBadge, { backgroundColor: c.greenDim }]}>
+              <Text style={[s.perpBadgeText, { color: c.greenDark }]}>
                 {asset.maxLeverage}x
               </Text>
             </View>
@@ -163,7 +163,7 @@ export default function TradeScreen() {
             <Ionicons
               name={fav ? "star" : "star-outline"}
               size={18}
-              color={fav ? proAccent.yellow : c.text}
+              color={fav ? c.greenDark : c.text}
             />
           </Pressable>
         </View>
@@ -239,7 +239,7 @@ export default function TradeScreen() {
                   <View
                     style={[
                       s.tfUnderline,
-                      { backgroundColor: proAccent.yellow },
+                      { backgroundColor: c.greenDark },
                     ]}
                   />
                 ) : null}
@@ -457,10 +457,10 @@ export default function TradeScreen() {
                         s.levPill,
                         {
                           backgroundColor: active
-                            ? proAccent.yellow
+                            ? c.greenDark
                             : "transparent",
                           borderColor: active
-                            ? proAccent.yellow
+                            ? c.greenDark
                             : c.border,
                         },
                       ]}

@@ -9,7 +9,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily, radius, spacing, proAccent } from "../../theme";
+import { useTheme, fontFamily, radius, spacing } from "../../theme";
 import {
   assets,
   formatPct,
@@ -19,6 +19,7 @@ import {
 import { useFavorites } from "../../favorites/context";
 import { Sparkline, seriesFromSeed } from "../Sparkline";
 import { SideMenu } from "../SideMenu";
+import { AmountDisplay } from "../AmountDisplay";
 
 const USDT_RATE = 1200; // ARS per USDT mock
 
@@ -29,16 +30,13 @@ export function ProHome() {
   const { favorites } = useFavorites();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Convert ARS-priced held assets to USDT equivalent
-  const { equityUsdt, pnlUsdt, pnlPct } = useMemo(() => {
+  const { equityArs, pnlArs, pnlPct } = useMemo(() => {
     const held = assets.filter((a) => a.held);
     const totalArs = held.reduce((s, a) => s + a.price * (a.qty ?? 1), 0);
-    const equity = totalArs / USDT_RATE;
-    const pnl = equity * 0.0162;
-    return { equityUsdt: equity, pnlUsdt: pnl, pnlPct: 1.62 };
+    const pnl = totalArs * 0.0162;
+    return { equityArs: totalArs, pnlArs: pnl, pnlPct: 1.62 };
   }, []);
 
-  // Watchlist: favoritos + si hay pocos, completar con top movers cripto/futuros
   const watchlist = useMemo(() => {
     const favList = assets.filter((a) => favorites.has(a.ticker));
     if (favList.length >= 5) return favList.slice(0, 8);
@@ -81,7 +79,7 @@ export function ProHome() {
           <Feather name="menu" size={18} color={c.text} />
         </Pressable>
         <View style={s.proBadgeWrap}>
-          <View style={[s.proDot, { backgroundColor: proAccent.yellow }]} />
+          <View style={[s.proDot, { backgroundColor: c.green }]} />
           <Text style={[s.proBadge, { color: c.text }]}>ALAMOS PRO</Text>
         </View>
         <Pressable
@@ -97,59 +95,58 @@ export function ProHome() {
         contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Equity card */}
-        <View
-          style={[
-            s.equityCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <View style={s.equityHead}>
-            <Text style={[s.equityLabel, { color: c.textMuted }]}>
-              TOTAL EQUITY
+        {/* ─── Equity hero — editorial ─── */}
+        <View style={s.heroBlock}>
+          <Text style={[s.heroLabel, { color: c.textMuted }]}>
+            Tu mesa de operaciones
+          </Text>
+          <AmountDisplay
+            value={equityArs}
+            size={42}
+            style={{ marginVertical: 6 }}
+          />
+          <View style={s.deltaRow}>
+            <Text style={[s.deltaTri, { color: c.greenDark }]}>▲</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              $ {Math.round(pnlArs).toLocaleString("es-AR")}
             </Text>
-            <Pressable hitSlop={6}>
-              <Feather name="eye" size={14} color={c.textMuted} />
-            </Pressable>
-          </View>
-          <Text style={[s.equityValue, { color: c.text }]}>
-            {equityUsdt.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-            <Text style={[s.equityUnit, { color: c.textMuted }]}> USDT</Text>
-          </Text>
-          <Text style={[s.equityAlt, { color: c.textMuted }]}>
-            ≈ $ {(equityUsdt * USDT_RATE).toLocaleString("es-AR", {
-              maximumFractionDigits: 0,
-            })}
-          </Text>
-
-          <View style={s.statsRow}>
-            <StatBlock
-              label="P&L 24h"
-              value={`+${pnlUsdt.toFixed(2)}`}
-              sub={`+${pnlPct.toFixed(2)}%`}
-              positive
-            />
-            <View style={[s.statsDivider, { backgroundColor: c.border }]} />
-            <StatBlock
-              label="Unrealized"
-              value="+84.20"
-              sub="+0.54%"
-              positive
-            />
-            <View style={[s.statsDivider, { backgroundColor: c.border }]} />
-            <StatBlock
-              label="Margin"
-              value="42%"
-              sub="available"
-              muted
-            />
+            <Text style={[s.deltaSep, { color: c.greenDark }]}>·</Text>
+            <Text style={[s.deltaText, { color: c.greenDark }]}>
+              {formatPct(pnlPct)} hoy
+            </Text>
           </View>
         </View>
 
-        {/* Quick actions */}
+        {/* ─── Stats strip ─── */}
+        <View
+          style={[
+            s.statsCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <StatBlock
+            label="P&L 24h"
+            value={`+$ ${Math.round(pnlArs).toLocaleString("es-AR")}`}
+            sub={`+${pnlPct.toFixed(2)}%`}
+            positive
+          />
+          <View style={[s.statsDivider, { backgroundColor: c.border }]} />
+          <StatBlock
+            label="Sin realizar"
+            value="+$ 10.104"
+            sub="+0,54%"
+            positive
+          />
+          <View style={[s.statsDivider, { backgroundColor: c.border }]} />
+          <StatBlock
+            label="Margen"
+            value="42%"
+            sub="disponible"
+            muted
+          />
+        </View>
+
+        {/* ─── Quick actions ─── */}
         <View style={s.quickRow}>
           <QuickAction
             icon="arrow-down-left"
@@ -168,17 +165,19 @@ export function ProHome() {
           />
           <QuickAction
             icon="trending-up"
-            label="Trade"
+            label="Operar"
             onPress={() => router.push("/(app)/explore")}
-            accent
+            primary
           />
         </View>
 
-        {/* Top gainers strip */}
+        {/* ─── Destacados del día ─── */}
         <View style={s.sectionHead}>
-          <Text style={[s.sectionTitle, { color: c.text }]}>Top Gainers</Text>
+          <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
+            DESTACADOS DEL DÍA
+          </Text>
           <Pressable onPress={() => router.push("/(app)/explore")}>
-            <Text style={[s.sectionLink, { color: c.textMuted }]}>
+            <Text style={[s.sectionLink, { color: c.text }]}>
               Ver todo →
             </Text>
           </Pressable>
@@ -197,15 +196,29 @@ export function ProHome() {
                 { backgroundColor: c.surface, borderColor: c.border },
               ]}
             >
-              <Text style={[s.gainerTicker, { color: c.text }]}>
-                {a.ticker}
-              </Text>
+              <View style={s.gainerTop}>
+                <Text style={[s.gainerTicker, { color: c.text }]}>
+                  {a.ticker}
+                </Text>
+                {a.maxLeverage ? (
+                  <View
+                    style={[
+                      s.levTag,
+                      { backgroundColor: c.greenDim },
+                    ]}
+                  >
+                    <Text style={[s.levTagText, { color: c.greenDark }]}>
+                      {a.maxLeverage}x
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Sparkline
                 series={seriesFromSeed(a.ticker, 18, a.change >= 0 ? "up" : "down")}
                 color={a.change >= 0 ? c.green : c.red}
-                height={36}
+                height={38}
                 withFill={false}
-                style={{ marginHorizontal: 0, marginVertical: 6 }}
+                style={{ marginHorizontal: 0, marginVertical: 8 }}
               />
               <Text style={[s.gainerPrice, { color: c.text }]}>
                 {a.price.toLocaleString("en-US", {
@@ -215,7 +228,7 @@ export function ProHome() {
               <Text
                 style={[
                   s.gainerChange,
-                  { color: a.change >= 0 ? c.green : c.red },
+                  { color: a.change >= 0 ? c.greenDark : c.red },
                 ]}
               >
                 {formatPct(a.change)}
@@ -224,9 +237,11 @@ export function ProHome() {
           ))}
         </ScrollView>
 
-        {/* Watchlist */}
+        {/* ─── Watchlist ─── */}
         <View style={s.sectionHead}>
-          <Text style={[s.sectionTitle, { color: c.text }]}>Watchlist</Text>
+          <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
+            WATCHLIST
+          </Text>
           <Pressable onPress={() => router.push("/(app)/explore")}>
             <Feather name="settings" size={14} color={c.textMuted} />
           </Pressable>
@@ -296,7 +311,7 @@ export function ProHome() {
                   <Text
                     style={[
                       s.changePillText,
-                      { color: a.change >= 0 ? c.green : c.red },
+                      { color: a.change >= 0 ? c.greenDark : c.red },
                     ]}
                   >
                     {formatPct(a.change)}
@@ -307,7 +322,7 @@ export function ProHome() {
           ))}
         </View>
 
-        {/* Announcement */}
+        {/* ─── Novedad ─── */}
         <View
           style={[
             s.announcement,
@@ -317,20 +332,20 @@ export function ProHome() {
           <View
             style={[
               s.announcementTag,
-              { backgroundColor: proAccent.yellowDim },
+              { backgroundColor: c.greenDim },
             ]}
           >
             <Text
               style={[
                 s.announcementTagText,
-                { color: proAccent.yellow },
+                { color: c.greenDark },
               ]}
             >
               NUEVO
             </Text>
           </View>
           <Text style={[s.announcementText, { color: c.text }]}>
-            Apalancamiento hasta 125x en BTCUSDT.P
+            Futuros perpetuos con apalancamiento hasta 125x
           </Text>
           <Feather name="chevron-right" size={16} color={c.textMuted} />
         </View>
@@ -355,7 +370,7 @@ function StatBlock({
   muted?: boolean;
 }) {
   const { c } = useTheme();
-  const valueColor = muted ? c.text : positive ? c.green : c.red;
+  const valueColor = muted ? c.text : positive ? c.greenDark : c.red;
   return (
     <View style={s.stat}>
       <Text style={[s.statLabel, { color: c.textMuted }]}>{label}</Text>
@@ -369,12 +384,12 @@ function QuickAction({
   icon,
   label,
   onPress,
-  accent,
+  primary,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   onPress: () => void;
-  accent?: boolean;
+  primary?: boolean;
 }) {
   const { c } = useTheme();
   return (
@@ -383,16 +398,16 @@ function QuickAction({
       style={[
         s.quick,
         {
-          backgroundColor: accent ? proAccent.yellow : c.surface,
-          borderColor: accent ? proAccent.yellow : c.border,
+          backgroundColor: primary ? c.ink : c.surface,
+          borderColor: primary ? c.ink : c.border,
         },
       ]}
     >
-      <Feather name={icon} size={16} color={accent ? c.ink : c.text} />
+      <Feather name={icon} size={16} color={primary ? c.bg : c.text} />
       <Text
         style={[
           s.quickLabel,
-          { color: accent ? c.ink : c.text },
+          { color: primary ? c.bg : c.text },
         ]}
       >
         {label}
@@ -407,7 +422,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 8,
   },
   iconBtn: {
@@ -433,48 +448,45 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Equity card */
-  equityCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    padding: 18,
-    borderRadius: radius.md,
-    borderWidth: 1,
+  /* Hero editorial */
+  heroBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
-  equityHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  equityLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.2,
-  },
-  equityValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 32,
-    letterSpacing: -1.1,
-    lineHeight: 36,
-  },
-  equityUnit: {
+  heroLabel: {
     fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  deltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  deltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+  },
+  deltaText: {
+    fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.2,
   },
-  equityAlt: {
+  deltaSep: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 4,
+    fontSize: 14,
+    opacity: 0.6,
   },
 
-  /* Stats row */
-  statsRow: {
+  /* Stats card */
+  statsCard: {
+    marginHorizontal: 20,
+    padding: 18,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     flexDirection: "row",
     alignItems: "stretch",
-    marginTop: 16,
   },
   statsDivider: {
     width: StyleSheet.hairlineWidth,
@@ -484,13 +496,12 @@ const s = StyleSheet.create({
   stat: {
     flex: 1,
     alignItems: "center",
-    gap: 2,
+    gap: 3,
   },
   statLabel: {
     fontFamily: fontFamily[600],
-    fontSize: 10,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
   statValue: {
     fontFamily: fontFamily[700],
@@ -506,17 +517,17 @@ const s = StyleSheet.create({
   /* Quick actions */
   quickRow: {
     flexDirection: "row",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginTop: 12,
     gap: 8,
   },
   quick: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: 12,
+    borderRadius: radius.lg,
+    paddingVertical: 14,
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   quickLabel: {
     fontFamily: fontFamily[600],
@@ -529,41 +540,56 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginTop: 24,
+    paddingHorizontal: 20,
+    marginTop: 28,
     marginBottom: 10,
   },
-  sectionTitle: {
+  sectionEyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
   sectionLink: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[700],
     fontSize: 12,
+    letterSpacing: -0.1,
   },
 
   /* Top gainers strip */
   gainersStrip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     gap: 10,
   },
   gainerCard: {
-    width: 130,
-    padding: 12,
-    borderRadius: radius.md,
+    width: 140,
+    padding: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
+  },
+  gainerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   gainerTicker: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  levTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  levTagText: {
+    fontFamily: fontFamily[700],
+    fontSize: 9,
+    letterSpacing: 0.4,
   },
   gainerPrice: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginTop: 2,
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   gainerChange: {
     fontFamily: fontFamily[600],
@@ -573,15 +599,15 @@ const s = StyleSheet.create({
 
   /* Watchlist */
   watchlistCard: {
-    marginHorizontal: 16,
-    borderRadius: radius.md,
+    marginHorizontal: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
   watchRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     paddingHorizontal: 14,
     gap: 10,
   },
@@ -592,13 +618,13 @@ const s = StyleSheet.create({
   },
   watchVol: {
     fontFamily: fontFamily[500],
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
     letterSpacing: -0.05,
   },
   watchRight: {
     alignItems: "flex-end",
-    minWidth: 88,
+    minWidth: 92,
     gap: 4,
   },
   watchPrice: {
@@ -607,7 +633,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
   changePill: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.sm,
   },
@@ -619,10 +645,10 @@ const s = StyleSheet.create({
 
   /* Announcement */
   announcement: {
-    marginHorizontal: 16,
-    marginTop: 24,
-    padding: 12,
-    borderRadius: radius.md,
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",

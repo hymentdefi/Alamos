@@ -24,6 +24,7 @@ import {
 } from "../../../lib/data/assets";
 import { useFavorites } from "../../../lib/favorites/context";
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
+import { useProMode } from "../../../lib/pro/context";
 
 type Filter = "todo" | AssetCategory;
 
@@ -39,8 +40,8 @@ const filters: { id: Filter; label: string }[] = [
 ];
 
 export default function ExploreScreen() {
-  const { mode } = useTheme();
-  if (mode === "dark") return <ProMarkets />;
+  const { isPro } = useProMode();
+  if (isPro) return <ProMarkets />;
   return <BaseExplore />;
 }
 

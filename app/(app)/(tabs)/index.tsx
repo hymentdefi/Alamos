@@ -25,6 +25,7 @@ import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { SideMenu } from "../../../lib/components/SideMenu";
 import { ProHome } from "../../../lib/components/pro/ProHome";
+import { useProMode } from "../../../lib/pro/context";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -79,8 +80,8 @@ const activityItems = [
 ];
 
 export default function HomeScreen() {
-  const { mode } = useTheme();
-  if (mode === "dark") return <ProHome />;
+  const { isPro } = useProMode();
+  if (isPro) return <ProHome />;
   return <BaseHome />;
 }
 

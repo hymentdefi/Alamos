@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius, spacing, proAccent } from "../../theme";
+import { useTheme, fontFamily, radius, spacing } from "../../theme";
 import {
   assets,
   formatPct,
@@ -197,7 +197,7 @@ export function ProMarkets() {
                   <Text
                     style={[
                       s.marketTabHint,
-                      { color: active ? proAccent.yellow : c.textFaint },
+                      { color: active ? c.greenDark : c.textFaint },
                     ]}
                   >
                     {m.hint}
@@ -207,7 +207,7 @@ export function ProMarkets() {
                   <View
                     style={[
                       s.marketTabUnderline,
-                      { backgroundColor: proAccent.yellow },
+                      { backgroundColor: c.greenDark },
                     ]}
                   />
                 ) : null}
@@ -309,7 +309,7 @@ export function ProMarkets() {
                       <Ionicons
                         name={fav ? "star" : "star-outline"}
                         size={14}
-                        color={fav ? proAccent.yellow : c.textFaint}
+                        color={fav ? c.greenDark : c.textFaint}
                       />
                     </Pressable>
                     <Text style={[s.rowTicker, { color: c.text }]}>
@@ -319,13 +319,13 @@ export function ProMarkets() {
                       <View
                         style={[
                           s.levBadge,
-                          { backgroundColor: proAccent.yellowDim },
+                          { backgroundColor: c.greenDim },
                         ]}
                       >
                         <Text
                           style={[
                             s.levBadgeText,
-                            { color: proAccent.yellow },
+                            { color: c.greenDark },
                           ]}
                         >
                           {a.maxLeverage}x
