@@ -21,26 +21,30 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Distancia mínima del swipe para confirmar (px). Alta a propósito: un
- * flick rápido no alcanza. Es una confirmación, no un atajo. */
-const SWIPE_THRESHOLD = 300;
-/** Distancia sobre la que la franja verde alcanza 100%. */
-const SWIPE_RANGE = 380;
-/** Velocidad mínima (px/ms) para shortcut con flick. Alta: el flick tiene
- * que ser deliberadamente rápido, no un roce. */
-const SWIPE_FLICK_VELOCITY = 2.4;
-/** Distancia mínima combinada con flick (fracción del range). */
+/** Constantes calibradas con el video de Robinhood.
+ *
+ * Resumen del comportamiento: el fill verde sigue al dedo 1:1 con una
+ * curva easeOutCubic (respuesta directa y snappy, no resistencia rubber).
+ * El commit se dispara al 70% del recorrido o con un flick deliberado
+ * (velocidad > 0.5 px/ms y ≥55% del recorrido). */
+const SWIPE_RANGE = 280;
+/** Fracción del range para considerar "confirmado" en el release. */
+const SWIPE_COMMIT_FRACTION = 0.7;
+const SWIPE_THRESHOLD = SWIPE_RANGE * SWIPE_COMMIT_FRACTION; // 196
+/** Velocidad mínima (px/ms) para confirmar con flick. */
+const SWIPE_FLICK_VELOCITY = 0.5;
+/** Distancia mínima junto con flick (fracción del range). */
 const SWIPE_FLICK_MIN_FRACTION = 0.55;
 /** Alto visible de la franja verde en reposo. */
 const STRIP_HEIGHT = 72;
 /** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
-/** Delay que dura cada texto en pantalla antes de transicionar al siguiente. */
-const PHASE_MS = 2200;
-/** Duración del fade out del texto. */
-const FADE_OUT_MS = 450;
-/** Duración del fade in del texto. */
-const FADE_IN_MS = 550;
+/** "Orden Enviada..." — corto, sólo confirma que salió (Robinhood: ~900 ms). */
+const PHASE_SENDING_MS = 900;
+/** "Orden Recibida..." — queda un buen tiempo (Robinhood: ~3000 ms). */
+const PHASE_RECEIVED_MS = 3000;
+/** Duración del cross-fade del texto (Robinhood: ~200 ms). */
+const FADE_MS = 200;
 
 const AVAILABLE_ARS = 1272850;
 
@@ -68,19 +72,18 @@ export default function ConfirmScreen() {
   const greenProgress = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const spinLoop = useRef(new Animated.Value(0)).current;
-  const checkMorph = useRef(new Animated.Value(0)).current;
   // Texto: solo fade, sin slide. Feel Robinhood.
   const statusOpacity = useRef(new Animated.Value(0)).current;
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("");
 
-  // Spinner loop — más lento que antes, feeling calmo.
+  // Spinner loop — 1000ms por vuelta (Robinhood ~900-1100).
   useEffect(() => {
     const loop = Animated.loop(
       Animated.timing(spinLoop, {
         toValue: 1,
-        duration: 1500,
+        duration: 1000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -89,36 +92,34 @@ export default function ConfirmScreen() {
     return () => loop.stop();
   }, [spinLoop]);
 
-  // Haptic ticks progresivos al 25%, 50%, 75% — feeling Robinhood.
-  const hapticStep = useRef(0);
+  // Un solo haptic "medium" al cruzar el commit threshold (70%) —
+  // feedback que te avisa "ya podés soltar".
+  const crossedCommit = useRef(false);
   useEffect(() => {
     const id = greenProgress.addListener(({ value }) => {
-      const thresholds = [0.25, 0.5, 0.75];
-      const next = thresholds.findIndex((t) => value < t);
-      const crossed = next === -1 ? thresholds.length : next;
-      if (crossed > hapticStep.current) {
-        hapticStep.current = crossed;
-        Haptics.selectionAsync().catch(() => {});
-      } else if (value < 0.1) {
-        hapticStep.current = 0;
+      if (value > SWIPE_COMMIT_FRACTION && !crossedCommit.current) {
+        crossedCommit.current = true;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      } else if (value < SWIPE_COMMIT_FRACTION - 0.1) {
+        crossedCommit.current = false;
       }
     });
     return () => greenProgress.removeListener(id);
   }, [greenProgress]);
 
-  /** Fade-out del texto, swap, fade-in. Solo opacidad, sin slide. */
+  /** Cross-fade del texto: rápido (200 ms cada dirección), sin slide. */
   const transitionText = (next: string): Promise<void> => {
     return new Promise((resolve) => {
       Animated.timing(statusOpacity, {
         toValue: 0,
-        duration: FADE_OUT_MS,
+        duration: FADE_MS,
         easing: Easing.inOut(Easing.quad),
         useNativeDriver: true,
       }).start(() => {
         setStatusText(next);
         Animated.timing(statusOpacity, {
           toValue: 1,
-          duration: FADE_IN_MS,
+          duration: FADE_MS,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }).start(() => resolve());
@@ -129,48 +130,38 @@ export default function ConfirmScreen() {
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // Fade-in del overlay entero, un toque lento.
+    // Fade-in del overlay completo.
     Animated.timing(overlayOpacity, {
       toValue: 1,
-      duration: 420,
+      duration: 340,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    // Haptic "success fuerte" al tocar tierra tras el swipe (equivalente al
+    // .heavy + success buzz de Robinhood).
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
 
-    // Texto inicial: "Orden Enviada..." aparece con fade in.
+    // Fase 1: "Orden Enviada..." aparece con fade-in.
     setStatusText("Orden Enviada...");
     Animated.timing(statusOpacity, {
       toValue: 1,
-      duration: FADE_IN_MS + 100,
+      duration: FADE_MS,
       easing: Easing.inOut(Easing.quad),
       useNativeDriver: true,
     }).start();
 
-    await wait(PHASE_MS);
+    await wait(PHASE_SENDING_MS);
 
-    // Transición a "Orden Recibida..."
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Fase 2: cross-fade a "Orden Recibida..." (queda 3s en pantalla).
+    setPhase("received");
     await transitionText("Orden Recibida...");
 
-    await wait(PHASE_MS);
+    await wait(PHASE_RECEIVED_MS);
 
-    // Transición a "Orden Ejecutada" + checkmark morph
-    setPhase("done");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {},
-    );
-    Animated.spring(checkMorph, {
-      toValue: 1,
-      tension: 140,
-      friction: 5,
-      useNativeDriver: true,
-    }).start();
-    await transitionText("Orden Ejecutada");
-
-    await wait(1600);
-
+    // Salida al success screen.
     router.replace({
       pathname: "/(app)/success",
       params: {
@@ -184,12 +175,12 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
-    // Haptic heavy al soltar + curva easeOutExpo para que llegue pulidito,
-    // sin bounce.
+    // Haptic heavy al commit — Robinhood firma el gesto con impacto fuerte.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    // easeOutExpo para que el fill termine pulido, sin bounce. ~350 ms.
     Animated.timing(greenProgress, {
       toValue: 1,
-      duration: 420,
+      duration: 350,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
     }).start(() => {
@@ -202,15 +193,13 @@ export default function ConfirmScreen() {
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
-        // Capturamos apenas se mueve un poquito hacia arriba. Sin dead-zone:
-        // la franja empieza a reaccionar de inmediato, aunque la curva la
-        // mantiene muy plana al principio.
         onMoveShouldSetPanResponder: (_, g) =>
           phase === "idle" && g.dy < -2,
         onMoveShouldSetPanResponderCapture: (_, g) =>
           phase === "idle" && g.dy < -2,
         onPanResponderGrant: () => {
-          Haptics.selectionAsync().catch(() => {});
+          // Robinhood: tap sutil al touchdown.
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         },
         onPanResponderMove: (_, g) => {
           if (phase !== "idle") return;
@@ -220,10 +209,9 @@ export default function ConfirmScreen() {
             return;
           }
           const raw = Math.min(1, dy / SWIPE_RANGE);
-          // EASE-IN fuerte (pow 1.9): al principio la franja casi no sube
-          // aunque el dedo se mueva. Recién al final empieza a acelerar.
-          // Así el swipe rápido/corto NO alcanza — tenés que comprometerte.
-          const curved = Math.pow(raw, 1.9);
+          // easeOutCubic sobre el fill — respuesta 1:1 al inicio (se siente
+          // directo y snappy), con una leve suavización hacia el final.
+          const curved = 1 - Math.pow(1 - raw, 3);
           greenProgress.setValue(curved);
         },
         onPanResponderRelease: (_, g) => {
@@ -237,11 +225,14 @@ export default function ConfirmScreen() {
           if (passedDistance || validFlick) {
             completeSwipe();
           } else {
-            // Spring de vuelta deliberadamente suave: transmite que "no llegaste".
+            // No llegó: spring-back natural, haptic light como feedback.
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+              () => {},
+            );
             Animated.spring(greenProgress, {
               toValue: 0,
-              tension: 120,
-              friction: 18,
+              tension: 180,
+              friction: 14,
               useNativeDriver: true,
             }).start();
           }
@@ -250,8 +241,8 @@ export default function ConfirmScreen() {
           if (phase !== "idle") return;
           Animated.spring(greenProgress, {
             toValue: 0,
-            tension: 120,
-            friction: 18,
+            tension: 180,
+            friction: 14,
             useNativeDriver: true,
           }).start();
         },
@@ -407,99 +398,62 @@ export default function ConfirmScreen() {
         <Text style={s.hintText}>Deslizá para ejecutar</Text>
       </Animated.View>
 
-      {/* Overlay de ejecución — layout estilo Robinhood: logo ~28% del top,
-          texto ~65%, disclaimer al pie. No se centra verticalmente. */}
+      {/* Overlay de ejecución — layout calibrado contra el video de
+          Robinhood: logo a ~40% del top, texto a ~56%, disclaimer pinned
+          al bottom con safe-area. */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
-          {/* Top: logo arriba del screen (15% de la altura de spacer). */}
-          <View style={{ height: SCREEN_H * 0.15 }} />
+          {/* Spacer hasta el logo: empuja el logo al ~33% del top,
+              centro del logo a ~40%. */}
+          <View style={{ height: SCREEN_H * 0.33 }} />
 
           <View style={s.logoWrap}>
-            {phase !== "done" ? (
-              <Animated.View
-                style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
-              >
-                <Svg width={140} height={140} viewBox="0 0 100 100">
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="rgba(255,255,255,0.22)"
-                    strokeWidth="3"
-                    fill="none"
-                  />
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="#FFFFFF"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeDasharray="90 186"
-                    strokeLinecap="round"
-                  />
-                </Svg>
-              </Animated.View>
-            ) : null}
-
             <Animated.View
-              style={[
-                s.logoOverlay,
-                {
-                  opacity: checkMorph.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0],
-                  }),
-                  transform: [
-                    {
-                      scale: checkMorph.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 0.4],
-                      }),
-                    },
-                  ],
-                },
-              ]}
+              style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
             >
+              <Svg width={140} height={140} viewBox="0 0 100 100">
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="rgba(255,255,255,0.22)"
+                  strokeWidth="3"
+                  fill="none"
+                />
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="#FFFFFF"
+                  strokeWidth="3.5"
+                  fill="none"
+                  strokeDasharray="100 176"
+                  strokeLinecap="round"
+                />
+              </Svg>
+            </Animated.View>
+
+            <View style={s.logoOverlay}>
               <Image
                 source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
                 style={s.logoImg}
                 resizeMode="contain"
               />
-            </Animated.View>
-
-            <Animated.View
-              style={[
-                s.checkOverlay,
-                {
-                  opacity: checkMorph,
-                  transform: [{ scale: checkMorph }],
-                },
-              ]}
-            >
-              <Feather
-                name="check"
-                size={78}
-                color="#FFFFFF"
-                strokeWidth={3.5}
-              />
-            </Animated.View>
+            </View>
           </View>
 
-          {/* Gap grande entre logo (arriba) y texto (abajo): el grupo se
-              distribuye en los dos tercios superiores del screen, como
-              Robinhood. */}
-          <View style={{ flex: 1 }} />
+          {/* Gap fijo hasta el texto — logo queda a ~40%, texto a ~56%. */}
+          <View style={{ height: SCREEN_H * 0.08 }} />
 
           <Animated.Text style={[s.execText, { opacity: statusOpacity }]}>
             {statusText}
           </Animated.Text>
 
-          {/* Gap fijo entre el texto y el disclaimer */}
-          <View style={{ height: SCREEN_H * 0.10 }} />
+          {/* Flex fill hacia el disclaimer. */}
+          <View style={{ flex: 1 }} />
 
           <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 24 }]}>
             <Text style={s.disclaimerText}>
@@ -693,11 +647,6 @@ const s = StyleSheet.create({
     width: 58,
     height: 58,
     tintColor: "#FFFFFF",
-  },
-  checkOverlay: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
   },
   execText: {
     fontFamily: fontFamily[700],
