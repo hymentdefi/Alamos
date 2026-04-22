@@ -20,10 +20,10 @@ import {
   type AssetCategory,
 } from "../../../lib/data/assets";
 import { useAuth } from "../../../lib/auth/context";
-import { AlamosLogo } from "../../../lib/components/Logo";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
+import { SideMenu } from "../../../lib/components/SideMenu";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -85,6 +85,7 @@ export default function HomeScreen() {
   const [tab, setTab] = useState<TabId>("tenencias");
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
@@ -145,7 +146,13 @@ export default function HomeScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <AlamosLogo variant="mark" tone="light" size={28} />
+        <Pressable
+          style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => setMenuOpen(true)}
+          hitSlop={8}
+        >
+          <Feather name="menu" size={18} color={c.text} />
+        </Pressable>
         <View style={s.topActions}>
           <Pressable
             style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
@@ -243,6 +250,8 @@ export default function HomeScreen() {
         <FeaturedFunds onOpen={openDetail} onSeeAll={() => router.push("/(app)/explore")} />
         <UniversityCallout />
       </ScrollView>
+
+      <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
