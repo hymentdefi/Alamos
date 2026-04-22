@@ -3,83 +3,127 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, type, radius, spacing, fontFamily } from "../../lib/theme";
-import { Sparkline } from "../../lib/components/Sparkline";
+import {
+  useTheme,
+  fontFamily,
+  radius,
+  spacing,
+  type ThemeColors,
+} from "../../lib/theme";
 import {
   assets,
   assetIconCode,
+  categoryLabels,
   formatARS,
   formatPct,
   type Asset,
+  type AssetCategory,
 } from "../../lib/data/assets";
 import { useAuth } from "../../lib/auth/context";
 import { AlamosLogo } from "../../lib/components/Logo";
+import { Sparkline } from "../../lib/components/Sparkline";
 
-const heldAssets = assets.filter((a) => a.held);
+type TabId = "tenencias" | "actividad" | "distribucion";
 
-const totalHoldings = heldAssets.reduce(
-  (sum, a) => sum + a.price * (a.qty ?? 1),
-  0,
-);
-const deltaPct = 1.96;
-const deltaAmount = Math.round((totalHoldings * deltaPct) / 100);
-
-const newsItems = [
+const activityItems = [
   {
     id: "1",
-    category: "Mercado",
-    title: "Bonos en dólares suben fuerte tras datos de reservas",
-    time: "hace 2h",
+    icon: "check-circle" as const,
+    title: "Compra AAPL",
+    date: "Hoy, 14:32",
+    amount: -48240,
   },
   {
     id: "2",
-    category: "CEDEARs",
-    title: "NVIDIA cierra en máximos históricos, acompañada por el sector tech",
-    time: "hace 4h",
+    icon: "arrow-down-left" as const,
+    title: "Ingreso transferencia",
+    date: "Ayer, 10:15",
+    amount: 250000,
   },
   {
     id: "3",
-    category: "Macro",
-    title: "Inflación de marzo se ubicaría por debajo del 3% según privados",
-    time: "hace 6h",
+    icon: "check-circle" as const,
+    title: "Compra AL30",
+    date: "14 abr, 09:45",
+    amount: -71540,
+  },
+  {
+    id: "4",
+    icon: "dollar-sign" as const,
+    title: "Dividendo AAPL",
+    date: "12 abr, 16:20",
+    amount: 4280,
+  },
+  {
+    id: "5",
+    icon: "arrow-up-right" as const,
+    title: "Venta parcial MSFT",
+    date: "10 abr, 11:02",
+    amount: 83490,
   },
 ];
-
-type TabId = "cartera" | "mercado" | "noticias";
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user } = useAuth();
-  const [tab, setTab] = useState<TabId>("cartera");
+  const [tab, setTab] = useState<TabId>("tenencias");
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
-  const marketAssets = useMemo(
-    () =>
-      [...assets]
-        .filter((a) => !a.held)
-        .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-        .slice(0, 5),
-    [],
+  const held = useMemo(() => assets.filter((a) => a.held), []);
+  const total = useMemo(
+    () => held.reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0),
+    [held],
   );
 
+  const dayPct = 1.96;
+  const dayDelta = Math.round((total * dayPct) / 100);
+
+  const byCategory = useMemo(() => {
+    const map = new Map<AssetCategory, { total: number; items: Asset[] }>();
+    for (const a of held) {
+      const v = a.price * (a.qty ?? 1);
+      const entry = map.get(a.category) ?? { total: 0, items: [] };
+      entry.total += v;
+      entry.items.push(a);
+      map.set(a.category, entry);
+    }
+    return [...map.entries()].sort((a, b) => b[1].total - a[1].total);
+  }, [held]);
+
   const openDetail = (asset: Asset) => {
-    router.push({ pathname: "/(app)/detail", params: { ticker: asset.ticker } });
+    if (asset.category === "efectivo") {
+      router.push("/(app)/transfer");
+      return;
+    }
+    router.push({
+      pathname: "/(app)/detail",
+      params: { ticker: asset.ticker },
+    });
   };
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <AlamosLogo variant="mark" tone="light" size={28} />
-        <Pressable
-          style={s.bellButton}
-          hitSlop={12}
-          onPress={() => router.push("/(app)/notifications")}
-        >
-          <Feather name="bell" size={20} color={c.text} />
-        </Pressable>
+        <View style={s.topActions}>
+          <Pressable
+            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+            onPress={() => router.push("/(app)/transfer")}
+            hitSlop={8}
+          >
+            <Feather name="plus" size={18} color={c.text} />
+          </Pressable>
+          <Pressable
+            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+            onPress={() => router.push("/(app)/notifications")}
+            hitSlop={8}
+          >
+            <Feather name="bell" size={18} color={c.text} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -87,91 +131,36 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.heroBlock}>
-          <Text style={[s.greet, { color: c.textMuted }]}>Hola, {firstName}</Text>
-          <Text style={[s.balance, { color: c.text }]}>{formatARS(totalHoldings)}</Text>
+          <Text style={[s.greet, { color: c.textMuted }]}>
+            Hola, {firstName}
+          </Text>
+          <Text style={[s.balance, { color: c.text }]}>{formatARS(total)}</Text>
           <View style={s.deltaRow}>
-            <Text style={[s.deltaTriangle, { color: c.greenDark }]}>▲</Text>
+            <Text style={[s.deltaTri, { color: c.greenDark }]}>▲</Text>
             <Text style={[s.deltaText, { color: c.greenDark }]}>
-              {formatARS(deltaAmount)}
+              {formatARS(dayDelta)}
             </Text>
             <Text style={[s.deltaSep, { color: c.greenDark }]}>·</Text>
             <Text style={[s.deltaText, { color: c.greenDark }]}>
-              {formatPct(deltaPct)} hoy
+              {formatPct(dayPct)} hoy
             </Text>
           </View>
 
-          <Sparkline color={c.greenDark} style={{ marginTop: 6 }} />
+          <Sparkline color={c.greenDark} style={{ marginTop: 16 }} />
         </View>
 
         <View style={s.tabsWrap}>
           <TabStrip tab={tab} onChange={setTab} />
         </View>
 
-        <View style={s.listBlock}>
-          {tab === "cartera" && (
-            <View>
-              {heldAssets.map((asset, i) => (
-                <AssetRow
-                  key={asset.ticker}
-                  asset={asset}
-                  onPress={() => openDetail(asset)}
-                  first={i === 0}
-                />
-              ))}
-              <Pressable
-                style={s.seeAll}
-                onPress={() => router.push("/(app)/portfolio")}
-              >
-                <Text style={[s.seeAllText, { color: c.text }]}>Ver toda la cartera</Text>
-                <Feather name="arrow-right" size={16} color={c.text} />
-              </Pressable>
-            </View>
-          )}
-
-          {tab === "mercado" && (
-            <View>
-              {marketAssets.map((asset, i) => (
-                <AssetRow
-                  key={asset.ticker}
-                  asset={asset}
-                  onPress={() => openDetail(asset)}
-                  first={i === 0}
-                  showPrice
-                />
-              ))}
-              <Pressable
-                style={s.seeAll}
-                onPress={() => router.push("/(app)/explore")}
-              >
-                <Text style={[s.seeAllText, { color: c.text }]}>Ver todo el mercado</Text>
-                <Feather name="arrow-right" size={16} color={c.text} />
-              </Pressable>
-            </View>
-          )}
-
-          {tab === "noticias" && (
-            <View>
-              {newsItems.map((n, i) => (
-                <Pressable
-                  key={n.id}
-                  style={[
-                    s.newsRow,
-                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-                  ]}
-                  onPress={() => router.push("/(app)/news")}
-                >
-                  <Text style={[s.newsCategory, { color: c.textMuted }]}>
-                    {n.category.toUpperCase()} · {n.time}
-                  </Text>
-                  <Text style={[s.newsTitle, { color: c.text }]}>{n.title}</Text>
-                </Pressable>
-              ))}
-              <Pressable style={s.seeAll} onPress={() => router.push("/(app)/news")}>
-                <Text style={[s.seeAllText, { color: c.text }]}>Ver todas las noticias</Text>
-                <Feather name="arrow-right" size={16} color={c.text} />
-              </Pressable>
-            </View>
-          )}
+        <View style={s.tabContent}>
+          {tab === "tenencias" ? (
+            <Tenencias byCategory={byCategory} onOpen={openDetail} />
+          ) : null}
+          {tab === "actividad" ? <Actividad /> : null}
+          {tab === "distribucion" ? (
+            <Distribucion byCategory={byCategory} total={total} />
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -187,9 +176,9 @@ function TabStrip({
 }) {
   const { c } = useTheme();
   const tabs: { id: TabId; label: string }[] = [
-    { id: "cartera", label: "Cartera" },
-    { id: "mercado", label: "Mercado" },
-    { id: "noticias", label: "Noticias" },
+    { id: "tenencias", label: "Tenencias" },
+    { id: "actividad", label: "Actividad" },
+    { id: "distribucion", label: "Distribución" },
   ];
 
   return (
@@ -209,10 +198,7 @@ function TabStrip({
             onPress={() => onChange(t.id)}
           >
             <Text
-              style={[
-                s.tabLabel,
-                { color: active ? c.text : c.textMuted },
-              ]}
+              style={[s.tabLabel, { color: active ? c.text : c.textMuted }]}
             >
               {t.label}
             </Text>
@@ -223,24 +209,186 @@ function TabStrip({
   );
 }
 
-function AssetRow({
-  asset,
-  onPress,
-  first,
-  showPrice = false,
+function Tenencias({
+  byCategory,
+  onOpen,
 }: {
-  asset: Asset;
-  onPress: () => void;
-  first?: boolean;
-  showPrice?: boolean;
+  byCategory: [AssetCategory, { total: number; items: Asset[] }][];
+  onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-  const value = showPrice ? asset.price : asset.price * (asset.qty ?? 1);
+  return (
+    <View>
+      {byCategory.map(([cat, data]) => (
+        <View key={cat} style={s.groupBlock}>
+          <View style={s.groupHead}>
+            <Text style={[s.groupTitle, { color: c.text }]}>
+              {categoryLabels[cat]}
+            </Text>
+            <Text style={[s.groupValue, { color: c.textMuted }]}>
+              {formatARS(data.total)}
+            </Text>
+          </View>
+          {data.items.map((asset, i) => (
+            <AssetRow
+              key={asset.ticker}
+              asset={asset}
+              first={i === 0}
+              onPress={() => onOpen(asset)}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Actividad() {
+  const { c } = useTheme();
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      {activityItems.map((item, i) => {
+        const positive = item.amount > 0;
+        return (
+          <View
+            key={item.id}
+            style={[
+              s.activityRow,
+              i > 0 && {
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: c.border,
+              },
+            ]}
+          >
+            <View
+              style={[
+                s.activityIcon,
+                {
+                  backgroundColor: positive ? c.greenDim : c.surfaceHover,
+                },
+              ]}
+            >
+              <Feather
+                name={item.icon}
+                size={16}
+                color={positive ? c.greenDark : c.text}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.activityTitle, { color: c.text }]}>
+                {item.title}
+              </Text>
+              <Text style={[s.activityDate, { color: c.textMuted }]}>
+                {item.date}
+              </Text>
+            </View>
+            <Text
+              style={[
+                s.activityAmount,
+                { color: positive ? c.greenDark : c.text },
+              ]}
+            >
+              {positive ? "+" : "−"}
+              {formatARS(item.amount)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function Distribucion({
+  byCategory,
+  total,
+}: {
+  byCategory: [AssetCategory, { total: number; items: Asset[] }][];
+  total: number;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
+        {byCategory.map(([cat, data], i) => {
+          const pct = (data.total / total) * 100;
+          return (
+            <View
+              key={cat}
+              style={{
+                width: `${pct}%`,
+                backgroundColor: allocationColor(cat, c),
+                borderTopLeftRadius: i === 0 ? radius.pill : 0,
+                borderBottomLeftRadius: i === 0 ? radius.pill : 0,
+                borderTopRightRadius:
+                  i === byCategory.length - 1 ? radius.pill : 0,
+                borderBottomRightRadius:
+                  i === byCategory.length - 1 ? radius.pill : 0,
+              }}
+            />
+          );
+        })}
+      </View>
+
+      <View style={{ gap: 10, marginTop: 16 }}>
+        {byCategory.map(([cat, data]) => {
+          const pct = (data.total / total) * 100;
+          return (
+            <View key={cat} style={s.legendRow}>
+              <View
+                style={[
+                  s.legendDot,
+                  { backgroundColor: allocationColor(cat, c) },
+                ]}
+              />
+              <Text style={[s.legendLabel, { color: c.text }]}>
+                {categoryLabels[cat]}
+              </Text>
+              <Text style={[s.legendPct, { color: c.textMuted }]}>
+                {pct.toFixed(1)}%
+              </Text>
+              <Text style={[s.legendValue, { color: c.text }]}>
+                {formatARS(data.total)}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function AssetRow({
+  asset,
+  first,
+  onPress,
+}: {
+  asset: Asset;
+  first?: boolean;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const isCash = asset.category === "efectivo";
+  const value = isCash
+    ? (asset.qty ?? 0)
+    : asset.price * (asset.qty ?? 1);
   const up = asset.change >= 0;
-  const dark = asset.iconTone === "dark";
+
+  const bg =
+    asset.iconTone === "dark"
+      ? c.ink
+      : asset.iconTone === "accent"
+      ? c.green
+      : c.surfaceSunken;
+  const fg =
+    asset.iconTone === "dark"
+      ? c.bg
+      : asset.iconTone === "accent"
+      ? c.ink
+      : c.textSecondary;
 
   return (
     <Pressable
+      onPress={onPress}
       style={[
         s.row,
         !first && {
@@ -248,42 +396,53 @@ function AssetRow({
           borderTopColor: c.border,
         },
       ]}
-      onPress={onPress}
     >
-      <View
-        style={[
-          s.icon,
-          {
-            backgroundColor: dark ? c.ink : c.surfaceSunken,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            s.iconText,
-            { color: dark ? c.bg : c.textSecondary },
-          ]}
-        >
+      <View style={[s.rowIcon, { backgroundColor: bg }]}>
+        <Text style={[s.rowIconText, { color: fg }]}>
           {assetIconCode(asset)}
         </Text>
       </View>
-      <View style={s.rowMiddle}>
-        <Text style={[s.rowTicker, { color: c.text }]}>{asset.ticker}</Text>
-        <Text style={[s.rowSub, { color: c.textMuted }]}>{asset.subLabel}</Text>
-      </View>
-      <View style={s.rowRight}>
-        <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
-        <Text
-          style={[
-            s.rowChange,
-            { color: up ? c.greenDark : c.red },
-          ]}
-        >
-          {formatPct(asset.change)}
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowTicker, { color: c.text }]}>
+          {isCash ? asset.name : asset.ticker}
         </Text>
+        <Text style={[s.rowSub, { color: c.textMuted }]}>
+          {isCash
+            ? asset.subLabel
+            : `${asset.qty} ${asset.qty === 1 ? "unidad" : "unidades"} · ${formatARS(asset.price)}`}
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
+        {!isCash ? (
+          <Text
+            style={[s.rowChange, { color: up ? c.greenDark : c.red }]}
+          >
+            {formatPct(asset.change)}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
+}
+
+function allocationColor(cat: AssetCategory, c: ThemeColors): string {
+  switch (cat) {
+    case "efectivo":
+      return c.green;
+    case "cedears":
+      return c.ink;
+    case "bonos":
+      return c.greenDark;
+    case "fci":
+      return c.textSecondary;
+    case "acciones":
+      return c.textMuted;
+    case "obligaciones":
+      return c.borderStrong;
+    default:
+      return c.textFaint;
+  }
 }
 
 const s = StyleSheet.create({
@@ -295,9 +454,13 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  bellButton: {
-    width: 40,
-    height: 40,
+  topActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  topBtn: {
+    width: 36,
+    height: 36,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -308,7 +471,9 @@ const s = StyleSheet.create({
     paddingBottom: 20,
   },
   greet: {
-    ...type.body,
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    letterSpacing: -0.15,
     marginBottom: 6,
   },
   balance: {
@@ -322,12 +487,11 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 20,
+    marginBottom: 4,
   },
-  deltaTriangle: {
+  deltaTri: {
     fontFamily: fontFamily[700],
     fontSize: 12,
-    lineHeight: 14,
   },
   deltaText: {
     fontFamily: fontFamily[600],
@@ -364,11 +528,32 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   tabLabel: {
-    ...type.smallStrong,
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
-  listBlock: {
-    paddingHorizontal: 20,
+  tabContent: {
     marginTop: 4,
+  },
+  groupBlock: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  groupHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 4,
+  },
+  groupTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  groupValue: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
   row: {
     flexDirection: "row",
@@ -376,29 +561,28 @@ const s = StyleSheet.create({
     paddingVertical: spacing.lg,
     gap: 14,
   },
-  icon: {
+  rowIcon: {
     width: 40,
     height: 40,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  iconText: {
+  rowIconText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
+    fontSize: 14,
     letterSpacing: -0.3,
   },
-  rowMiddle: { flex: 1 },
   rowTicker: {
     fontFamily: fontFamily[700],
     fontSize: 16,
     letterSpacing: -0.3,
   },
   rowSub: {
-    ...type.small,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
     marginTop: 2,
   },
-  rowRight: { alignItems: "flex-end" },
   rowPrice: {
     fontFamily: fontFamily[700],
     fontSize: 15,
@@ -408,34 +592,68 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
-    letterSpacing: -0.1,
   },
-  newsRow: {
-    paddingVertical: spacing.lg,
-  },
-  newsCategory: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  newsTitle: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    lineHeight: 20,
-    letterSpacing: -0.2,
-  },
-  seeAll: {
+  activityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "transparent",
+    paddingVertical: spacing.lg,
+    gap: 14,
   },
-  seeAllText: {
+  activityIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityTitle: {
     fontFamily: fontFamily[600],
     fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  activityDate: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activityAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  barTrack: {
+    height: 10,
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  legendPct: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    minWidth: 46,
+    textAlign: "right",
+  },
+  legendValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    minWidth: 92,
+    textAlign: "right",
     letterSpacing: -0.15,
   },
 });

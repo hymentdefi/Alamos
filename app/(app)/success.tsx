@@ -91,14 +91,6 @@ export default function SuccessScreen() {
         >
           <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
         </Pressable>
-        <Pressable
-          style={s.secondary}
-          onPress={() => router.replace("/(app)/portfolio")}
-        >
-          <Text style={[s.secondaryText, { color: c.textSecondary }]}>
-            Ver mi cartera
-          </Text>
-        </Pressable>
       </View>
     </View>
   );

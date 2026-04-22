@@ -1,4 +1,5 @@
 export type AssetCategory =
+  | "efectivo"
   | "cedears"
   | "acciones"
   | "bonos"
@@ -15,11 +16,11 @@ export interface Asset {
   /** 2 caracteres para el ícono cuadrado — si no, se usan los 2 primeros del ticker. */
   iconCode?: string;
   /** Variante visual del ícono en listas. */
-  iconTone?: "dark" | "neutral";
+  iconTone?: "dark" | "neutral" | "accent";
   category: AssetCategory;
-  /** Precio actual en ARS. */
+  /** Precio actual en ARS. Para efectivo = 1. */
   price: number;
-  /** Variación del día en %. */
+  /** Variación del día en %. Para efectivo = 0. */
   change: number;
   held: boolean;
   qty?: number;
@@ -27,6 +28,20 @@ export interface Asset {
 }
 
 export const assets: Asset[] = [
+  // ─── Efectivo (es un activo más de la cartera) ───
+  {
+    ticker: "ARS",
+    name: "Pesos argentinos",
+    subLabel: "Efectivo · Disponible",
+    iconCode: "$",
+    iconTone: "accent",
+    category: "efectivo",
+    price: 1,
+    change: 0,
+    held: true,
+    qty: 342180,
+  },
+
   // ─── CEDEARs (acciones USA representadas localmente) ───
   {
     ticker: "AAPL",
@@ -369,8 +384,21 @@ export const assetCategories = [
   { id: "obligaciones" as const, label: "ONs" },
   { id: "letras" as const, label: "Letras" },
   { id: "caucion" as const, label: "Caución" },
+  { id: "efectivo" as const, label: "Efectivo" },
   { id: "favoritos" as const, label: "Favoritos" },
 ];
+
+/** Labels de categorías para display en grupos / leyendas. */
+export const categoryLabels: Record<AssetCategory, string> = {
+  efectivo: "Efectivo",
+  cedears: "CEDEARs",
+  bonos: "Bonos",
+  fci: "Fondos",
+  acciones: "Acciones AR",
+  obligaciones: "Obligaciones",
+  letras: "Letras",
+  caucion: "Caución",
+};
 
 export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");

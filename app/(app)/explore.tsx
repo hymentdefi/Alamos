@@ -45,6 +45,8 @@ export default function ExploreScreen() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return assets.filter((a) => {
+      // Efectivo no se opera desde el mercado — solo vive en la cartera
+      if (a.category === "efectivo") return false;
       if (filter === "favoritos" && !a.favorite) return false;
       if (filter !== "todo" && filter !== "favoritos" && a.category !== filter)
         return false;

@@ -246,6 +246,7 @@ export default function DetailScreen() {
 
 function categoryLabel(cat: AssetCategory): string {
   const labels: Record<AssetCategory, string> = {
+    efectivo: "Efectivo",
     cedears: "CEDEAR",
     bonos: "Bono soberano",
     fci: "Fondo común de inversión",
@@ -321,6 +322,8 @@ function stats(asset: ReturnType<typeof useMemo<any>> | any): { label: string; v
 
 function aboutText(cat: AssetCategory): string {
   switch (cat) {
+    case "efectivo":
+      return "Saldo en pesos disponible en tu cuenta de Alamos. Lo usás para comprar cualquier activo o podés retirarlo a tu cuenta bancaria cuando quieras.";
     case "cedears":
       return "Certificado de depósito argentino que representa acciones de empresas del exterior. Operan en pesos en BYMA.";
     case "bonos":

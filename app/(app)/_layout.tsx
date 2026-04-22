@@ -54,17 +54,6 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="portfolio"
-        options={{
-          title: "Cartera",
-          tabBarIcon: ({ color }) => (
-            <View style={st.iconWrap}>
-              <Feather name="pie-chart" size={22} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="news"
         options={{
           title: "Noticias",
