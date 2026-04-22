@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import {
   assets,
@@ -12,6 +12,7 @@ import {
   type AssetCategory,
 } from "../../lib/data/assets";
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
+import { useFavorites } from "../../lib/favorites/context";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -53,11 +54,13 @@ export default function DetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { isFavorite, toggle: toggleFav } = useFavorites();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const asset = useMemo(() => assets.find((a) => a.ticker === ticker), [ticker]);
   if (!asset) return null;
+  const fav = isFavorite(asset.ticker);
 
   const pctForRange = rangePctFor(asset.ticker, range);
   const rangeUp = pctForRange >= 0;
@@ -98,8 +101,16 @@ export default function DetailScreen() {
             {asset.subLabel}
           </Text>
         </View>
-        <Pressable style={[s.iconBtn, { backgroundColor: c.surfaceHover }]} hitSlop={12}>
-          <Feather name="bookmark" size={18} color={c.text} />
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          hitSlop={12}
+          onPress={() => toggleFav(asset.ticker)}
+        >
+          <Ionicons
+            name={fav ? "star" : "star-outline"}
+            size={18}
+            color={fav ? c.greenDark : c.text}
+          />
         </Pressable>
       </View>
 

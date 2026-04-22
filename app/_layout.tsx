@@ -11,6 +11,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from "@expo-google-fonts/plus-jakarta-sans";
 import { AuthProvider, useAuth } from "../lib/auth/context";
+import { FavoritesProvider } from "../lib/favorites/context";
 import { ThemeContext, themes, type ThemeMode, brand, fontFamily } from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -104,8 +105,10 @@ export default function RootLayout() {
   return (
     <ThemeContext.Provider value={themeValue}>
       <AuthProvider>
-        <StatusBar style={mode === "light" ? "dark" : "light"} />
-        <AuthGate />
+        <FavoritesProvider>
+          <StatusBar style={mode === "light" ? "dark" : "light"} />
+          <AuthGate />
+        </FavoritesProvider>
       </AuthProvider>
     </ThemeContext.Provider>
   );
