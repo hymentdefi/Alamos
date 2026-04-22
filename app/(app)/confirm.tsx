@@ -26,8 +26,6 @@ const { height: SCREEN_H } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 300;
 /** Distancia sobre la que la franja verde alcanza 100%. */
 const SWIPE_RANGE = 380;
-/** Primeros N px se descartan para que un tap no active nada. */
-const SWIPE_DEAD_ZONE = 28;
 /** Velocidad mínima (px/ms) para shortcut con flick. Alta: el flick tiene
  * que ser deliberadamente rápido, no un roce. */
 const SWIPE_FLICK_VELOCITY = 2.4;
@@ -204,10 +202,13 @@ export default function ConfirmScreen() {
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
+        // Capturamos apenas se mueve un poquito hacia arriba. Sin dead-zone:
+        // la franja empieza a reaccionar de inmediato, aunque la curva la
+        // mantiene muy plana al principio.
         onMoveShouldSetPanResponder: (_, g) =>
-          phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
+          phase === "idle" && g.dy < -2,
         onMoveShouldSetPanResponderCapture: (_, g) =>
-          phase === "idle" && -g.dy > SWIPE_DEAD_ZONE,
+          phase === "idle" && g.dy < -2,
         onPanResponderGrant: () => {
           Haptics.selectionAsync().catch(() => {});
         },
@@ -218,8 +219,7 @@ export default function ConfirmScreen() {
             greenProgress.setValue(0);
             return;
           }
-          const effective = Math.max(0, dy - SWIPE_DEAD_ZONE);
-          const raw = Math.min(1, effective / (SWIPE_RANGE - SWIPE_DEAD_ZONE));
+          const raw = Math.min(1, dy / SWIPE_RANGE);
           // EASE-IN fuerte (pow 1.9): al principio la franja casi no sube
           // aunque el dedo se mueva. Recién al final empieza a acelerar.
           // Así el swipe rápido/corto NO alcanza — tenés que comprometerte.
@@ -414,7 +414,8 @@ export default function ConfirmScreen() {
           pointerEvents="none"
           style={[s.execOverlay, { opacity: overlayOpacity }]}
         >
-          <View style={{ height: SCREEN_H * 0.24 }} />
+          {/* Top: logo arriba del screen (15% de la altura de spacer). */}
+          <View style={{ height: SCREEN_H * 0.15 }} />
 
           <View style={s.logoWrap}>
             {phase !== "done" ? (
@@ -488,17 +489,19 @@ export default function ConfirmScreen() {
             </Animated.View>
           </View>
 
-          {/* Gap entre logo y texto: corto y fijo, así el logo y el texto
-              se leen como UN grupo. */}
-          <View style={{ height: 56 }} />
+          {/* Gap grande entre logo (arriba) y texto (abajo): el grupo se
+              distribuye en los dos tercios superiores del screen, como
+              Robinhood. */}
+          <View style={{ flex: 1 }} />
 
           <Animated.Text style={[s.execText, { opacity: statusOpacity }]}>
             {statusText}
           </Animated.Text>
 
-          <View style={{ flex: 1 }} />
+          {/* Gap fijo entre el texto y el disclaimer */}
+          <View style={{ height: SCREEN_H * 0.10 }} />
 
-          <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 22 }]}>
+          <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 24 }]}>
             <Text style={s.disclaimerText}>
               La respuesta del sistema, el precio y velocidad de ejecución, la
               liquidez, los datos del mercado y los tiempos de acceso pueden
@@ -707,15 +710,15 @@ const s = StyleSheet.create({
 
   /* Disclaimer al pie del overlay */
   disclaimerWrap: {
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
   disclaimerText: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.82)",
+    fontSize: 15,
+    lineHeight: 22,
+    color: "rgba(255,255,255,0.88)",
     textAlign: "center",
-    letterSpacing: -0.05,
+    letterSpacing: -0.1,
   },
 });
