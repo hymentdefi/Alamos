@@ -9,10 +9,13 @@ import {
   PanResponder,
   Easing,
   Image,
+  type StyleProp,
+  type TextStyle,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
@@ -21,29 +24,38 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Constantes calibradas con el video de Robinhood.
+/** Constantes del swipe-to-submit. Calibradas contra el feeling real de
+ * Robinhood (amortiguación + umbral bajo + snap con spring).
  *
- * Resumen del comportamiento: el fill verde sigue al dedo 1:1 con una
- * curva easeOutCubic (respuesta directa y snappy, no resistencia rubber).
- * El commit se dispara al 70% del recorrido o con un flick deliberado
- * (velocidad > 0.5 px/ms y ≥55% del recorrido). */
+ * Comportamiento:
+ *  1. Resistencia progresiva: el botón se mueve ~1:1 con el dedo al inicio
+ *     y progresivamente menos cuanto más alto estás. Al 100% del
+ *     SWIPE_RANGE, el botón visual está al 70% (30% de damping).
+ *  2. Commit al 45% del recorrido del dedo: basta con media banda elástica
+ *     para enganchar y dejar que la animación termine sola.
+ *  3. Al confirmar: spring real (stiffness 300, damping 20, mass 1) para
+ *     tener micro-bounce físico al llegar al tope.
+ *  4. Si no llegás: regreso lento y elástico (380 ms ease-out), no un
+ *     snap agresivo. */
 const SWIPE_RANGE = 280;
-/** Fracción del range para considerar "confirmado" en el release. */
-const SWIPE_COMMIT_FRACTION = 0.7;
-const SWIPE_THRESHOLD = SWIPE_RANGE * SWIPE_COMMIT_FRACTION; // 196
-/** Velocidad mínima (px/ms) para confirmar con flick. */
-const SWIPE_FLICK_VELOCITY = 0.5;
-/** Distancia mínima junto con flick (fracción del range). */
-const SWIPE_FLICK_MIN_FRACTION = 0.55;
+/** Fracción del recorrido del dedo (no del visual) para confirmar. */
+const SWIPE_COMMIT_FRACTION = 0.45;
+/** Velocidad mínima para confirmar por flick, px/ms. */
+const SWIPE_FLICK_VELOCITY = 0.6;
+/** Distancia mínima combinada con flick (fracción del range). */
+const SWIPE_FLICK_MIN_FRACTION = 0.35;
+/** Fracción máxima de damping al 100% del recorrido (0.3 = al 100% del
+ * dedo, el botón visual está al 70%). */
+const SWIPE_DAMPING_MAX = 0.3;
 /** Alto visible de la franja verde en reposo. */
 const STRIP_HEIGHT = 72;
 /** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
-/** "Orden Enviada..." — corto, sólo confirma que salió (Robinhood: ~900 ms). */
+/** "Orden Enviada..." — corto, sólo confirma que salió. */
 const PHASE_SENDING_MS = 900;
-/** "Orden Recibida..." — queda un buen tiempo (Robinhood: ~3000 ms). */
+/** "Orden Recibida..." — queda un buen tiempo. */
 const PHASE_RECEIVED_MS = 3000;
-/** Duración del cross-fade del texto (Robinhood: ~200 ms). */
+/** Duración del cross-fade del texto. */
 const FADE_MS = 200;
 
 const AVAILABLE_ARS = 1272850;
@@ -175,13 +187,14 @@ export default function ConfirmScreen() {
 
   const completeSwipe = () => {
     if (phase !== "idle") return;
-    // Haptic heavy al commit — Robinhood firma el gesto con impacto fuerte.
+    // Spring físico: al pasar el umbral, el botón "se engancha" y vuela
+    // arriba con micro-bounce. Parámetros de Robinhood aprox.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    // easeOutExpo para que el fill termine pulido, sin bounce. ~350 ms.
-    Animated.timing(greenProgress, {
+    Animated.spring(greenProgress, {
       toValue: 1,
-      duration: 350,
-      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      stiffness: 300,
+      damping: 20,
+      mass: 1,
       useNativeDriver: true,
     }).start(() => {
       runOrderFlow();
@@ -198,7 +211,6 @@ export default function ConfirmScreen() {
         onMoveShouldSetPanResponderCapture: (_, g) =>
           phase === "idle" && g.dy < -2,
         onPanResponderGrant: () => {
-          // Robinhood: tap sutil al touchdown.
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         },
         onPanResponderMove: (_, g) => {
@@ -208,41 +220,49 @@ export default function ConfirmScreen() {
             greenProgress.setValue(0);
             return;
           }
-          const raw = Math.min(1, dy / SWIPE_RANGE);
-          // easeOutCubic sobre el fill — respuesta 1:1 al inicio (se siente
-          // directo y snappy), con una leve suavización hacia el final.
-          const curved = 1 - Math.pow(1 - raw, 3);
-          greenProgress.setValue(curved);
+          // RESISTENCIA PROGRESIVA: el botón visual va siempre un poco
+          // atrás del dedo, y el "lag" aumenta con el recorrido — como
+          // estirar una banda elástica.
+          //   raw = dedo / range  (puede superar 1)
+          //   visual = raw * (1 - DAMPING_MAX * clamp(raw, 0, 1))
+          // Al 0% del recorrido: visual = raw (1:1).
+          // Al 100%: visual = 1 * 0.7 = 0.7 (30% de damping).
+          const raw = dy / SWIPE_RANGE;
+          const clamped = Math.min(1, raw);
+          const damped = raw * (1 - SWIPE_DAMPING_MAX * clamped);
+          greenProgress.setValue(Math.min(1, damped));
         },
         onPanResponderRelease: (_, g) => {
           if (phase !== "idle") return;
           const dy = -g.dy;
           const vy = -g.vy;
-          const passedDistance = dy > SWIPE_THRESHOLD;
+          const rawProgress = dy / SWIPE_RANGE;
+          const passedThreshold = rawProgress >= SWIPE_COMMIT_FRACTION;
           const validFlick =
             vy > SWIPE_FLICK_VELOCITY &&
-            dy > SWIPE_RANGE * SWIPE_FLICK_MIN_FRACTION;
-          if (passedDistance || validFlick) {
+            rawProgress > SWIPE_FLICK_MIN_FRACTION;
+          if (passedThreshold || validFlick) {
             completeSwipe();
           } else {
-            // No llegó: spring-back natural, haptic light como feedback.
+            // Regreso lento y elástico: 380 ms ease-out. Da sensación de
+            // "no llegué" sin agresividad.
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
               () => {},
             );
-            Animated.spring(greenProgress, {
+            Animated.timing(greenProgress, {
               toValue: 0,
-              tension: 180,
-              friction: 14,
+              duration: 380,
+              easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }).start();
           }
         },
         onPanResponderTerminate: () => {
           if (phase !== "idle") return;
-          Animated.spring(greenProgress, {
+          Animated.timing(greenProgress, {
             toValue: 0,
-            tension: 180,
-            friction: 14,
+            duration: 380,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }).start();
         },
@@ -395,7 +415,13 @@ export default function ConfirmScreen() {
           },
         ]}
       >
-        <Text style={s.hintText}>Deslizá para ejecutar</Text>
+        <Feather
+          name="chevron-up"
+          size={14}
+          color="rgba(255,255,255,0.85)"
+          style={{ marginBottom: 2 }}
+        />
+        <ShimmerText style={s.hintText}>Deslizá para ejecutar</ShimmerText>
       </Animated.View>
 
       {/* Overlay de ejecución — layout calibrado contra el video de
@@ -495,6 +521,89 @@ function PullChevron({ color }: { color: string }) {
     <Animated.View style={{ transform: [{ translateY: bounce }] }}>
       <Feather name="chevron-up" size={26} color={color} />
     </Animated.View>
+  );
+}
+
+/**
+ * Texto con shimmer estilo Robinhood: un brillo suave y ancho se desliza
+ * de izquierda a derecha en 2.2s con una pausa de ~900ms entre ciclos.
+ * El gradiente está encima del texto; donde es semi-opaco suma blanco
+ * sobre la base (texto al 65% de opacidad). Los bordes se difuminan
+ * gradualmente con stops progresivos.
+ */
+function ShimmerText({
+  children,
+  style,
+}: {
+  children: string;
+  style: StyleProp<TextStyle>;
+}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const [w, setW] = useState(0);
+
+  useEffect(() => {
+    if (w <= 0) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 2200,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.delay(900),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer, w]);
+
+  const gradientW = w * 0.55;
+  const translateX = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-gradientW, w],
+  });
+
+  return (
+    <View
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+      style={{ overflow: "hidden" }}
+    >
+      <Text style={[style, { color: "rgba(255,255,255,0.65)" }]}>
+        {children}
+      </Text>
+      {w > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            width: gradientW,
+            transform: [{ translateX }],
+          }}
+        >
+          <LinearGradient
+            colors={[
+              "rgba(255,255,255,0)",
+              "rgba(255,255,255,0.22)",
+              "rgba(255,255,255,0.55)",
+              "rgba(255,255,255,0.22)",
+              "rgba(255,255,255,0)",
+            ]}
+            locations={[0, 0.3, 0.5, 0.7, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }
 
