@@ -21,9 +21,21 @@ import {
 } from "../../lib/data/assets";
 import { useAuth } from "../../lib/auth/context";
 import { AlamosLogo } from "../../lib/components/Logo";
-import { Sparkline } from "../../lib/components/Sparkline";
+import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
+type Range = "1D" | "1S" | "1M" | "3M" | "1A";
+
+const ranges: Range[] = ["1D", "1S", "1M", "3M", "1A"];
+
+/** Variación % por rango — determina el trend y color del chart. */
+const rangeChanges: Record<Range, number> = {
+  "1D": 1.96,
+  "1S": 3.24,
+  "1M": -2.1,
+  "3M": 8.45,
+  "1A": 23.7,
+};
 
 const activityItems = [
   {
@@ -69,6 +81,8 @@ export default function HomeScreen() {
   const { c } = useTheme();
   const { user } = useAuth();
   const [tab, setTab] = useState<TabId>("tenencias");
+  const [range, setRange] = useState<Range>("1D");
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
@@ -78,8 +92,25 @@ export default function HomeScreen() {
     [held],
   );
 
-  const dayPct = 1.96;
-  const dayDelta = Math.round((total * dayPct) / 100);
+  const series = useMemo(
+    () => generateSeries(total, rangeChanges[range], `home-${range}`),
+    [total, range],
+  );
+
+  const rangePct = rangeChanges[range];
+  const isUp = rangePct >= 0;
+  const trendColor = isUp ? c.greenDark : c.red;
+
+  const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
+  const rangeStart = series[0];
+  const displayDelta = current - rangeStart;
+  const displayPct = (displayDelta / rangeStart) * 100;
+  const displayIsUp = displayDelta >= 0;
+
+  const timeLabel =
+    scrubIndex != null
+      ? indexLabel(range, scrubIndex, series.length)
+      : rangeSubtitle(range);
 
   const byCategory = useMemo(() => {
     const map = new Map<AssetCategory, { total: number; items: Asset[] }>();
@@ -129,24 +160,63 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={scrubIndex == null}
       >
         <View style={s.heroBlock}>
           <Text style={[s.greet, { color: c.textMuted }]}>
             Hola, {firstName}
           </Text>
-          <Text style={[s.balance, { color: c.text }]}>{formatARS(total)}</Text>
+          <Text style={[s.balance, { color: c.text }]}>{formatARS(current)}</Text>
           <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color: c.greenDark }]}>▲</Text>
-            <Text style={[s.deltaText, { color: c.greenDark }]}>
-              {formatARS(dayDelta)}
+            <Text style={[s.deltaTri, { color: trendColor }]}>
+              {displayIsUp ? "▲" : "▼"}
             </Text>
-            <Text style={[s.deltaSep, { color: c.greenDark }]}>·</Text>
-            <Text style={[s.deltaText, { color: c.greenDark }]}>
-              {formatPct(dayPct)} hoy
+            <Text style={[s.deltaText, { color: trendColor }]}>
+              {formatARS(Math.abs(displayDelta))}
             </Text>
+            <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
+            <Text style={[s.deltaText, { color: trendColor }]}>
+              {formatPct(displayPct)}
+            </Text>
+            <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
+            <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <Sparkline color={c.greenDark} style={{ marginTop: 16 }} />
+          <Sparkline
+            series={series}
+            color={trendColor}
+            onScrub={(idx) => setScrubIndex(idx)}
+            onScrubEnd={() => setScrubIndex(null)}
+            style={{ marginTop: 18 }}
+          />
+
+          <View style={s.rangeRow}>
+            {ranges.map((r) => {
+              const active = r === range;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => setRange(r)}
+                  style={[
+                    s.rangePill,
+                    active && { backgroundColor: trendColor },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Text
+                    style={[
+                      s.rangeText,
+                      {
+                        color: active ? c.bg : c.textMuted,
+                      },
+                    ]}
+                  >
+                    {r}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         <View style={s.tabsWrap}>
@@ -166,6 +236,77 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+/* ─── Helpers ─── */
+
+/** Genera una serie realista: va desde (total / (1 + pct/100)) hasta total, con ruido. */
+function generateSeries(total: number, pct: number, seed: string): number[] {
+  const length = 40;
+  const startValue = total / (1 + pct / 100);
+  const noise = seriesFromSeed(seed, length, "flat");
+  const noiseScale = total * 0.018;
+  const out: number[] = [];
+  for (let i = 0; i < length; i++) {
+    const t = i / (length - 1);
+    const linear = startValue + (total - startValue) * t;
+    const normalized = (noise[i] - 100) / 6;
+    out.push(linear + normalized * noiseScale);
+  }
+  out[length - 1] = total;
+  return out;
+}
+
+function rangeSubtitle(r: Range): string {
+  switch (r) {
+    case "1D":
+      return "hoy";
+    case "1S":
+      return "esta semana";
+    case "1M":
+      return "este mes";
+    case "3M":
+      return "3 meses";
+    case "1A":
+      return "1 año";
+  }
+}
+
+function indexLabel(r: Range, index: number, length: number): string {
+  const t = 1 - index / (length - 1);
+  switch (r) {
+    case "1D": {
+      const h = Math.round(t * 24);
+      if (h === 0) return "ahora";
+      if (h === 1) return "hace 1h";
+      return `hace ${h}h`;
+    }
+    case "1S": {
+      const d = Math.round(t * 7);
+      if (d === 0) return "hoy";
+      if (d === 1) return "hace 1 día";
+      return `hace ${d} días`;
+    }
+    case "1M": {
+      const d = Math.round(t * 30);
+      if (d === 0) return "hoy";
+      return `hace ${d} días`;
+    }
+    case "3M": {
+      const w = Math.round(t * 13);
+      if (w === 0) return "hoy";
+      if (w === 1) return "hace 1 sem";
+      return `hace ${w} sem`;
+    }
+    case "1A": {
+      const m = Math.round(t * 12);
+      if (m === 0) return "hoy";
+      if (m === 1) return "hace 1 mes";
+      return `hace ${m} meses`;
+    }
+  }
+}
+
+/* ─── Subcomponentes ─── */
 
 function TabStrip({
   tab,
@@ -415,9 +556,7 @@ function AssetRow({
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
         {!isCash ? (
-          <Text
-            style={[s.rowChange, { color: up ? c.greenDark : c.red }]}
-          >
+          <Text style={[s.rowChange, { color: up ? c.greenDark : c.red }]}>
             {formatPct(asset.change)}
           </Text>
         ) : null}
@@ -468,7 +607,7 @@ const s = StyleSheet.create({
   heroBlock: {
     paddingHorizontal: 24,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   greet: {
     fontFamily: fontFamily[500],
@@ -488,6 +627,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     marginBottom: 4,
+    flexWrap: "wrap",
   },
   deltaTri: {
     fontFamily: fontFamily[700],
@@ -503,9 +643,30 @@ const s = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
+  timeLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  rangeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  rangePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  rangeText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: 0.4,
+  },
   tabsWrap: {
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 20,
     paddingBottom: 14,
   },
   tabGroup: {

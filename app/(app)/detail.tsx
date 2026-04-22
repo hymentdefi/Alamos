@@ -11,10 +11,42 @@ import {
   formatPct,
   type AssetCategory,
 } from "../../lib/data/assets";
-import { Sparkline, pathFromSeed } from "../../lib/components/Sparkline";
+import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
+
+/** Variación % por rango para el activo (mock, determinístico). */
+function rangePctFor(ticker: string, range: Range): number {
+  let h = 0;
+  for (let i = 0; i < ticker.length; i++) h = (h * 31 + ticker.charCodeAt(i)) | 0;
+  const base = ((Math.abs(h) % 200) - 100) / 10; // -10 a 10
+  const mult: Record<Range, number> = {
+    "1D": 0.3,
+    "1S": 0.7,
+    "1M": 1.2,
+    "3M": 2.1,
+    "1A": 3.5,
+    MAX: 5.2,
+  };
+  return base * mult[range];
+}
+
+function buildPriceSeries(currentPrice: number, pct: number, seed: string): number[] {
+  const length = 40;
+  const start = currentPrice / (1 + pct / 100);
+  const noise = seriesFromSeed(seed, length, "flat");
+  const noiseScale = currentPrice * 0.015;
+  const out: number[] = [];
+  for (let i = 0; i < length; i++) {
+    const t = i / (length - 1);
+    const linear = start + (currentPrice - start) * t;
+    const normalized = (noise[i] - 100) / 6;
+    out.push(linear + normalized * noiseScale);
+  }
+  out[length - 1] = currentPrice;
+  return out;
+}
 
 export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
@@ -22,16 +54,30 @@ export default function DetailScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const asset = useMemo(() => assets.find((a) => a.ticker === ticker), [ticker]);
   if (!asset) return null;
 
-  const up = asset.change >= 0;
-  const color = up ? c.greenDark : c.red;
-  const chartPath = useMemo(
-    () => pathFromSeed(`${asset.ticker}-${range}`, up ? "up" : "down"),
-    [asset.ticker, range, up],
+  const pctForRange = rangePctFor(asset.ticker, range);
+  const rangeUp = pctForRange >= 0;
+  const color = rangeUp ? c.greenDark : c.red;
+
+  const series = useMemo(
+    () => buildPriceSeries(asset.price, pctForRange, `${asset.ticker}-${range}`),
+    [asset.price, asset.ticker, pctForRange, range],
   );
+
+  const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
+  const rangeStart = series[0];
+  const displayDelta = current - rangeStart;
+  const displayPct = (displayDelta / rangeStart) * 100;
+  const displayUp = displayDelta >= 0;
+
+  const timeLabel =
+    scrubIndex != null
+      ? indexLabel(range, scrubIndex, series.length)
+      : rangeLabel(range);
 
   const position = asset.held && asset.qty ? asset.qty : 0;
   const positionValue = position * asset.price;
@@ -89,19 +135,25 @@ export default function DetailScreen() {
             </View>
           </View>
 
-          <Text style={[s.price, { color: c.text }]}>{formatARS(asset.price)}</Text>
+          <Text style={[s.price, { color: c.text }]}>{formatARS(current)}</Text>
           <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color }]}>{up ? "▲" : "▼"}</Text>
-            <Text style={[s.deltaText, { color }]}>{formatPct(asset.change)}</Text>
+            <Text style={[s.deltaTri, { color }]}>{displayUp ? "▲" : "▼"}</Text>
+            <Text style={[s.deltaText, { color }]}>
+              {formatARS(Math.abs(displayDelta))}
+            </Text>
             <Text style={[s.deltaSep, { color }]}>·</Text>
-            <Text style={[s.deltaText, { color }]}>{rangeLabel(range)}</Text>
+            <Text style={[s.deltaText, { color }]}>{formatPct(displayPct)}</Text>
+            <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
+            <Text style={[s.deltaText, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
           <Sparkline
+            series={series}
             color={color}
-            path={chartPath}
             height={160}
             style={{ marginTop: 20 }}
+            onScrub={(idx) => setScrubIndex(idx)}
+            onScrubEnd={() => setScrubIndex(null)}
           />
 
           <View style={s.rangeRow}>
@@ -113,13 +165,14 @@ export default function DetailScreen() {
                   onPress={() => setRange(r)}
                   style={[
                     s.rangePill,
-                    active && { backgroundColor: c.surfaceHover },
+                    active && { backgroundColor: color },
                   ]}
+                  hitSlop={8}
                 >
                   <Text
                     style={[
                       s.rangeText,
-                      { color: active ? c.text : c.textMuted },
+                      { color: active ? c.bg : c.textMuted },
                     ]}
                   >
                     {r}
@@ -267,11 +320,49 @@ function rangeLabel(r: Range): string {
     case "1M":
       return "este mes";
     case "3M":
-      return "estos 3 meses";
+      return "3 meses";
     case "1A":
-      return "este año";
+      return "1 año";
     case "MAX":
       return "histórico";
+  }
+}
+
+function indexLabel(r: Range, index: number, length: number): string {
+  const t = 1 - index / (length - 1);
+  switch (r) {
+    case "1D": {
+      const h = Math.round(t * 24);
+      if (h === 0) return "ahora";
+      if (h === 1) return "hace 1h";
+      return `hace ${h}h`;
+    }
+    case "1S": {
+      const d = Math.round(t * 7);
+      if (d === 0) return "hoy";
+      if (d === 1) return "hace 1 día";
+      return `hace ${d} días`;
+    }
+    case "1M": {
+      const d = Math.round(t * 30);
+      if (d === 0) return "hoy";
+      return `hace ${d} días`;
+    }
+    case "3M": {
+      const w = Math.round(t * 13);
+      if (w === 0) return "hoy";
+      return `hace ${w} sem`;
+    }
+    case "1A": {
+      const m = Math.round(t * 12);
+      if (m === 0) return "hoy";
+      return `hace ${m} meses`;
+    }
+    case "MAX": {
+      const y = Math.round(t * 5);
+      if (y === 0) return "este año";
+      return `hace ${y} años`;
+    }
   }
 }
 
