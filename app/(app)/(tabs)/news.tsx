@@ -422,7 +422,7 @@ function NewsCard({
       <ScrollHint />
 
       {/* Imagen que ocupa todo el espacio entre header y contenido */}
-      <View style={card.imageWrap}>
+      <Pressable style={card.imageWrap} onPress={onOpenDetail}>
         <Animated.View
           style={[
             card.imageAnim,
@@ -438,7 +438,7 @@ function NewsCard({
             resizeMode="cover"
           />
         </Animated.View>
-      </View>
+      </Pressable>
 
       {/* Contenido debajo — layout normal */}
       <View style={card.bottom}>
@@ -556,18 +556,31 @@ function DetailSheet({
 }) {
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(0)).current;
+  const scrollYRef = useRef(0);
   const { height: screenH } = Dimensions.get("window");
 
-  // Reset translateY cuando se abre
+  // Reset translateY y scrollY cuando se abre
   useEffect(() => {
-    if (item) translateY.setValue(0);
+    if (item) {
+      translateY.setValue(0);
+      scrollYRef.current = 0;
+    }
   }, [item, translateY]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) =>
-          g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        onStartShouldSetPanResponder: () => false,
+        // Solo capturamos el gesto si el scroll interno está en el tope y el
+        // user está tirando hacia abajo con intención clara (más vertical que
+        // horizontal).
+        onMoveShouldSetPanResponder: (_, g) => {
+          return (
+            scrollYRef.current <= 0 &&
+            g.dy > 6 &&
+            Math.abs(g.dy) > Math.abs(g.dx)
+          );
+        },
         onPanResponderMove: (_, g) => {
           if (g.dy > 0) translateY.setValue(g.dy);
         },
@@ -590,6 +603,14 @@ function DetailSheet({
             }).start();
           }
         },
+        onPanResponderTerminate: () => {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 180,
+            friction: 12,
+          }).start();
+        },
       }),
     [screenH, onClose, translateY],
   );
@@ -606,14 +627,20 @@ function DetailSheet({
         <Pressable style={sheet.backdrop} onPress={onClose} />
         <Animated.View
           style={[sheet.body, { transform: [{ translateY }] }]}
+          {...panResponder.panHandlers}
         >
-          <View {...panResponder.panHandlers} style={sheet.dragArea}>
+          <View style={sheet.dragArea}>
             <View style={sheet.handle} />
           </View>
           {item ? (
             <ScrollView
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               showsVerticalScrollIndicator={false}
+              onScroll={(e) => {
+                scrollYRef.current = e.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
+              bounces={false}
             >
               <Image source={{ uri: item.image }} style={sheet.image} />
               <View style={sheet.content}>
@@ -787,6 +814,7 @@ const hint = StyleSheet.create({
     right: 14,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 20,
   },
 });
 
