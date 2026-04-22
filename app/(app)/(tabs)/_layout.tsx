@@ -37,6 +37,7 @@ export default function TabsLayout() {
           title: "Inicio",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
+              key={`home-${focused}`}
               path={tabPaths.home}
               focused={focused}
               color={color}
@@ -50,6 +51,7 @@ export default function TabsLayout() {
           title: "Mercado",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
+              key={`markets-${focused}`}
               path={tabPaths.markets}
               focused={focused}
               color={color}
@@ -63,6 +65,7 @@ export default function TabsLayout() {
           title: "Noticias",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
+              key={`news-${focused}`}
               path={tabPaths.news}
               focused={focused}
               color={color}
@@ -76,6 +79,7 @@ export default function TabsLayout() {
           title: "Perfil",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
+              key={`profile-${focused}`}
               path={tabPaths.profile}
               focused={focused}
               color={color}

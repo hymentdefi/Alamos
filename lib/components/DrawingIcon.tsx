@@ -48,12 +48,12 @@ export function DrawingIcon({
 
     Haptics.selectionAsync().catch(() => {});
 
-    // Scale pop (native)
-    scale.setValue(0.7);
+    // Scale pop (native driver — siempre funciona)
+    scale.setValue(0.55);
     Animated.spring(scale, {
       toValue: 1,
-      tension: 180,
-      friction: 7,
+      tension: 150,
+      friction: 5,
       useNativeDriver: true,
     }).start();
 
