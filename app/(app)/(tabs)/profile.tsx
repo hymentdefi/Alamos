@@ -84,18 +84,19 @@ export default function ProfileScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 12,
-          paddingBottom: 140,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[s.fixedHeader, { paddingTop: insets.top + 12, backgroundColor: c.bg }]}>
         <View style={s.header}>
           <Text style={[s.title, { color: c.text }]}>Perfil</Text>
           <AlamosLogo variant="mark" tone="light" size={22} />
         </View>
+      </View>
 
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: 140,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
         <View
           style={[
             s.identityCard,
@@ -216,6 +217,9 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+  fixedHeader: {
+    paddingBottom: 4,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

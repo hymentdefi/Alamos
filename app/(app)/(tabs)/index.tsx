@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -238,8 +238,118 @@ export default function HomeScreen() {
             <Distribucion byCategory={byCategory} total={total} />
           ) : null}
         </View>
+
+        <FCICallout onPress={() => router.push("/(app)/explore")} />
+        <UniversityCallout />
       </ScrollView>
     </View>
+  );
+}
+
+function FCICallout({ onPress }: { onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={[s.fciCard, { backgroundColor: c.ink }]}>
+      <View style={s.fciEyebrow}>
+        <View style={[s.fciDot, { backgroundColor: c.green }]} />
+        <Text style={[s.fciEyebrowText, { color: c.green }]}>
+          PARA TUS PESOS
+        </Text>
+      </View>
+
+      <Text style={[s.fciTitle, { color: c.bg }]}>
+        Hacé rendir{"\n"}tus pesos.
+      </Text>
+      <Text style={[s.fciBody, { color: "rgba(250,250,247,0.72)" }]}>
+        Los Fondos Comunes de Inversión son una de las formas más elegidas en
+        Argentina. Rinden más que un plazo fijo, tu plata queda líquida y
+        empezás con poco.
+      </Text>
+
+      <View style={s.fciFeatures}>
+        <View
+          style={[
+            s.fciFeature,
+            { borderColor: "rgba(250,250,247,0.12)" },
+          ]}
+        >
+          <Text style={[s.fciFeatureValue, { color: c.bg }]}>$ 1.000</Text>
+          <Text
+            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
+          >
+            mínimo
+          </Text>
+        </View>
+        <View
+          style={[
+            s.fciFeature,
+            { borderColor: "rgba(250,250,247,0.12)" },
+          ]}
+        >
+          <Text style={[s.fciFeatureValue, { color: c.bg }]}>~37% TNA</Text>
+          <Text
+            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
+          >
+            pesos
+          </Text>
+        </View>
+        <View
+          style={[
+            s.fciFeature,
+            { borderColor: "rgba(250,250,247,0.12)" },
+          ]}
+        >
+          <Text style={[s.fciFeatureValue, { color: c.bg }]}>T+0</Text>
+          <Text
+            style={[s.fciFeatureLabel, { color: "rgba(250,250,247,0.56)" }]}
+          >
+            liquidez
+          </Text>
+        </View>
+      </View>
+
+      <Pressable
+        style={[s.fciBtn, { backgroundColor: c.green }]}
+        onPress={onPress}
+      >
+        <Text style={[s.fciBtnText, { color: c.ink }]}>
+          Explorar fondos
+        </Text>
+        <Feather name="arrow-right" size={16} color={c.ink} />
+      </Pressable>
+    </View>
+  );
+}
+
+function UniversityCallout() {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      style={[
+        s.uniCard,
+        { backgroundColor: c.surface, borderColor: c.border },
+      ]}
+      onPress={() =>
+        Linking.openURL("https://alamos.capital/university").catch(() => {})
+      }
+    >
+      <View style={[s.uniIcon, { backgroundColor: c.surfaceHover }]}>
+        <Feather name="book-open" size={18} color={c.text} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.uniTitle, { color: c.text }]}>
+          ¿Primera vez invirtiendo?
+        </Text>
+        <Text style={[s.uniBody, { color: c.textMuted }]}>
+          Aprendé desde cero en{" "}
+          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+            Alamos University
+          </Text>
+          . Guías, tutoriales y casos del mercado argentino.
+        </Text>
+      </View>
+      <Feather name="arrow-up-right" size={18} color={c.textMuted} />
+    </Pressable>
   );
 }
 
@@ -602,6 +712,113 @@ function allocationColor(cat: AssetCategory, c: ThemeColors): string {
 }
 
 const s = StyleSheet.create({
+  /* ─── FCI Callout ─── */
+  fciCard: {
+    marginHorizontal: 20,
+    marginTop: 36,
+    padding: 22,
+    borderRadius: radius.xl,
+  },
+  fciEyebrow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  fciDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  fciEyebrowText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  fciTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 32,
+    lineHeight: 34,
+    letterSpacing: -1.2,
+    marginBottom: 14,
+  },
+  fciBody: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.1,
+    marginBottom: 20,
+  },
+  fciFeatures: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+  },
+  fciFeature: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 2,
+  },
+  fciFeatureValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  fciFeatureLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
+  fciBtn: {
+    height: 48,
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  fciBtnText: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+
+  /* ─── University Callout ─── */
+  uniCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 18,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  uniIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uniTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  uniBody: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: -0.1,
+  },
+
+  /* ─── Core layout ─── */
   root: { flex: 1 },
   topBar: {
     paddingHorizontal: 20,
