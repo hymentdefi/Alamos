@@ -19,6 +19,7 @@ import {
   ScrollView,
   RefreshControl,
   PanResponder,
+  Easing,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -382,45 +383,86 @@ function NewsCard({
   height: number;
   onOpenDetail: () => void;
 }) {
-  return (
-    <View style={{ height, backgroundColor: "#000" }}>
-      <Image
-        source={{ uri: item.image }}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-      />
-      <LinearGradient
-        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.96)"]}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFillObject}
-      />
+  const { c } = useTheme();
 
-      {/* Scroll hint: arriba, centrado, solo icono */}
+  // Float animation — la imagen "respira" suave, loop infinito
+  const float = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 1900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 1900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [float]);
+
+  const translateY = float.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-8, 8],
+  });
+
+  return (
+    <View style={{ height, backgroundColor: c.bg }}>
+      {/* Scroll hint arriba */}
       <ScrollHint />
 
-      {/* Bottom content */}
-      <View style={card.bottom} pointerEvents="box-none">
-        <Text style={card.source}>
+      {/* Imagen flotante cuadrada */}
+      <View style={card.imageWrap}>
+        <Animated.View style={{ transform: [{ translateY }] }}>
+          <View style={[card.imageShadow, { shadowColor: c.ink }]}>
+            <Image
+              source={{ uri: item.image }}
+              style={card.imageSquare}
+              resizeMode="cover"
+            />
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* Contenido debajo */}
+      <View style={card.bottom}>
+        <Text style={[card.source, { color: c.textMuted }]}>
           {item.source} · {item.time}
         </Text>
-        <Text style={card.title}>{item.title}</Text>
-        <Text style={card.summary} numberOfLines={3}>
+        <Text style={[card.title, { color: c.text }]}>{item.title}</Text>
+        <Text
+          style={[card.summary, { color: c.textSecondary }]}
+          numberOfLines={3}
+        >
           {item.summary}
         </Text>
 
         {item.tickers?.length ? (
           <View style={card.tickerRow}>
             {item.tickers.map((t) => (
-              <View key={t} style={card.tickerPill}>
-                <Text style={card.tickerText}>{t}</Text>
+              <View
+                key={t}
+                style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
+              >
+                <Text style={[card.tickerText, { color: c.text }]}>{t}</Text>
               </View>
             ))}
           </View>
         ) : null}
 
-        <Pressable style={card.readBtn} onPress={onOpenDetail}>
-          <Feather name="chevron-up" size={16} color="#000" />
-          <Text style={card.readBtnText}>Leer noticia</Text>
+        <Pressable
+          style={[card.readBtn, { backgroundColor: c.ink }]}
+          onPress={onOpenDetail}
+        >
+          <Feather name="chevron-up" size={16} color={c.bg} />
+          <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
         </Pressable>
       </View>
     </View>
@@ -430,8 +472,9 @@ function NewsCard({
 /* ─── Indicador animado de scroll ─── */
 
 function ScrollHint() {
+  const { c } = useTheme();
   const bounce = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0.5)).current;
+  const fade = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -450,12 +493,12 @@ function ScrollHint() {
         ]),
         Animated.sequence([
           Animated.timing(fade, {
-            toValue: 1,
+            toValue: 0.9,
             duration: 700,
             useNativeDriver: true,
           }),
           Animated.timing(fade, {
-            toValue: 0.5,
+            toValue: 0.4,
             duration: 700,
             useNativeDriver: true,
           }),
@@ -477,12 +520,12 @@ function ScrollHint() {
         },
       ]}
     >
-      <Feather name="chevron-up" size={22} color="#FFF" />
+      <Feather name="chevron-up" size={20} color={c.textMuted} />
       <Feather
         name="chevron-up"
-        size={22}
-        color="#FFF"
-        style={{ marginTop: -14, opacity: 0.6 }}
+        size={20}
+        color={c.textMuted}
+        style={{ marginTop: -12, opacity: 0.5 }}
       />
     </Animated.View>
   );
@@ -647,50 +690,62 @@ const s = StyleSheet.create({
 });
 
 const card = StyleSheet.create({
+  imageWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+  },
+  imageShadow: {
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  imageSquare: {
+    width: 260,
+    height: 260,
+    borderRadius: 20,
+  },
   bottom: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 40,
-    paddingHorizontal: 20,
+    bottom: 32,
+    paddingHorizontal: 24,
   },
   source: {
-    color: "rgba(255,255,255,0.7)",
     fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.05,
     marginBottom: 8,
   },
   title: {
-    color: "#FFF",
     fontFamily: fontFamily[700],
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 26,
+    lineHeight: 30,
     letterSpacing: -0.8,
     marginBottom: 10,
   },
   summary: {
-    color: "rgba(255,255,255,0.82)",
     fontFamily: fontFamily[500],
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: -0.1,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   tickerRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   tickerPill: {
-    backgroundColor: "rgba(255,255,255,0.16)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.sm,
   },
   tickerText: {
-    color: "#FFF",
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 0.2,
@@ -700,13 +755,11 @@ const card = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#FFF",
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: radius.pill,
   },
   readBtnText: {
-    color: "#000",
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.15,
