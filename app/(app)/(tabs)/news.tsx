@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 
 interface NewsItem {
   id: string;

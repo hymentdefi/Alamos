@@ -28,11 +28,11 @@ export interface Asset {
 }
 
 export const assets: Asset[] = [
-  // ─── Efectivo (es un activo más de la cartera) ───
+  // ─── Dinero (pesos y dólares como activos) ───
   {
     ticker: "ARS",
-    name: "Pesos argentinos",
-    subLabel: "Efectivo · Disponible",
+    name: "Pesos",
+    subLabel: "Listos para invertir",
     iconCode: "$",
     iconTone: "accent",
     category: "efectivo",
@@ -40,6 +40,18 @@ export const assets: Asset[] = [
     change: 0,
     held: true,
     qty: 342180,
+  },
+  {
+    ticker: "USD",
+    name: "Dólares",
+    subLabel: "Dólar MEP · saldo",
+    iconCode: "US",
+    iconTone: "dark",
+    category: "efectivo",
+    price: 1200, // tipo de cambio mock — dólar MEP en ARS
+    change: 0,
+    held: true,
+    qty: 850,
   },
 
   // ─── CEDEARs (acciones USA representadas localmente) ───
@@ -390,7 +402,7 @@ export const assetCategories = [
 
 /** Labels de categorías para display en grupos / leyendas. */
 export const categoryLabels: Record<AssetCategory, string> = {
-  efectivo: "Efectivo",
+  efectivo: "Dinero",
   cedears: "CEDEARs",
   bonos: "Bonos",
   fci: "Fondos",

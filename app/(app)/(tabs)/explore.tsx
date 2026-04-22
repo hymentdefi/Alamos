@@ -10,7 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 import {
   assets,
   assetIconCode,
@@ -18,7 +18,7 @@ import {
   formatPct,
   type Asset,
   type AssetCategory,
-} from "../../lib/data/assets";
+} from "../../../lib/data/assets";
 
 type Filter = "todo" | AssetCategory | "favoritos";
 

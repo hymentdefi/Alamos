@@ -1,103 +1,40 @@
-import { Tabs } from "expo-router";
-import { Platform, View, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily } from "../../lib/theme";
+import { Stack } from "expo-router";
+import { useTheme } from "../../lib/theme";
 
 export default function AppLayout() {
   const { c } = useTheme();
 
   return (
-    <Tabs
+    <Stack
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarStyle: {
-          backgroundColor: c.bg,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-          height: Platform.OS === "ios" ? 84 : 68,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === "ios" ? 22 : 10,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarActiveTintColor: c.text,
-        tabBarInactiveTintColor: c.textFaint,
-        tabBarLabelStyle: {
-          fontFamily: fontFamily[600],
-          fontSize: 11,
-          letterSpacing: -0.1,
-          marginTop: 2,
-        },
+        contentStyle: { backgroundColor: c.bg },
+        animation: "slide_from_right",
+        animationDuration: 260,
+        gestureEnabled: true,
+        gestureDirection: "horizontal",
+        fullScreenGestureEnabled: true,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Inicio",
-          tabBarIcon: ({ color }) => (
-            <View style={st.iconWrap}>
-              <Feather name="home" size={22} color={color} />
-            </View>
-          ),
-        }}
+      <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
+      <Stack.Screen name="detail" />
+      <Stack.Screen name="buy" />
+      <Stack.Screen name="confirm" />
+      <Stack.Screen
+        name="success"
+        options={{ animation: "slide_from_bottom", gestureEnabled: false }}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: "Mercado",
-          tabBarIcon: ({ color }) => (
-            <View style={st.iconWrap}>
-              <Feather name="trending-up" size={22} color={color} />
-            </View>
-          ),
-        }}
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="transfer" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="security" />
+      <Stack.Screen name="support" />
+      <Stack.Screen name="about" />
+      <Stack.Screen name="account" />
+      <Stack.Screen
+        name="onboarding"
+        options={{ animation: "fade", gestureEnabled: false }}
       />
-      <Tabs.Screen
-        name="news"
-        options={{
-          title: "Noticias",
-          tabBarIcon: ({ color }) => (
-            <View style={st.iconWrap}>
-              <Feather name="file-text" size={22} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Perfil",
-          tabBarIcon: ({ color }) => (
-            <View style={st.iconWrap}>
-              <Feather name="user" size={22} color={color} />
-            </View>
-          ),
-        }}
-      />
-
-      {/* Hidden screens (navegadas desde otras pantallas, no son tabs) */}
-      <Tabs.Screen name="onboarding" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="detail" options={{ href: null }} />
-      <Tabs.Screen name="confirm" options={{ href: null }} />
-      <Tabs.Screen name="success" options={{ href: null }} />
-      <Tabs.Screen name="buy" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="account" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
-      <Tabs.Screen name="security" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="transfer" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-      <Tabs.Screen name="about" options={{ href: null }} />
-      <Tabs.Screen name="support" options={{ href: null }} />
-    </Tabs>
+    </Stack>
   );
 }
-
-const st = StyleSheet.create({
-  iconWrap: {
-    width: 44,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

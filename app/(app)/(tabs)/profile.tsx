@@ -2,9 +2,9 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useAuth } from "../../lib/auth/context";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
-import { AlamosLogo } from "../../lib/components/Logo";
+import { useAuth } from "../../../lib/auth/context";
+import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
+import { AlamosLogo } from "../../../lib/components/Logo";
 
 interface MenuItem {
   icon: keyof typeof Feather.glyphMap;

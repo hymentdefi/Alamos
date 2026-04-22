@@ -9,7 +9,7 @@ import {
   radius,
   spacing,
   type ThemeColors,
-} from "../../lib/theme";
+} from "../../../lib/theme";
 import {
   assets,
   assetIconCode,
@@ -18,10 +18,10 @@ import {
   formatPct,
   type Asset,
   type AssetCategory,
-} from "../../lib/data/assets";
-import { useAuth } from "../../lib/auth/context";
-import { AlamosLogo } from "../../lib/components/Logo";
-import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
+} from "../../../lib/data/assets";
+import { useAuth } from "../../../lib/auth/context";
+import { AlamosLogo } from "../../../lib/components/Logo";
+import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
 type Range = "1D" | "1S" | "1M" | "3M" | "1A";
@@ -121,7 +121,12 @@ export default function HomeScreen() {
       entry.items.push(a);
       map.set(a.category, entry);
     }
-    return [...map.entries()].sort((a, b) => b[1].total - a[1].total);
+    return [...map.entries()].sort((a, b) => {
+      // Dinero siempre arriba de todo
+      if (a[0] === "efectivo") return -1;
+      if (b[0] === "efectivo") return 1;
+      return b[1].total - a[1].total;
+    });
   }, [held]);
 
   const openDetail = (asset: Asset) => {
@@ -509,9 +514,16 @@ function AssetRow({
 }) {
   const { c } = useTheme();
   const isCash = asset.category === "efectivo";
-  const value = isCash
-    ? (asset.qty ?? 0)
-    : asset.price * (asset.qty ?? 1);
+  const isUSD = asset.ticker === "USD";
+  const qty = asset.qty ?? 0;
+
+  const primaryValue = isCash
+    ? isUSD
+      ? `US$ ${qty.toLocaleString("es-AR")}`
+      : formatARS(qty)
+    : formatARS(asset.price * (asset.qty ?? 1));
+  const secondaryValue = isCash && isUSD ? formatARS(asset.price * qty) : null;
+
   const up = asset.change >= 0;
 
   const bg =
@@ -554,8 +566,12 @@ function AssetRow({
         </Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
-        <Text style={[s.rowPrice, { color: c.text }]}>{formatARS(value)}</Text>
-        {!isCash ? (
+        <Text style={[s.rowPrice, { color: c.text }]}>{primaryValue}</Text>
+        {secondaryValue ? (
+          <Text style={[s.rowChange, { color: c.textMuted }]}>
+            ≈ {secondaryValue}
+          </Text>
+        ) : !isCash ? (
           <Text style={[s.rowChange, { color: up ? c.greenDark : c.red }]}>
             {formatPct(asset.change)}
           </Text>

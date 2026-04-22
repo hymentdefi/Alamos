@@ -268,7 +268,7 @@ export default function DetailScreen() {
             backgroundColor: c.surface,
             borderTopColor: c.border,
             shadowColor: c.ink,
-            paddingBottom: insets.bottom + 14,
+            paddingBottom: insets.bottom + 6,
           },
         ]}
       >
