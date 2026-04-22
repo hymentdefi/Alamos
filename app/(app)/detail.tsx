@@ -285,6 +285,17 @@ export default function DetailScreen() {
         ]}
       >
         <Pressable
+          style={[s.btn, { backgroundColor: c.ink }]}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/buy",
+              params: { ticker: asset.ticker, mode: "buy" },
+            })
+          }
+        >
+          <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
+        </Pressable>
+        <Pressable
           style={[s.btn, { backgroundColor: c.surfaceHover }]}
           onPress={() =>
             router.push({
@@ -302,17 +313,6 @@ export default function DetailScreen() {
           >
             Vender
           </Text>
-        </Pressable>
-        <Pressable
-          style={[s.btn, { backgroundColor: c.ink }]}
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/buy",
-              params: { ticker: asset.ticker, mode: "buy" },
-            })
-          }
-        >
-          <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
         </Pressable>
       </View>
     </View>

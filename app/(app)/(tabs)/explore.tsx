@@ -133,16 +133,13 @@ function BaseExplore() {
             hitSlop={8}
             style={[
               s.favBtn,
-              {
-                backgroundColor: onlyFavs ? c.ink : c.surfaceHover,
-                borderColor: onlyFavs ? c.ink : c.border,
-              },
+              { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
             <Ionicons
               name={onlyFavs ? "star" : "star-outline"}
               size={18}
-              color={onlyFavs ? c.green : c.text}
+              color={onlyFavs ? c.greenDark : c.text}
             />
           </Pressable>
         </View>
