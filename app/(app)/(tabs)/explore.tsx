@@ -24,10 +24,6 @@ import {
 import { useFavorites } from "../../../lib/favorites/context";
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 import { useProMode } from "../../../lib/pro/context";
-import {
-  HorizontalPager,
-  type HorizontalPagerHandle,
-} from "../../../lib/components/HorizontalPager";
 import { Tap } from "../../../lib/components/Tap";
 import { isMarketOpen, marketClosedMessage } from "../../../lib/market/hours";
 
@@ -54,21 +50,17 @@ function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { favorites, isFavorite } = useFavorites();
+  const { isFavorite } = useFavorites();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
 
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const [onlyFavs, setOnlyFavs] = useState(false);
-  const pagerRef = useRef<HorizontalPagerHandle>(null);
   const filterScrollRef = useRef<ScrollView>(null);
-  const pageRefs = useRef<Record<string, ScrollView | null>>({});
-  const pageRefSetters = useRef<Record<string, (r: ScrollView | null) => void>>(
-    {},
-  );
+  const listRef = useRef<ScrollView | null>(null);
 
-  const filter = filters[activeIdx].id;
+  const filter = filters[activeIdx];
 
   const topMovers = useMemo(
     () =>
@@ -100,7 +92,7 @@ function BaseExplore() {
     Haptics.selectionAsync().catch(() => {});
   };
 
-  // Scroll de los pills para centrar el activo
+  // Scroll de los pills para centrar la categoría activa
   useEffect(() => {
     filterScrollRef.current?.scrollTo({
       x: Math.max(0, activeIdx * 92 - 60),
@@ -111,27 +103,17 @@ function BaseExplore() {
   const openFilter = useCallback((idx: number) => {
     Haptics.selectionAsync().catch(() => {});
     setActiveIdx(idx);
-    pagerRef.current?.scrollToIndex(idx, true);
+    listRef.current?.scrollTo({ y: 0, animated: false });
   }, []);
 
-  // Tap sobre la tab Mercado estando en Mercado → scroll al tope de la página activa
+  // Tap sobre la tab Mercado estando en Mercado → scroll al tope
   useEffect(() => {
     const unsub = navigation.addListener("tabPress" as never, () => {
       if (!isFocused) return;
-      const id = filters[activeIdx].id;
-      pageRefs.current[id]?.scrollTo({ y: 0, animated: true });
+      listRef.current?.scrollTo({ y: 0, animated: true });
     });
     return unsub;
-  }, [navigation, isFocused, activeIdx]);
-
-  const setPageRef = useCallback((id: string) => {
-    if (!pageRefSetters.current[id]) {
-      pageRefSetters.current[id] = (ref) => {
-        pageRefs.current[id] = ref;
-      };
-    }
-    return pageRefSetters.current[id];
-  }, []);
+  }, [navigation, isFocused]);
 
   const marketOpen = isMarketOpen();
 
@@ -234,24 +216,17 @@ function BaseExplore() {
         </ScrollView>
       </View>
 
-      <HorizontalPager
-        ref={pagerRef}
-        items={filters}
-        index={activeIdx}
-        onIndexChange={setActiveIdx}
-        keyExtractor={(f) => f.id}
-        renderItem={(f) => (
-          <MarketPage
-            filter={f.id}
-            label={f.label}
-            query={query}
-            onlyFavs={onlyFavs}
-            topMovers={topMovers}
-            onOpen={openDetail}
-            isFavorite={isFavorite}
-            listRef={setPageRef(f.id)}
-          />
-        )}
+      <MarketPage
+        filter={filter.id}
+        label={filter.label}
+        query={query}
+        onlyFavs={onlyFavs}
+        topMovers={topMovers}
+        onOpen={openDetail}
+        isFavorite={isFavorite}
+        listRef={(r) => {
+          listRef.current = r;
+        }}
       />
     </View>
   );
@@ -411,8 +386,6 @@ function MarketPage({
 
 const CARD_W = 160;
 const GAP = 12;
-/** Velocidad del auto-scroll en px/s. */
-const AUTO_SPEED = 22;
 
 function MoversMarquee({
   movers,
@@ -422,65 +395,19 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-  const scrollRef = useRef<ScrollView>(null);
-  const posRef = useRef(0);
-  const interactingRef = useRef(false);
-  // Ancho de una copia completa; como duplicamos el contenido, al cruzarlo
-  // reseteamos la posición para simular un loop infinito.
-  const loopWidth = movers.length * (CARD_W + GAP);
-
-  useEffect(() => {
-    let rafId: number;
-    let last = Date.now();
-    const tick = () => {
-      const now = Date.now();
-      const dt = (now - last) / 1000;
-      last = now;
-      if (!interactingRef.current && loopWidth > 0) {
-        posRef.current += AUTO_SPEED * dt;
-        if (posRef.current >= loopWidth) posRef.current -= loopWidth;
-        scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [loopWidth]);
-
   return (
     <View style={s.marqueeWrap}>
       <ScrollView
-        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.marqueeTrack}
-        scrollEventThrottle={16}
         decelerationRate="normal"
-        onScrollBeginDrag={() => {
-          interactingRef.current = true;
-        }}
-        onScrollEndDrag={(e) => {
-          posRef.current = e.nativeEvent.contentOffset.x;
-        }}
-        onMomentumScrollEnd={(e) => {
-          posRef.current = e.nativeEvent.contentOffset.x;
-          if (loopWidth > 0 && posRef.current >= loopWidth) {
-            posRef.current -= loopWidth;
-            scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
-          }
-          interactingRef.current = false;
-        }}
-        onScroll={(e) => {
-          if (interactingRef.current) {
-            posRef.current = e.nativeEvent.contentOffset.x;
-          }
-        }}
       >
-        {[...movers, ...movers].map((asset, idx) => {
+        {movers.map((asset) => {
           const up = asset.change >= 0;
           return (
             <Pressable
-              key={`${asset.ticker}-${idx}`}
+              key={asset.ticker}
               onPress={() => onOpen(asset)}
               style={[
                 s.moverCard,
