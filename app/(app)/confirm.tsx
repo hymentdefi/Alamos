@@ -281,6 +281,10 @@ export default function ConfirmScreen() {
 
   // Static full-circle overlay shown when arc completes at done.
   const fullCircleOpacity = useSharedValue(0);
+  // Ring + logo fade-out en error state (spec section I: "spinner
+  // decelerates smoothly" — aca el equivalente visual es un fade de
+  // 300 ms del grupo entero).
+  const heroFadeOut = useSharedValue(0);
 
   // Checkmark morph.
   const checkOpacity = useSharedValue(0);
@@ -506,6 +510,14 @@ export default function ConfirmScreen() {
     // al ver el cambio a "").
     setStatusText("");
 
+    // Ring + logo se desvanecen suavemente en 300 ms (spec I: "spinner
+    // decelerates smoothly" — el fade es el equivalente visual sin cortar
+    // la rotación abruptamente).
+    heroFadeOut.value = withTiming(1, {
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+    });
+
     // Incoming error title (same ghostly rise as status cross-fade).
     enterText(errTitleOpacity, errTitleTranslateY, errTitleScale);
 
@@ -575,6 +587,10 @@ export default function ConfirmScreen() {
 
   const fullCircleStyle = useAnimatedStyle(() => ({
     opacity: fullCircleOpacity.value,
+  }));
+  // Error state: ring + logo + check se desvanecen en 300 ms.
+  const heroFadeOutStyle = useAnimatedStyle(() => ({
+    opacity: 1 - heroFadeOut.value,
   }));
 
   const checkWrapStyle = useAnimatedStyle(() => ({
@@ -728,14 +744,18 @@ export default function ConfirmScreen() {
         >
           <View style={{ flex: 1 }} />
 
-          {/* Hero: ring + logo + checkmark, intrinsic size */}
-          <View
-            style={{
-              width: ringSize,
-              height: ringSize,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+          {/* Hero: ring + logo + checkmark. Wrapped en Animated.View
+              para soportar el fade-out en error state (spec section I). */}
+          <Animated.View
+            style={[
+              {
+                width: ringSize,
+                height: ringSize,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+              heroFadeOutStyle,
+            ]}
           >
             {/* Spinning arc (active during draw + spinner loop). */}
             <Animated.View
@@ -830,7 +850,7 @@ export default function ConfirmScreen() {
                 />
               </Svg>
             </Animated.View>
-          </View>
+          </Animated.View>
 
           {/* Spec layout: flex 0.6 gap entre el ring y el texto. */}
           <View style={{ flex: 0.6 }} />
