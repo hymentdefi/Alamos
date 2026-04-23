@@ -6,11 +6,11 @@ import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 export default function TabsLayout() {
   const { mode, c } = useTheme();
   const isDark = mode === "dark";
-  // Fondo translúcido: off-white con alpha en light, near-black con alpha
-  // en dark. Simula ese 'vidrio esmerilado' sin necesidad de expo-blur.
+  // Fondo casi sólido con un hint de translucidez para que se sienta vivo
+  // sin perder legibilidad.
   const islandBg = isDark
-    ? "rgba(11, 14, 17, 0.78)"
-    : "rgba(250, 250, 247, 0.78)";
+    ? "rgba(18, 22, 27, 0.96)"
+    : "rgba(255, 255, 255, 0.96)";
 
   return (
     <Tabs
@@ -26,25 +26,25 @@ export default function TabsLayout() {
             style={{
               flex: 1,
               backgroundColor: islandBg,
-              borderRadius: radius.xl,
+              borderRadius: radius.xxl,
               borderWidth: 1,
               borderColor: c.border,
               shadowColor: "#000",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.08,
-              shadowRadius: 16,
-              elevation: 10,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 14,
               overflow: "hidden",
             }}
           />
         ),
         tabBarStyle: {
           position: "absolute",
-          left: 16,
-          right: 16,
-          bottom: Platform.OS === "ios" ? 22 : 16,
-          height: 64,
-          paddingTop: 10,
+          left: 24,
+          right: 24,
+          bottom: Platform.OS === "ios" ? 24 : 18,
+          height: 68,
+          paddingTop: 8,
           paddingBottom: 10,
           borderTopWidth: 0,
           backgroundColor: "transparent",

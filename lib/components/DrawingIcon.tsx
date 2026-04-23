@@ -15,13 +15,12 @@ interface Props {
 
 /** Dash length fijo — mayor que cualquier path en viewBox 24x24. */
 const DASH_LEN = 220;
+/** Color del marcador arriba del icono cuando está activa la tab. */
+const MARKER_COLOR = "#5ac43e";
 
 /**
- * Ícono de tab que se dibuja al activarse — estilo Binance.
- * Bypassea Animated.Value para el SVG (que tiene bugs con strokeDashoffset
- * en algunas versiones de react-native-svg). Usa requestAnimationFrame
- * directo para drivear el draw via setState, y Animated nativo para la
- * escala (transform, siempre funciona).
+ * Ícono de tab que se dibuja al activarse + un pill verde arriba
+ * que marca la tab activa. Haptic + scale-pop en cada cambio.
  */
 export function DrawingIcon({
   path,
@@ -32,6 +31,8 @@ export function DrawingIcon({
   duration = 460,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
+  const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const [dashOffset, setDashOffset] = useState(0);
   const prevFocused = useRef(focused);
 
@@ -39,34 +40,66 @@ export function DrawingIcon({
     const wasFocused = prevFocused.current;
     prevFocused.current = focused;
 
-    // Sin foco: reset firme, sin animación.
+    // Sin foco: reset firme + marker out.
     if (!focused) {
       scale.stopAnimation(() => scale.setValue(1));
       setDashOffset(0);
+      Animated.parallel([
+        Animated.timing(markerOpacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(markerScale, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
       return;
     }
 
-    // Ya estaba enfocado (volvimos de una subpantalla, re-render del tab bar,
-    // etc.): asegurar estado "dibujado" sin relanzar la animación.
+    // Ya estaba enfocado (re-render, vuelta de subpantalla): asegurar
+    // estado dibujado + marker visible sin re-animar.
     if (wasFocused) {
       scale.stopAnimation(() => scale.setValue(1));
       setDashOffset(0);
+      markerOpacity.setValue(1);
+      markerScale.setValue(1);
       return;
     }
 
     Haptics.selectionAsync().catch(() => {});
 
-    // Scale pop (native driver, transform — siempre funciona)
+    // Scale pop del ícono (spring).
     scale.setValue(0.4);
-    const spring = Animated.spring(scale, {
+    const iconSpring = Animated.spring(scale, {
       toValue: 1,
       tension: 140,
       friction: 5,
       useNativeDriver: true,
     });
-    spring.start();
+    iconSpring.start();
 
-    // Drawing via RAF loop — no depende de Animated/SVG interop
+    // Marker fade + grow desde el centro.
+    markerOpacity.setValue(0);
+    markerScale.setValue(0.2);
+    const markerAnim = Animated.parallel([
+      Animated.timing(markerOpacity, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.spring(markerScale, {
+        toValue: 1,
+        tension: 160,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]);
+    markerAnim.start();
+
+    // Drawing via RAF loop — no depende de Animated/SVG interop.
     setDashOffset(DASH_LEN);
     let start: number | null = null;
     let raf: number;
@@ -74,7 +107,6 @@ export function DrawingIcon({
       if (start === null) start = t;
       const elapsed = t - start;
       const progress = Math.min(1, elapsed / duration);
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setDashOffset((1 - eased) * DASH_LEN);
       if (progress < 1) {
@@ -87,13 +119,24 @@ export function DrawingIcon({
 
     return () => {
       cancelAnimationFrame(raf);
-      spring.stop();
+      iconSpring.stop();
+      markerAnim.stop();
       scale.setValue(1);
     };
-  }, [focused, duration, scale]);
+  }, [focused, duration, scale, markerScale, markerOpacity]);
 
   return (
     <View style={s.wrap}>
+      <Animated.View
+        style={[
+          s.marker,
+          {
+            backgroundColor: MARKER_COLOR,
+            opacity: markerOpacity,
+            transform: [{ scaleX: markerScale }],
+          },
+        ]}
+      />
       <Animated.View style={{ transform: [{ scale }] }}>
         <Svg width={size} height={size} viewBox={viewBox}>
           <Path
@@ -114,10 +157,16 @@ export function DrawingIcon({
 
 const s = StyleSheet.create({
   wrap: {
-    width: 44,
-    height: 32,
+    width: 48,
+    height: 38,
     alignItems: "center",
-    justifyContent: "center",
+    paddingTop: 2,
+    gap: 5,
+  },
+  marker: {
+    width: 22,
+    height: 3,
+    borderRadius: 2,
   },
 });
 
