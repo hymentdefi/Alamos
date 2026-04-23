@@ -172,9 +172,9 @@ function BaseHome() {
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
-  // Color del trazo del chart: verde más vivo al estilo Robinhood,
-  // separado del trendColor que usamos para textos y pills.
-  const chartColor = isUp ? c.green : c.red;
+  // Color del trazo del chart: verde Alamos específico para charts
+  // (#5ac43e), separado del trendColor que usamos para textos y pills.
+  const chartColor = isUp ? "#5ac43e" : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -301,7 +301,7 @@ function BaseHome() {
             color={chartColor}
             height={260}
             withFill={false}
-            strokeWidth={2.2}
+            strokeWidth={1.4}
             smooth={false}
             onScrub={(idx) => setScrubIndex(idx)}
             onScrubEnd={() => setScrubIndex(null)}
