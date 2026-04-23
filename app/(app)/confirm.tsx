@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -34,46 +34,47 @@ import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-/** Helper para el único haptic .success de la pantalla, al aparecer el
- * checkmark. Total de haptics en el flow = 2 (el del SwipeToSubmit al
- * completar + este). */
 function fireSuccessHaptic() {
   Haptics.notificationAsync(
     Haptics.NotificationFeedbackType.Success,
   ).catch(() => {});
 }
+function fireErrorHaptic() {
+  Haptics.notificationAsync(
+    Haptics.NotificationFeedbackType.Error,
+  ).catch(() => {});
+}
 
-/** Alias para tipado corto en el helper crossfadeText. */
 type SharedValueOf<T> = { value: T };
 
-/** Alto visible de la franja verde (pill del SwipeToSubmit) en reposo. */
 const STRIP_HEIGHT = 72;
-/** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
-/** "Orden Enviada..." — corto, sólo confirma que salió. */
 const PHASE_SENDING_MS = 900;
-/** "Orden Recibida..." — queda un buen tiempo. */
 const PHASE_RECEIVED_MS = 2400;
-/** Mínimo absoluto de loading antes de mostrar success. */
 const MIN_LOADING_MS = 600;
-/** Hold del estado "Orden Ejecutada" con el checkmark antes de navegar. */
 const DONE_HOLD_MS = 1700;
-/** Longitud del path del checkmark (viewBox 0 0 24 24). */
+const TIMEOUT_MS = 8000;
 const CHECK_PATH_LEN = 24;
-/** Fracción del ancho de pantalla que ocupa el ring. */
-const RING_DIAMETER_FRACTION = 0.27;
-/** Stroke width como fracción del diámetro del ring. */
-const RING_STROKE_FRACTION = 0.028;
-/** Duración del loop de rotación del spinner (ms). */
 const SPIN_DURATION_MS = 1000;
-/** Circunferencia en unidades del viewBox (r=44). */
+// SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
-/** Arco visible del spinner: 75° ≈ 20% de la circunferencia. */
+// Spinner arc once the draw completes: 75° ≈ 20% of circumference.
 const ARC_LEN = CIRC * (75 / 360);
+
+// Cross-fade timings (spec C) — non-negotiable.
+const OUT_DURATION = 600;
+const IN_DURATION = 700;
+const IN_DELAY = 100;
+const GHOST_OPACITY = 0.05;
+const RISE_DISTANCE = 60;
+const START_SCALE = 0.82;
+
+const outEasing = Easing.out(Easing.cubic);
+const inEasing = Easing.bezier(0.16, 1, 0.3, 1);
 
 const AVAILABLE_ARS = 1272850;
 
-type Phase = "idle" | "sending" | "received" | "done";
+type Phase = "idle" | "sending" | "received" | "done" | "error";
 
 export default function ConfirmScreen() {
   const { ticker, amount, mode } = useLocalSearchParams<{
@@ -84,7 +85,7 @@ export default function ConfirmScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { width: windowW } = useWindowDimensions();
+  const { width: windowW, height: windowH } = useWindowDimensions();
 
   const asset = assets.find((a) => a.ticker === ticker);
   const isSell = mode === "sell";
@@ -94,68 +95,75 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  // Ring sizing basado en el viewport actual (no Dimensions.get).
-  const ringSize = Math.round(windowW * RING_DIAMETER_FRACTION);
-  // Stroke: target fijo 2.5 px en pantalla (spec), pero con floor para
-  // que en phones muy chiquitos no se vea demasiado fino.
+  // Ring sizing (spec D): 56% of screen width, clamped 220..320.
+  const ringSize = Math.min(
+    320,
+    Math.max(220, Math.round(windowW * 0.56)),
+  );
   const ringStrokeScreen = Math.max(
     2.5,
-    Math.round(ringSize * RING_STROKE_FRACTION * 10) / 10,
+    Math.round(ringSize * 0.014 * 10) / 10,
   );
-  // Stroke en unidades del viewBox 100. El viewBox escala a ringSize px.
+  // viewBox is 100 → convert screen-px stroke to viewBox units.
   const ringStrokeViewBox = (ringStrokeScreen / ringSize) * 100;
-  const logoInnerSize = Math.round(ringSize * 0.58);
-  const checkSize = Math.round(ringSize * 0.56);
+  // Logo inside the ring: 44% of the ring diameter.
+  const logoInnerSize = Math.round(ringSize * 0.44);
+  const checkSize = Math.round(ringSize * 0.48);
 
-  // ─── Shared values (todos viven en UI thread) ───
-  // Progreso del swipe (0..1). Lo escribe SwipeToSubmit desde su worklet.
+  // Logo entrance travel: 22% of screen height (~180px on a standard iPhone).
+  const entranceTravel = Math.round(windowH * 0.22);
+
+  // ─── Shared values ─────────────────────────────────────────────
+  // SwipeToSubmit writes this from its worklet (0..1) to move the green cover.
   const greenProgress = useSharedValue(0);
 
-  // Entry staggered del overlay.
-  // t=0ms: logo cae + rota.
-  const logoEntry = useSharedValue(0);
-  // t=250ms: el circle se dibuja (strokeDashoffset CIRC→0) y el wrapper
-  // rota -90→270 simultáneamente.
-  const circleDraw = useSharedValue(0);
-  // t=350ms: el texto entra con z-depth.
-  const textEntry = useSharedValue(0);
-
-  // Rotación continua del spinner (se enciende cuando el draw termina).
-  const spinDeg = useSharedValue(-90);
-
-  // Opacidades/escalas/Y de cada texto (stacked, no condicionales).
-  // Iniciales: scale 0.82 + translateY +12 (entra desde atrás y abajo).
-  const txSendingOpacity = useSharedValue(0);
-  const txSendingScale = useSharedValue(0.82);
-  const txSendingY = useSharedValue(12);
-  const txReceivedOpacity = useSharedValue(0);
-  const txReceivedScale = useSharedValue(0.82);
-  const txReceivedY = useSharedValue(12);
-  const txDoneOpacity = useSharedValue(0);
-  const txDoneScale = useSharedValue(0.82);
-  const txDoneY = useSharedValue(12);
-
-  // Morph logo→check.
-  const logoOpacity = useSharedValue(1);
+  // Logo entrance (spec A) — independent translate/opacity/rotate.
+  const logoTranslateY = useSharedValue(entranceTravel);
+  const logoOpacity = useSharedValue(0);
+  const logoRotate = useSharedValue(-15);
+  // Logo morph to check (done phase): scale 1 → 0.7.
   const logoScale = useSharedValue(1);
+
+  // Ring draw (spec B) + continuous spinner.
+  const ringProgress = useSharedValue(0);
+  const ringRotation = useSharedValue(-90);
+
+  // Static full-circle overlay shown when arc completes at done.
+  const fullCircleOpacity = useSharedValue(0);
+
+  // Checkmark morph.
   const checkOpacity = useSharedValue(0);
   const checkScale = useSharedValue(0.5);
   const checkOffset = useSharedValue(CHECK_PATH_LEN);
 
-  // Cross-fade del arc al full-circle (estático) cuando se confirma.
-  const fullCircleOpacity = useSharedValue(0);
+  // Status-text slots. Each has opacity/translateY/scale.
+  // "sending" is the initial incoming text → starts in ghost state.
+  const sendOpacity = useSharedValue(GHOST_OPACITY);
+  const sendTranslateY = useSharedValue(80);
+  const sendScale = useSharedValue(START_SCALE);
+  const recvOpacity = useSharedValue(0);
+  const recvTranslateY = useSharedValue(RISE_DISTANCE);
+  const recvScale = useSharedValue(START_SCALE);
+  const doneOpacity = useSharedValue(0);
+  const doneTranslateY = useSharedValue(RISE_DISTANCE);
+  const doneScale = useSharedValue(START_SCALE);
+  // Error title + subtitle + "Volver" button.
+  const errTitleOpacity = useSharedValue(0);
+  const errTitleTranslateY = useSharedValue(RISE_DISTANCE);
+  const errTitleScale = useSharedValue(START_SCALE);
+  const errSubOpacity = useSharedValue(0);
+  const errBtnOpacity = useSharedValue(0);
 
   const [phase, setPhase] = useState<Phase>("idle");
-  // Flag UI-thread: cuando el draw termina, arrancamos el spinner loop.
   const [spinnerRunning, setSpinnerRunning] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completedRef = useRef(false);
 
-  // El loop del spinner arranca cuando circleDraw terminó. Arrancamos
-  // desde 270° (= donde quedó el wrapper al final del orbit draw) para
-  // continuidad visual sin saltos. Loop infinito lineal a 1000 ms.
+  // Infinite spinner loop starts once the draw completes.
   useEffect(() => {
     if (!spinnerRunning) return;
-    spinDeg.value = 270;
-    spinDeg.value = withRepeat(
+    ringRotation.value = 270;
+    ringRotation.value = withRepeat(
       withTiming(270 + 360, {
         duration: SPIN_DURATION_MS,
         easing: Easing.linear,
@@ -166,137 +174,141 @@ export default function ConfirmScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinnerRunning]);
 
-  /** Cross-fade de textos estilo Robinhood:
-   *   – SALIENTE se desvanece EN SU LUGAR: opacity 1→0 + scale 1→0.95,
-   *     sin translateY. 250 ms ease-in.
-   *   – ENTRANTE viene desde abajo con recorrido largo: translateY +60→0
-   *     + scale 0.82→1 + opacity 0→1. 500 ms ease-out-expo.
-   *   Los dos arrancan simultáneamente; el frame donde se superponen es
-   *   lo que da el "aura". */
-  const crossfadeText = (
-    fromOpacity: SharedValueOf<number>,
-    fromScale: SharedValueOf<number>,
-    _fromY: SharedValueOf<number>,
-    toOpacity: SharedValueOf<number>,
-    toScale: SharedValueOf<number>,
-    toY: SharedValueOf<number>,
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  /** Spec C: incoming text rises from +60 below, ghost→solid + 0.82→1 scale,
+   *  700ms easeOutExpo, 100ms delay (creates ~400ms ghostly overlap with the
+   *  outgoing fade). */
+  const enterText = (
+    op: SharedValueOf<number>,
+    ty: SharedValueOf<number>,
+    sc: SharedValueOf<number>,
   ) => {
-    // Saliente: no se mueve, sólo fade + scale down sutil.
-    fromOpacity.value = withTiming(0, {
-      duration: 250,
-      easing: Easing.in(Easing.quad),
-    });
-    fromScale.value = withTiming(0.95, {
-      duration: 250,
-      easing: Easing.in(Easing.quad),
-    });
-    // Entrante: valores iniciales explícitos (por si quedó con otros
-    // valores de un crossfade anterior), y luego animaciones largas.
-    toScale.value = 0.82;
-    toY.value = 60;
-    toOpacity.value = withTiming(1, {
-      duration: 500,
-      easing: Easing.bezier(0.16, 1, 0.3, 1),
-    });
-    toScale.value = withTiming(1, {
-      duration: 500,
-      easing: Easing.bezier(0.16, 1, 0.3, 1),
-    });
-    toY.value = withTiming(0, {
-      duration: 500,
-      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    op.value = GHOST_OPACITY;
+    ty.value = RISE_DISTANCE;
+    sc.value = START_SCALE;
+    op.value = withDelay(
+      IN_DELAY,
+      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+    );
+    ty.value = withDelay(
+      IN_DELAY,
+      withTiming(0, { duration: IN_DURATION, easing: inEasing }),
+    );
+    sc.value = withDelay(
+      IN_DELAY,
+      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+    );
+  };
+
+  /** Spec C: outgoing text fades IN PLACE — only opacity animates, never
+   *  translateY or scale. */
+  const exitText = (op: SharedValueOf<number>) => {
+    op.value = withTiming(0, {
+      duration: OUT_DURATION,
+      easing: outEasing,
     });
   };
 
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // ─── Entry staggered (secuencia ~1.7 s) ────────────────────────
-    // t=0: logo con spring lento. Viene desde MUY abajo (+120 px) para
-    // que el recorrido sea visible, no un pop.
-    logoEntry.value = withSpring(1, {
+    // ─── t=0: Logo entrance ─ slow spring over ~700ms, ~180px visible rise.
+    logoTranslateY.value = withSpring(0, {
       mass: 1,
-      stiffness: 120,
-      damping: 14,
+      stiffness: 55,
+      damping: 12,
+      overshootClamping: false,
+      restDisplacementThreshold: 0.01,
+      restSpeedThreshold: 0.01,
     });
-    // t=300: círculo se dibuja (strokeDashoffset) + orbit rotation.
-    // Duración 1100 ms ease-out-quint.
-    circleDraw.value = withDelay(
-      300,
+    logoOpacity.value = withTiming(1, {
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+    });
+    logoRotate.value = withSpring(0, {
+      mass: 1,
+      stiffness: 55,
+      damping: 12,
+    });
+
+    // ─── t=250ms: ring draws around logo over 900ms, then becomes spinner.
+    ringProgress.value = withDelay(
+      250,
       withTiming(
         1,
-        { duration: 1100, easing: Easing.bezier(0.22, 1, 0.36, 1) },
+        { duration: 900, easing: Easing.bezier(0.22, 1, 0.36, 1) },
         (finished) => {
           "worklet";
-          if (finished) {
-            runOnJS(setSpinnerRunning)(true);
-          }
+          if (finished) runOnJS(setSpinnerRunning)(true);
         },
       ),
     );
-    // t=600: texto "Orden Enviada..." entra desde MUY abajo (+80 px)
-    // con z-depth (scale 0.82 → 1.0) en 500 ms ease-out-expo. Recorrido
-    // visible, no pop.
-    txSendingScale.value = 0.82;
-    txSendingY.value = 80;
-    txSendingOpacity.value = withDelay(
-      600,
-      withTiming(1, {
-        duration: 500,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-      }),
-    );
-    txSendingScale.value = withDelay(
-      600,
-      withTiming(1, {
-        duration: 500,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-      }),
-    );
-    txSendingY.value = withDelay(
-      600,
-      withTiming(0, {
-        duration: 500,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
+    ringRotation.value = withDelay(
+      250,
+      withTiming(270, {
+        duration: 900,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
       }),
     );
 
-    // Mínimo 600 ms de loading incluso si el "API" respondiera instantáneo.
-    const apiCall = wait(PHASE_SENDING_MS);
-    const minLoading = wait(MIN_LOADING_MS);
-    await Promise.all([apiCall, minLoading]);
+    // ─── t=500ms: "Orden Enviada..." arrives as logo is settling.
+    // Starts in ghost state from useSharedValue init; animates with 700ms
+    // easeOutExpo. No IN_DELAY here — the 500ms delay already covers the
+    // stagger from the logo entrance.
+    sendOpacity.value = withDelay(
+      500,
+      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+    );
+    sendTranslateY.value = withDelay(
+      500,
+      withTiming(0, { duration: IN_DURATION, easing: inEasing }),
+    );
+    sendScale.value = withDelay(
+      500,
+      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+    );
 
-    // Fase 2: cross-fade "Enviada" → "Recibida" con escala.
+    // Watchdog: if nothing confirms in 8s, fall into error state.
+    timeoutRef.current = setTimeout(() => {
+      if (completedRef.current) return;
+      triggerError();
+    }, TIMEOUT_MS);
+
+    // Wait for the "API call" + minimum loading window.
+    await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
+    if (completedRef.current) return;
+
+    // Phase 2: sending → received.
     setPhase("received");
-    crossfadeText(
-      txSendingOpacity,
-      txSendingScale,
-      txSendingY,
-      txReceivedOpacity,
-      txReceivedScale,
-      txReceivedY,
-    );
+    exitText(sendOpacity);
+    enterText(recvOpacity, recvTranslateY, recvScale);
 
     await wait(PHASE_RECEIVED_MS);
+    if (completedRef.current) return;
 
-    // Fase 3: cross-fade a "Ejecutada" + morph logo→check.
+    // Phase 3: received → done + morph logo to checkmark.
     setPhase("done");
-    crossfadeText(
-      txReceivedOpacity,
-      txReceivedScale,
-      txReceivedY,
-      txDoneOpacity,
-      txDoneScale,
-      txDoneY,
-    );
+    completedRef.current = true;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
-    // Spinner arc → full circle estático.
+    exitText(recvOpacity);
+    enterText(doneOpacity, doneTranslateY, doneScale);
+
+    // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {
       duration: 300,
       easing: Easing.out(Easing.cubic),
     });
 
-    // Logo: fade-out + scale down 200 ms ease-in.
+    // Logo fades out + scales down, then checkmark pops in.
     logoOpacity.value = withTiming(0, {
       duration: 200,
       easing: Easing.in(Easing.quad),
@@ -306,15 +318,14 @@ export default function ConfirmScreen() {
       easing: Easing.in(Easing.quad),
     });
 
-    // Check: 50 ms delay, luego pop con spring (overshoot controlado).
-    // En el callback del spring firamos el único haptic de success.
-    checkScale.value = 0.5;
+    // Check: 250ms after the logo fade begins (= ~50ms after logo is gone).
+    // Spring pop with overshoot; haptic fires on the spring's rest frame.
     checkOpacity.value = withDelay(
-      50,
-      withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) }),
+      250,
+      withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }),
     );
     checkScale.value = withDelay(
-      50,
+      250,
       withSpring(
         1,
         { mass: 0.8, stiffness: 220, damping: 12 },
@@ -324,16 +335,11 @@ export default function ConfirmScreen() {
         },
       ),
     );
-    // Stroke-draw del check en paralelo al pop.
     checkOffset.value = withDelay(
-      80,
-      withTiming(0, {
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-      }),
+      280,
+      withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) }),
     );
 
-    // Hold 1.7 s sobre el estado success.
     await wait(DONE_HOLD_MS);
 
     router.replace({
@@ -347,12 +353,36 @@ export default function ConfirmScreen() {
     });
   };
 
-  /* ─── Estilos animados (todos UI thread) ─────────────────────── */
+  const triggerError = () => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    setPhase("error");
+    fireErrorHaptic();
 
-  // Cover verde fullscreen: translateY desde (screenH - strip - safe)
-  // hasta 0, bindeado directamente a greenProgress (que SwipeToSubmit
-  // escribe desde su worklet).
-  const { height: windowH } = useWindowDimensions();
+    // Fade out whichever status text is currently visible.
+    exitText(sendOpacity);
+    exitText(recvOpacity);
+    exitText(doneOpacity);
+
+    // Incoming error title (same ghostly rise as status cross-fade).
+    enterText(errTitleOpacity, errTitleTranslateY, errTitleScale);
+
+    // Subtitle fades in after the title is mostly settled.
+    errSubOpacity.value = withDelay(
+      500,
+      withTiming(1, { duration: 400, easing: inEasing }),
+    );
+
+    // "Volver" button comes in last.
+    errBtnOpacity.value = withDelay(
+      900,
+      withTiming(1, { duration: 400, easing: inEasing }),
+    );
+  };
+
+  /* ─── Animated styles ─────────────────────────────────────────── */
+
+  // Green cover slides up as SwipeToSubmit progress advances.
   const greenCoverStyle = useAnimatedStyle(() => {
     const startY = windowH - (STRIP_HEIGHT + insets.bottom);
     return {
@@ -369,80 +399,43 @@ export default function ConfirmScreen() {
     };
   });
 
-  // ── Entry: logo "planea" desde muy abajo con rotate + scale ──
-  // translateY +120 → 0 (recorrido largo, visible). Rotate -15° → 0.
-  const logoEntryStyle = useAnimatedStyle(() => ({
-    opacity: logoEntry.value,
+  // Logo wrapper: translateY (rise) + rotate (plane-in) + scale (done morph).
+  const logoWrapStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
     transform: [
-      {
-        scale: interpolate(
-          logoEntry.value,
-          [0, 1],
-          [0.6, 1],
-          Extrapolation.CLAMP,
-        ),
-      },
-      {
-        rotate: `${interpolate(logoEntry.value, [0, 1], [-15, 0], Extrapolation.CLAMP)}deg`,
-      },
-      {
-        translateY: interpolate(
-          logoEntry.value,
-          [0, 1],
-          [120, 0],
-          Extrapolation.CLAMP,
-        ),
-      },
+      { translateY: logoTranslateY.value },
+      { rotate: `${logoRotate.value}deg` },
+      { scale: logoScale.value },
     ],
   }));
 
-  // ── Circle draw: strokeDashoffset + orbit rotation (-90→270). ──
-  // Mientras se dibuja, el wrapper rota; cuando termina, spinnerRunning
-  // pasa a true y `spinDeg` toma el control del loop.
+  // Ring arc: animate ONLY strokeDashoffset (spec D — dasharray is static).
   const drawStrokeProps = useAnimatedProps(() => ({
     strokeDashoffset: interpolate(
-      circleDraw.value,
+      ringProgress.value,
       [0, 1],
       [CIRC, 0],
       Extrapolation.CLAMP,
     ),
   }));
 
-  // Rotación del wrapper SVG: -90 al inicio (para empezar el stroke en
-  // las 12), luego o bien (a) orbit rotation durante el draw, o (b) el
-  // loop infinito del spinDeg. Priorizamos spinDeg cuando está corriendo.
-  const spinnerStyle = useAnimatedStyle(() => {
-    const baseRot = spinnerRunning
-      ? spinDeg.value
-      : interpolate(
-          circleDraw.value,
-          [0, 1],
-          [-90, 270],
-          Extrapolation.CLAMP,
-        );
-    return {
-      transform: [{ rotate: `${baseRot}deg` }],
-      opacity: interpolate(
-        fullCircleOpacity.value,
-        [0, 1],
-        [1, 0],
-        Extrapolation.CLAMP,
-      ),
-    };
-  });
+  // Spinner wrapper: rotates during draw + during infinite loop.
+  // Hidden once fullCircleOpacity hits 1 (crossfades to static full circle).
+  const spinnerStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringRotation.value}deg` }],
+    opacity: interpolate(
+      fullCircleOpacity.value,
+      [0, 1],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
 
   const fullCircleStyle = useAnimatedStyle(() => ({
     opacity: fullCircleOpacity.value,
   }));
 
-  // ── Logo (en el ring): visible mientras no morph-amos al check. ──
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
-  }));
-
-  // ── Checkmark: aparece al done. ──
-  const checkStyle = useAnimatedStyle(() => ({
+  const checkWrapStyle = useAnimatedStyle(() => ({
     opacity: checkOpacity.value,
     transform: [{ scale: checkScale.value }],
   }));
@@ -450,27 +443,39 @@ export default function ConfirmScreen() {
     strokeDashoffset: checkOffset.value,
   }));
 
-  // ── Textos stackeados. Cada uno tiene su propio shared value. ──
-  const txSendingStyle = useAnimatedStyle(() => ({
-    opacity: txSendingOpacity.value,
+  const sendTextStyle = useAnimatedStyle(() => ({
+    opacity: sendOpacity.value,
     transform: [
-      { scale: txSendingScale.value },
-      { translateY: txSendingY.value },
+      { translateY: sendTranslateY.value },
+      { scale: sendScale.value },
     ],
   }));
-  const txReceivedStyle = useAnimatedStyle(() => ({
-    opacity: txReceivedOpacity.value,
+  const recvTextStyle = useAnimatedStyle(() => ({
+    opacity: recvOpacity.value,
     transform: [
-      { scale: txReceivedScale.value },
-      { translateY: txReceivedY.value },
+      { translateY: recvTranslateY.value },
+      { scale: recvScale.value },
     ],
   }));
-  const txDoneStyle = useAnimatedStyle(() => ({
-    opacity: txDoneOpacity.value,
+  const doneTextStyle = useAnimatedStyle(() => ({
+    opacity: doneOpacity.value,
     transform: [
-      { scale: txDoneScale.value },
-      { translateY: txDoneY.value },
+      { translateY: doneTranslateY.value },
+      { scale: doneScale.value },
     ],
+  }));
+  const errTitleStyle = useAnimatedStyle(() => ({
+    opacity: errTitleOpacity.value,
+    transform: [
+      { translateY: errTitleTranslateY.value },
+      { scale: errTitleScale.value },
+    ],
+  }));
+  const errSubStyle = useAnimatedStyle(() => ({
+    opacity: errSubOpacity.value,
+  }));
+  const errBtnStyle = useAnimatedStyle(() => ({
+    opacity: errBtnOpacity.value,
   }));
 
   if (!asset) return null;
@@ -486,15 +491,13 @@ export default function ConfirmScreen() {
     },
   ];
 
-  // Status bar: si estamos en fase "idle" respetamos el tema (la card es
-  // blanca); en cualquier otra fase el verde full-bleed necesita iconos
-  // blancos (light).
   const statusBarStyle = phase === "idle" ? "dark" : "light";
 
   return (
     <View style={[s.root, { backgroundColor: brand.green }]}>
       <StatusBar style={statusBarStyle} translucent />
-      {/* Card blanca con contenido */}
+
+      {/* Card blanca con el resumen de orden — detrás del cover verde */}
       <View
         style={[
           s.card,
@@ -576,19 +579,15 @@ export default function ConfirmScreen() {
         </View>
       </View>
 
-      {/* Cover verde fullscreen: traslada hacia arriba bindeado al
-          greenProgress que escribe SwipeToSubmit desde su worklet. */}
+      {/* Green cover full-bleed */}
       <Animated.View
         pointerEvents="none"
         style={[s.greenCover, { height: windowH }, greenCoverStyle]}
       />
 
-      {/* SwipeToSubmit — pill anclado al bottom. Todo el gesto y la
-          animación de swipe viven en UI thread. */}
+      {/* Swipe to submit pill anchored al bottom */}
       {phase === "idle" ? (
-        <View
-          style={[s.swipeAnchor, { paddingBottom: insets.bottom }]}
-        >
+        <View style={[s.swipeAnchor, { paddingBottom: insets.bottom }]}>
           <SwipeToSubmit
             onSubmit={runOrderFlow}
             progressOut={greenProgress}
@@ -596,166 +595,173 @@ export default function ConfirmScreen() {
         </View>
       ) : null}
 
-      {/* Overlay de ejecución — layout flex 1/3/2/2.
-          El spacer top (flex 1) + hero (flex 3) posicionan el logo
-          automáticamente al ~38% del safe area en cualquier pantalla.
-          Textos stackeados con position absolute, todos montados desde
-          el arranque y animados con opacity/scale/translateY. */}
+      {/* Execution overlay: flex 1 / ring / 0.8 / text / 1.5 (spec E).
+          Ring sits at ~35-40%, text at ~60-70% from top. */}
       {phase !== "idle" ? (
         <View
-          pointerEvents="none"
+          pointerEvents="box-none"
           style={[
             s.execOverlay,
             { paddingTop: insets.top, paddingBottom: insets.bottom },
           ]}
         >
-          {/* flex 1: spacer top */}
           <View style={{ flex: 1 }} />
 
-          {/* flex 3: hero (ring + logo + check) */}
-          <View style={s.hero}>
-            <View
-              style={{
-                width: ringSize,
-                height: ringSize,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+          {/* Hero: ring + logo + checkmark, intrinsic size */}
+          <View
+            style={{
+              width: ringSize,
+              height: ringSize,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {/* Spinning arc (active during draw + spinner loop). */}
+            <Animated.View
+              style={[s.absFill, s.centerContent, spinnerStyle]}
             >
-              {/* Spinning arc. Durante el draw rota -90→270; cuando
-                  termina, el loop infinito de spinDeg toma el control. */}
-              <Animated.View
-                style={[
-                  s.spinnerWrap,
-                  { width: ringSize, height: ringSize },
-                  logoEntryStyle,
-                  spinnerStyle,
-                ]}
+              <Svg
+                width={ringSize}
+                height={ringSize}
+                viewBox="0 0 100 100"
               >
-                <Svg
-                  width={ringSize}
-                  height={ringSize}
-                  viewBox="0 0 100 100"
-                >
-                  {/* Track: 12% opacidad. */}
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="rgba(255,255,255,0.12)"
-                    strokeWidth={ringStrokeViewBox}
-                    fill="none"
-                  />
-                  {/* Arco activo. Durante el draw dasharray=CIRC (para
-                      dibujar el círculo completo via offset); una vez
-                      que el draw termina y el spinner arranca, la
-                      apariencia visual es la misma porque queda en
-                      offset=0, pero el wrapper rota. Luego para el loop
-                      usamos dasharray ARC_LEN (75°). */}
-                  <AnimatedCircle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="#FFFFFF"
-                    strokeWidth={ringStrokeViewBox}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={
-                      spinnerRunning
-                        ? `${ARC_LEN} ${CIRC - ARC_LEN}`
-                        : `${CIRC} ${CIRC}`
-                    }
-                    animatedProps={
-                      spinnerRunning ? undefined : drawStrokeProps
-                    }
-                  />
-                </Svg>
-              </Animated.View>
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="rgba(255,255,255,0.12)"
+                  strokeWidth={ringStrokeViewBox}
+                  fill="none"
+                />
+                <AnimatedCircle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="#FFFFFF"
+                  strokeWidth={ringStrokeViewBox}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={
+                    spinnerRunning
+                      ? `${ARC_LEN} ${CIRC - ARC_LEN}`
+                      : `${CIRC} ${CIRC}`
+                  }
+                  animatedProps={
+                    spinnerRunning ? undefined : drawStrokeProps
+                  }
+                />
+              </Svg>
+            </Animated.View>
 
-              {/* Full circle estático (done). */}
-              <Animated.View
-                style={[
-                  s.spinnerWrap,
-                  { width: ringSize, height: ringSize },
-                  fullCircleStyle,
-                ]}
+            {/* Static full circle shown at done (cross-fades over arc). */}
+            <Animated.View
+              style={[s.absFill, s.centerContent, fullCircleStyle]}
+            >
+              <Svg
+                width={ringSize}
+                height={ringSize}
+                viewBox="0 0 100 100"
               >
-                <Svg
-                  width={ringSize}
-                  height={ringSize}
-                  viewBox="0 0 100 100"
-                >
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    stroke="#FFFFFF"
-                    strokeWidth={ringStrokeViewBox}
-                    fill="none"
-                  />
-                </Svg>
-              </Animated.View>
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="#FFFFFF"
+                  strokeWidth={ringStrokeViewBox}
+                  fill="none"
+                />
+              </Svg>
+            </Animated.View>
 
-              {/* Logo Alamos (entra con logoEntry, se apaga con
-                  logoOpacity/logoScale al morph). Combinamos ambas
-                  vistas animadas anidando. */}
-              <Animated.View style={[s.centerAbs, logoEntryStyle]}>
-                <Animated.View style={logoStyle}>
-                  <Image
-                    source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
-                    style={{
-                      width: logoInnerSize,
-                      height: logoInnerSize,
-                      tintColor: "#FFFFFF",
-                    }}
-                    resizeMode="contain"
-                  />
-                </Animated.View>
-              </Animated.View>
+            {/* Alamos logo — rises into place, fades + scales at done. */}
+            <Animated.View
+              style={[s.absFill, s.centerContent, logoWrapStyle]}
+            >
+              <Image
+                source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
+                style={{
+                  width: logoInnerSize,
+                  height: logoInnerSize,
+                  tintColor: "#FFFFFF",
+                }}
+                resizeMode="contain"
+              />
+            </Animated.View>
 
-              {/* Checkmark: aparece al done con spring + stroke-draw. */}
-              <Animated.View style={[s.centerAbs, checkStyle]}>
-                <Svg
-                  width={checkSize}
-                  height={checkSize}
-                  viewBox="0 0 24 24"
-                >
-                  <AnimatedPath
-                    d="M5 12 L10 17 L19 7"
-                    stroke="#FFFFFF"
-                    strokeWidth={2.7}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
-                    animatedProps={checkPathProps}
-                  />
-                </Svg>
-              </Animated.View>
-            </View>
+            {/* Checkmark (done). Snappy spring, stroke-draw in parallel. */}
+            <Animated.View
+              style={[s.absFill, s.centerContent, checkWrapStyle]}
+            >
+              <Svg
+                width={checkSize}
+                height={checkSize}
+                viewBox="0 0 24 24"
+              >
+                <AnimatedPath
+                  d="M5 12 L10 17 L19 7"
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
+                  animatedProps={checkPathProps}
+                />
+              </Svg>
+            </Animated.View>
           </View>
 
-          {/* flex 1: gap entre el ring y el texto */}
-          <View style={{ flex: 1 }} />
+          <View style={{ flex: 0.8 }} />
 
-          {/* flex 1: zona del texto (justifyContent flex-start = el
-              texto queda pegado al tope de esta zona, que vive en el
-              ~60-73 % del screen). Los 3 Animated.Text stackeados con
-              position absolute. */}
-          <View style={s.textStack}>
-            <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
-              Orden Enviada...
-            </Animated.Text>
-            <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
-              Orden Recibida...
-            </Animated.Text>
-            <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
-              Orden Ejecutada
-            </Animated.Text>
+          {/* Status-text zone. Fixed height so the 34px text has room and
+              the 28px error title (potentially 2 lines) also fits. All
+              slots are always mounted; animations drive visibility. */}
+          <View style={s.textContainer}>
+            <Animated.View style={[s.textSlot, sendTextStyle]}>
+              <Text style={s.statusText}>Orden Enviada...</Text>
+            </Animated.View>
+            <Animated.View style={[s.textSlot, recvTextStyle]}>
+              <Text style={s.statusText}>Orden Recibida...</Text>
+            </Animated.View>
+            <Animated.View style={[s.textSlot, doneTextStyle]}>
+              <Text style={s.statusText}>Orden Ejecutada</Text>
+            </Animated.View>
+            <Animated.View style={[s.textSlot, errTitleStyle]}>
+              <Text style={s.errorTitle}>
+                No pudimos confirmar tu orden
+              </Text>
+            </Animated.View>
           </View>
 
-          {/* flex 2: spacer bottom (aire premium) */}
-          <View style={{ flex: 2 }} />
+          {/* Error subtitle (always mounted, opacity controlled). */}
+          <Animated.View
+            style={[s.subtitleWrap, errSubStyle]}
+            pointerEvents="none"
+          >
+            <Text style={s.errorSubtitle}>
+              Revisa el estado en tu portafolio
+            </Text>
+          </Animated.View>
+
+          <View style={{ flex: 1.5 }} />
+
+          {/* "Volver" button — only pressable in error state. */}
+          <Animated.View
+            pointerEvents={phase === "error" ? "box-none" : "none"}
+            style={[
+              s.errorBtnWrap,
+              { bottom: insets.bottom + 40 },
+              errBtnStyle,
+            ]}
+          >
+            <Pressable
+              onPress={() => router.back()}
+              style={s.errorBtn}
+              hitSlop={12}
+            >
+              <Text style={s.errorBtnText}>Volver</Text>
+            </Pressable>
+          </Animated.View>
         </View>
       ) : null}
     </View>
@@ -854,7 +860,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Green cover (sube sobre la card via translateY) */
+  /* Green cover */
   greenCover: {
     position: "absolute",
     left: 0,
@@ -863,7 +869,6 @@ const s = StyleSheet.create({
     backgroundColor: brand.green,
   },
 
-  /* Anchor del SwipeToSubmit al bottom del screen. */
   swipeAnchor: {
     position: "absolute",
     left: 0,
@@ -871,53 +876,80 @@ const s = StyleSheet.create({
     bottom: 0,
   },
 
-  /* Execution overlay: flex 1/3/2/2 sin posiciones hardcoded. */
+  /* Execution overlay — flex 1 / ring / 0.8 / text / 1.5 (spec E). */
   execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
   },
-  /* Hero: ocupa flex 2.5 del overlay, centra el ring vertical y horiz.
-     Layout completo: 1 spacer / 2.5 hero / 1 gap / 1 texto / 2 spacer. */
-  hero: {
-    flex: 2.5,
+  absFill: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  centerContent: {
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Wrapper absolute del spinner/full-circle dentro del hero. */
-  spinnerWrap: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  /* Helper: centrado absoluto dentro del ring (logo y check). */
-  centerAbs: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  /* Zona del texto: flex 1. El texto arranca al tope de esta zona
-     (justifyContent flex-start) y los 3 Animated.Text se stackean con
-     position absolute para poder animar simultáneamente. */
-  textStack: {
-    flex: 1,
-    alignSelf: "stretch",
-    alignItems: "center",
-    justifyContent: "flex-start",
+
+  /* Text zone: fixed height so the 34px line + 28px two-line error fit.
+     Each slot absolutely fills the container and flex-centers its Text. */
+  textContainer: {
+    width: "100%",
+    height: 96,
     position: "relative",
+    overflow: "visible",
   },
-  textAbs: {
+  textSlot: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
   },
-  execText: {
+  statusText: {
     fontFamily: fontFamily[600],
     fontSize: 34,
     color: "#FFFFFF",
     letterSpacing: -0.3,
     textAlign: "center",
-    paddingHorizontal: 24,
     lineHeight: 40,
+  },
+  errorTitle: {
+    fontFamily: fontFamily[600],
+    fontSize: 28,
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+    textAlign: "center",
+    lineHeight: 34,
+  },
+  subtitleWrap: {
+    width: "100%",
+    paddingHorizontal: 32,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  errorSubtitle: {
+    fontFamily: fontFamily[400],
+    fontSize: 15,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+  },
+  errorBtnWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  errorBtn: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+  },
+  errorBtnText: {
+    fontFamily: fontFamily[600],
+    fontSize: 17,
+    color: "#FFFFFF",
   },
 });
