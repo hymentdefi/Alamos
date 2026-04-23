@@ -61,8 +61,8 @@ const DONE_HOLD_MS = 1700;
 /** Longitud del path del checkmark (viewBox 0 0 24 24). */
 const CHECK_PATH_LEN = 24;
 /** Fracción del ancho de pantalla que ocupa el ring. */
-const RING_DIAMETER_FRACTION = 0.24;
-/** Stroke width como fracción del diámetro del ring (2.5 px en ring 100). */
+const RING_DIAMETER_FRACTION = 0.27;
+/** Stroke width como fracción del diámetro del ring. */
 const RING_STROKE_FRACTION = 0.028;
 /** Duración del loop de rotación del spinner (ms). */
 const SPIN_DURATION_MS = 1000;
@@ -166,45 +166,44 @@ export default function ConfirmScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinnerRunning]);
 
-  /** Cross-fade de textos con z-depth fuerte. El saliente sube y se
-   * desvanece; el entrante viene desde abajo con scale y translateY.
-   * Ambos 400 ms — deliberadamente lentos (feel Robinhood). */
+  /** Cross-fade de textos estilo Robinhood:
+   *   – SALIENTE se desvanece EN SU LUGAR: opacity 1→0 + scale 1→0.95,
+   *     sin translateY. 250 ms ease-in.
+   *   – ENTRANTE viene desde abajo con recorrido largo: translateY +60→0
+   *     + scale 0.82→1 + opacity 0→1. 500 ms ease-out-expo.
+   *   Los dos arrancan simultáneamente; el frame donde se superponen es
+   *   lo que da el "aura". */
   const crossfadeText = (
     fromOpacity: SharedValueOf<number>,
     fromScale: SharedValueOf<number>,
-    fromY: SharedValueOf<number>,
+    _fromY: SharedValueOf<number>,
     toOpacity: SharedValueOf<number>,
     toScale: SharedValueOf<number>,
     toY: SharedValueOf<number>,
   ) => {
-    // Saliente: 400 ms ease-in, sube ligeramente (-8) mientras hace fade.
+    // Saliente: no se mueve, sólo fade + scale down sutil.
     fromOpacity.value = withTiming(0, {
-      duration: 400,
+      duration: 250,
       easing: Easing.in(Easing.quad),
     });
     fromScale.value = withTiming(0.95, {
-      duration: 400,
+      duration: 250,
       easing: Easing.in(Easing.quad),
     });
-    fromY.value = withTiming(-8, {
-      duration: 400,
-      easing: Easing.in(Easing.quad),
-    });
-    // Entrante: 400 ms ease-out-expo. scale 0.82→1 + translateY +12→0.
-    // El recorrido simultáneo de scale y Y es lo que da el "viene desde
-    // atrás y abajo" que tiene Robinhood.
+    // Entrante: valores iniciales explícitos (por si quedó con otros
+    // valores de un crossfade anterior), y luego animaciones largas.
     toScale.value = 0.82;
-    toY.value = 12;
+    toY.value = 60;
     toOpacity.value = withTiming(1, {
-      duration: 400,
+      duration: 500,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
     toScale.value = withTiming(1, {
-      duration: 400,
+      duration: 500,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
     toY.value = withTiming(0, {
-      duration: 400,
+      duration: 500,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
   };
@@ -212,13 +211,13 @@ export default function ConfirmScreen() {
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // ─── Entry staggered (secuencia ~1.6 s) ────────────────────────
-    // t=0: logo con spring lento (stiffness 120 = se ve todo el
-    // recorrido, no un pop). Viene desde translateY +80.
+    // ─── Entry staggered (secuencia ~1.7 s) ────────────────────────
+    // t=0: logo con spring lento. Viene desde MUY abajo (+120 px) para
+    // que el recorrido sea visible, no un pop.
     logoEntry.value = withSpring(1, {
       mass: 1,
       stiffness: 120,
-      damping: 16,
+      damping: 14,
     });
     // t=300: círculo se dibuja (strokeDashoffset) + orbit rotation.
     // Duración 1100 ms ease-out-quint.
@@ -235,28 +234,29 @@ export default function ConfirmScreen() {
         },
       ),
     );
-    // t=600: texto "Orden Enviada..." con z-depth fuerte (scale
-    // 0.82 → 1.0 + translateY +12 → 0) en 450 ms ease-out-expo.
+    // t=600: texto "Orden Enviada..." entra desde MUY abajo (+80 px)
+    // con z-depth (scale 0.82 → 1.0) en 500 ms ease-out-expo. Recorrido
+    // visible, no pop.
     txSendingScale.value = 0.82;
-    txSendingY.value = 12;
+    txSendingY.value = 80;
     txSendingOpacity.value = withDelay(
       600,
       withTiming(1, {
-        duration: 450,
+        duration: 500,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
       }),
     );
     txSendingScale.value = withDelay(
       600,
       withTiming(1, {
-        duration: 450,
+        duration: 500,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
       }),
     );
     txSendingY.value = withDelay(
       600,
       withTiming(0, {
-        duration: 450,
+        duration: 500,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
       }),
     );
@@ -369,8 +369,8 @@ export default function ConfirmScreen() {
     };
   });
 
-  // ── Entry: logo "planea" desde abajo con rotate + scale ──
-  // translateY de +80 → 0 para que se vea el recorrido (no pop).
+  // ── Entry: logo "planea" desde muy abajo con rotate + scale ──
+  // translateY +120 → 0 (recorrido largo, visible). Rotate -15° → 0.
   const logoEntryStyle = useAnimatedStyle(() => ({
     opacity: logoEntry.value,
     transform: [
@@ -383,13 +383,13 @@ export default function ConfirmScreen() {
         ),
       },
       {
-        rotate: `${interpolate(logoEntry.value, [0, 1], [-20, 0], Extrapolation.CLAMP)}deg`,
+        rotate: `${interpolate(logoEntry.value, [0, 1], [-15, 0], Extrapolation.CLAMP)}deg`,
       },
       {
         translateY: interpolate(
           logoEntry.value,
           [0, 1],
-          [80, 0],
+          [120, 0],
           Extrapolation.CLAMP,
         ),
       },
@@ -609,8 +609,8 @@ export default function ConfirmScreen() {
             { paddingTop: insets.top, paddingBottom: insets.bottom },
           ]}
         >
-          {/* flex 1.2: spacer top */}
-          <View style={{ flex: 1.2 }} />
+          {/* flex 1: spacer top */}
+          <View style={{ flex: 1 }} />
 
           {/* flex 3: hero (ring + logo + check) */}
           <View style={s.hero}>
@@ -735,26 +735,27 @@ export default function ConfirmScreen() {
             </View>
           </View>
 
-          {/* flex 3: texto en la parte alta de la zona (15% del tope del
-              propio flex). Los 3 Animated.Text siempre montados en el
-              mismo slot, stacked con position absolute. */}
+          {/* flex 1: gap entre el ring y el texto */}
+          <View style={{ flex: 1 }} />
+
+          {/* flex 1: zona del texto (justifyContent flex-start = el
+              texto queda pegado al tope de esta zona, que vive en el
+              ~60-73 % del screen). Los 3 Animated.Text stackeados con
+              position absolute. */}
           <View style={s.textStack}>
-            <View style={{ flex: 0.15 }} />
-            <View style={s.textSlot}>
-              <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
-                Orden Enviada...
-              </Animated.Text>
-              <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
-                Orden Recibida...
-              </Animated.Text>
-              <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
-                Orden Ejecutada
-              </Animated.Text>
-            </View>
+            <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
+              Orden Enviada...
+            </Animated.Text>
+            <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
+              Orden Recibida...
+            </Animated.Text>
+            <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
+              Orden Ejecutada
+            </Animated.Text>
           </View>
 
-          {/* flex 1.5: spacer bottom (aire premium) */}
-          <View style={{ flex: 1.5 }} />
+          {/* flex 2: spacer bottom (aire premium) */}
+          <View style={{ flex: 2 }} />
         </View>
       ) : null}
     </View>
@@ -875,10 +876,10 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
   },
-  /* Hero: ocupa flex 2 del overlay, centra el ring vertical y horiz.
-     (el texto va en flex 3 debajo, con paddingTop del 15%). */
+  /* Hero: ocupa flex 2.5 del overlay, centra el ring vertical y horiz.
+     Layout completo: 1 spacer / 2.5 hero / 1 gap / 1 texto / 2 spacer. */
   hero: {
-    flex: 2,
+    flex: 2.5,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -894,18 +895,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Slot del texto: flex 3 con un inner flex 0.15 arriba que actúa
-     como paddingTop del 15% de la zona. El textSlot contiene los 3
-     Animated.Text stackeados con position absolute. */
+  /* Zona del texto: flex 1. El texto arranca al tope de esta zona
+     (justifyContent flex-start) y los 3 Animated.Text se stackean con
+     position absolute para poder animar simultáneamente. */
   textStack: {
-    flex: 3,
+    flex: 1,
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "flex-start",
-  },
-  textSlot: {
-    alignSelf: "stretch",
-    alignItems: "center",
     position: "relative",
   },
   textAbs: {
@@ -918,7 +915,7 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 34,
     color: "#FFFFFF",
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
     textAlign: "center",
     paddingHorizontal: 24,
     lineHeight: 40,
