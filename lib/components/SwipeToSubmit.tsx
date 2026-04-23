@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -12,11 +12,15 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius } from "../theme";
 
@@ -34,6 +38,29 @@ const SWIPE_FLICK_MIN_FRACTION = 0.35;
 const SWIPE_DAMPING_MAX = 0.3;
 /** Altura visual del pill en reposo. */
 const PILL_HEIGHT = 72;
+
+/* ─── Constantes del shimmer ─────────────────────────────────────── */
+
+/** Fracción del ancho del pill que ocupa el wave del shimmer. */
+const SHIMMER_WIDTH_FRACTION = 0.55;
+/** Duración del recorrido del shimmer de punta a punta, ms. */
+const SHIMMER_SWEEP_MS = 2200;
+/** Pausa entre ciclos del shimmer, ms. */
+const SHIMMER_PAUSE_MS = 900;
+/** Fracción del progress a partir de la cual el shimmer se oculta
+ * (cuando empezás a arrastrar, el brillo desaparece rápido). */
+const SHIMMER_FADE_OUT_AT = 0.15;
+
+/** Colores del gradiente del shimmer. 5 stops para transiciones suaves
+ * sin "flash" cortante. */
+const SHIMMER_COLORS = [
+  "rgba(255,255,255,0)",
+  "rgba(255,255,255,0.22)",
+  "rgba(255,255,255,0.55)",
+  "rgba(255,255,255,0.22)",
+  "rgba(255,255,255,0)",
+] as const;
+const SHIMMER_LOCATIONS = [0, 0.3, 0.5, 0.7, 1] as const;
 
 /* ─── Haptics JS-side (se invocan vía runOnJS desde el worklet) ──── */
 
@@ -231,20 +258,104 @@ export function SwipeToSubmit({
     ),
   }));
 
+  /* ─── Shimmer (todo en UI thread) ──────────────────────────────── */
+
+  // Mide el ancho del pill para calcular el recorrido del wave.
+  const [pillWidth, setPillWidth] = useState(0);
+  // Shared value: 0 = wave offscreen left, 1 = wave offscreen right.
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    if (pillWidth <= 0) return;
+    // Reseteamos el valor antes de arrancar el loop para que el wave
+    // siempre empiece offscreen izquierda.
+    shimmer.value = 0;
+    // Loop: 2200 ms moviendo + pausa de 900 ms + salto instantáneo a 0
+    // (withTiming duration 0). Se repite infinito.
+    shimmer.value = withRepeat(
+      withSequence(
+        withTiming(1, {
+          duration: SHIMMER_SWEEP_MS,
+          easing: Easing.linear,
+        }),
+        withDelay(SHIMMER_PAUSE_MS, withTiming(0, { duration: 0 })),
+      ),
+      -1,
+      false,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pillWidth]);
+
+  const gradientWidth = pillWidth * SHIMMER_WIDTH_FRACTION;
+
+  // Wave sliding from -gradientWidth to pillWidth (offscreen to offscreen).
+  const shimmerWaveStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: interpolate(
+          shimmer.value,
+          [0, 1],
+          [-gradientWidth, pillWidth],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  // Overlay visibility: se desvanece apenas empezás a arrastrar; se
+  // restaura solo cuando progress vuelve a ~0 (bounce-back). Todo en UI
+  // thread: no depende de React state, reacciona inmediato.
+  const shimmerOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [0, SHIMMER_FADE_OUT_AT],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
+        onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
         style={[s.pill, { backgroundColor }, pillStyle, style]}
       >
         <Animated.View style={chevronStyle}>
           <Feather
             name="chevron-up"
             size={14}
-            color="rgba(255,255,255,0.85)"
+            color="rgba(255,255,255,0.75)"
             style={{ marginBottom: 2 }}
           />
         </Animated.View>
         <Text style={s.label}>{label}</Text>
+
+        {/* Shimmer overlay: cubre TODO el contenido del pill (chevron +
+            texto) y sólo se ve cuando el pill está en reposo. */}
+        {pillWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[s.shimmerContainer, shimmerOverlayStyle]}
+          >
+            <Animated.View
+              style={[
+                s.shimmerWave,
+                { width: gradientWidth },
+                shimmerWaveStyle,
+              ]}
+            >
+              <LinearGradient
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                colors={SHIMMER_COLORS as any}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                locations={SHIMMER_LOCATIONS as any}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+          </Animated.View>
+        ) : null}
       </Animated.View>
     </GestureDetector>
   );
@@ -258,11 +369,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
+    overflow: "hidden",
   },
   label: {
     fontFamily: fontFamily[700],
     fontSize: 17,
-    color: "#FFFFFF",
+    // Base atenuada para que el shimmer se note al pasar.
+    color: "rgba(255,255,255,0.72)",
     letterSpacing: -0.2,
+  },
+  shimmerContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  shimmerWave: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
   },
 });
