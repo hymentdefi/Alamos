@@ -252,7 +252,7 @@ export function SideMenu({ visible, onClose }: Props) {
               },
             ]}
           >
-            <AlamosLogo variant="lockupShort" tone="light" size={30} />
+            <AlamosLogo variant="lockupShort" tone="light" size={44} />
             {!isPro ? (
               <Text style={[s.proPillAccent, { color: c.greenDark }]}>
                 Pro
@@ -375,9 +375,9 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
   },
   proPillAccent: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily[500],
+    fontSize: 22,
+    letterSpacing: -0.5,
   },
   /* Identity */
   identity: {
