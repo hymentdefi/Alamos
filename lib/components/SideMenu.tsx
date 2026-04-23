@@ -126,10 +126,12 @@ export function SideMenu({ visible, onClose }: Props) {
   if (!rendered) return null;
 
   const handleTogglePro = () => {
-    // Cerramos el menú primero así la pantalla de bienvenida se ve
-    // plena, sin el panel tapándola por los costados.
+    // Cerramos el menú primero y esperamos a que el Modal se desmonte
+    // completo (anim 240ms + margen). Si abrimos el Modal del Transition
+    // antes, iOS lo deja en cola hasta que se dismissea el anterior y
+    // la animación de bienvenida se pierde.
     onClose();
-    setTimeout(() => requestSwitch(), 180);
+    setTimeout(() => requestSwitch(), 320);
   };
 
   const navigateTo = (path: string) => {
@@ -233,7 +235,7 @@ export function SideMenu({ visible, onClose }: Props) {
               onPress={onClose}
               hitSlop={10}
             >
-              <Feather name="x" size={20} color={c.text} />
+              <Feather name="arrow-left" size={20} color={c.text} />
             </Pressable>
           </View>
 
@@ -250,15 +252,13 @@ export function SideMenu({ visible, onClose }: Props) {
               },
             ]}
           >
-            <AlamosLogo variant="mark" tone="light" size={22} />
-            <View style={s.proPillTextRow}>
-              <Text style={[s.proPillBrand, { color: c.text }]}>ALAMOS</Text>
-              {!isPro ? (
-                <Text style={[s.proPillAccent, { color: c.greenDark }]}>
-                  Pro
-                </Text>
-              ) : null}
-            </View>
+            <AlamosLogo variant="lockupShort" tone="light" size={22} />
+            {!isPro ? (
+              <Text style={[s.proPillAccent, { color: c.greenDark }]}>
+                Pro
+              </Text>
+            ) : null}
+            <View style={{ flex: 1 }} />
             <Feather name="chevron-right" size={20} color={c.textFaint} />
           </Pressable>
 
@@ -340,7 +340,7 @@ const s = StyleSheet.create({
   },
   closeRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     paddingHorizontal: 20,
     paddingBottom: 6,
   },
