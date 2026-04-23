@@ -45,6 +45,143 @@ function fireErrorHaptic() {
   ).catch(() => {});
 }
 
+/* ───────────── CrossFadeStatusText (spec section F) ───────────────────
+ *
+ * Componente ping-pong A/B para transicionar entre textos de status
+ * con un frame ghostly de superposición (feel Robinhood).
+ *
+ * Comportamiento:
+ *  – SALIENTE se desvanece EN SU LUGAR: opacity 1→0 (600 ms ease-out-
+ *    cubic). No se anima translateY ni scale.
+ *  – ENTRANTE arranca con snap a ghost (opacity 0.05, translateY +60,
+ *    scale 0.82) y, 100 ms después, sube + se solidifica + escala a 1
+ *    (700 ms ease-out-expo).
+ *  – Las dos animaciones corren simultáneas → ~400 ms de overlap
+ *    donde ambos textos son visibles. Eso es el "aura" Robinhood.
+ *
+ * Valores del spec (NO negociables):
+ *  OUT_DURATION  = 600 ms
+ *  IN_DURATION   = 700 ms
+ *  IN_DELAY      = 100 ms
+ *  GHOST_OPACITY = 0.05  (NO 0 — el pop a 0 mata el efecto ghostly)
+ *  RISE_DISTANCE = 60 px (positivo = abajo en RN; sube a 0)
+ *  START_SCALE   = 0.82
+ *
+ * Todo corre en UI thread (useSharedValue + useAnimatedStyle).
+ */
+function CrossFadeStatusText({ text }: { text: string }) {
+  const [slots, setSlots] = useState<{ a: string; b: string }>({
+    a: text,
+    b: "",
+  });
+  const activeSlot = useRef<"a" | "b">("a");
+  const mounted = useRef(false);
+
+  // Estado inicial: si arrancamos con texto no vacío, slot A visible;
+  // si arrancamos vacío, ambos en 0.
+  const aOpacity = useSharedValue(text ? 1 : 0);
+  const aTranslateY = useSharedValue(0);
+  const aScale = useSharedValue(1);
+  const bOpacity = useSharedValue(0);
+  const bTranslateY = useSharedValue(RISE_DISTANCE);
+  const bScale = useSharedValue(START_SCALE);
+
+  useEffect(() => {
+    // Primer effect (mount): no animar; el slot A ya tiene el texto
+    // inicial. Las animaciones arrancan en el siguiente cambio.
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+
+    const animateIn = (
+      op: { value: number },
+      ty: { value: number },
+      sc: { value: number },
+    ) => {
+      op.value = GHOST_OPACITY;
+      ty.value = RISE_DISTANCE;
+      sc.value = START_SCALE;
+      op.value = withDelay(
+        IN_DELAY,
+        withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+      );
+      ty.value = withDelay(
+        IN_DELAY,
+        withTiming(0, { duration: IN_DURATION, easing: inEasing }),
+      );
+      sc.value = withDelay(
+        IN_DELAY,
+        withTiming(1, { duration: IN_DURATION, easing: inEasing }),
+      );
+    };
+    const animateOut = (op: { value: number }) => {
+      op.value = withTiming(0, {
+        duration: OUT_DURATION,
+        easing: outEasing,
+      });
+    };
+
+    if (activeSlot.current === "a") {
+      // Saliente: A. Entrante: B.
+      setSlots((prev) => ({ ...prev, b: text }));
+      animateOut(aOpacity);
+      animateIn(bOpacity, bTranslateY, bScale);
+      activeSlot.current = "b";
+    } else {
+      // Saliente: B. Entrante: A.
+      setSlots((prev) => ({ ...prev, a: text }));
+      animateOut(bOpacity);
+      animateIn(aOpacity, aTranslateY, aScale);
+      activeSlot.current = "a";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  const aStyle = useAnimatedStyle(() => ({
+    opacity: aOpacity.value,
+    transform: [
+      { translateY: aTranslateY.value },
+      { scale: aScale.value },
+    ],
+  }));
+  const bStyle = useAnimatedStyle(() => ({
+    opacity: bOpacity.value,
+    transform: [
+      { translateY: bTranslateY.value },
+      { scale: bScale.value },
+    ],
+  }));
+
+  return (
+    <View style={cfStyles.wrap}>
+      <Animated.Text style={[cfStyles.slot, aStyle]}>{slots.a}</Animated.Text>
+      <Animated.Text style={[cfStyles.slot, bStyle]}>{slots.b}</Animated.Text>
+    </View>
+  );
+}
+
+const cfStyles = StyleSheet.create({
+  wrap: {
+    width: "100%",
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
+  },
+  slot: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    // Typography del spec: 34 px, weight 600, blanco, letter-spacing -0.3.
+    fontFamily: "PlusJakartaSans_600SemiBold",
+    fontSize: 34,
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+  },
+});
+
 type SharedValueOf<T> = { value: T };
 
 const STRIP_HEIGHT = 72;
@@ -139,17 +276,10 @@ export default function ConfirmScreen() {
   const checkScale = useSharedValue(0.5);
   const checkOffset = useSharedValue(CHECK_PATH_LEN);
 
-  // Status-text slots. Each has opacity/translateY/scale.
-  // "sending" is the initial incoming text → starts in ghost state.
-  const sendOpacity = useSharedValue(GHOST_OPACITY);
-  const sendTranslateY = useSharedValue(80);
-  const sendScale = useSharedValue(START_SCALE);
-  const recvOpacity = useSharedValue(0);
-  const recvTranslateY = useSharedValue(RISE_DISTANCE);
-  const recvScale = useSharedValue(START_SCALE);
-  const doneOpacity = useSharedValue(0);
-  const doneTranslateY = useSharedValue(RISE_DISTANCE);
-  const doneScale = useSharedValue(START_SCALE);
+  // Status text: el crossfade ping-pong A/B lo maneja internamente el
+  // componente <CrossFadeStatusText>. Desde acá sólo cambiamos la prop
+  // `text` y él se encarga (spec section F).
+
   // Error title + subtitle + "Volver" button.
   const errTitleOpacity = useSharedValue(0);
   const errTitleTranslateY = useSharedValue(RISE_DISTANCE);
@@ -158,6 +288,11 @@ export default function ConfirmScreen() {
   const errBtnOpacity = useSharedValue(0);
 
   const [phase, setPhase] = useState<Phase>("idle");
+  // statusText drivea el CrossFadeStatusText. Cuando cambia, el
+  // componente corre el crossfade ping-pong A/B por sí solo. Arranca
+  // vacío y el parent lo setea a "Orden Enviada..." 500 ms después
+  // del logo (para stagger con la entrada del logo).
+  const [statusText, setStatusText] = useState<string>("");
   const [spinnerRunning, setSpinnerRunning] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completedRef = useRef(false);
@@ -260,21 +395,12 @@ export default function ConfirmScreen() {
     );
 
     // ─── t=500ms: "Orden Enviada..." arrives as logo is settling.
-    // Starts in ghost state from useSharedValue init; animates with 700ms
-    // easeOutExpo. No IN_DELAY here — the 500ms delay already covers the
-    // stagger from the logo entrance.
-    sendOpacity.value = withDelay(
-      500,
-      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
-    );
-    sendTranslateY.value = withDelay(
-      500,
-      withTiming(0, { duration: IN_DURATION, easing: inEasing }),
-    );
-    sendScale.value = withDelay(
-      500,
-      withTiming(1, { duration: IN_DURATION, easing: inEasing }),
-    );
+    // Cambiar el statusText dispara el crossfade ping-pong en
+    // CrossFadeStatusText (ghost→solid con 100 ms de delay interno).
+    setTimeout(() => {
+      if (completedRef.current) return;
+      setStatusText("Orden Enviada...");
+    }, 500);
 
     // Watchdog: if nothing confirms in 8s, fall into error state.
     timeoutRef.current = setTimeout(() => {
@@ -286,10 +412,10 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received.
+    // Phase 2: sending → received. El crossfade lo dispara el cambio
+    // de prop en CrossFadeStatusText (sale "Enviada", entra "Recibida").
     setPhase("received");
-    exitText(sendOpacity);
-    enterText(recvOpacity, recvTranslateY, recvScale);
+    setStatusText("Orden Recibida...");
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;
@@ -301,9 +427,7 @@ export default function ConfirmScreen() {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-
-    exitText(recvOpacity);
-    enterText(doneOpacity, doneTranslateY, doneScale);
+    setStatusText("Orden Ejecutada");
 
     // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {
@@ -362,10 +486,9 @@ export default function ConfirmScreen() {
     setPhase("error");
     fireErrorHaptic();
 
-    // Fade out whichever status text is currently visible.
-    exitText(sendOpacity);
-    exitText(recvOpacity);
-    exitText(doneOpacity);
+    // Fade out el status text actual (CrossFadeStatusText lo hace
+    // al ver el cambio a "").
+    setStatusText("");
 
     // Incoming error title (same ghostly rise as status cross-fade).
     enterText(errTitleOpacity, errTitleTranslateY, errTitleScale);
@@ -446,27 +569,6 @@ export default function ConfirmScreen() {
     strokeDashoffset: checkOffset.value,
   }));
 
-  const sendTextStyle = useAnimatedStyle(() => ({
-    opacity: sendOpacity.value,
-    transform: [
-      { translateY: sendTranslateY.value },
-      { scale: sendScale.value },
-    ],
-  }));
-  const recvTextStyle = useAnimatedStyle(() => ({
-    opacity: recvOpacity.value,
-    transform: [
-      { translateY: recvTranslateY.value },
-      { scale: recvScale.value },
-    ],
-  }));
-  const doneTextStyle = useAnimatedStyle(() => ({
-    opacity: doneOpacity.value,
-    transform: [
-      { translateY: doneTranslateY.value },
-      { scale: doneScale.value },
-    ],
-  }));
   const errTitleStyle = useAnimatedStyle(() => ({
     opacity: errTitleOpacity.value,
     transform: [
@@ -717,19 +819,12 @@ export default function ConfirmScreen() {
           {/* Spec layout: flex 0.6 gap entre el ring y el texto. */}
           <View style={{ flex: 0.6 }} />
 
-          {/* Status-text zone. Fixed height so the 34px text has room and
-              the 28px error title (potentially 2 lines) also fits. All
-              slots are always mounted; animations drive visibility. */}
+          {/* Status-text zone. El CrossFadeStatusText maneja el crossfade
+              ping-pong A/B con ghostly overlap (spec section F).
+              El error title sigue en un slot separado porque tiene
+              tipografía distinta (28 px vs 34 px). */}
           <View style={s.textContainer}>
-            <Animated.View style={[s.textSlot, sendTextStyle]}>
-              <Text style={s.statusText}>Orden Enviada...</Text>
-            </Animated.View>
-            <Animated.View style={[s.textSlot, recvTextStyle]}>
-              <Text style={s.statusText}>Orden Recibida...</Text>
-            </Animated.View>
-            <Animated.View style={[s.textSlot, doneTextStyle]}>
-              <Text style={s.statusText}>Orden Ejecutada</Text>
-            </Animated.View>
+            <CrossFadeStatusText text={statusText} />
             <Animated.View style={[s.textSlot, errTitleStyle]}>
               <Text style={s.errorTitle}>
                 No pudimos confirmar tu orden
