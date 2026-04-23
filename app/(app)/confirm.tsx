@@ -4,20 +4,14 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Dimensions,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import Svg, {
-  Circle,
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Path,
-  Stop,
-} from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import Animated, {
   Easing,
@@ -27,7 +21,9 @@ import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
@@ -36,8 +32,19 @@ import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const { height: SCREEN_H } = Dimensions.get("window");
+/** Helper para el único haptic .success de la pantalla, al aparecer el
+ * checkmark. Total de haptics en el flow = 2 (el del SwipeToSubmit al
+ * completar + este). */
+function fireSuccessHaptic() {
+  Haptics.notificationAsync(
+    Haptics.NotificationFeedbackType.Success,
+  ).catch(() => {});
+}
+
+/** Alias para tipado corto en el helper crossfadeText. */
+type SharedValueOf<T> = { value: T };
 
 /** Alto visible de la franja verde (pill del SwipeToSubmit) en reposo. */
 const STRIP_HEIGHT = 72;
@@ -47,20 +54,22 @@ const CARD_RADIUS = 28;
 const PHASE_SENDING_MS = 900;
 /** "Orden Recibida..." — queda un buen tiempo. */
 const PHASE_RECEIVED_MS = 2400;
-/** Mínimo absoluto de loading antes de mostrar success. La pausa intencional
- * le da seriedad y confianza al flujo. */
+/** Mínimo absoluto de loading antes de mostrar success. */
 const MIN_LOADING_MS = 600;
 /** Hold del estado "Orden Ejecutada" con el checkmark antes de navegar. */
-const DONE_HOLD_MS = 1800;
-/** Duración del morph logo → checkmark (cross-fade con scale). */
-const MORPH_MS = 300;
-/** Duración del stroke-draw del check. */
-const CHECK_DRAW_MS = 320;
-/** Duración del cross-fade del texto. */
-const FADE_MS = 200;
-/** Longitud del path del checkmark (suficiente con 24 para el path en
- * viewBox 0 0 24 24). */
+const DONE_HOLD_MS = 1700;
+/** Longitud del path del checkmark (viewBox 0 0 24 24). */
 const CHECK_PATH_LEN = 24;
+/** Fracción del ancho de pantalla que ocupa el ring. */
+const RING_DIAMETER_FRACTION = 0.22;
+/** Stroke width como fracción del diámetro del ring. */
+const RING_STROKE_FRACTION = 0.033;
+/** Duración del loop de rotación del spinner (ms). */
+const SPIN_DURATION_MS = 1000;
+/** Circunferencia en unidades del viewBox (r=44). */
+const CIRC = 2 * Math.PI * 44;
+/** Arco visible del spinner: 75° ≈ 20% de la circunferencia. */
+const ARC_LEN = CIRC * (75 / 360);
 
 const AVAILABLE_ARS = 1272850;
 
@@ -75,6 +84,7 @@ export default function ConfirmScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { width: windowW } = useWindowDimensions();
 
   const asset = assets.find((a) => a.ticker === ticker);
   const isSell = mode === "sell";
@@ -84,123 +94,230 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
+  // Ring sizing basado en el viewport actual (no Dimensions.get).
+  const ringSize = Math.round(windowW * RING_DIAMETER_FRACTION);
+  const ringStrokeScreen = Math.max(
+    2.2,
+    Math.round(ringSize * RING_STROKE_FRACTION * 10) / 10,
+  );
+  // Stroke en unidades del viewBox 100. El viewBox escala a ringSize px.
+  const ringStrokeViewBox = (ringStrokeScreen / ringSize) * 100;
+  const logoInnerSize = Math.round(ringSize * 0.58);
+  const checkSize = Math.round(ringSize * 0.56);
+
   // ─── Shared values (todos viven en UI thread) ───
-  // Progreso del swipe (0..1). Lo escribe SwipeToSubmit desde su worklet
-  // y lo leemos acá en useAnimatedStyle para el cover verde.
+  // Progreso del swipe (0..1). Lo escribe SwipeToSubmit desde su worklet.
   const greenProgress = useSharedValue(0);
-  // Fade-in del overlay de ejecución entero.
-  const overlayOpacity = useSharedValue(0);
-  // Rotación del spinner en grados (loop infinito).
-  const spinDeg = useSharedValue(0);
-  // Opacidad del status text (cross-fade entre fases).
-  const statusOpacity = useSharedValue(0);
-  // Morph logo→check: 0 = logo, 1 = check.
-  const morph = useSharedValue(0);
-  // Cross-fade del spinning arc al full-circle estático.
-  const fullCircleOpacity = useSharedValue(0);
-  // strokeDashoffset del check: CHECK_PATH_LEN = invisible, 0 = dibujado.
+
+  // Entry staggered del overlay.
+  // t=0ms: logo cae + rota.
+  const logoEntry = useSharedValue(0);
+  // t=250ms: el circle se dibuja (strokeDashoffset CIRC→0) y el wrapper
+  // rota -90→270 simultáneamente.
+  const circleDraw = useSharedValue(0);
+  // t=350ms: el texto entra con z-depth.
+  const textEntry = useSharedValue(0);
+
+  // Rotación continua del spinner (se enciende cuando el draw termina).
+  const spinDeg = useSharedValue(-90);
+
+  // Opacidades/escalas de cada texto (stacked, no condicionales).
+  const txSendingOpacity = useSharedValue(0);
+  const txSendingScale = useSharedValue(0.9);
+  const txSendingY = useSharedValue(0);
+  const txReceivedOpacity = useSharedValue(0);
+  const txReceivedScale = useSharedValue(0.9);
+  const txReceivedY = useSharedValue(0);
+  const txDoneOpacity = useSharedValue(0);
+  const txDoneScale = useSharedValue(0.9);
+  const txDoneY = useSharedValue(0);
+
+  // Morph logo→check.
+  const logoOpacity = useSharedValue(1);
+  const logoScale = useSharedValue(1);
+  const checkOpacity = useSharedValue(0);
+  const checkScale = useSharedValue(0.5);
   const checkOffset = useSharedValue(CHECK_PATH_LEN);
 
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [statusText, setStatusText] = useState("");
+  // Cross-fade del arc al full-circle (estático) cuando se confirma.
+  const fullCircleOpacity = useSharedValue(0);
 
-  // Spinner loop — 1100 ms por vuelta (spec).
+  const [phase, setPhase] = useState<Phase>("idle");
+  // Flag UI-thread: cuando el draw termina, arrancamos el spinner loop.
+  const [spinnerRunning, setSpinnerRunning] = useState(false);
+
+  // El loop del spinner arranca cuando circleDraw terminó. Arrancamos
+  // desde 270° (= donde quedó el wrapper al final del orbit draw) para
+  // continuidad visual sin saltos. Loop infinito lineal a 1000 ms.
   useEffect(() => {
+    if (!spinnerRunning) return;
+    spinDeg.value = 270;
     spinDeg.value = withRepeat(
-      withTiming(360, { duration: 1100, easing: Easing.linear }),
+      withTiming(270 + 360, {
+        duration: SPIN_DURATION_MS,
+        easing: Easing.linear,
+      }),
       -1,
       false,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [spinnerRunning]);
 
-  /** Cross-fade del texto: fade-out, swap, fade-in. La transición del
-   * sharedValue usa el callback de withTiming (worklet) + runOnJS para
-   * bridgear a setStatusText y resolve. */
-  const transitionText = (next: string): Promise<void> => {
-    return new Promise((resolve) => {
-      statusOpacity.value = withTiming(
-        0,
-        { duration: FADE_MS, easing: Easing.inOut(Easing.quad) },
-        (finished) => {
-          "worklet";
-          if (!finished) return;
-          runOnJS(setStatusText)(next);
-          statusOpacity.value = withTiming(
-            1,
-            { duration: FADE_MS, easing: Easing.inOut(Easing.quad) },
-            (done) => {
-              "worklet";
-              if (done) runOnJS(resolve)();
-            },
-          );
-        },
-      );
+  /** Anima out el texto actual + in el siguiente usando escalas (z-depth)
+   * y translateY sutil. Sin spring — timings con easings específicos.
+   * Todo queda montado: stackeamos y animamos opacidad/scale. */
+  const crossfadeText = (
+    fromOpacity: SharedValueOf<number>,
+    fromScale: SharedValueOf<number>,
+    fromY: SharedValueOf<number>,
+    toOpacity: SharedValueOf<number>,
+    toScale: SharedValueOf<number>,
+    toY: SharedValueOf<number>,
+  ) => {
+    // Saliente: 200 ms ease-in.
+    fromOpacity.value = withTiming(0, {
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+    });
+    fromScale.value = withTiming(0.95, {
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+    });
+    fromY.value = withTiming(-4, {
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+    });
+    // Entrante: 250 ms ease-out-expo (scale 0.90→1.0 da z-depth).
+    toY.value = 0;
+    toScale.value = 0.9;
+    toOpacity.value = withTiming(1, {
+      duration: 250,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    toScale.value = withTiming(1, {
+      duration: 250,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
   };
 
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // Entry del grupo circulo+logo+texto: fade + scale 0.9→1.0 en
-    // 200 ms ease-out. Va atado a overlayOpacity (la misma sharedValue
-    // también drivea el scale vía interpolate en overlayStyle).
-    overlayOpacity.value = withTiming(1, {
-      duration: 200,
-      easing: Easing.out(Easing.quad),
+    // ─── Entry staggered ──────────────────────────────────────────
+    // t=0: logo con spring (overshoot visible, dampingRatio ~0.65).
+    logoEntry.value = withSpring(1, {
+      mass: 1,
+      stiffness: 180,
+      damping: 14,
     });
-
-    // Haptic "success fuerte" al tocar tierra tras el swipe.
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {},
+    // t=250: circulo se dibuja (strokeDashoffset) + orbit rotation.
+    //   ease-out-quint para desaceleración suave.
+    circleDraw.value = withDelay(
+      250,
+      withTiming(
+        1,
+        { duration: 900, easing: Easing.bezier(0.22, 1, 0.36, 1) },
+        (finished) => {
+          "worklet";
+          if (finished) {
+            // Al terminar el draw arrancamos el spinner loop (transición
+            // a la rotación continua).
+            runOnJS(setSpinnerRunning)(true);
+          }
+        },
+      ),
     );
-
-    // Fase 1: "Orden Enviada..." aparece con fade-in.
-    setStatusText("Orden Enviada...");
-    statusOpacity.value = withTiming(1, {
-      duration: FADE_MS,
-      easing: Easing.inOut(Easing.quad),
-    });
+    // t=350: texto con z-depth. Primero settear el valor inicial del
+    // estado "sending" y animarlo in.
+    txSendingScale.value = 0.88;
+    txSendingOpacity.value = withDelay(
+      350,
+      withTiming(1, {
+        duration: 280,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+      }),
+    );
+    txSendingScale.value = withDelay(
+      350,
+      withTiming(1, {
+        duration: 280,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+      }),
+    );
 
     // Mínimo 600 ms de loading incluso si el "API" respondiera instantáneo.
     const apiCall = wait(PHASE_SENDING_MS);
     const minLoading = wait(MIN_LOADING_MS);
     await Promise.all([apiCall, minLoading]);
 
-    // Fase 2: cross-fade a "Orden Recibida..."
+    // Fase 2: cross-fade "Enviada" → "Recibida" con escala.
     setPhase("received");
-    await transitionText("Orden Recibida...");
+    crossfadeText(
+      txSendingOpacity,
+      txSendingScale,
+      txSendingY,
+      txReceivedOpacity,
+      txReceivedScale,
+      txReceivedY,
+    );
 
     await wait(PHASE_RECEIVED_MS);
 
-    // Fase 3: morph logo → check + cross-fade "Orden Ejecutada".
+    // Fase 3: cross-fade a "Ejecutada" + morph logo→check.
     setPhase("done");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {},
+    crossfadeText(
+      txReceivedOpacity,
+      txReceivedScale,
+      txReceivedY,
+      txDoneOpacity,
+      txDoneScale,
+      txDoneY,
     );
 
-    // Cross-fade del spinning arc al full-circle estático (UI thread).
+    // Spinner arc → full circle estático.
     fullCircleOpacity.value = withTiming(1, {
-      duration: MORPH_MS,
+      duration: 300,
       easing: Easing.out(Easing.cubic),
     });
-    // Cross-fade logo → checkmark (scale + opacity, UI thread).
-    morph.value = withTiming(1, {
-      duration: MORPH_MS,
-      easing: Easing.out(Easing.cubic),
+
+    // Logo: fade-out + scale down 200 ms ease-in.
+    logoOpacity.value = withTiming(0, {
+      duration: 200,
+      easing: Easing.in(Easing.quad),
     });
-    // Stroke-draw del check un toque después del morph — ahora en UI
-    // thread también vía useAnimatedProps.
-    setTimeout(() => {
-      checkOffset.value = withTiming(0, {
-        duration: CHECK_DRAW_MS,
+    logoScale.value = withTiming(0.7, {
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+    });
+
+    // Check: 50 ms delay, luego pop con spring (overshoot controlado).
+    // En el callback del spring firamos el único haptic de success.
+    checkScale.value = 0.5;
+    checkOpacity.value = withDelay(
+      50,
+      withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) }),
+    );
+    checkScale.value = withDelay(
+      50,
+      withSpring(
+        1,
+        { mass: 0.8, stiffness: 220, damping: 12 },
+        (finished) => {
+          "worklet";
+          if (finished) runOnJS(fireSuccessHaptic)();
+        },
+      ),
+    );
+    // Stroke-draw del check en paralelo al pop.
+    checkOffset.value = withDelay(
+      80,
+      withTiming(0, {
+        duration: 300,
         easing: Easing.out(Easing.cubic),
-      });
-    }, MORPH_MS * 0.5);
+      }),
+    );
 
-    await transitionText("Orden Ejecutada");
-
-    // Hold 1.8 s sobre el estado success.
+    // Hold 1.7 s sobre el estado success.
     await wait(DONE_HOLD_MS);
 
     router.replace({
@@ -216,11 +333,12 @@ export default function ConfirmScreen() {
 
   /* ─── Estilos animados (todos UI thread) ─────────────────────── */
 
-  // Cover verde fullscreen: translateY desde (SCREEN_H - strip - safe)
+  // Cover verde fullscreen: translateY desde (screenH - strip - safe)
   // hasta 0, bindeado directamente a greenProgress (que SwipeToSubmit
   // escribe desde su worklet).
+  const { height: windowH } = useWindowDimensions();
   const greenCoverStyle = useAnimatedStyle(() => {
-    const startY = SCREEN_H - (STRIP_HEIGHT + insets.bottom);
+    const startY = windowH - (STRIP_HEIGHT + insets.bottom);
     return {
       transform: [
         {
@@ -235,72 +353,107 @@ export default function ConfirmScreen() {
     };
   });
 
-  // Overlay entra con fade + scale (0.9 → 1.0) en 200 ms ease-out.
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
+  // ── Entry: logo cae con rotate + scale ──
+  const logoEntryStyle = useAnimatedStyle(() => ({
+    opacity: logoEntry.value,
     transform: [
       {
         scale: interpolate(
-          overlayOpacity.value,
+          logoEntry.value,
           [0, 1],
-          [0.9, 1],
+          [0.6, 1],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        rotate: `${interpolate(logoEntry.value, [0, 1], [-20, 0], Extrapolation.CLAMP)}deg`,
+      },
+      {
+        translateY: interpolate(
+          logoEntry.value,
+          [0, 1],
+          [30, 0],
           Extrapolation.CLAMP,
         ),
       },
     ],
   }));
 
-  const statusStyle = useAnimatedStyle(() => ({
-    opacity: statusOpacity.value,
-  }));
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spinDeg.value}deg` }],
-    // El arc se cross-fadea al full-circle cuando llegamos a "done".
-    opacity: interpolate(
-      fullCircleOpacity.value,
+  // ── Circle draw: strokeDashoffset + orbit rotation (-90→270). ──
+  // Mientras se dibuja, el wrapper rota; cuando termina, spinnerRunning
+  // pasa a true y `spinDeg` toma el control del loop.
+  const drawStrokeProps = useAnimatedProps(() => ({
+    strokeDashoffset: interpolate(
+      circleDraw.value,
       [0, 1],
-      [1, 0],
+      [CIRC, 0],
       Extrapolation.CLAMP,
     ),
   }));
+
+  // Rotación del wrapper SVG: -90 al inicio (para empezar el stroke en
+  // las 12), luego o bien (a) orbit rotation durante el draw, o (b) el
+  // loop infinito del spinDeg. Priorizamos spinDeg cuando está corriendo.
+  const spinnerStyle = useAnimatedStyle(() => {
+    const baseRot = spinnerRunning
+      ? spinDeg.value
+      : interpolate(
+          circleDraw.value,
+          [0, 1],
+          [-90, 270],
+          Extrapolation.CLAMP,
+        );
+    return {
+      transform: [{ rotate: `${baseRot}deg` }],
+      opacity: interpolate(
+        fullCircleOpacity.value,
+        [0, 1],
+        [1, 0],
+        Extrapolation.CLAMP,
+      ),
+    };
+  });
 
   const fullCircleStyle = useAnimatedStyle(() => ({
     opacity: fullCircleOpacity.value,
   }));
 
+  // ── Logo (en el ring): visible mientras no morph-amos al check. ──
   const logoStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.value, [0, 1], [1, 0], Extrapolation.CLAMP),
-    transform: [
-      {
-        scale: interpolate(
-          morph.value,
-          [0, 1],
-          [1, 0.8],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
+    opacity: logoOpacity.value,
+    transform: [{ scale: logoScale.value }],
   }));
 
+  // ── Checkmark: aparece al done. ──
   const checkStyle = useAnimatedStyle(() => ({
-    opacity: morph.value,
-    transform: [
-      {
-        scale: interpolate(
-          morph.value,
-          [0, 1],
-          [0.8, 1],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
+    opacity: checkOpacity.value,
+    transform: [{ scale: checkScale.value }],
   }));
-
-  // Animated props sobre el Path SVG: strokeDashoffset viene del shared
-  // value, entonces el stroke-draw corre 100% en UI thread.
   const checkPathProps = useAnimatedProps(() => ({
     strokeDashoffset: checkOffset.value,
+  }));
+
+  // ── Textos stackeados. Cada uno tiene su propio shared value. ──
+  const txSendingStyle = useAnimatedStyle(() => ({
+    opacity: txSendingOpacity.value,
+    transform: [
+      { scale: txSendingScale.value },
+      { translateY: txSendingY.value },
+    ],
+  }));
+  const txReceivedStyle = useAnimatedStyle(() => ({
+    opacity: txReceivedOpacity.value,
+    transform: [
+      { scale: txReceivedScale.value },
+      { translateY: txReceivedY.value },
+    ],
+  }));
+  const txDoneStyle = useAnimatedStyle(() => ({
+    opacity: txDoneOpacity.value,
+    transform: [
+      { scale: txDoneScale.value },
+      { translateY: txDoneY.value },
+    ],
   }));
 
   if (!asset) return null;
@@ -410,13 +563,11 @@ export default function ConfirmScreen() {
           greenProgress que escribe SwipeToSubmit desde su worklet. */}
       <Animated.View
         pointerEvents="none"
-        style={[s.greenCover, { height: SCREEN_H }, greenCoverStyle]}
+        style={[s.greenCover, { height: windowH }, greenCoverStyle]}
       />
 
       {/* SwipeToSubmit — pill anclado al bottom. Todo el gesto y la
-          animación de swipe viven en UI thread. Una vez que arrancó el
-          flujo de ejecución lo desmontamos para que el overlay quede
-          limpio. */}
+          animación de swipe viven en UI thread. */}
       {phase === "idle" ? (
         <View
           style={[s.swipeAnchor, { paddingBottom: insets.bottom }]}
@@ -428,123 +579,161 @@ export default function ConfirmScreen() {
         </View>
       ) : null}
 
-      {/* Overlay de ejecución — todo con reanimated shared values.
-          Layout: grupo círculo+logo+texto en el tercio superior (top
-          del círculo ~38% del safe-area), sin disclaimer. El aire
-          abajo es intencional. */}
+      {/* Overlay de ejecución — layout flex 1/3/2/2.
+          El spacer top (flex 1) + hero (flex 3) posicionan el logo
+          automáticamente al ~38% del safe area en cualquier pantalla.
+          Textos stackeados con position absolute, todos montados desde
+          el arranque y animados con opacity/scale/translateY. */}
       {phase !== "idle" ? (
-        <Animated.View
+        <View
           pointerEvents="none"
-          style={[s.execOverlay, overlayStyle]}
+          style={[
+            s.execOverlay,
+            { paddingTop: insets.top, paddingBottom: insets.bottom },
+          ]}
         >
-          <View
-            style={{
-              height:
-                insets.top +
-                (SCREEN_H - insets.top - insets.bottom) * 0.38,
-            }}
-          />
+          {/* flex 1: spacer top */}
+          <View style={{ flex: 1 }} />
 
-          <View style={s.logoWrap}>
-            {/* Spinning arc (sending/received) con gradiente radial
-                transparent→white para simular el "tirón" del leading
-                edge. Al rotar, el gradient rota también. */}
-            <Animated.View style={[s.spinnerWrap, spinnerStyle]}>
-              <Svg width={80} height={80} viewBox="0 0 100 100">
-                <Defs>
-                  <SvgLinearGradient
-                    id="arcGrad"
-                    x1="0"
-                    y1="50"
-                    x2="100"
-                    y2="50"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <Stop
-                      offset="0"
-                      stopColor="#FFFFFF"
-                      stopOpacity="0"
-                    />
-                    <Stop
-                      offset="1"
-                      stopColor="#FFFFFF"
-                      stopOpacity="0.9"
-                    />
-                  </SvgLinearGradient>
-                </Defs>
-                {/* Track: apenas sugerido (13%). */}
-                <Circle
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  stroke="rgba(255,255,255,0.13)"
-                  strokeWidth="3"
-                  fill="none"
-                />
-                {/* Arco activo: ~100° visible (75 de 276 de circunferencia),
-                    strokeWidth 3 en viewBox = 2.4 px en pantalla (fino y
-                    elegante). Gradient del transparente al blanco 90%. */}
-                <Circle
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  stroke="url(#arcGrad)"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeDasharray="75 201"
-                  strokeLinecap="round"
-                />
-              </Svg>
-            </Animated.View>
+          {/* flex 3: hero (ring + logo + check) */}
+          <View style={s.hero}>
+            <View
+              style={{
+                width: ringSize,
+                height: ringSize,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {/* Spinning arc. Durante el draw rota -90→270; cuando
+                  termina, el loop infinito de spinDeg toma el control. */}
+              <Animated.View
+                style={[
+                  s.spinnerWrap,
+                  { width: ringSize, height: ringSize },
+                  logoEntryStyle,
+                  spinnerStyle,
+                ]}
+              >
+                <Svg
+                  width={ringSize}
+                  height={ringSize}
+                  viewBox="0 0 100 100"
+                >
+                  {/* Track: 12% opacidad. */}
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeWidth={ringStrokeViewBox}
+                    fill="none"
+                  />
+                  {/* Arco activo. Durante el draw dasharray=CIRC (para
+                      dibujar el círculo completo via offset); una vez
+                      que el draw termina y el spinner arranca, la
+                      apariencia visual es la misma porque queda en
+                      offset=0, pero el wrapper rota. Luego para el loop
+                      usamos dasharray ARC_LEN (75°). */}
+                  <AnimatedCircle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="#FFFFFF"
+                    strokeWidth={ringStrokeViewBox}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={
+                      spinnerRunning
+                        ? `${ARC_LEN} ${CIRC - ARC_LEN}`
+                        : `${CIRC} ${CIRC}`
+                    }
+                    animatedProps={
+                      spinnerRunning ? undefined : drawStrokeProps
+                    }
+                  />
+                </Svg>
+              </Animated.View>
 
-            {/* Full circle estático (done) — cross-fade con el arc. */}
-            <Animated.View style={[s.spinnerWrap, fullCircleStyle]}>
-              <Svg width={80} height={80} viewBox="0 0 100 100">
-                <Circle
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  stroke="#FFFFFF"
-                  strokeOpacity="0.9"
-                  strokeWidth="3"
-                  fill="none"
-                />
-              </Svg>
-            </Animated.View>
+              {/* Full circle estático (done). */}
+              <Animated.View
+                style={[
+                  s.spinnerWrap,
+                  { width: ringSize, height: ringSize },
+                  fullCircleStyle,
+                ]}
+              >
+                <Svg
+                  width={ringSize}
+                  height={ringSize}
+                  viewBox="0 0 100 100"
+                >
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    stroke="#FFFFFF"
+                    strokeWidth={ringStrokeViewBox}
+                    fill="none"
+                  />
+                </Svg>
+              </Animated.View>
 
-            {/* Logo Alamos — sólido blanco, ~60% del diámetro interior. */}
-            <Animated.View style={[s.logoOverlay, logoStyle]}>
-              <Image
-                source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
-                style={s.logoImg}
-                resizeMode="contain"
-              />
-            </Animated.View>
+              {/* Logo Alamos (entra con logoEntry, se apaga con
+                  logoOpacity/logoScale al morph). Combinamos ambas
+                  vistas animadas anidando. */}
+              <Animated.View style={[s.centerAbs, logoEntryStyle]}>
+                <Animated.View style={logoStyle}>
+                  <Image
+                    source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
+                    style={{
+                      width: logoInnerSize,
+                      height: logoInnerSize,
+                      tintColor: "#FFFFFF",
+                    }}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+              </Animated.View>
 
-            {/* Checkmark — stroke-draw via useAnimatedProps. */}
-            <Animated.View style={[s.logoOverlay, checkStyle]}>
-              <Svg width={46} height={46} viewBox="0 0 24 24">
-                <AnimatedPath
-                  d="M5 12 L10 17 L19 7"
-                  stroke="#FFFFFF"
-                  strokeWidth={2.5}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
-                  animatedProps={checkPathProps}
-                />
-              </Svg>
-            </Animated.View>
+              {/* Checkmark: aparece al done con spring + stroke-draw. */}
+              <Animated.View style={[s.centerAbs, checkStyle]}>
+                <Svg
+                  width={checkSize}
+                  height={checkSize}
+                  viewBox="0 0 24 24"
+                >
+                  <AnimatedPath
+                    d="M5 12 L10 17 L19 7"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.7}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
+                    animatedProps={checkPathProps}
+                  />
+                </Svg>
+              </Animated.View>
+            </View>
           </View>
 
-          {/* Gap fijo de 28 px entre círculo y texto (spec). */}
-          <View style={{ height: 28 }} />
+          {/* flex 2: texto stackeado (3 Animated.Text en el mismo slot) */}
+          <View style={s.textStack}>
+            <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
+              Orden Enviada...
+            </Animated.Text>
+            <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
+              Orden Recibida...
+            </Animated.Text>
+            <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
+              Orden Ejecutada
+            </Animated.Text>
+          </View>
 
-          <Animated.Text style={[s.execText, statusStyle]}>
-            {statusText}
-          </Animated.Text>
-        </Animated.View>
+          {/* flex 2: spacer bottom (aire premium) */}
+          <View style={{ flex: 2 }} />
+        </View>
       ) : null}
     </View>
   );
@@ -659,43 +848,48 @@ const s = StyleSheet.create({
     bottom: 0,
   },
 
-  /* Execution overlay — layout estilo Robinhood, no vertical-center */
+  /* Execution overlay: flex 1/3/2/2 sin posiciones hardcoded. */
   execOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
   },
-  logoWrap: {
-    width: 80,
-    height: 80,
+  /* Hero: ocupa flex 3 del overlay, centra el ring vertical y horiz. */
+  hero: {
+    flex: 3,
     alignItems: "center",
     justifyContent: "center",
   },
+  /* Wrapper absolute del spinner/full-circle dentro del hero. */
   spinnerWrap: {
     position: "absolute",
-    width: 80,
-    height: 80,
     alignItems: "center",
     justifyContent: "center",
   },
-  logoOverlay: {
+  /* Helper: centrado absoluto dentro del ring (logo y check). */
+  centerAbs: {
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
   },
-  logoImg: {
-    // ~60% del diámetro del spinner (80 * 0.6 ≈ 48; bumpeamos a 52 para
-    // que el mark se sienta sólido, no chiquito).
-    width: 52,
-    height: 52,
-    tintColor: "#FFFFFF",
+  /* Slot del texto: flex 2, los 3 Animated.Text stackeados dentro. */
+  textStack: {
+    flex: 2,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 28,
+  },
+  textAbs: {
+    position: "absolute",
+    top: 28,
+    left: 0,
+    right: 0,
   },
   execText: {
-    // Status text: 22 px, weight 600 (SemiBold), letter-spacing -0.2,
-    // blanco puro. Corto y premium.
     fontFamily: fontFamily[600],
-    fontSize: 22,
+    fontSize: 28,
     color: "#FFFFFF",
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
     textAlign: "center",
     paddingHorizontal: 24,
   },
