@@ -244,26 +244,26 @@ export default function BuyScreen() {
         </View>
       </View>
 
-      {/* Hero: centrado verticalmente en el espacio entre el toggle
-          (arriba) y la barrita (abajo). */}
-      <View style={s.heroSection}>
-        <View style={s.hero}>
-          <Text
-            style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-            allowFontScaling={false}
-          >
-            {heroDisplay}
-          </Text>
-          <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
-            {hint}
-          </Text>
-          <Text style={[s.available, { color: c.textMuted }]}>
-            {availableLabel}
-          </Text>
-        </View>
+      {/* Spacer superior: empuja hero + slider hacia abajo. Ratio mayor
+          al inferior para que el hero quede más bajo y el teclado suba. */}
+      <View style={{ flex: 1.6 }} />
+
+      <View style={s.hero}>
+        <Text
+          style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          allowFontScaling={false}
+        >
+          {heroDisplay}
+        </Text>
+        <Text style={[s.heroHint, { color: exceeds ? c.red : c.textMuted }]}>
+          {hint}
+        </Text>
+        <Text style={[s.available, { color: c.textMuted }]}>
+          {availableLabel}
+        </Text>
       </View>
 
       <View style={s.sliderRow}>
@@ -274,8 +274,9 @@ export default function BuyScreen() {
         />
       </View>
 
-      {/* Spacer que empuja el teclado hacia abajo, pegado al asset strip. */}
-      <View style={{ flex: 1 }} />
+      {/* Spacer inferior: más chico, así el teclado queda más arriba
+          sin pegarse al asset strip. */}
+      <View style={{ flex: 0.5 }} />
 
       <View style={s.keypad}>
         {keys.map((row, ri) => (
@@ -386,10 +387,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 16,
     letterSpacing: -0.25,
-  },
-  heroSection: {
-    flex: 1,
-    justifyContent: "center",
   },
   modeRow: {
     paddingHorizontal: 20,
