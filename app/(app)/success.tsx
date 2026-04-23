@@ -48,7 +48,7 @@ export default function SuccessScreen() {
           <Feather name="check" size={36} color={c.ink} strokeWidth={3} />
         </View>
         <Text style={[s.title, { color: c.text }]}>
-          Orden {isSell ? "de venta" : "de compra"} enviada
+          Orden ejecutada
         </Text>
         <Text style={[s.subtitle, { color: c.textMuted }]}>
           Tu orden de mercado por {formatARS(numAmount)} de{" "}
