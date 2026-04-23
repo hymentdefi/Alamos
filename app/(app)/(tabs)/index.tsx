@@ -214,36 +214,6 @@ function BaseHome() {
         >
           <Feather name="menu" size={18} color={c.text} />
         </Tap>
-        <View style={s.topActions}>
-          <Tap
-            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
-            haptic="light"
-            onPress={() =>
-              router.push({
-                pathname: "/(app)/transfer",
-                params: { mode: "deposit" },
-              })
-            }
-            hitSlop={8}
-          >
-            <Feather name="arrow-down-left" size={14} color={c.text} />
-            <Text style={[s.topPillText, { color: c.text }]}>Ingresar</Text>
-          </Tap>
-          <Tap
-            style={[s.topPill, { backgroundColor: c.surfaceHover }]}
-            haptic="light"
-            onPress={() =>
-              router.push({
-                pathname: "/(app)/transfer",
-                params: { mode: "withdraw" },
-              })
-            }
-            hitSlop={8}
-          >
-            <Feather name="arrow-up-right" size={14} color={c.text} />
-            <Text style={[s.topPillText, { color: c.text }]}>Retirar</Text>
-          </Tap>
-        </View>
       </View>
 
       <ScrollView
@@ -281,6 +251,37 @@ function BaseHome() {
             </Text>
             <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
+          </View>
+
+          <View style={s.cashActionsRow}>
+            <Tap
+              style={[s.cashPill, { backgroundColor: c.surfaceHover }]}
+              haptic="light"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "deposit" },
+                })
+              }
+              hitSlop={6}
+            >
+              <Feather name="arrow-down-left" size={14} color={c.text} />
+              <Text style={[s.cashPillText, { color: c.text }]}>Ingresar</Text>
+            </Tap>
+            <Tap
+              style={[s.cashPill, { backgroundColor: c.surfaceHover }]}
+              haptic="light"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "withdraw" },
+                })
+              }
+              hitSlop={6}
+            >
+              <Feather name="arrow-up-right" size={14} color={c.text} />
+              <Text style={[s.cashPillText, { color: c.text }]}>Retirar</Text>
+            </Tap>
           </View>
 
           <Sparkline
@@ -940,11 +941,6 @@ const s = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  topActions: {
-    flexDirection: "row",
-    gap: 8,
   },
   topBtn: {
     width: 36,
@@ -953,15 +949,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  topPill: {
+  cashActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  cashPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     height: 36,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
   },
-  topPillText: {
+  cashPillText: {
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.15,

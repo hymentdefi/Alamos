@@ -129,7 +129,7 @@ function BaseExplore() {
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
-            <View style={[s.closedDot, { backgroundColor: c.red }]} />
+            <View style={[s.closedDot, { backgroundColor: c.green }]} />
             <Text
               style={[s.closedText, { color: c.textSecondary }]}
               numberOfLines={2}
