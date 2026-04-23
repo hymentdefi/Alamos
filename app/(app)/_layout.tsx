@@ -17,7 +17,13 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
-      <Stack.Screen name="detail" />
+      {/* Detail: fullscreen gesture OFF para que pasar el dedo sobre el
+          chart (scrubbing del sparkline) no dispare el swipe-back. El
+          swipe desde el borde izquierdo sigue andando como back. */}
+      <Stack.Screen
+        name="detail"
+        options={{ fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen name="trade" />
       {/* Buy: fullscreen gesture OFF para que arrastrar el slider no
           dispare el swipe-back. El swipe desde el borde izquierdo sigue

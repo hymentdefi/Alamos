@@ -149,6 +149,15 @@ function BaseHome() {
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
 
+  // Saludo según la hora local: 05-12 buen día, 12-20 buenas tardes, resto
+  // buenas noches.
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return "Buen día";
+    if (h >= 12 && h < 20) return "Buenas tardes";
+    return "Buenas noches";
+  }, []);
+
   const held = useMemo(() => assets.filter((a) => a.held), []);
   const total = useMemo(
     () => held.reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0),
@@ -235,7 +244,7 @@ function BaseHome() {
       >
         <View style={s.heroBlock}>
           <Text style={[s.greet, { color: c.textMuted }]}>
-            Hola, {firstName}
+            {greeting}, {firstName}
           </Text>
           <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
           <View style={s.deltaRow}>
