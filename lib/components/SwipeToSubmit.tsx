@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -10,6 +11,7 @@ import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -21,6 +23,7 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius } from "../theme";
 
@@ -74,6 +77,20 @@ function hapticHeavy() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 }
 
+/** Log temporal para debuggear la race del onEnd (bug 1). */
+function logSwipeEnd(
+  dy: number,
+  vy: number,
+  visualProgress: number,
+  threshold: number,
+  commit: boolean,
+) {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[Swipe] dy=${dy.toFixed(0)} vy=${vy.toFixed(2)} visual=${visualProgress.toFixed(3)} thr=${threshold} commit=${commit}`,
+  );
+}
+
 /* ─── Tipos públicos ─────────────────────────────────────────────── */
 
 export interface SwipeToSubmitProps {
@@ -122,6 +139,10 @@ export function SwipeToSubmit({
   // Flag en UI thread para disparar el haptic-medium una sola vez al
   // cruzar el threshold.
   const crossedCommit = useSharedValue(false);
+  // Fail-safe: garantiza que triggerSubmit se llame UNA sola vez aunque
+  // haya múltiples paths que lo disparen (onEnd, spring callback,
+  // useAnimatedReaction al cruzar 0.99).
+  const didFire = useSharedValue(false);
 
   // React state sólo para DESHABILITAR el gesto después del submit.
   // No lo leemos durante el drag (leemos el sharedValue disabled si hace
@@ -133,6 +154,20 @@ export function SwipeToSubmit({
     setCommitted(true);
     onSubmit();
   }, [onSubmit]);
+
+  // Fail-safe global: si progress.value cruza 0.99 por CUALQUIER motivo
+  // (onEnd completó, spring terminó, usuario llegó a 1 mid-drag), se
+  // dispara triggerSubmit. El flag didFire evita el double-fire.
+  useAnimatedReaction(
+    () => progress.value,
+    (current) => {
+      "worklet";
+      if (current >= 0.99 && !didFire.value) {
+        didFire.value = true;
+        runOnJS(triggerSubmit)();
+      }
+    },
+  );
 
   const gesture = useMemo(
     () =>
@@ -178,22 +213,43 @@ export function SwipeToSubmit({
           const dy = -e.translationY;
           // velocityY viene en px/s; normalizamos a px/ms.
           const vy = -e.velocityY / 1000;
-          const rawProgress = dy / SWIPE_RANGE;
-          const passedThreshold = rawProgress >= SWIPE_COMMIT_FRACTION;
-          const validFlick =
-            vy > SWIPE_FLICK_VELOCITY &&
-            rawProgress > SWIPE_FLICK_MIN_FRACTION;
+          // IMPORTANTE: leemos el VISUAL progress (damped) directo del
+          // sharedValue, no lo recomputamos desde translationY. Esto cubre
+          // el caso en el que la animación ya disparó y progress.value
+          // está por encima de lo que daría dy/SWIPE_RANGE.
+          const visualProgress = progress.value;
+          const passedByPosition = visualProgress >= SWIPE_COMMIT_FRACTION;
+          // Flick: velocidad alta + al menos 25% de recorrido visual.
+          // Proyecta que la posición final va a cruzar el threshold.
+          const passedByVelocity =
+            vy > SWIPE_FLICK_VELOCITY && visualProgress >= 0.25;
+          const commit = passedByPosition || passedByVelocity;
 
-          if (passedThreshold || validFlick) {
+          runOnJS(logSwipeEnd)(
+            dy,
+            vy,
+            visualProgress,
+            SWIPE_COMMIT_FRACTION,
+            commit,
+          );
+
+          if (commit) {
             runOnJS(hapticHeavy)();
-            // Spring físico: stiffness 300, damping 20, mass 1.
-            // Trae el micro-bounce al tope.
+            // Spring físico. El triggerSubmit lo dispara useAnimatedReaction
+            // cuando progress.value cruza 0.99 (primary path). Mantenemos
+            // también el callback del spring como segundo red de seguridad.
             progress.value = withSpring(
               1,
               { stiffness: 300, damping: 20, mass: 1 },
               (finished) => {
                 "worklet";
-                if (finished) runOnJS(triggerSubmit)();
+                if (
+                  !didFire.value &&
+                  (finished || progress.value >= 0.99)
+                ) {
+                  didFire.value = true;
+                  runOnJS(triggerSubmit)();
+                }
               },
             );
             if (progressOut) {
@@ -224,6 +280,7 @@ export function SwipeToSubmit({
       committed,
       progress,
       crossedCommit,
+      didFire,
       triggerSubmit,
       progressOut,
     ],
@@ -320,40 +377,61 @@ export function SwipeToSubmit({
         onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
         style={[s.pill, { backgroundColor }, pillStyle, style]}
       >
+        {/* Base: chevron + texto atenuados. Siempre visibles. */}
         <Animated.View style={chevronStyle}>
           <Feather
             name="chevron-up"
             size={14}
-            color="rgba(255,255,255,0.75)"
+            color="rgba(255,255,255,0.72)"
             style={{ marginBottom: 2 }}
           />
         </Animated.View>
         <Text style={s.label}>{label}</Text>
 
-        {/* Shimmer overlay: cubre TODO el contenido del pill (chevron +
-            texto) y sólo se ve cuando el pill está en reposo. */}
+        {/* Shimmer overlay clippeado a la FORMA del chevron+texto via
+            MaskedView. El LinearGradient corre en un Animated.View que
+            desliza dentro del mask; sólo se ve en los píxeles donde el
+            mask element (chevron + texto en blanco) es opaco. */}
         {pillWidth > 0 ? (
           <Animated.View
             pointerEvents="none"
-            style={[s.shimmerContainer, shimmerOverlayStyle]}
+            style={[StyleSheet.absoluteFill, shimmerOverlayStyle]}
           >
-            <Animated.View
-              style={[
-                s.shimmerWave,
-                { width: gradientWidth },
-                shimmerWaveStyle,
-              ]}
+            <MaskedView
+              style={StyleSheet.absoluteFill}
+              maskElement={
+                <View style={s.maskContainer}>
+                  <Feather
+                    name="chevron-up"
+                    size={14}
+                    color="#FFFFFF"
+                    style={{ marginBottom: 2 }}
+                  />
+                  <Text style={s.maskLabel}>{label}</Text>
+                </View>
+              }
             >
-              <LinearGradient
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                colors={SHIMMER_COLORS as any}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                locations={SHIMMER_LOCATIONS as any}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
+              {/* Children del mask: wave deslizante con el gradiente
+                  de shimmer. Sólo renderiza donde el mask es opaco
+                  (letras y chevron). */}
+              <Animated.View
+                style={[
+                  s.shimmerWave,
+                  { width: gradientWidth },
+                  shimmerWaveStyle,
+                ]}
+              >
+                <LinearGradient
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  colors={SHIMMER_COLORS as any}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  locations={SHIMMER_LOCATIONS as any}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+            </MaskedView>
           </Animated.View>
         ) : null}
       </Animated.View>
@@ -378,8 +456,20 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.72)",
     letterSpacing: -0.2,
   },
-  shimmerContainer: {
-    ...StyleSheet.absoluteFillObject,
+  // Mask element: mismo layout que el pill, texto y chevron en blanco
+  // sólido para que MaskedView deje pasar el shimmer por esa forma.
+  maskContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    backgroundColor: "transparent",
+  },
+  maskLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
   },
   shimmerWave: {
     position: "absolute",
