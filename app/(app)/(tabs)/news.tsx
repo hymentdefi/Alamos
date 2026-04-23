@@ -42,7 +42,7 @@ import {
 } from "../../../lib/components/HorizontalPager";
 import { Tap } from "../../../lib/components/Tap";
 
-type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "cripto";
+type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "crypto";
 
 interface NewsItem {
   id: string;
@@ -62,7 +62,7 @@ interface NewsItem {
 
 const CAT_COLORS: Record<Category, string> = {
   mercado: "#0ECB81",
-  cripto: "#F7931A",
+  crypto: "#F7931A",
   cedears: "#4A7DFF",
   bonos: "#E8B84A",
   fci: "#2DD4BF",
@@ -92,9 +92,9 @@ const feed: NewsItem[] = [
   },
   {
     id: "2",
-    category: "cripto",
-    categoryLabel: "Cripto",
-    categoryColor: CAT_COLORS.cripto,
+    category: "crypto",
+    categoryLabel: "Crypto",
+    categoryColor: CAT_COLORS.crypto,
     source: "CoinDesk",
     time: "hace 2h",
     title: "Bitcoin roza los USD 68.000 arrastrando al sector tech",
@@ -205,9 +205,9 @@ const feed: NewsItem[] = [
   },
   {
     id: "8",
-    category: "cripto",
-    categoryLabel: "Cripto",
-    categoryColor: CAT_COLORS.cripto,
+    category: "crypto",
+    categoryLabel: "Crypto",
+    categoryColor: CAT_COLORS.crypto,
     source: "The Block",
     time: "hace 10h",
     title: "Ethereum sube 5% anticipando la próxima actualización",
@@ -227,7 +227,7 @@ const feed: NewsItem[] = [
 const categoryTabs: { id: Category | "todas"; label: string }[] = [
   { id: "todas", label: "Para vos" },
   { id: "mercado", label: "Mercado" },
-  { id: "cripto", label: "Cripto" },
+  { id: "crypto", label: "Crypto" },
   { id: "cedears", label: "CEDEARs" },
   { id: "bonos", label: "Bonos" },
   { id: "fci", label: "Fondos" },

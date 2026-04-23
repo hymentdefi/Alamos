@@ -37,14 +37,10 @@ export function isMarketOpen(date = new Date()): boolean {
 }
 
 /** Texto para el disclaimer cuando el mercado está cerrado. */
-export function marketClosedMessage(date = new Date()): string {
-  const { day, hour, minute } = argentinaNow(date);
-  const isWeekend = day === 0 || day === 6;
-  if (isWeekend) {
-    return "Mercado cerrado · Las órdenes quedan pendientes hasta el lunes a las 10:30.";
-  }
-  if (minutesOfDay(hour, minute) < OPEN_MINS) {
-    return "Fuera de horario de mercado · Abrimos hoy a las 10:30.";
-  }
-  return "Mercado cerrado · Reanudamos mañana a las 10:30.";
+export function marketClosedMessage(_date = new Date()): string {
+  // Mensaje único, sin asumir qué día es hoy/mañana: no tenemos un
+  // calendario de feriados, así que cualquier referencia temporal
+  // concreta (p.ej. 'abrimos mañana') puede ser falsa si el próximo
+  // día hábil es feriado. Mejor genérico y siempre correcto.
+  return "Mercado cerrado · Operamos de lunes a viernes de 10:30 a 17:00 hs.";
 }

@@ -25,7 +25,7 @@ function unitWordFor(cat: AssetCategory): string {
       return "cuotapartes";
     case "obligaciones":
       return "ONs";
-    case "cripto":
+    case "crypto":
       return "monedas";
     default:
       return "unidades";

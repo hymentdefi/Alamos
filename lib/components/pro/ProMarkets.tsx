@@ -77,7 +77,7 @@ export function ProMarkets() {
   const list = useMemo(() => {
     let arr: Asset[];
     if (market === "spot") {
-      arr = assets.filter((a) => a.category === "cripto");
+      arr = assets.filter((a) => a.category === "crypto");
     } else if (market === "futures") {
       arr = assets.filter((a) => a.category === "futuros");
     } else {

@@ -7,7 +7,7 @@ export type AssetCategory =
   | "letras"
   | "caucion"
   | "fci"
-  | "cripto"
+  | "crypto"
   | "futuros"
   | "opciones";
 
@@ -28,7 +28,7 @@ export interface Asset {
   held: boolean;
   qty?: number;
   favorite?: boolean;
-  /** Volumen 24h en unidades de cotización (solo cripto/futuros). */
+  /** Volumen 24h en unidades de cotización (solo crypto/futuros). */
   volume24h?: number;
   /** Apalancamiento máximo disponible (solo futuros). */
   maxLeverage?: number;
@@ -396,14 +396,14 @@ export const assets: Asset[] = [
     held: false,
   },
 
-  // ─── Cripto Spot (solo visible en Alamos Pro) ───
+  // ─── Crypto Spot (solo visible en Alamos Pro) ───
   {
     ticker: "BTC/USDT",
     name: "Bitcoin",
     subLabel: "BTC · Spot",
     iconCode: "BT",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 67432.5,
     change: 1.24,
     held: false,
@@ -415,7 +415,7 @@ export const assets: Asset[] = [
     subLabel: "ETH · Spot",
     iconCode: "ET",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 3284.15,
     change: -0.91,
     held: false,
@@ -427,7 +427,7 @@ export const assets: Asset[] = [
     subLabel: "SOL · Spot",
     iconCode: "SO",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 142.82,
     change: 3.22,
     held: false,
@@ -439,7 +439,7 @@ export const assets: Asset[] = [
     subLabel: "BNB · Spot",
     iconCode: "BN",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 584.3,
     change: 0.74,
     held: false,
@@ -451,7 +451,7 @@ export const assets: Asset[] = [
     subLabel: "XRP · Spot",
     iconCode: "XR",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 0.52,
     change: -1.15,
     held: false,
@@ -463,7 +463,7 @@ export const assets: Asset[] = [
     subLabel: "ADA · Spot",
     iconCode: "AD",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 0.45,
     change: 1.87,
     held: false,
@@ -475,7 +475,7 @@ export const assets: Asset[] = [
     subLabel: "LINK · Spot",
     iconCode: "LI",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 14.32,
     change: 2.14,
     held: false,
@@ -487,7 +487,7 @@ export const assets: Asset[] = [
     subLabel: "AVAX · Spot",
     iconCode: "AV",
     iconTone: "dark",
-    category: "cripto",
+    category: "crypto",
     price: 32.41,
     change: -2.37,
     held: false,
@@ -603,7 +603,7 @@ export const categoryLabels: Record<AssetCategory, string> = {
   obligaciones: "Obligaciones",
   letras: "Letras",
   caucion: "Caución",
-  cripto: "Cripto",
+  crypto: "Crypto",
   futuros: "Futuros",
   opciones: "Opciones",
 };

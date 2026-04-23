@@ -330,7 +330,7 @@ function categoryLabel(cat: AssetCategory): string {
     obligaciones: "Obligación negociable",
     letras: "Letra del Tesoro",
     caucion: "Caución bursátil",
-    cripto: "Cripto Spot",
+    crypto: "Crypto Spot",
     futuros: "Futuro perpetuo",
     opciones: "Opción",
   };
@@ -455,7 +455,7 @@ function aboutText(cat: AssetCategory): string {
       return "Letra capitalizable del Tesoro. Corto plazo, rendimiento fijo.";
     case "caucion":
       return "Préstamo de corto plazo entre inversores con garantía en títulos públicos. Rinde pesos a tasa de mercado.";
-    case "cripto":
+    case "crypto":
       return "Criptomoneda spot. Operable 24/7 en el mercado internacional con liquidación inmediata.";
     case "futuros":
       return "Contrato de futuro perpetuo con apalancamiento. Alto riesgo, solo para traders experimentados.";

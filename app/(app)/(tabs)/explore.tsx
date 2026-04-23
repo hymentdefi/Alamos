@@ -33,10 +33,10 @@ type Filter = "todo" | AssetCategory;
 const filters: { id: Filter; label: string }[] = [
   { id: "todo", label: "Todo" },
   { id: "cedears", label: "CEDEARs" },
-  { id: "bonos", label: "Bonos" },
   { id: "fci", label: "Fondos" },
+  { id: "crypto", label: "Crypto" },
+  { id: "bonos", label: "Bonos" },
   { id: "acciones", label: "Acciones" },
-  { id: "cripto", label: "Cripto" },
   { id: "obligaciones", label: "ONs" },
   { id: "letras", label: "Letras" },
   { id: "caucion", label: "Caución" },

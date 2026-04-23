@@ -45,7 +45,7 @@ export function ProHome() {
       .filter(
         (a) =>
           !favorites.has(a.ticker) &&
-          (a.category === "cripto" || a.category === "futuros") &&
+          (a.category === "crypto" || a.category === "futuros") &&
           a.ticker !== "ARS" &&
           a.ticker !== "USD",
       )
@@ -56,7 +56,7 @@ export function ProHome() {
   const topGainers = useMemo(
     () =>
       [...assets]
-        .filter((a) => a.category === "cripto" || a.category === "futuros")
+        .filter((a) => a.category === "crypto" || a.category === "futuros")
         .sort((a, b) => b.change - a.change)
         .slice(0, 4),
     [],
