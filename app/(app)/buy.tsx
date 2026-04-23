@@ -8,6 +8,7 @@ import {
   assets,
   assetIconCode,
   formatARS,
+  formatQty,
   type AssetCategory,
 } from "../../lib/data/assets";
 import { Tap } from "../../lib/components/Tap";
@@ -87,11 +88,18 @@ export default function BuyScreen() {
   const applyPct = (pct: number) => {
     const ratio = pct / 100;
     if (inputMode === "amount") {
-      const next = Math.round(maxCash * ratio);
+      // En 100% usamos Math.floor para no empujar 1 peso por encima del
+      // disponible. El resto de porcentajes redondea normal.
+      const next =
+        pct >= 100 ? Math.floor(maxCash) : Math.round(maxCash * ratio);
       setInput(String(next));
     } else {
-      const next = maxQty * ratio;
-      const formatted = next
+      // Truncar a 4 decimales (no toFixed, que redondea hacia arriba y
+      // puede quedar 1 ulp por encima del máximo — eso disparaba el
+      // 'supera lo disponible' al poner 100%).
+      const raw = maxQty * ratio;
+      const truncated = Math.floor(raw * 10000) / 10000;
+      const formatted = truncated
         .toFixed(4)
         .replace(/0+$/, "")
         .replace(/\.$/, "");
@@ -165,18 +173,23 @@ export default function BuyScreen() {
       ? `$${bigPrimary}`
       : `${bigPrimary} ${asset.ticker}`;
 
+  // Truncado a 4 decimales para alinear con lo que el slider deja
+  // cargar al 100% — si acá mostramos redondeo hacia arriba, el hint
+  // de 'supera lo disponible' queda incongruente con lo que alcanza.
+  const maxQtyFloored = Math.floor(maxQty * 10000) / 10000;
+
   const hint = !hasInput
     ? " "
     : exceeds
     ? inputMode === "amount"
       ? `Supera lo disponible (${formatARS(maxCash)})`
-      : `Supera lo disponible (${maxQty.toFixed(4)} ${asset.ticker})`
+      : `Supera lo disponible (${formatQty(maxQtyFloored)} ${asset.ticker})`
     : inputMode === "amount"
-    ? `≈ ${qtyAmount.toFixed(4)} ${asset.ticker}`
+    ? `≈ ${formatQty(qtyAmount)} ${asset.ticker}`
     : `≈ ${formatARS(arsAmount)}`;
 
   const availableLabel = isSell
-    ? `Disponible para vender: ${asset.qty ?? 0} ${asset.ticker}`
+    ? `Disponible para vender: ${formatQty(asset.qty ?? 0)} ${asset.ticker}`
     : `Fondos disponibles para operar: ${formatARS(maxCash)}`;
 
   return (
@@ -245,7 +258,7 @@ export default function BuyScreen() {
       </View>
 
       {/* Spacer superior: empuja hero + slider hacia abajo. */}
-      <View style={{ flex: 1.2 }} />
+      <View style={{ flex: 0.7 }} />
 
       <View style={s.hero}>
         <Text

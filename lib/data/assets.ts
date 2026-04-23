@@ -621,6 +621,18 @@ export function formatARS(n: number): string {
 }
 
 /**
+ * Formatea una cantidad (acciones, cuotapartes, cripto) con separador
+ * decimal ',' y de miles '.' al estilo argentino, sin ceros finales
+ * innecesarios. Hasta `maxDecimals` decimales.
+ */
+export function formatQty(n: number, maxDecimals = 4): string {
+  return n.toLocaleString("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals,
+  });
+}
+
+/**
  * Separa un monto en sus partes para poder renderizar los decimales más
  * chicos que la parte entera (estilo Robinhood / apps bancarias).
  */
