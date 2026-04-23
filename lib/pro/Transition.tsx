@@ -285,7 +285,7 @@ const s = StyleSheet.create({
     width: SCREEN_W,
   },
   welcome: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[600],
     fontSize: 26,
     letterSpacing: -0.4,
     marginBottom: 16,
@@ -293,10 +293,10 @@ const s = StyleSheet.create({
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 2,
   },
   accentText: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[700],
     fontSize: 54,
     letterSpacing: -1.8,
   },

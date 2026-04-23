@@ -362,11 +362,11 @@ const s = StyleSheet.create({
   proPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 4,
     marginHorizontal: 20,
     marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
