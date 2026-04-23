@@ -95,20 +95,23 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  // Ring sizing (spec D): 56% of screen width, clamped 220..320.
+  // Ring sizing (spec A, updated): 28% del ancho, clamped 100-140 px.
+  // Chico, elegante, discreto. NO domina la pantalla — como Robinhood.
   const ringSize = Math.min(
-    320,
-    Math.max(220, Math.round(windowW * 0.56)),
+    140,
+    Math.max(100, Math.round(windowW * 0.28)),
   );
+  // Stroke fino: piso 2 px, target ~2 % del ring (≈2-2.8 px).
   const ringStrokeScreen = Math.max(
-    2.5,
-    Math.round(ringSize * 0.014 * 10) / 10,
+    2,
+    Math.round(ringSize * 0.02 * 10) / 10,
   );
   // viewBox is 100 → convert screen-px stroke to viewBox units.
   const ringStrokeViewBox = (ringStrokeScreen / ringSize) * 100;
-  // Logo inside the ring: 44% of the ring diameter.
-  const logoInnerSize = Math.round(ringSize * 0.44);
-  const checkSize = Math.round(ringSize * 0.48);
+  // Logo inside the ring: 60 % del diámetro (fill con presencia).
+  const logoInnerSize = Math.round(ringSize * 0.6);
+  // Check: 55 % del ring (un toque más chico para respirar).
+  const checkSize = Math.round(ringSize * 0.55);
 
   // Logo entrance travel: 22% of screen height (~180px on a standard iPhone).
   const entranceTravel = Math.round(windowH * 0.22);
@@ -218,13 +221,13 @@ export default function ConfirmScreen() {
     setPhase("sending");
 
     // ─── t=0: Logo entrance ─ slow spring over ~700ms, ~180px visible rise.
+    // (rest thresholds quedaron fuera en reanimated 4: el default threshold
+    // es fino; el spring settle se calcula por mass/stiffness/damping.)
     logoTranslateY.value = withSpring(0, {
       mass: 1,
       stiffness: 55,
       damping: 12,
       overshootClamping: false,
-      restDisplacementThreshold: 0.01,
-      restSpeedThreshold: 0.01,
     });
     logoOpacity.value = withTiming(1, {
       duration: 500,
@@ -711,7 +714,8 @@ export default function ConfirmScreen() {
             </Animated.View>
           </View>
 
-          <View style={{ flex: 0.8 }} />
+          {/* Spec layout: flex 0.6 gap entre el ring y el texto. */}
+          <View style={{ flex: 0.6 }} />
 
           {/* Status-text zone. Fixed height so the 34px text has room and
               the 28px error title (potentially 2 lines) also fits. All
@@ -743,7 +747,8 @@ export default function ConfirmScreen() {
             </Text>
           </Animated.View>
 
-          <View style={{ flex: 1.5 }} />
+          {/* Spec layout: flex 1.3 spacer bottom asimétrico (óptica center). */}
+          <View style={{ flex: 1.3 }} />
 
           {/* "Volver" button — only pressable in error state. */}
           <Animated.View
