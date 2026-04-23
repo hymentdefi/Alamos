@@ -21,7 +21,7 @@ interface Props {
   accent?: string;
 }
 
-const SNAPS = [25, 50, 75, 100];
+const SNAPS = [0, 25, 50, 75, 100];
 /** Distancia en % dentro de la cual el thumb "pega" al snap. */
 const SNAP_TOLERANCE = 2.5;
 const THUMB_SIZE = 18;
@@ -47,7 +47,7 @@ export function PercentSlider({
       if (trackW <= 0) return value;
       const clamped = Math.max(0, Math.min(trackW, x));
       let pct = (clamped / trackW) * 100;
-      for (const s of [0, ...SNAPS]) {
+      for (const s of SNAPS) {
         if (Math.abs(pct - s) < SNAP_TOLERANCE) {
           pct = s;
           break;
@@ -59,7 +59,7 @@ export function PercentSlider({
   );
 
   const maybeHaptic = (pct: number) => {
-    const snap = [0, ...SNAPS].find((s) => Math.abs(s - pct) < 0.5) ?? null;
+    const snap = SNAPS.find((s) => Math.abs(s - pct) < 0.5) ?? null;
     if (snap !== lastSnap.current) {
       if (snap !== null) Haptics.selectionAsync().catch(() => {});
       lastSnap.current = snap;
@@ -156,7 +156,11 @@ export function PercentSlider({
               style={[s.tooltip, { left: thumbLeft }]}
             >
               <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
-                <Text style={[s.tooltipText, { color: c.bg }]}>
+                <Text
+                  style={[s.tooltipText, { color: c.bg }]}
+                  numberOfLines={1}
+                  allowFontScaling={false}
+                >
                   {pctRounded}%
                 </Text>
               </View>
@@ -223,22 +227,23 @@ const s = StyleSheet.create({
   },
   tooltip: {
     position: "absolute",
-    top: -34,
+    top: -36,
     alignItems: "center",
     // Centrar sobre el thumb
-    marginLeft: -22,
-    width: 44,
+    marginLeft: -28,
+    width: 56,
   },
   tooltipPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: radius.sm,
   },
   tooltipText: {
     fontFamily: fontFamily[700],
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: -0.05,
     textAlign: "center",
+    includeFontPadding: false,
   },
   tooltipArrow: {
     alignSelf: "center",
