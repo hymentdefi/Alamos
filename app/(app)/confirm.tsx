@@ -10,13 +10,13 @@ import {
   Easing,
   Image,
   type StyleProp,
-  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
@@ -54,9 +54,21 @@ const CARD_RADIUS = 28;
 /** "Orden Enviada..." — corto, sólo confirma que salió. */
 const PHASE_SENDING_MS = 900;
 /** "Orden Recibida..." — queda un buen tiempo. */
-const PHASE_RECEIVED_MS = 3000;
+const PHASE_RECEIVED_MS = 2400;
+/** Mínimo absoluto de loading antes de mostrar success. La pausa intencional
+ * le da seriedad y confianza al flujo. */
+const MIN_LOADING_MS = 600;
+/** Hold del estado "Orden Ejecutada" con el checkmark antes de navegar. */
+const DONE_HOLD_MS = 1800;
+/** Duración del morph logo → checkmark (cross-fade con scale). */
+const MORPH_MS = 300;
+/** Duración del stroke-draw del check. */
+const CHECK_DRAW_MS = 320;
 /** Duración del cross-fade del texto. */
 const FADE_MS = 200;
+/** Longitud del path del checkmark (suficiente con 24 para el path en
+ * viewBox 0 0 24 24). */
+const CHECK_PATH_LEN = 24;
 
 const AVAILABLE_ARS = 1272850;
 
@@ -86,6 +98,13 @@ export default function ConfirmScreen() {
   const spinLoop = useRef(new Animated.Value(0)).current;
   // Texto: solo fade, sin slide. Feel Robinhood.
   const statusOpacity = useRef(new Animated.Value(0)).current;
+  // Morph logo→check: 0 = logo visible, 1 = check visible.
+  const morph = useRef(new Animated.Value(0)).current;
+  // Cross-fade del spinner arc al full-circle estático.
+  const fullCircleOpacity = useRef(new Animated.Value(0)).current;
+  // Offset del stroke-draw del check (no es Animated.Value porque el
+  // interop con react-native-svg es buggy; usamos RAF + state).
+  const [checkOffset, setCheckOffset] = useState(CHECK_PATH_LEN);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("");
@@ -139,6 +158,29 @@ export default function ConfirmScreen() {
     });
   };
 
+  /** Dibuja el checkmark con stroke-draw (RAF-driven, reliable cross-
+   * platform, evita bugs de Animated + react-native-svg). */
+  const drawCheckmark = (duration: number): Promise<void> => {
+    return new Promise((resolve) => {
+      setCheckOffset(CHECK_PATH_LEN);
+      let start: number | null = null;
+      const tick = (t: number) => {
+        if (start === null) start = t;
+        const elapsed = t - start;
+        const p = Math.min(1, elapsed / duration);
+        // ease-out cubic
+        const eased = 1 - Math.pow(1 - p, 3);
+        setCheckOffset((1 - eased) * CHECK_PATH_LEN);
+        if (p < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  };
+
   const runOrderFlow = async () => {
     setPhase("sending");
 
@@ -150,8 +192,7 @@ export default function ConfirmScreen() {
       useNativeDriver: true,
     }).start();
 
-    // Haptic "success fuerte" al tocar tierra tras el swipe (equivalente al
-    // .heavy + success buzz de Robinhood).
+    // Haptic "success fuerte" al tocar tierra tras el swipe.
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => {},
     );
@@ -165,15 +206,48 @@ export default function ConfirmScreen() {
       useNativeDriver: true,
     }).start();
 
-    await wait(PHASE_SENDING_MS);
+    // Mínimo 600 ms de loading incluso si el "API" respondiera instantáneo.
+    // La pausa intencional da seriedad al flujo.
+    const apiCall = wait(PHASE_SENDING_MS);
+    const minLoading = wait(MIN_LOADING_MS);
+    await Promise.all([apiCall, minLoading]);
 
-    // Fase 2: cross-fade a "Orden Recibida..." (queda 3s en pantalla).
+    // Fase 2: cross-fade a "Orden Recibida..."
     setPhase("received");
     await transitionText("Orden Recibida...");
 
     await wait(PHASE_RECEIVED_MS);
 
-    // Salida al success screen.
+    // Fase 3: morph logo → check + cross-fade "Orden Ejecutada".
+    setPhase("done");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
+
+    // Cross-fade del spinning arc al full-circle estático.
+    Animated.timing(fullCircleOpacity, {
+      toValue: 1,
+      duration: MORPH_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+
+    // Cross-fade del logo → checkmark (scale + opacity).
+    Animated.timing(morph, {
+      toValue: 1,
+      duration: MORPH_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+
+    // Stroke-draw del check se dispara un toque más tarde (cuando el logo
+    // empezó a desaparecer). Corre en paralelo con el cross-fade del texto.
+    setTimeout(() => drawCheckmark(CHECK_DRAW_MS), MORPH_MS * 0.5);
+    await transitionText("Orden Ejecutada");
+
+    // Hold 1.8 s sobre el estado success.
+    await wait(DONE_HOLD_MS);
+
     router.replace({
       pathname: "/(app)/success",
       params: {
@@ -385,10 +459,6 @@ export default function ConfirmScreen() {
             </Text>
           </View>
         </View>
-
-        <View style={s.chevronBottom}>
-          <PullChevron color={c.text} />
-        </View>
       </View>
 
       {/* Cover verde que sube desde abajo con translateY (nativo, smooth) */}
@@ -403,7 +473,9 @@ export default function ConfirmScreen() {
         ]}
       />
 
-      {/* Hint "Deslizá para ejecutar" anclado al bottom, se desvanece al subir */}
+      {/* Hint "Deslizá para ejecutar" anclado al bottom, se desvanece al subir.
+          El Shimmer wrappea chevron + texto juntos: el brillo pasa por todo
+          el contenido del pill. */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -415,13 +487,23 @@ export default function ConfirmScreen() {
           },
         ]}
       >
-        <Feather
-          name="chevron-up"
-          size={14}
-          color="rgba(255,255,255,0.85)"
-          style={{ marginBottom: 2 }}
-        />
-        <ShimmerText style={s.hintText}>Deslizá para ejecutar</ShimmerText>
+        <Shimmer
+          style={{
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+          }}
+        >
+          <Feather
+            name="chevron-up"
+            size={14}
+            color="rgba(255,255,255,0.85)"
+            style={{ marginBottom: 2 }}
+          />
+          <Text style={[s.hintText, { color: "rgba(255,255,255,0.75)" }]}>
+            Deslizá para ejecutar
+          </Text>
+        </Shimmer>
       </Animated.View>
 
       {/* Overlay de ejecución — layout calibrado contra el video de
@@ -437,8 +519,18 @@ export default function ConfirmScreen() {
           <View style={{ height: SCREEN_H * 0.33 }} />
 
           <View style={s.logoWrap}>
+            {/* Spinning arc (visible en sending/received). */}
             <Animated.View
-              style={[s.spinnerWrap, { transform: [{ rotate: spin }] }]}
+              style={[
+                s.spinnerWrap,
+                {
+                  transform: [{ rotate: spin }],
+                  opacity: fullCircleOpacity.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0],
+                  }),
+                },
+              ]}
             >
               <Svg width={140} height={140} viewBox="0 0 100 100">
                 <Circle
@@ -462,13 +554,80 @@ export default function ConfirmScreen() {
               </Svg>
             </Animated.View>
 
-            <View style={s.logoOverlay}>
+            {/* Full circle estático (visible en done) — cross-fade con el arc. */}
+            <Animated.View
+              style={[s.spinnerWrap, { opacity: fullCircleOpacity }]}
+            >
+              <Svg width={140} height={140} viewBox="0 0 100 100">
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  stroke="#FFFFFF"
+                  strokeWidth="3.5"
+                  fill="none"
+                />
+              </Svg>
+            </Animated.View>
+
+            {/* Logo Alamos (~60% del diámetro interior) — se apaga al morph. */}
+            <Animated.View
+              style={[
+                s.logoOverlay,
+                {
+                  opacity: morph.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0],
+                  }),
+                  transform: [
+                    {
+                      scale: morph.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0.8],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
               <Image
                 source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
                 style={s.logoImg}
                 resizeMode="contain"
               />
-            </View>
+            </Animated.View>
+
+            {/* Checkmark SVG — aparece con scale + opacity, y el trazo se
+                dibuja vía strokeDashoffset controlado por RAF. */}
+            <Animated.View
+              style={[
+                s.logoOverlay,
+                {
+                  opacity: morph,
+                  transform: [
+                    {
+                      scale: morph.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Svg width={78} height={78} viewBox="0 0 24 24">
+                <Path
+                  d="M5 12 L10 17 L19 7"
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
+                  strokeDashoffset={checkOffset}
+                />
+              </Svg>
+            </Animated.View>
           </View>
 
           {/* Gap fijo hasta el texto — logo queda a ~40%, texto a ~56%. */}
@@ -495,35 +654,6 @@ export default function ConfirmScreen() {
   );
 }
 
-function PullChevron({ color }: { color: string }) {
-  const bounce = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounce, {
-          toValue: -4,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounce, {
-          toValue: 0,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [bounce]);
-  return (
-    <Animated.View style={{ transform: [{ translateY: bounce }] }}>
-      <Feather name="chevron-up" size={26} color={color} />
-    </Animated.View>
-  );
-}
-
 /**
  * Texto con shimmer estilo Robinhood: un brillo suave y ancho se desliza
  * de izquierda a derecha en 2.2s con una pausa de ~900ms entre ciclos.
@@ -531,12 +661,12 @@ function PullChevron({ color }: { color: string }) {
  * sobre la base (texto al 65% de opacidad). Los bordes se difuminan
  * gradualmente con stops progresivos.
  */
-function ShimmerText({
+function Shimmer({
   children,
   style,
 }: {
-  children: string;
-  style: StyleProp<TextStyle>;
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
 }) {
   const shimmer = useRef(new Animated.Value(0)).current;
   const [w, setW] = useState(0);
@@ -572,11 +702,9 @@ function ShimmerText({
   return (
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={{ overflow: "hidden" }}
+      style={[{ overflow: "hidden" }, style]}
     >
-      <Text style={[style, { color: "rgba(255,255,255,0.65)" }]}>
-        {children}
-      </Text>
+      {children}
       {w > 0 ? (
         <Animated.View
           pointerEvents="none"
@@ -698,11 +826,6 @@ const s = StyleSheet.create({
     lineHeight: 19,
     letterSpacing: -0.1,
   },
-  chevronBottom: {
-    alignItems: "center",
-    paddingBottom: 18,
-    paddingTop: 8,
-  },
 
   /* Green cover (sube sobre la card via translateY) */
   greenCover: {
@@ -753,8 +876,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   logoImg: {
-    width: 58,
-    height: 58,
+    // ~60% del diámetro interior del spinner (radio 44 en viewBox 100,
+    // escala 1.4x → ~123 px interior → 60% ≈ 78 px).
+    width: 78,
+    height: 78,
     tintColor: "#FFFFFF",
   },
   execText: {
