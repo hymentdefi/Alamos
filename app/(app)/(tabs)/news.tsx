@@ -28,7 +28,6 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import * as SecureStore from "expo-secure-store";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
   DisclaimerFooter,
@@ -235,8 +234,6 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
   { id: "macro", label: "Macro" },
 ];
 
-const SWIPE_HINT_KEY = "news:swipe_hint_seen:v2";
-
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -248,6 +245,7 @@ export default function NewsScreen() {
   const [footerH, setFooterH] = useState(40);
   const [legalOpen, setLegalOpen] = useState(false);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const hintShownRef = useRef(false);
   const pagerRef = useRef<HorizontalPagerHandle>(null);
   const catScrollRef = useRef<ScrollView>(null);
   const pageListRefs = useRef<Record<string, FlatList | null>>({});
@@ -258,29 +256,20 @@ export default function NewsScreen() {
   const { hasAccepted, loading: consentLoading, accept } = useLegalConsent();
   const showOnboarding = !consentLoading && !hasAccepted && isFocused;
 
-  // Hint de "deslizá para pasar": solo la primera vez, una única vez.
-  // Lo gateamos a que el onboarding ya se haya aceptado para que no quede
-  // tapado por el modal (y no se descarte sin ser visto).
+  // Hint de "deslizá para pasar": una vez por launch de la app, la primera
+  // vez que el usuario entra a Noticias con el disclaimer aceptado. No
+  // persistimos a SecureStore — la persistencia previa podía quedar stuck
+  // y evitar que se vea el hint.
   useEffect(() => {
     if (consentLoading || !hasAccepted) return;
-    let cancelled = false;
-    SecureStore.getItemAsync(SWIPE_HINT_KEY)
-      .then((seen) => {
-        if (cancelled) return;
-        if (!seen) setShowSwipeHint(true);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [consentLoading, hasAccepted]);
+    if (!isFocused) return;
+    if (hintShownRef.current) return;
+    hintShownRef.current = true;
+    setShowSwipeHint(true);
+  }, [consentLoading, hasAccepted, isFocused]);
 
   const dismissSwipeHint = useCallback(() => {
-    setShowSwipeHint((prev) => {
-      if (!prev) return prev;
-      SecureStore.setItemAsync(SWIPE_HINT_KEY, "1").catch(() => {});
-      return false;
-    });
+    setShowSwipeHint(false);
   }, []);
 
   const { height: screenH } = Dimensions.get("window");
@@ -377,29 +366,33 @@ export default function NewsScreen() {
         </ScrollView>
       </View>
 
-      <HorizontalPager
-        ref={pagerRef}
-        items={categoryTabs}
-        index={activeTab}
-        onIndexChange={setActiveTab}
-        keyExtractor={(t) => t.id}
-        extraData={showSwipeHint}
-        renderItem={(t) => (
-          <NewsPage
-            items={filterForTab(t)}
-            cardH={cardH}
-            listRef={setPageRef(t.id)}
-            showSwipeHint={showSwipeHint}
-            onDismissHint={dismissSwipeHint}
-            onOpenDetail={(n) => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                () => {},
-              );
-              setDetail(n);
-            }}
-          />
-        )}
-      />
+      <View style={{ flex: 1 }}>
+        <HorizontalPager
+          ref={pagerRef}
+          items={categoryTabs}
+          index={activeTab}
+          onIndexChange={setActiveTab}
+          keyExtractor={(t) => t.id}
+          renderItem={(t) => (
+            <NewsPage
+              items={filterForTab(t)}
+              cardH={cardH}
+              listRef={setPageRef(t.id)}
+              onDismissHint={dismissSwipeHint}
+              onOpenDetail={(n) => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                  () => {},
+                );
+                setDetail(n);
+              }}
+            />
+          )}
+        />
+        {/* Hint arriba-de-todo, renderizado al nivel de NewsScreen para
+            evitar el problema del FlatList PureComponent del pager, que
+            no re-renderiza sus cells cuando sólo cambia el closure. */}
+        <SwipeHint visible={showSwipeHint} />
+      </View>
 
       <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
         <DisclaimerFooter onOpen={() => setLegalOpen(true)} />
@@ -421,14 +414,12 @@ function NewsPage({
   items,
   cardH,
   listRef,
-  showSwipeHint,
   onDismissHint,
   onOpenDetail,
 }: {
   items: NewsItem[];
   cardH: number;
   listRef: (ref: FlatList | null) => void;
-  showSwipeHint: boolean;
   onDismissHint: () => void;
   onOpenDetail: (n: NewsItem) => void;
 }) {
@@ -497,7 +488,6 @@ function NewsPage({
           </View>
         }
       />
-      <SwipeHint visible={showSwipeHint} />
     </View>
   );
 }
