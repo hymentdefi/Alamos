@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { AlamosLogo } from "../components/Logo";
-import { brand, fontFamily } from "../theme";
+import { brand, fontFamily, useTheme } from "../theme";
 import type { ProTransitionTarget } from "./context";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -29,6 +29,8 @@ interface Props {
  * commit del flip por detrás, y fade-out final.
  */
 export function ProTransition({ target, onCommit, onEnd }: Props) {
+  const { mode, c } = useTheme();
+
   // Animated values — se crean una sola vez y se resetean en cada ciclo.
   const bgOpacity = useRef(new Animated.Value(0)).current;
   const welcomeTx = useRef(new Animated.Value(24)).current;
@@ -195,8 +197,12 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
   if (!target) return null;
 
   const toPro = target === "toPro";
-  const bgColor = toPro ? brand.ink : brand.bg;
-  const welcomeColor = toPro ? "rgba(250,250,247,0.72)" : "rgba(14,15,12,0.54)";
+  // El fondo y tono del logo siguen el tema actual, NO el modo destino.
+  // Light mode → fondo claro; dark mode → fondo oscuro.
+  const isDark = mode === "dark";
+  const bgColor = c.bg;
+  const welcomeColor = c.textMuted;
+  const logoTone = isDark ? "dark" : "light";
   const accentColor = brand.green;
 
   return (
@@ -239,8 +245,8 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
             >
               <AlamosLogo
                 variant="lockupShort"
-                tone={toPro ? "dark" : "light"}
-                size={44}
+                tone={logoTone}
+                size={58}
               />
             </Animated.View>
 
@@ -274,25 +280,24 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: "42%",
+    paddingHorizontal: 28,
+    justifyContent: "center",
     width: SCREEN_W,
   },
   welcome: {
     fontFamily: fontFamily[500],
-    fontSize: 18,
-    letterSpacing: -0.2,
-    marginBottom: 12,
+    fontSize: 26,
+    letterSpacing: -0.4,
+    marginBottom: 16,
   },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
   accentText: {
     fontFamily: fontFamily[500],
-    fontSize: 34,
-    letterSpacing: -1,
-    marginLeft: 2,
+    fontSize: 44,
+    letterSpacing: -1.4,
   },
 });
