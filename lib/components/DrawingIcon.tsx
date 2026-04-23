@@ -69,13 +69,16 @@ export function DrawingIcon({
       return;
     }
 
-    Haptics.selectionAsync().catch(() => {});
+    // Haptic con más presencia que selectionAsync — el tap se siente
+    // como un golpecito sutil.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-    // Scale pop del ícono (spring).
-    scale.setValue(0.4);
+    // Scale pop más pronunciado del ícono para que la entrada sea
+    // visiblemente dinámica.
+    scale.setValue(0.3);
     const iconSpring = Animated.spring(scale, {
       toValue: 1,
-      tension: 140,
+      tension: 160,
       friction: 5,
       useNativeDriver: true,
     });
