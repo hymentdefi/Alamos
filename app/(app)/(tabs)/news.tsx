@@ -235,7 +235,7 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
   { id: "macro", label: "Macro" },
 ];
 
-const SWIPE_HINT_KEY = "news:swipe_hint_seen";
+const SWIPE_HINT_KEY = "news:swipe_hint_seen:v2";
 
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
@@ -259,7 +259,10 @@ export default function NewsScreen() {
   const showOnboarding = !consentLoading && !hasAccepted && isFocused;
 
   // Hint de "deslizá para pasar": solo la primera vez, una única vez.
+  // Lo gateamos a que el onboarding ya se haya aceptado para que no quede
+  // tapado por el modal (y no se descarte sin ser visto).
   useEffect(() => {
+    if (consentLoading || !hasAccepted) return;
     let cancelled = false;
     SecureStore.getItemAsync(SWIPE_HINT_KEY)
       .then((seen) => {
@@ -270,7 +273,7 @@ export default function NewsScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [consentLoading, hasAccepted]);
 
   const dismissSwipeHint = useCallback(() => {
     setShowSwipeHint((prev) => {
@@ -446,7 +449,9 @@ function NewsPage({
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const y = e.nativeEvent.contentOffset.y;
-      if (y > 12) onDismissHint();
+      // Recién descartamos cuando el usuario ya demostró que entendió
+      // el gesto (scrolleó 1/4 de card) — no apenas toca la lista.
+      if (y > cardH * 0.25) onDismissHint();
       const idx = Math.round(y / cardH);
       if (idx !== activeIdxRef.current) {
         activeIdxRef.current = idx;
@@ -467,7 +472,6 @@ function NewsPage({
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
-        onScrollBeginDrag={onDismissHint}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
