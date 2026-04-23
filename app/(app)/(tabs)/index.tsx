@@ -14,7 +14,7 @@ import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { Tap } from "../../../lib/components/Tap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
   useTheme,
@@ -40,58 +40,14 @@ import { SideMenu } from "../../../lib/components/SideMenu";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
+import {
+  activityItems,
+  rangeChanges,
+  ranges,
+  type Range,
+} from "../../../lib/data/homeMocks";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
-type Range = "1D" | "1S" | "1M" | "3M" | "1A";
-
-const ranges: Range[] = ["1D", "1S", "1M", "3M", "1A"];
-
-/** Variación % por rango — determina el trend y color del chart. */
-const rangeChanges: Record<Range, number> = {
-  "1D": 1.96,
-  "1S": 3.24,
-  "1M": -2.1,
-  "3M": 8.45,
-  "1A": 23.7,
-};
-
-const activityItems = [
-  {
-    id: "1",
-    icon: "check-circle" as const,
-    title: "Compra AAPL",
-    date: "Hoy, 14:32",
-    amount: -48240,
-  },
-  {
-    id: "2",
-    icon: "arrow-down-left" as const,
-    title: "Ingreso transferencia",
-    date: "Ayer, 10:15",
-    amount: 250000,
-  },
-  {
-    id: "3",
-    icon: "check-circle" as const,
-    title: "Compra AL30",
-    date: "14 abr, 09:45",
-    amount: -71540,
-  },
-  {
-    id: "4",
-    icon: "dollar-sign" as const,
-    title: "Dividendo AAPL",
-    date: "12 abr, 16:20",
-    amount: 4280,
-  },
-  {
-    id: "5",
-    icon: "arrow-up-right" as const,
-    title: "Venta parcial MSFT",
-    date: "10 abr, 11:02",
-    amount: 83490,
-  },
-];
 
 export default function HomeScreen() {
   const { isPro } = useProMode();
@@ -147,7 +103,7 @@ function BaseHome() {
     return unsub;
   }, [navigation, isFocused, refreshing, onRefresh]);
 
-  const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
+  const firstName = user?.fullName?.split(" ")[0];
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   const total = useMemo(
@@ -252,7 +208,7 @@ function BaseHome() {
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -265,13 +221,16 @@ function BaseHome() {
       >
         <View style={s.heroBlock}>
           <Text style={[s.greet, { color: c.textMuted }]}>
-            Hola, {firstName}
+            {firstName ? `Hola, ${firstName}` : "Hola"}
           </Text>
           <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
           <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color: trendColor }]}>
-              {displayIsUp ? "▲" : "▼"}
-            </Text>
+            <AntDesign
+              name={displayIsUp ? "caret-up" : "caret-down"}
+              size={10}
+              color={trendColor}
+              style={{ marginRight: 2 }}
+            />
             <Text style={[s.deltaText, { color: trendColor }]}>
               {formatARS(Math.abs(displayDelta))}
             </Text>
@@ -287,7 +246,10 @@ function BaseHome() {
             series={series}
             color={trendColor}
             onScrub={(idx) => setScrubIndex(idx)}
-            onScrubEnd={() => setScrubIndex(null)}
+            onScrubEnd={() => {
+              setScrubIndex(null);
+              Haptics.selectionAsync().catch(() => {});
+            }}
             style={{ marginTop: 18 }}
           />
 
@@ -297,7 +259,12 @@ function BaseHome() {
               return (
                 <Pressable
                   key={r}
-                  onPress={() => setRange(r)}
+                  onPress={() => {
+                    if (r !== range) {
+                      Haptics.selectionAsync().catch(() => {});
+                    }
+                    setRange(r);
+                  }}
                   style={[
                     s.rangePill,
                     active && { backgroundColor: trendColor },
@@ -586,6 +553,31 @@ function Tenencias({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
+  const router = useRouter();
+
+  if (byCategory.length === 0) {
+    return (
+      <View style={s.emptyBlock}>
+        <View style={[s.emptyIcon, { backgroundColor: c.surfaceHover }]}>
+          <Feather name="pie-chart" size={22} color={c.textMuted} />
+        </View>
+        <Text style={[s.emptyTitle, { color: c.text }]}>
+          Aún no tenés inversiones
+        </Text>
+        <Text style={[s.emptyBody, { color: c.textMuted }]}>
+          Empezá con $ 1.000 y hacé que tu plata rinda todos los días.
+        </Text>
+        <Tap
+          style={[s.emptyCta, { backgroundColor: c.ink }]}
+          onPress={() => router.push("/(app)/explore")}
+          haptic="light"
+        >
+          <Text style={[s.emptyCtaText, { color: c.bg }]}>Explorar mercado</Text>
+        </Tap>
+      </View>
+    );
+  }
+
   return (
     <View>
       {byCategory.map(([cat, data]) => (
@@ -977,23 +969,12 @@ const s = StyleSheet.create({
     letterSpacing: -0.15,
     marginBottom: 6,
   },
-  balance: {
-    fontFamily: fontFamily[700],
-    fontSize: 46,
-    lineHeight: 50,
-    letterSpacing: -2,
-    marginBottom: 8,
-  },
   deltaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 4,
     flexWrap: "wrap",
-  },
-  deltaTri: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
   },
   deltaText: {
     fontFamily: fontFamily[600],
@@ -1178,5 +1159,44 @@ const s = StyleSheet.create({
     minWidth: 92,
     textAlign: "right",
     letterSpacing: -0.15,
+  },
+  emptyBlock: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 24,
+  },
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  emptyBody: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 19,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    marginBottom: 18,
+    maxWidth: 280,
+  },
+  emptyCta: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+  },
+  emptyCtaText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 });
