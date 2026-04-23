@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet, Animated, Text } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as SecureStore from "expo-secure-store";
+
+const THEME_STORAGE_KEY = "theme_mode";
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -87,11 +90,27 @@ export default function RootLayout() {
 
   const [mode, setMode] = useState<ThemeMode>("light");
 
-  const themeValue = useMemo(() => ({
-    mode,
-    c: themes[mode],
-    toggle: () => setMode((m) => (m === "light" ? "dark" : "light")),
-  }), [mode]);
+  // Cargar preferencia de tema persistida al iniciar la app.
+  useEffect(() => {
+    SecureStore.getItemAsync(THEME_STORAGE_KEY)
+      .then((v) => {
+        if (v === "dark" || v === "light") setMode(v);
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggle = useCallback(() => {
+    setMode((m) => {
+      const next = m === "light" ? "dark" : "light";
+      SecureStore.setItemAsync(THEME_STORAGE_KEY, next).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const themeValue = useMemo(
+    () => ({ mode, c: themes[mode], toggle }),
+    [mode, toggle],
+  );
 
   if (!fontsLoaded) {
     return <View style={splash.container} />;

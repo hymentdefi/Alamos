@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Linking,
   RefreshControl,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -41,7 +40,6 @@ import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
 
-type TabId = "dinero" | "portfolio";
 type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
 const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
@@ -70,7 +68,6 @@ function BaseHome() {
   const { user } = useAuth();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const [tab, setTab] = useState<TabId>("portfolio");
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -202,7 +199,7 @@ function BaseHome() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
@@ -240,7 +237,7 @@ function BaseHome() {
           <Sparkline
             series={series}
             color={chartColor}
-            height={260}
+            height={300}
             withFill={false}
             strokeWidth={1.4}
             smooth={false}
@@ -266,7 +263,7 @@ function BaseHome() {
                     style={[
                       s.rangeText,
                       {
-                        color: active ? c.bg : c.textMuted,
+                        color: active ? c.bg : chartColor,
                       },
                     ]}
                   >
@@ -278,147 +275,14 @@ function BaseHome() {
           </View>
         </View>
 
-        <View style={s.tabsWrap}>
-          <TabStrip tab={tab} onChange={setTab} />
-        </View>
+        <Dinero byCategory={byCategory} />
+        <Portfolio byCategory={byCategory} onOpen={openDetail} />
 
-        <View style={s.tabContent}>
-          {tab === "dinero" ? (
-            <Dinero byCategory={byCategory} />
-          ) : null}
-          {tab === "portfolio" ? (
-            <Portfolio byCategory={byCategory} onOpen={openDetail} />
-          ) : null}
-        </View>
-
-        <FeaturedFunds onOpen={openDetail} onSeeAll={() => router.push("/(app)/explore")} />
-        <AcademyCallout />
       </ScrollView>
 
       <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
       <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
-  );
-}
-
-function FeaturedFunds({
-  onOpen,
-  onSeeAll,
-}: {
-  onOpen: (a: Asset) => void;
-  onSeeAll: () => void;
-}) {
-  const { c } = useTheme();
-  const funds = useMemo(
-    () =>
-      assets
-        .filter((a) => a.category === "fci")
-        .sort((a, b) => b.change - a.change)
-        .slice(0, 3),
-    [],
-  );
-
-  if (funds.length === 0) return null;
-
-  return (
-    <View style={s.featuredBlock}>
-      <View style={s.featuredHead}>
-        <Text style={[s.featuredEyebrow, { color: c.textMuted }]}>
-          FONDOS POPULARES
-        </Text>
-        <Text style={[s.featuredSub, { color: c.text }]}>
-          Tu plata rinde todos los días, desde $ 1.000.
-        </Text>
-      </View>
-
-      <View
-        style={[
-          s.featuredCard,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-      >
-        {funds.map((f, i) => {
-          const up = f.change >= 0;
-          return (
-            <Pressable
-              key={f.ticker}
-              onPress={() => onOpen(f)}
-              style={[
-                s.featuredRow,
-                i > 0 && {
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: c.border,
-                },
-              ]}
-            >
-              <View style={[s.featuredIcon, { backgroundColor: c.surfaceSunken }]}>
-                <Text style={[s.featuredIconText, { color: c.textSecondary }]}>
-                  {f.iconCode ?? f.ticker.slice(0, 2)}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.featuredName, { color: c.text }]}>
-                  {f.name}
-                </Text>
-                <Text style={[s.featuredSubline, { color: c.textMuted }]}>
-                  {f.subLabel}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[s.featuredChange, { color: up ? c.greenDark : c.red }]}>
-                  {formatPct(f.change)}
-                </Text>
-                <Feather
-                  name="chevron-right"
-                  size={16}
-                  color={c.textFaint}
-                  style={{ marginTop: 2 }}
-                />
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Pressable style={s.featuredSeeAll} onPress={onSeeAll}>
-        <Text style={[s.featuredSeeAllText, { color: c.text }]}>
-          Ver todos los fondos
-        </Text>
-        <Feather name="arrow-right" size={14} color={c.text} />
-      </Pressable>
-    </View>
-  );
-}
-
-function AcademyCallout() {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      style={[
-        s.uniCard,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
-      onPress={() =>
-        Linking.openURL("https://alamos.capital/academy").catch(() => {})
-      }
-    >
-      <View style={[s.uniIcon, { backgroundColor: c.surfaceHover }]}>
-        <Feather name="book-open" size={18} color={c.text} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[s.uniTitle, { color: c.text }]}>
-          ¿Primera vez invirtiendo?
-        </Text>
-        <Text style={[s.uniBody, { color: c.textMuted }]}>
-          Aprendé desde cero en{" "}
-          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-            Alamos Academy
-          </Text>
-          . Guías, tutoriales y casos del mercado argentino.
-        </Text>
-      </View>
-      <Feather name="arrow-up-right" size={18} color={c.textMuted} />
-    </Pressable>
   );
 }
 
@@ -510,47 +374,6 @@ function indexLabel(r: Range, index: number, length: number): string {
 
 /* ─── Subcomponentes ─── */
 
-function TabStrip({
-  tab,
-  onChange,
-}: {
-  tab: TabId;
-  onChange: (t: TabId) => void;
-}) {
-  const { c } = useTheme();
-  const tabs: { id: TabId; label: string }[] = [
-    { id: "dinero", label: "Dinero" },
-    { id: "portfolio", label: "Portfolio" },
-  ];
-
-  return (
-    <View style={[s.tabGroup, { backgroundColor: c.surfaceHover }]}>
-      {tabs.map((t) => {
-        const active = tab === t.id;
-        return (
-          <Pressable
-            key={t.id}
-            style={[
-              s.tab,
-              active && [
-                s.tabActive,
-                { backgroundColor: c.surface, shadowColor: c.ink },
-              ],
-            ]}
-            onPress={() => onChange(t.id)}
-          >
-            <Text
-              style={[s.tabLabel, { color: active ? c.text : c.textMuted }]}
-            >
-              {t.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 /* ─── Dinero: cash positions + acciones de Ingresar/Retirar ─── */
 function Dinero({
   byCategory,
@@ -567,28 +390,27 @@ function Dinero({
   const ars = cash.find((a) => a.ticker === "ARS");
   const usd = cash.find((a) => a.ticker === "USD");
 
+  if (!ars && !usd) return null;
+
   return (
-    <View style={{ paddingHorizontal: 20 }}>
-      {/* Card principal: pesos argentinos con acciones */}
+    <View style={s.sectionBlock}>
+      <View style={s.sectionHead}>
+        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>DINERO</Text>
+      </View>
+
       {ars ? (
-        <View
-          style={[
-            s.moneyCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <Text style={[s.moneyEyebrow, { color: c.textMuted }]}>
-            PESOS DISPONIBLES
-          </Text>
-          <Text style={[s.moneyBalance, { color: c.text }]}>
-            {formatARS(ars.price * (ars.qty ?? 1))}
-          </Text>
-          <Text style={[s.moneyHint, { color: c.textMuted }]}>
-            Tu plata líquida. La movés cuando quieras.
-          </Text>
-          <View style={s.moneyActionsRow}>
+        <View style={s.moneyRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.moneyRowLabel, { color: c.textSecondary }]}>
+              Pesos argentinos
+            </Text>
+            <Text style={[s.moneyRowAmount, { color: c.text }]}>
+              {formatARS(ars.price * (ars.qty ?? 1))}
+            </Text>
+          </View>
+          <View style={s.moneyInlineActions}>
             <Tap
-              style={[s.moneyActionPrimary, { backgroundColor: c.ink }]}
+              style={[s.moneyIconBtn, { backgroundColor: c.ink }]}
               haptic="medium"
               onPress={() =>
                 router.push({
@@ -596,14 +418,14 @@ function Dinero({
                   params: { mode: "deposit" },
                 })
               }
+              hitSlop={6}
             >
-              <Feather name="arrow-down-left" size={15} color={c.bg} />
-              <Text style={[s.moneyActionText, { color: c.bg }]}>Ingresar</Text>
+              <Feather name="arrow-down-left" size={16} color={c.bg} />
             </Tap>
             <Tap
               style={[
-                s.moneyActionSecondary,
-                { backgroundColor: c.surfaceHover, borderColor: c.border },
+                s.moneyIconBtn,
+                { backgroundColor: c.surfaceHover, borderColor: c.border, borderWidth: 1 },
               ]}
               haptic="light"
               onPress={() =>
@@ -612,37 +434,38 @@ function Dinero({
                   params: { mode: "withdraw" },
                 })
               }
+              hitSlop={6}
             >
-              <Feather name="arrow-up-right" size={15} color={c.text} />
-              <Text
-                style={[s.moneyActionTextSecondary, { color: c.text }]}
-              >
-                Retirar
-              </Text>
+              <Feather name="arrow-up-right" size={16} color={c.text} />
             </Tap>
           </View>
         </View>
       ) : null}
 
-      {/* Card secundaria: dólares MEP */}
       {usd ? (
         <View
           style={[
-            s.moneyCardSecondary,
-            { backgroundColor: c.surface, borderColor: c.border },
+            s.moneyRow,
+            {
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
+            },
           ]}
         >
           <View style={{ flex: 1 }}>
-            <Text style={[s.moneyEyebrow, { color: c.textMuted }]}>
-              DÓLARES MEP
+            <Text style={[s.moneyRowLabel, { color: c.textSecondary }]}>
+              Dólares MEP
             </Text>
-            <Text style={[s.moneyBalanceSecondary, { color: c.text }]}>
-              US$ {(usd.qty ?? 0).toLocaleString("es-AR")}
-            </Text>
-            <Text style={[s.moneyHint, { color: c.textMuted }]}>
-              {formatARS(usd.price * (usd.qty ?? 1))} en pesos
+            <Text style={[s.moneyRowAmount, { color: c.text }]}>
+              US${" "}
+              {(usd.qty ?? 0).toLocaleString("es-AR", {
+                maximumFractionDigits: 2,
+              })}
             </Text>
           </View>
+          <Text style={[s.moneyRowEquiv, { color: c.textMuted }]}>
+            {formatARS(usd.price * (usd.qty ?? 1))}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -694,44 +517,50 @@ function Portfolio({
 
   return (
     <View>
-      {/* Header: total invertido + rendimiento del día */}
-      <View
-        style={[
-          s.portfolioSummary,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
-            TOTAL INVERTIDO
+      {/* Header editorial: total invertido grande, rendimiento abajo */}
+      <View style={s.portfolioHero}>
+        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
+          PORTFOLIO
+        </Text>
+        <Text style={[s.portfolioTotal, { color: c.text }]}>
+          {formatARS(invested)}
+        </Text>
+        <View style={s.portfolioDelta}>
+          <Text
+            style={[
+              s.portfolioDeltaTri,
+              { color: up ? c.greenDark : c.red },
+            ]}
+          >
+            {up ? "▲" : "▼"}
           </Text>
-          <Text style={[s.summaryValue, { color: c.text }]}>
-            {formatARS(invested)}
-          </Text>
-        </View>
-        <View style={[s.summaryDivider, { backgroundColor: c.border }]} />
-        <View style={{ flex: 1 }}>
-          <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
-            RENDIMIENTO HOY
-          </Text>
-          <View style={s.summaryDeltaRow}>
-            <Text
-              style={[
-                s.summaryDeltaTri,
-                { color: up ? c.greenDark : c.red },
-              ]}
-            >
-              {up ? "▲" : "▼"}
-            </Text>
-            <Text
-              style={[s.summaryValue, { color: up ? c.greenDark : c.red }]}
-            >
-              {formatPct(weightedPct)}
-            </Text>
-          </View>
-          <Text style={[s.summaryHint, { color: c.textMuted }]}>
-            {up ? "+" : "−"}
+          <Text
+            style={[
+              s.portfolioDeltaText,
+              { color: up ? c.greenDark : c.red },
+            ]}
+          >
             {formatARS(Math.abs(rendimientoAbs))}
+          </Text>
+          <Text
+            style={[
+              s.portfolioDeltaSep,
+              { color: up ? c.greenDark : c.red },
+            ]}
+          >
+            ·
+          </Text>
+          <Text
+            style={[
+              s.portfolioDeltaText,
+              { color: up ? c.greenDark : c.red },
+            ]}
+          >
+            {formatPct(weightedPct)}
+          </Text>
+          <Text style={[s.portfolioDeltaSep, { color: c.textMuted }]}>·</Text>
+          <Text style={[s.portfolioDeltaPeriod, { color: c.textMuted }]}>
+            hoy
           </Text>
         </View>
       </View>
@@ -760,7 +589,7 @@ function Portfolio({
 
       {/* Distribución al final — contextualiza las tenencias */}
       <View style={s.distBlock}>
-        <Text style={[s.distEyebrow, { color: c.textMuted }]}>
+        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
           DISTRIBUCIÓN
         </Text>
         <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
@@ -918,108 +747,6 @@ function allocationColor(cat: AssetCategory, c: ThemeColors): string {
 }
 
 const s = StyleSheet.create({
-  /* ─── Fondos populares ─── */
-  featuredBlock: {
-    paddingHorizontal: 20,
-    marginTop: 32,
-  },
-  featuredHead: {
-    marginBottom: 12,
-  },
-  featuredEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 6,
-  },
-  featuredSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.15,
-  },
-  featuredCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  featuredRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: spacing.md + 4,
-    paddingHorizontal: 14,
-  },
-  featuredIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  featuredIconText: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: -0.2,
-  },
-  featuredName: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.25,
-  },
-  featuredSubline: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-  },
-  featuredChange: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  featuredSeeAll: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 14,
-  },
-  featuredSeeAllText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
-  },
-
-  /* ─── Academy Callout ─── */
-  uniCard: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 18,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  uniIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  uniTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-    marginBottom: 4,
-  },
-  uniBody: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 17,
-    letterSpacing: -0.1,
-  },
-
   /* ─── Core layout ─── */
   root: { flex: 1 },
   topBar: {
@@ -1036,119 +763,91 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Dinero tab */
-  moneyCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 22,
-    marginBottom: 12,
+  /* Secciones editoriales (Dinero / Portfolio) */
+  sectionBlock: {
+    marginTop: 36,
+    paddingHorizontal: 20,
   },
-  moneyEyebrow: {
+  sectionHead: {
+    marginBottom: 14,
+  },
+  sectionEyebrow: {
     fontFamily: fontFamily[700],
     fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  moneyBalance: {
-    fontFamily: fontFamily[800],
-    fontSize: 38,
-    letterSpacing: -1.4,
-    marginBottom: 4,
-  },
-  moneyBalanceSecondary: {
-    fontFamily: fontFamily[700],
-    fontSize: 24,
-    letterSpacing: -0.8,
-    marginBottom: 2,
-  },
-  moneyHint: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    lineHeight: 16,
-  },
-  moneyActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  moneyActionPrimary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: radius.pill,
-  },
-  moneyActionSecondary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  moneyActionText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  moneyActionTextSecondary: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  moneyCardSecondary: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 18,
+    letterSpacing: 1.4,
   },
 
-  /* Portfolio tab */
-  portfolioSummary: {
-    marginHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 20,
-    padding: 18,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  summaryDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: "stretch",
-  },
-  summaryEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.2,
-    marginBottom: 6,
-  },
-  summaryValue: {
-    fontFamily: fontFamily[800],
-    fontSize: 20,
-    letterSpacing: -0.6,
-  },
-  summaryDeltaRow: {
+  /* Dinero */
+  moneyRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    paddingVertical: 16,
+    gap: 14,
   },
-  summaryDeltaTri: {
+  moneyRowLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginBottom: 4,
+  },
+  moneyRowAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
+  },
+  moneyRowEquiv: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  moneyInlineActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  moneyIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /* Portfolio hero */
+  portfolioHero: {
+    paddingHorizontal: 20,
+    marginTop: 36,
+    marginBottom: 20,
+  },
+  portfolioTotal: {
+    fontFamily: fontFamily[800],
+    fontSize: 36,
+    letterSpacing: -1.4,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  portfolioDelta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexWrap: "wrap",
+  },
+  portfolioDeltaTri: {
     fontFamily: fontFamily[700],
     fontSize: 12,
   },
-  summaryHint: {
+  portfolioDeltaText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  portfolioDeltaSep: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+  },
+  portfolioDeltaPeriod: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: -0.05,
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
   emptyPortfolio: {
     fontFamily: fontFamily[500],
@@ -1161,12 +860,6 @@ const s = StyleSheet.create({
   distBlock: {
     paddingHorizontal: 20,
     marginTop: 32,
-  },
-  distEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.2,
-    marginBottom: 12,
   },
   heroBlock: {
     paddingHorizontal: 24,
@@ -1227,38 +920,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.4,
-  },
-  tabsWrap: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 14,
-  },
-  tabGroup: {
-    flexDirection: "row",
-    padding: 4,
-    borderRadius: radius.md,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.sm,
-  },
-  tabActive: {
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  tabLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  tabContent: {
-    marginTop: 4,
   },
   groupBlock: {
     paddingHorizontal: 20,

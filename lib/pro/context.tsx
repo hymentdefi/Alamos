@@ -2,11 +2,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
 import { ProTransition } from "./Transition";
+
+const STORAGE_KEY = "pro_mode";
 
 export type ProTransitionTarget = "toPro" | "toLite" | null;
 
@@ -32,6 +36,15 @@ export function ProProvider({ children }: { children: React.ReactNode }) {
   const [isPro, setIsPro] = useState(false);
   const [target, setTarget] = useState<ProTransitionTarget>(null);
 
+  // Cargar preferencia persistida al iniciar la app.
+  useEffect(() => {
+    SecureStore.getItemAsync(STORAGE_KEY)
+      .then((v) => {
+        if (v === "1") setIsPro(true);
+      })
+      .catch(() => {});
+  }, []);
+
   const requestSwitch = useCallback(() => {
     setTarget((current) => {
       if (current) return current; // ya corriendo, ignorar
@@ -41,7 +54,11 @@ export function ProProvider({ children }: { children: React.ReactNode }) {
   }, [isPro]);
 
   const commitFlip = useCallback(() => {
-    setIsPro((p) => !p);
+    setIsPro((p) => {
+      const next = !p;
+      SecureStore.setItemAsync(STORAGE_KEY, next ? "1" : "0").catch(() => {});
+      return next;
+    });
   }, []);
 
   const endTransition = useCallback(() => {
