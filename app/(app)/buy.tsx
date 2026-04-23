@@ -244,10 +244,9 @@ export default function BuyScreen() {
         </View>
       </View>
 
-      {/* Middle — el monto, pills y teclado quedan centrados verticalmente
-          entre el toggle (arriba) y la barra bottom (abajo). */}
-      <View style={s.middle}>
-        {/* AMOUNT HERO: tamaño fijo, centrado */}
+      {/* Hero: centrado verticalmente en el espacio entre el toggle
+          (arriba) y la barrita (abajo). */}
+      <View style={s.heroSection}>
         <View style={s.hero}>
           <Text
             style={[s.heroValue, { color: exceeds ? c.red : c.text }]}
@@ -265,38 +264,41 @@ export default function BuyScreen() {
             {availableLabel}
           </Text>
         </View>
+      </View>
 
-        <View style={s.sliderRow}>
-          <PercentSlider
-            value={currentPct}
-            onChange={applyPct}
-            disabled={maxCash <= 0}
-          />
-        </View>
+      <View style={s.sliderRow}>
+        <PercentSlider
+          value={currentPct}
+          onChange={applyPct}
+          disabled={maxCash <= 0}
+        />
+      </View>
 
-        <View style={s.keypad}>
-          {keys.map((row, ri) => (
-            <View key={ri} style={s.keyRow}>
-              {row.map((k) => (
-                <Tap
-                  key={k}
-                  onPress={() => handleKey(k)}
-                  haptic="selection"
-                  pressScale={0.92}
-                  rippleColor="rgba(14,15,12,0.08)"
-                  rippleContained={false}
-                  style={s.keyBtn}
-                >
-                  {k === "back" ? (
-                    <Feather name="delete" size={24} color={c.text} />
-                  ) : (
-                    <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
-                  )}
-                </Tap>
-              ))}
-            </View>
-          ))}
-        </View>
+      {/* Spacer que empuja el teclado hacia abajo, pegado al asset strip. */}
+      <View style={{ flex: 1 }} />
+
+      <View style={s.keypad}>
+        {keys.map((row, ri) => (
+          <View key={ri} style={s.keyRow}>
+            {row.map((k) => (
+              <Tap
+                key={k}
+                onPress={() => handleKey(k)}
+                haptic="selection"
+                pressScale={0.92}
+                rippleColor="rgba(14,15,12,0.08)"
+                rippleContained={false}
+                style={s.keyBtn}
+              >
+                {k === "back" ? (
+                  <Feather name="delete" size={24} color={c.text} />
+                ) : (
+                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                )}
+              </Tap>
+            ))}
+          </View>
+        ))}
       </View>
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
@@ -385,7 +387,7 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.25,
   },
-  middle: {
+  heroSection: {
     flex: 1,
     justifyContent: "center",
   },
