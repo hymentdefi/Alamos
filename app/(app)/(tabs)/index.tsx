@@ -41,7 +41,7 @@ import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
 
-type TabId = "tenencias" | "actividad" | "distribucion";
+type TabId = "dinero" | "portfolio";
 type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
 const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
@@ -57,44 +57,6 @@ const rangeChanges: Record<Range, number> = {
   YTD: 15.3,
 };
 
-const activityItems = [
-  {
-    id: "1",
-    icon: "check-circle" as const,
-    title: "Compra AAPL",
-    date: "Hoy, 14:32",
-    amount: -48240,
-  },
-  {
-    id: "2",
-    icon: "arrow-down-left" as const,
-    title: "Ingreso transferencia",
-    date: "Ayer, 10:15",
-    amount: 250000,
-  },
-  {
-    id: "3",
-    icon: "check-circle" as const,
-    title: "Compra AL30",
-    date: "14 abr, 09:45",
-    amount: -71540,
-  },
-  {
-    id: "4",
-    icon: "dollar-sign" as const,
-    title: "Dividendo AAPL",
-    date: "12 abr, 16:20",
-    amount: 4280,
-  },
-  {
-    id: "5",
-    icon: "arrow-up-right" as const,
-    title: "Venta parcial MSFT",
-    date: "10 abr, 11:02",
-    amount: 83490,
-  },
-];
-
 export default function HomeScreen() {
   const { isPro } = useProMode();
   if (isPro) return <ProHome />;
@@ -108,7 +70,7 @@ function BaseHome() {
   const { user } = useAuth();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const [tab, setTab] = useState<TabId>("tenencias");
+  const [tab, setTab] = useState<TabId>("portfolio");
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -228,6 +190,14 @@ function BaseHome() {
         >
           <Feather name="menu" size={18} color={c.text} />
         </Tap>
+        <Tap
+          style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.push("/(app)/activity")}
+          hitSlop={8}
+          haptic="selection"
+        >
+          <Feather name="clock" size={18} color={c.text} />
+        </Tap>
       </View>
 
       <ScrollView
@@ -265,37 +235,6 @@ function BaseHome() {
             </Text>
             <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
-          </View>
-
-          <View style={s.cashActionsRow}>
-            <Tap
-              style={[s.cashPill, { backgroundColor: c.surfaceHover }]}
-              haptic="light"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "deposit" },
-                })
-              }
-              hitSlop={6}
-            >
-              <Feather name="arrow-down-left" size={14} color={c.text} />
-              <Text style={[s.cashPillText, { color: c.text }]}>Ingresar</Text>
-            </Tap>
-            <Tap
-              style={[s.cashPill, { backgroundColor: c.surfaceHover }]}
-              haptic="light"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "withdraw" },
-                })
-              }
-              hitSlop={6}
-            >
-              <Feather name="arrow-up-right" size={14} color={c.text} />
-              <Text style={[s.cashPillText, { color: c.text }]}>Retirar</Text>
-            </Tap>
           </View>
 
           <Sparkline
@@ -344,12 +283,11 @@ function BaseHome() {
         </View>
 
         <View style={s.tabContent}>
-          {tab === "tenencias" ? (
-            <Tenencias byCategory={byCategory} onOpen={openDetail} />
+          {tab === "dinero" ? (
+            <Dinero byCategory={byCategory} />
           ) : null}
-          {tab === "actividad" ? <Actividad /> : null}
-          {tab === "distribucion" ? (
-            <Distribucion byCategory={byCategory} total={total} />
+          {tab === "portfolio" ? (
+            <Portfolio byCategory={byCategory} onOpen={openDetail} />
           ) : null}
         </View>
 
@@ -581,9 +519,8 @@ function TabStrip({
 }) {
   const { c } = useTheme();
   const tabs: { id: TabId; label: string }[] = [
-    { id: "tenencias", label: "Tenencias" },
-    { id: "actividad", label: "Actividad" },
-    { id: "distribucion", label: "Distribución" },
+    { id: "dinero", label: "Dinero" },
+    { id: "portfolio", label: "Portfolio" },
   ];
 
   return (
@@ -614,7 +551,106 @@ function TabStrip({
   );
 }
 
-function Tenencias({
+/* ─── Dinero: cash positions + acciones de Ingresar/Retirar ─── */
+function Dinero({
+  byCategory,
+}: {
+  byCategory: [AssetCategory, { total: number; items: Asset[] }][];
+}) {
+  const { c } = useTheme();
+  const router = useRouter();
+  const cash = useMemo(
+    () => byCategory.find(([cat]) => cat === "efectivo")?.[1].items ?? [],
+    [byCategory],
+  );
+
+  const ars = cash.find((a) => a.ticker === "ARS");
+  const usd = cash.find((a) => a.ticker === "USD");
+
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      {/* Card principal: pesos argentinos con acciones */}
+      {ars ? (
+        <View
+          style={[
+            s.moneyCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <Text style={[s.moneyEyebrow, { color: c.textMuted }]}>
+            PESOS DISPONIBLES
+          </Text>
+          <Text style={[s.moneyBalance, { color: c.text }]}>
+            {formatARS(ars.price * (ars.qty ?? 1))}
+          </Text>
+          <Text style={[s.moneyHint, { color: c.textMuted }]}>
+            Tu plata líquida. La movés cuando quieras.
+          </Text>
+          <View style={s.moneyActionsRow}>
+            <Tap
+              style={[s.moneyActionPrimary, { backgroundColor: c.ink }]}
+              haptic="medium"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "deposit" },
+                })
+              }
+            >
+              <Feather name="arrow-down-left" size={15} color={c.bg} />
+              <Text style={[s.moneyActionText, { color: c.bg }]}>Ingresar</Text>
+            </Tap>
+            <Tap
+              style={[
+                s.moneyActionSecondary,
+                { backgroundColor: c.surfaceHover, borderColor: c.border },
+              ]}
+              haptic="light"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "withdraw" },
+                })
+              }
+            >
+              <Feather name="arrow-up-right" size={15} color={c.text} />
+              <Text
+                style={[s.moneyActionTextSecondary, { color: c.text }]}
+              >
+                Retirar
+              </Text>
+            </Tap>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Card secundaria: dólares MEP */}
+      {usd ? (
+        <View
+          style={[
+            s.moneyCardSecondary,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[s.moneyEyebrow, { color: c.textMuted }]}>
+              DÓLARES MEP
+            </Text>
+            <Text style={[s.moneyBalanceSecondary, { color: c.text }]}>
+              US$ {(usd.qty ?? 0).toLocaleString("es-AR")}
+            </Text>
+            <Text style={[s.moneyHint, { color: c.textMuted }]}>
+              {formatARS(usd.price * (usd.qty ?? 1))} en pesos
+            </Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ─── Portfolio: activos financieros con métricas y distribución ─── */
+function Portfolio({
   byCategory,
   onOpen,
 }: {
@@ -622,9 +658,86 @@ function Tenencias({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
+
+  const portfolioEntries = useMemo(
+    () => byCategory.filter(([cat]) => cat !== "efectivo"),
+    [byCategory],
+  );
+  const invested = useMemo(
+    () => portfolioEntries.reduce((sum, [, data]) => sum + data.total, 0),
+    [portfolioEntries],
+  );
+  // Rendimiento ponderado del día: Σ (valor × change%) / invertido.
+  const weightedPct = useMemo(() => {
+    if (invested <= 0) return 0;
+    let w = 0;
+    for (const [, data] of portfolioEntries) {
+      for (const a of data.items) {
+        const v = a.price * (a.qty ?? 1);
+        w += v * (a.change / 100);
+      }
+    }
+    return (w / invested) * 100;
+  }, [portfolioEntries, invested]);
+  const rendimientoAbs = invested * (weightedPct / 100);
+  const up = weightedPct >= 0;
+
+  if (portfolioEntries.length === 0) {
+    return (
+      <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+        <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
+          Todavía no tenés inversiones. Entrá a Mercado para empezar.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View>
-      {byCategory.map(([cat, data]) => (
+      {/* Header: total invertido + rendimiento del día */}
+      <View
+        style={[
+          s.portfolioSummary,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
+            TOTAL INVERTIDO
+          </Text>
+          <Text style={[s.summaryValue, { color: c.text }]}>
+            {formatARS(invested)}
+          </Text>
+        </View>
+        <View style={[s.summaryDivider, { backgroundColor: c.border }]} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
+            RENDIMIENTO HOY
+          </Text>
+          <View style={s.summaryDeltaRow}>
+            <Text
+              style={[
+                s.summaryDeltaTri,
+                { color: up ? c.greenDark : c.red },
+              ]}
+            >
+              {up ? "▲" : "▼"}
+            </Text>
+            <Text
+              style={[s.summaryValue, { color: up ? c.greenDark : c.red }]}
+            >
+              {formatPct(weightedPct)}
+            </Text>
+          </View>
+          <Text style={[s.summaryHint, { color: c.textMuted }]}>
+            {up ? "+" : "−"}
+            {formatARS(Math.abs(rendimientoAbs))}
+          </Text>
+        </View>
+      </View>
+
+      {/* Listado agrupado por categoría */}
+      {portfolioEntries.map(([cat, data]) => (
         <View key={cat} style={s.groupBlock}>
           <View style={s.groupHead}>
             <Text style={[s.groupTitle, { color: c.text }]}>
@@ -644,119 +757,57 @@ function Tenencias({
           ))}
         </View>
       ))}
-    </View>
-  );
-}
 
-function Actividad() {
-  const { c } = useTheme();
-  return (
-    <View style={{ paddingHorizontal: 20 }}>
-      {activityItems.map((item, i) => {
-        const positive = item.amount > 0;
-        return (
-          <View
-            key={item.id}
-            style={[
-              s.activityRow,
-              i > 0 && {
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: c.border,
-              },
-            ]}
-          >
-            <View
-              style={[
-                s.activityIcon,
-                {
-                  backgroundColor: positive ? c.greenDim : c.surfaceHover,
-                },
-              ]}
-            >
-              <Feather
-                name={item.icon}
-                size={16}
-                color={positive ? c.greenDark : c.text}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.activityTitle, { color: c.text }]}>
-                {item.title}
-              </Text>
-              <Text style={[s.activityDate, { color: c.textMuted }]}>
-                {item.date}
-              </Text>
-            </View>
-            <Text
-              style={[
-                s.activityAmount,
-                { color: positive ? c.greenDark : c.text },
-              ]}
-            >
-              {positive ? "+" : "−"}
-              {formatARS(item.amount)}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function Distribucion({
-  byCategory,
-  total,
-}: {
-  byCategory: [AssetCategory, { total: number; items: Asset[] }][];
-  total: number;
-}) {
-  const { c } = useTheme();
-  return (
-    <View style={{ paddingHorizontal: 20 }}>
-      <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
-        {byCategory.map(([cat, data], i) => {
-          const pct = (data.total / total) * 100;
-          return (
-            <View
-              key={cat}
-              style={{
-                width: `${pct}%`,
-                backgroundColor: allocationColor(cat, c),
-                borderTopLeftRadius: i === 0 ? radius.pill : 0,
-                borderBottomLeftRadius: i === 0 ? radius.pill : 0,
-                borderTopRightRadius:
-                  i === byCategory.length - 1 ? radius.pill : 0,
-                borderBottomRightRadius:
-                  i === byCategory.length - 1 ? radius.pill : 0,
-              }}
-            />
-          );
-        })}
-      </View>
-
-      <View style={{ gap: 10, marginTop: 16 }}>
-        {byCategory.map(([cat, data]) => {
-          const pct = (data.total / total) * 100;
-          return (
-            <View key={cat} style={s.legendRow}>
+      {/* Distribución al final — contextualiza las tenencias */}
+      <View style={s.distBlock}>
+        <Text style={[s.distEyebrow, { color: c.textMuted }]}>
+          DISTRIBUCIÓN
+        </Text>
+        <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
+          {portfolioEntries.map(([cat, data], i) => {
+            const pct = (data.total / invested) * 100;
+            return (
               <View
-                style={[
-                  s.legendDot,
-                  { backgroundColor: allocationColor(cat, c) },
-                ]}
+                key={cat}
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: allocationColor(cat, c),
+                  borderTopLeftRadius: i === 0 ? radius.pill : 0,
+                  borderBottomLeftRadius: i === 0 ? radius.pill : 0,
+                  borderTopRightRadius:
+                    i === portfolioEntries.length - 1 ? radius.pill : 0,
+                  borderBottomRightRadius:
+                    i === portfolioEntries.length - 1 ? radius.pill : 0,
+                }}
               />
-              <Text style={[s.legendLabel, { color: c.text }]}>
-                {categoryLabels[cat]}
-              </Text>
-              <Text style={[s.legendPct, { color: c.textMuted }]}>
-                {pct.toFixed(1)}%
-              </Text>
-              <Text style={[s.legendValue, { color: c.text }]}>
-                {formatARS(data.total)}
-              </Text>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
+
+        <View style={{ gap: 10, marginTop: 16 }}>
+          {portfolioEntries.map(([cat, data]) => {
+            const pct = (data.total / invested) * 100;
+            return (
+              <View key={cat} style={s.legendRow}>
+                <View
+                  style={[
+                    s.legendDot,
+                    { backgroundColor: allocationColor(cat, c) },
+                  ]}
+                />
+                <Text style={[s.legendLabel, { color: c.text }]}>
+                  {categoryLabels[cat]}
+                </Text>
+                <Text style={[s.legendPct, { color: c.textMuted }]}>
+                  {pct.toFixed(1)}%
+                </Text>
+                <Text style={[s.legendValue, { color: c.text }]}>
+                  {formatARS(data.total)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -976,6 +1027,7 @@ const s = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
   topBtn: {
     width: 36,
@@ -984,24 +1036,137 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cashActionsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 10,
+  /* Dinero tab */
+  moneyCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 22,
+    marginBottom: 12,
+  },
+  moneyEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  moneyBalance: {
+    fontFamily: fontFamily[800],
+    fontSize: 38,
+    letterSpacing: -1.4,
+    marginBottom: 4,
+  },
+  moneyBalanceSecondary: {
+    fontFamily: fontFamily[700],
+    fontSize: 24,
+    letterSpacing: -0.8,
     marginBottom: 2,
   },
-  cashPill: {
+  moneyHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    lineHeight: 16,
+  },
+  moneyActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  moneyActionPrimary: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    height: 36,
-    paddingHorizontal: 14,
+    justifyContent: "center",
+    gap: 8,
+    height: 46,
     borderRadius: radius.pill,
   },
-  cashPillText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
+  moneyActionSecondary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 46,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  moneyActionText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  moneyActionTextSecondary: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  moneyCardSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 18,
+  },
+
+  /* Portfolio tab */
+  portfolioSummary: {
+    marginHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 20,
+    padding: 18,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  summaryDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+  },
+  summaryEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  summaryValue: {
+    fontFamily: fontFamily[800],
+    fontSize: 20,
+    letterSpacing: -0.6,
+  },
+  summaryDeltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  summaryDeltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+  },
+  summaryHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  emptyPortfolio: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.1,
+    lineHeight: 20,
+    textAlign: "center",
+    paddingVertical: 24,
+  },
+  distBlock: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+  },
+  distEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginBottom: 12,
   },
   heroBlock: {
     paddingHorizontal: 24,
@@ -1152,34 +1317,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
-  },
-  activityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: spacing.lg,
-    gap: 14,
-  },
-  activityIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activityTitle: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  activityDate: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-  },
-  activityAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
   },
   barTrack: {
     height: 10,

@@ -40,6 +40,7 @@ export default function AppLayout() {
         name="success"
         options={{ animation: "slide_from_bottom", gestureEnabled: false }}
       />
+      <Stack.Screen name="activity" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="transfer" />
       <Stack.Screen name="settings" />
