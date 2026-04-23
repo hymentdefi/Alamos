@@ -7,7 +7,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import Svg, { G, Path, Text as SvgText } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { brand, fontFamily, useTheme } from "../theme";
 import type { ProTransitionTarget } from "./context";
@@ -26,12 +26,12 @@ interface Props {
 const DASH_LEN = 260;
 
 /**
- * Lockup de Alamos dibujado en SVG con animación de trazo de los
- * triángulos (estilo pencil-draw). El param `progress` va de 0 a 1;
- * los triángulos se dibujan con un leve stagger (el verde adelanta
- * al negro) para que el recorrido del lápiz se sienta orgánico.
+ * Sólo los dos triángulos del isotipo Alamos, dibujados en SVG con
+ * animación de trazo (estilo pencil-draw). El param `progress` va de
+ * 0 a 1; los triángulos se dibujan con un stagger (verde adelanta al
+ * negro) para que el recorrido del lápiz se sienta orgánico.
  */
-function AnimatedAlamosLockup({
+function AnimatedAlamosMark({
   size,
   tone,
   progress,
@@ -40,9 +40,6 @@ function AnimatedAlamosLockup({
   tone: "light" | "dark";
   progress: number;
 }) {
-  const aspect = 260 / 100;
-  const width = size * aspect;
-  const height = size;
   const inkColor = tone === "dark" ? "#FAFAF7" : "#0E0F0C";
 
   // Stagger: el verde se dibuja durante 0-0.65, el negro durante 0.35-1.
@@ -52,39 +49,27 @@ function AnimatedAlamosLockup({
   const offset2 = (1 - p2) * DASH_LEN;
 
   return (
-    <Svg width={width} height={height} viewBox="0 0 260 100">
-      <G transform="translate(10, 10) scale(0.8)">
-        <Path
-          d="M 38 26 L 16 86 L 60 86 Z"
-          stroke="#00E676"
-          strokeWidth={5.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
-          strokeDashoffset={offset1}
-        />
-        <Path
-          d="M 56 12 L 29 86 L 83 86 Z"
-          stroke={inkColor}
-          strokeWidth={5.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
-          strokeDashoffset={offset2}
-        />
-      </G>
-      <SvgText
-        x={92}
-        y={68}
-        fontFamily={fontFamily[700]}
-        fontSize={42}
-        fontWeight="700"
-        fill={inkColor}
-      >
-        Alamos
-      </SvgText>
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Path
+        d="M 38 26 L 16 86 L 60 86 Z"
+        stroke="#00E676"
+        strokeWidth={6.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
+        strokeDashoffset={offset1}
+      />
+      <Path
+        d="M 56 12 L 29 86 L 83 86 Z"
+        stroke={inkColor}
+        strokeWidth={6.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
+        strokeDashoffset={offset2}
+      />
     </Svg>
   );
 }
@@ -326,23 +311,31 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
             Bienvenido a
           </Animated.Text>
 
-          <View style={s.logoRow}>
-            <Animated.View
-              style={{
+          <Animated.View
+            style={[
+              s.logoRow,
+              {
                 opacity: logoOpacity,
                 transform: [
                   { translateY: logoTx },
                   { scale: logoScale },
                 ],
-              }}
+              },
+            ]}
+          >
+            <AnimatedAlamosMark
+              size={96}
+              tone={logoTone}
+              progress={drawProgress}
+            />
+            <Animated.Text
+              style={[
+                s.alamosText,
+                { color: isDark ? brand.bg : brand.ink },
+              ]}
             >
-              <AnimatedAlamosLockup
-                size={120}
-                tone={logoTone}
-                progress={drawProgress}
-              />
-            </Animated.View>
-
+              Alamos
+            </Animated.Text>
             {toPro ? (
               <Animated.Text
                 style={[
@@ -360,7 +353,7 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
                 Pro
               </Animated.Text>
             ) : null}
-          </View>
+          </Animated.View>
         </View>
       </Animated.View>
     </Modal>
@@ -381,20 +374,25 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 26,
     letterSpacing: -0.4,
-    marginBottom: 18,
+    marginBottom: 6,
   },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 0,
+    gap: 4,
+  },
+  alamosText: {
+    fontFamily: fontFamily[700],
+    fontSize: 52,
+    letterSpacing: -2.4,
+    // Pegar el texto a la derecha del mark SVG. El viewBox del mark
+    // (100x100) deja aire a los lados; compensamos con margin negativo.
+    marginLeft: -10,
   },
   accentText: {
     fontFamily: fontFamily[700],
     fontSize: 52,
     letterSpacing: -1.6,
-    // El SVG lockup tiene trailing space a la derecha del texto 'Alamos'
-    // (viewBox 260 vs el texto terminando antes). Compensamos para que
-    // 'Pro' quede pegado.
-    marginLeft: -44,
+    marginLeft: 6,
   },
 });
