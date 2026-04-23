@@ -244,9 +244,8 @@ export default function BuyScreen() {
         </View>
       </View>
 
-      {/* Spacer superior: empuja hero + slider hacia abajo. Ratio mayor
-          al inferior para que el hero quede más bajo y el teclado suba. */}
-      <View style={{ flex: 1.6 }} />
+      {/* Spacer superior: empuja hero + slider hacia abajo. */}
+      <View style={{ flex: 1.2 }} />
 
       <View style={s.hero}>
         <Text
@@ -274,9 +273,8 @@ export default function BuyScreen() {
         />
       </View>
 
-      {/* Spacer inferior: más chico, así el teclado queda más arriba
-          sin pegarse al asset strip. */}
-      <View style={{ flex: 0.5 }} />
+      {/* Spacer entre slider y teclado. */}
+      <View style={{ flex: 0.4 }} />
 
       <View style={s.keypad}>
         {keys.map((row, ri) => (
@@ -301,6 +299,9 @@ export default function BuyScreen() {
           </View>
         ))}
       </View>
+
+      {/* Levanta el teclado por encima del asset strip. */}
+      <View style={{ height: 24 }} />
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <View style={s.assetStrip}>
@@ -419,9 +420,9 @@ const s = StyleSheet.create({
   },
   heroValue: {
     fontFamily: fontFamily[800],
-    fontSize: 64,
-    letterSpacing: -0.8,
-    lineHeight: 70,
+    fontSize: 66,
+    letterSpacing: -0.2,
+    lineHeight: 72,
     textAlign: "center",
     includeFontPadding: false,
   },
