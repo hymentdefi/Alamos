@@ -104,7 +104,7 @@ export default function SupportScreen() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 160 }}
+        contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── ALAMOS ACADEMY ── */}

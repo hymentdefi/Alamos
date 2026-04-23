@@ -266,7 +266,7 @@ function MarketPage({
   return (
     <ScrollView
       ref={listRef}
-      contentContainerStyle={{ paddingBottom: 160 }}
+      contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
     >
       {showMovers ? (

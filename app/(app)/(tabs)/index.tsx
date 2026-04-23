@@ -199,7 +199,7 @@ function BaseHome() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 160 }}
+        contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
