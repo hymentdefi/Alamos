@@ -27,6 +27,12 @@ interface Props<T> {
   keyExtractor: (item: T, index: number) => string;
   /** Optional: fired while the user is actively scrolling (for prefetch / UI hints). */
   onScrollingIndex?: (idx: number) => void;
+  /**
+   * Cambia cuando querés forzar re-render de las páginas (FlatList es
+   * PureComponent y no re-renderiza cells cuando sólo cambia el closure
+   * de renderItem).
+   */
+  extraData?: unknown;
 }
 
 /**
@@ -36,7 +42,7 @@ interface Props<T> {
  * soporte nested vertical scroll sin conflictos.
  */
 function HorizontalPagerInner<T>(
-  { items, index, onIndexChange, renderItem, keyExtractor, onScrollingIndex }: Props<T>,
+  { items, index, onIndexChange, renderItem, keyExtractor, onScrollingIndex, extraData }: Props<T>,
   ref: React.Ref<HorizontalPagerHandle>,
 ) {
   const { width: screenW } = Dimensions.get("window");
@@ -115,6 +121,7 @@ function HorizontalPagerInner<T>(
       removeClippedSubviews
       initialScrollIndex={index}
       getItemLayout={getItemLayout}
+      extraData={extraData}
       onScroll={onScroll}
       scrollEventThrottle={16}
       onMomentumScrollEnd={onMomentumEnd}

@@ -383,6 +383,7 @@ export default function NewsScreen() {
         index={activeTab}
         onIndexChange={setActiveTab}
         keyExtractor={(t) => t.id}
+        extraData={showSwipeHint}
         renderItem={(t) => (
           <NewsPage
             items={filterForTab(t)}
