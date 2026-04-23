@@ -22,6 +22,8 @@ interface Props {
   color: string;
   height?: number;
   withFill?: boolean;
+  /** Grosor del trazo. Default 2.4. */
+  strokeWidth?: number;
   /** Callback mientras el usuario arrastra el dedo sobre el chart. */
   onScrub?: (index: number, value: number) => void;
   onScrubStart?: () => void;
@@ -39,6 +41,7 @@ export function Sparkline({
   color,
   height = 140,
   withFill = true,
+  strokeWidth = 2.4,
   onScrub,
   onScrubStart,
   onScrubEnd,
@@ -129,7 +132,7 @@ export function Sparkline({
         <Path
           d={d}
           stroke={color}
-          strokeWidth={2.4}
+          strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"

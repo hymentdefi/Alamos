@@ -172,6 +172,9 @@ function BaseHome() {
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
+  // Color del trazo del chart: verde más vivo al estilo Robinhood,
+  // separado del trendColor que usamos para textos y pills.
+  const chartColor = isUp ? c.green : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -295,9 +298,10 @@ function BaseHome() {
 
           <Sparkline
             series={series}
-            color={trendColor}
+            color={chartColor}
             height={260}
             withFill={false}
+            strokeWidth={3.4}
             onScrub={(idx) => setScrubIndex(idx)}
             onScrubEnd={() => setScrubIndex(null)}
             style={{ marginTop: 18 }}
