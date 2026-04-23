@@ -32,10 +32,24 @@ export function DrawingIcon({
   duration = 460,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
-  const [dashOffset, setDashOffset] = useState(focused ? 0 : 0);
+  const [dashOffset, setDashOffset] = useState(0);
+  const prevFocused = useRef(focused);
 
   useEffect(() => {
+    const wasFocused = prevFocused.current;
+    prevFocused.current = focused;
+
+    // Sin foco: reset firme, sin animación.
     if (!focused) {
+      scale.stopAnimation(() => scale.setValue(1));
+      setDashOffset(0);
+      return;
+    }
+
+    // Ya estaba enfocado (volvimos de una subpantalla, re-render del tab bar,
+    // etc.): asegurar estado "dibujado" sin relanzar la animación.
+    if (wasFocused) {
+      scale.stopAnimation(() => scale.setValue(1));
       setDashOffset(0);
       return;
     }
@@ -44,12 +58,13 @@ export function DrawingIcon({
 
     // Scale pop (native driver, transform — siempre funciona)
     scale.setValue(0.4);
-    Animated.spring(scale, {
+    const spring = Animated.spring(scale, {
       toValue: 1,
       tension: 140,
       friction: 5,
       useNativeDriver: true,
-    }).start();
+    });
+    spring.start();
 
     // Drawing via RAF loop — no depende de Animated/SVG interop
     setDashOffset(DASH_LEN);
@@ -72,6 +87,8 @@ export function DrawingIcon({
 
     return () => {
       cancelAnimationFrame(raf);
+      spring.stop();
+      scale.setValue(1);
     };
   }, [focused, duration, scale]);
 
