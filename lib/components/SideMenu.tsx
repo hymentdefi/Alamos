@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -19,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing } from "../theme";
 import { useAuth } from "../auth/context";
 import { useProMode } from "../pro/context";
+import { AlamosLogo } from "./Logo";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 // Panel ocupa el 100% de la pantalla — sin dejar un borde a la derecha.
@@ -43,7 +43,7 @@ export function SideMenu({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user, logout } = useAuth();
-  const { isPro, togglePro } = useProMode();
+  const { isPro, requestSwitch } = useProMode();
 
   const [rendered, setRendered] = useState(visible);
   const tx = useRef(new Animated.Value(-PANEL_W)).current;
@@ -126,7 +126,10 @@ export function SideMenu({ visible, onClose }: Props) {
   if (!rendered) return null;
 
   const handleTogglePro = () => {
-    togglePro();
+    // Cerramos el menú primero así la pantalla de bienvenida se ve
+    // plena, sin el panel tapándola por los costados.
+    onClose();
+    setTimeout(() => requestSwitch(), 180);
   };
 
   const navigateTo = (path: string) => {
@@ -234,45 +237,30 @@ export function SideMenu({ visible, onClose }: Props) {
             </Pressable>
           </View>
 
-          {/* ── Alamos Pro Toggle ── */}
-          <View
-            style={[
-              s.proCard,
-              { backgroundColor: c.ink },
+          {/* ── Alamos Pro pill (toggle hacia el otro modo) ── */}
+          <Pressable
+            onPress={handleTogglePro}
+            style={({ pressed }) => [
+              s.proPill,
+              {
+                backgroundColor: c.surface,
+                borderColor: c.border,
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+              },
             ]}
           >
-            <View style={s.proHead}>
-              <View style={s.proEyebrow}>
-                <View style={[s.proDot, { backgroundColor: c.green }]} />
-                <Text style={[s.proEyebrowText, { color: c.green }]}>
-                  ALAMOS PRO
+            <AlamosLogo variant="mark" tone="light" size={22} />
+            <View style={s.proPillTextRow}>
+              <Text style={[s.proPillBrand, { color: c.text }]}>ALAMOS</Text>
+              {!isPro ? (
+                <Text style={[s.proPillAccent, { color: c.greenDark }]}>
+                  Pro
                 </Text>
-              </View>
-              <Switch
-                value={isPro}
-                onValueChange={handleTogglePro}
-                trackColor={{
-                  false: "rgba(250,250,247,0.16)",
-                  true: c.green,
-                }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="rgba(250,250,247,0.16)"
-              />
+              ) : null}
             </View>
-            <Text style={[s.proTitle, { color: c.bg }]}>
-              Terminal pro para inversores avanzados.
-            </Text>
-            <Text
-              style={[
-                s.proBody,
-                { color: "rgba(250,250,247,0.64)" },
-              ]}
-            >
-              {isPro
-                ? "Activo. Vista densa con profundidad de mercado, órdenes avanzadas y data cruda."
-                : "Activá el modo Pro cuando estés listo. Tema oscuro tipo terminal, más data y controles rápidos."}
-            </Text>
-          </View>
+            <Feather name="chevron-right" size={20} color={c.textFaint} />
+          </Pressable>
 
           {/* ── User identity ── */}
           <View style={s.identity}>
@@ -363,46 +351,33 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Pro card */
-  proCard: {
+  /* Pro pill — tipo Binance: logo + ALAMOS + 'Pro' + chevron */
+  proPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginHorizontal: 20,
     marginTop: 8,
-    padding: 18,
-    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  proHead: {
+  proPillTextRow: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
+    alignItems: "baseline",
+    gap: 6,
   },
-  proEyebrow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  proPillBrand: {
+    fontFamily: fontFamily[800],
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
-  proDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  proEyebrowText: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-  },
-  proTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 20,
-    lineHeight: 24,
-    letterSpacing: -0.6,
-    marginBottom: 8,
-  },
-  proBody: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 19,
-    letterSpacing: -0.1,
+  proPillAccent: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   /* Identity */
   identity: {
