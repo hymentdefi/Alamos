@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   View,
   Text,
   ScrollView,
@@ -63,12 +64,49 @@ function BaseHome() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [tab, setTab] = useState<TabId>("tenencias");
+  const [displayTab, setDisplayTab] = useState<TabId>("tenencias");
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
+  const tabOpacity = useRef(new Animated.Value(1)).current;
+  const chartOpacity = useRef(new Animated.Value(1)).current;
+  const prevRangeRef = useRef<Range>("1D");
+
+  useEffect(() => {
+    if (tab === displayTab) return;
+    Animated.timing(tabOpacity, {
+      toValue: 0,
+      duration: 90,
+      useNativeDriver: true,
+    }).start(() => {
+      setDisplayTab(tab);
+      Animated.timing(tabOpacity, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [tab, displayTab, tabOpacity]);
+
+  useEffect(() => {
+    if (prevRangeRef.current === range) return;
+    prevRangeRef.current = range;
+    Animated.sequence([
+      Animated.timing(chartOpacity, {
+        toValue: 0.35,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(chartOpacity, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [range, chartOpacity]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -223,7 +261,12 @@ function BaseHome() {
           <Text style={[s.greet, { color: c.textMuted }]}>
             {firstName ? `Hola, ${firstName}` : "Hola"}
           </Text>
-          <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
+          <AmountDisplay
+            value={current}
+            size={46}
+            animateOnMount
+            style={{ marginBottom: 8 }}
+          />
           <View style={s.deltaRow}>
             <AntDesign
               name={displayIsUp ? "caret-up" : "caret-down"}
@@ -242,16 +285,17 @@ function BaseHome() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <Sparkline
-            series={series}
-            color={trendColor}
-            onScrub={(idx) => setScrubIndex(idx)}
-            onScrubEnd={() => {
-              setScrubIndex(null);
-              Haptics.selectionAsync().catch(() => {});
-            }}
-            style={{ marginTop: 18 }}
-          />
+          <Animated.View style={{ opacity: chartOpacity, marginTop: 18 }}>
+            <Sparkline
+              series={series}
+              color={trendColor}
+              onScrub={(idx) => setScrubIndex(idx)}
+              onScrubEnd={() => {
+                setScrubIndex(null);
+                Haptics.selectionAsync().catch(() => {});
+              }}
+            />
+          </Animated.View>
 
           <View style={s.rangeRow}>
             {ranges.map((r) => {
@@ -291,15 +335,15 @@ function BaseHome() {
           <TabStrip tab={tab} onChange={setTab} />
         </View>
 
-        <View style={s.tabContent}>
-          {tab === "tenencias" ? (
+        <Animated.View style={[s.tabContent, { opacity: tabOpacity }]}>
+          {displayTab === "tenencias" ? (
             <Tenencias byCategory={byCategory} onOpen={openDetail} />
           ) : null}
-          {tab === "actividad" ? <Actividad /> : null}
-          {tab === "distribucion" ? (
+          {displayTab === "actividad" ? <Actividad /> : null}
+          {displayTab === "distribucion" ? (
             <Distribucion byCategory={byCategory} total={total} />
           ) : null}
-        </View>
+        </Animated.View>
 
         <FeaturedFunds onOpen={openDetail} onSeeAll={() => router.push("/(app)/explore")} />
         <UniversityCallout />
