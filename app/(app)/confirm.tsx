@@ -44,6 +44,12 @@ function fireErrorHaptic() {
     Haptics.NotificationFeedbackType.Error,
   ).catch(() => {});
 }
+/** Spec section G: "Orden Recibida..." mini-hit de dopamina (Medium),
+ * firmeza + seca. Se dispara en el frame en que el texto entrante cruza
+ * ~50% de opacidad → IN_DELAY + IN_DURATION / 2 ≈ 450 ms post-trigger. */
+function fireMediumHaptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+}
 
 /* ───────────── CrossFadeStatusText (spec section F) ───────────────────
  *
@@ -186,12 +192,17 @@ type SharedValueOf<T> = { value: T };
 
 const STRIP_HEIGHT = 72;
 const CARD_RADIUS = 28;
-const PHASE_SENDING_MS = 900;
-const PHASE_RECEIVED_MS = 2400;
+/** Dwell mínimo de cada fase (spec section E — dopaminergic flow).
+ * 800 → 700 → 2000 ms = total ~3.5 s (sin contar entrada del logo). */
+const PHASE_SENDING_MS = 800;
+const PHASE_RECEIVED_MS = 700;
+const DONE_HOLD_MS = 2000;
 const MIN_LOADING_MS = 600;
-const DONE_HOLD_MS = 1700;
 const TIMEOUT_MS = 8000;
 const CHECK_PATH_LEN = 24;
+/** Delay del haptic Medium al entrar a "Orden Recibida..." — el
+ * entrante cruza 50 % de opacidad ~en IN_DELAY + IN_DURATION / 2. */
+const RECIBIDA_HAPTIC_DELAY_MS = 450;
 const SPIN_DURATION_MS = 1000;
 // SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
@@ -394,12 +405,12 @@ export default function ConfirmScreen() {
       }),
     );
 
-    // ─── t=500ms: "Orden Enviada..." arrives as logo is settling.
-    // Cambiar el statusText dispara el crossfade ping-pong en
-    // CrossFadeStatusText (ghost→solid con 100 ms de delay interno).
+    // ─── t=500ms: "Enviando Orden..." (state 1, operational). SILENCIO
+    // total de hápticos — la silencia carga anticipación (spec G).
+    // Cambiar el statusText dispara el crossfade ping-pong.
     setTimeout(() => {
       if (completedRef.current) return;
-      setStatusText("Orden Enviada...");
+      setStatusText("Enviando Orden...");
     }, 500);
 
     // Watchdog: if nothing confirms in 8s, fall into error state.
@@ -412,10 +423,15 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received. El crossfade lo dispara el cambio
-    // de prop en CrossFadeStatusText (sale "Enviada", entra "Recibida").
+    // Phase 2: sending → received (state 2 = primera mini-hit dopa).
+    // El crossfade lo dispara el cambio de prop. El haptic Medium se
+    // dispara cuando el texto entrante cruza ~50 % de opacidad.
     setPhase("received");
     setStatusText("Orden Recibida...");
+    setTimeout(() => {
+      if (completedRef.current && phase !== "received") return;
+      fireMediumHaptic();
+    }, RECIBIDA_HAPTIC_DELAY_MS);
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;
