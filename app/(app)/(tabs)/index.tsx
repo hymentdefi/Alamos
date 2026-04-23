@@ -336,7 +336,7 @@ function BaseHome() {
         </View>
 
         <FeaturedFunds onOpen={openDetail} onSeeAll={() => router.push("/(app)/explore")} />
-        <UniversityCallout />
+        <AcademyCallout />
       </ScrollView>
 
       <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
@@ -434,7 +434,7 @@ function FeaturedFunds({
   );
 }
 
-function UniversityCallout() {
+function AcademyCallout() {
   const { c } = useTheme();
   return (
     <Pressable
@@ -443,7 +443,7 @@ function UniversityCallout() {
         { backgroundColor: c.surface, borderColor: c.border },
       ]}
       onPress={() =>
-        Linking.openURL("https://alamos.capital/university").catch(() => {})
+        Linking.openURL("https://alamos.capital/academy").catch(() => {})
       }
     >
       <View style={[s.uniIcon, { backgroundColor: c.surfaceHover }]}>
@@ -456,7 +456,7 @@ function UniversityCallout() {
         <Text style={[s.uniBody, { color: c.textMuted }]}>
           Aprendé desde cero en{" "}
           <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-            Alamos University
+            Alamos Academy
           </Text>
           . Guías, tutoriales y casos del mercado argentino.
         </Text>
@@ -903,7 +903,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.15,
   },
 
-  /* ─── University Callout ─── */
+  /* ─── Academy Callout ─── */
   uniCard: {
     marginHorizontal: 20,
     marginTop: 16,
