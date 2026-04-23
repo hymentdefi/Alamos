@@ -129,11 +129,11 @@ export function SideMenu({ visible, onClose }: Props) {
 
   const handleTogglePro = () => {
     // Cerramos el menú primero y esperamos a que el Modal se desmonte
-    // completo (anim 240ms + margen). Si abrimos el Modal del Transition
+    // completo (anim 280ms + margen). Si abrimos el Modal del Transition
     // antes, iOS lo deja en cola hasta que se dismissea el anterior y
     // la animación de bienvenida se pierde.
     onClose();
-    setTimeout(() => requestSwitch(), 320);
+    setTimeout(() => requestSwitch(), 380);
   };
 
   const navigateTo = (path: string) => {

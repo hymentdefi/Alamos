@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   View,
   PanResponder,
+  StyleSheet,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
@@ -144,30 +145,38 @@ export function Sparkline({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-
-        {activePoint ? (
-          <>
-            <Line
-              x1={activePoint.x}
-              x2={activePoint.x}
-              y1={0}
-              y2={VB_H}
-              stroke={color}
-              strokeWidth={1}
-              strokeOpacity={0.35}
-              strokeDasharray="3,3"
-            />
-            <Circle
-              cx={activePoint.x}
-              cy={activePoint.y}
-              r={5}
-              fill={color}
-              stroke="#FFFFFF"
-              strokeWidth={2}
-            />
-          </>
-        ) : null}
       </Svg>
+
+      {/* Scrub overlay — SVG separado con viewBox 1:1 en píxeles, para
+          que la Circle y la línea vertical no se distorsionen con el
+          preserveAspectRatio='none' del chart principal. */}
+      {activePoint && layoutWidth > 0 ? (
+        <Svg
+          width={layoutWidth}
+          height={height}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        >
+          <Line
+            x1={(activePoint.x / VB_W) * layoutWidth}
+            x2={(activePoint.x / VB_W) * layoutWidth}
+            y1={0}
+            y2={height}
+            stroke={color}
+            strokeWidth={1}
+            strokeOpacity={0.35}
+            strokeDasharray="3,3"
+          />
+          <Circle
+            cx={(activePoint.x / VB_W) * layoutWidth}
+            cy={(activePoint.y / VB_H) * height}
+            r={5}
+            fill={color}
+            stroke="#FFFFFF"
+            strokeWidth={2}
+          />
+        </Svg>
+      ) : null}
     </View>
   );
 }
