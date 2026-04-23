@@ -293,11 +293,15 @@ const s = StyleSheet.create({
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 0,
   },
   accentText: {
     fontFamily: fontFamily[700],
     fontSize: 54,
     letterSpacing: -1.8,
+    // El lockupShort tiene aire a la derecha que escala con el tamaño
+    // del logo; acá (size=88) compensamos ~2x el margin del pill para
+    // lograr una proximidad visual similar.
+    marginLeft: -26,
   },
 });

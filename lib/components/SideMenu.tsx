@@ -386,9 +386,9 @@ const s = StyleSheet.create({
     fontSize: 18,
     letterSpacing: -0.4,
     // El lockupShort tiene aire a la derecha del texto 'Alamos';
-    // compensamos con un margin negativo fuerte para que 'Pro' quede
-    // realmente pegado al texto 'Alamos' del logo.
-    marginLeft: -18,
+    // compensamos con un margin negativo para que 'Pro' quede cerca
+    // del texto 'Alamos' del logo, con un pequeño aire de respiración.
+    marginLeft: -13,
   },
   /* Identity */
   identity: {
