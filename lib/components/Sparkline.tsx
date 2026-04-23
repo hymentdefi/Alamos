@@ -203,9 +203,13 @@ function computePath(
       d += ` C${cx},${prev.y} ${cx},${curr.y} ${curr.x},${curr.y}`;
     }
   } else {
-    // Trazo lineal — picos filosos estilo Robinhood.
+    // Step function estilo Robinhood: horizontal hasta el siguiente
+    // tick, después vertical. Sin diagonales — cada precio se mantiene
+    // hasta el próximo dato.
     for (let i = 1; i < points.length; i++) {
-      d += ` L${points[i].x},${points[i].y}`;
+      const prev = points[i - 1];
+      const curr = points[i];
+      d += ` L${curr.x},${prev.y} L${curr.x},${curr.y}`;
     }
   }
 
