@@ -42,17 +42,19 @@ import { useProMode } from "../../../lib/pro/context";
 import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
 
 type TabId = "tenencias" | "actividad" | "distribucion";
-type Range = "1D" | "1S" | "1M" | "3M" | "1A";
+type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
-const ranges: Range[] = ["1D", "1S", "1M", "3M", "1A"];
+const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
 /** Variación % por rango — determina el trend y color del chart. */
 const rangeChanges: Record<Range, number> = {
+  "1min": 0.08,
+  "1H": 0.42,
   "1D": 1.96,
   "1S": 3.24,
   "1M": -2.1,
   "3M": 8.45,
-  "1A": 23.7,
+  YTD: 15.3,
 };
 
 const activityItems = [
@@ -317,7 +319,7 @@ function BaseHome() {
                   onPress={() => setRange(r)}
                   style={[
                     s.rangePill,
-                    active && { backgroundColor: trendColor },
+                    active && { backgroundColor: chartColor },
                   ]}
                   hitSlop={8}
                 >
@@ -503,6 +505,10 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
 
 function rangeSubtitle(r: Range): string {
   switch (r) {
+    case "1min":
+      return "último minuto";
+    case "1H":
+      return "última hora";
     case "1D":
       return "hoy";
     case "1S":
@@ -511,14 +517,26 @@ function rangeSubtitle(r: Range): string {
       return "este mes";
     case "3M":
       return "3 meses";
-    case "1A":
-      return "1 año";
+    case "YTD":
+      return "en el año";
   }
 }
 
 function indexLabel(r: Range, index: number, length: number): string {
   const t = 1 - index / (length - 1);
   switch (r) {
+    case "1min": {
+      const s = Math.round(t * 60);
+      if (s === 0) return "ahora";
+      if (s === 1) return "hace 1s";
+      return `hace ${s}s`;
+    }
+    case "1H": {
+      const m = Math.round(t * 60);
+      if (m === 0) return "ahora";
+      if (m === 1) return "hace 1m";
+      return `hace ${m}m`;
+    }
     case "1D": {
       const h = Math.round(t * 24);
       if (h === 0) return "ahora";
@@ -542,8 +560,9 @@ function indexLabel(r: Range, index: number, length: number): string {
       if (w === 1) return "hace 1 sem";
       return `hace ${w} sem`;
     }
-    case "1A": {
-      const m = Math.round(t * 12);
+    case "YTD": {
+      // Hoy es abril, así que 0-3 meses atrás cubren el YTD.
+      const m = Math.round(t * 4);
       if (m === 0) return "hoy";
       if (m === 1) return "hace 1 mes";
       return `hace ${m} meses`;
@@ -1035,7 +1054,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   rangePill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
