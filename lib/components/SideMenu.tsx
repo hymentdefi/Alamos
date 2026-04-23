@@ -56,19 +56,22 @@ export function SideMenu({ visible, onClose }: Props) {
   useEffect(() => {
     if (visible) {
       setRendered(true);
-      Animated.spring(tx, {
+      // Ease-out-quart para apertura: arranca rápido y frena suave al
+      // final — se siente como que el panel 'se asienta' en lugar de
+      // rebotar como hacía el spring.
+      Animated.timing(tx, {
         toValue: 0,
-        tension: 70,
-        friction: 14,
-        restSpeedThreshold: 0.5,
-        restDisplacementThreshold: 0.5,
+        duration: 340,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: true,
       }).start();
     } else if (rendered) {
+      // Ease-in-quart para cierre: arranca tranquilo y acelera al
+      // final, espejando la curva de apertura.
       Animated.timing(tx, {
         toValue: -PANEL_W,
-        duration: 240,
-        easing: Easing.in(Easing.cubic),
+        duration: 280,
+        easing: Easing.bezier(0.64, 0, 0.78, 0),
         useNativeDriver: true,
       }).start(({ finished }) => {
         if (finished) setRendered(false);
@@ -347,7 +350,7 @@ const s = StyleSheet.create({
   },
   closeRow: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "flex-end",
     paddingHorizontal: 20,
     paddingBottom: 6,
   },
