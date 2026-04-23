@@ -366,8 +366,8 @@ const s = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+    paddingVertical: 5,
+    borderRadius: radius.lg,
     borderWidth: 1,
   },
   proPillTextRow: {
