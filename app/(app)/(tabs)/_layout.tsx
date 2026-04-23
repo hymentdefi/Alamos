@@ -137,12 +137,12 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="support"
+        name="alamo"
         options={{
-          title: "Soporte",
+          title: "Tu Alamo",
           tabBarIcon: ({ focused, color }) => (
             <DrawingIcon
-              path={tabPaths.support}
+              path={tabPaths.alamo}
               focused={focused}
               color={color}
             />

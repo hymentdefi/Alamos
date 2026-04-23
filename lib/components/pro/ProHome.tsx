@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   View,
   Text,
@@ -18,9 +18,7 @@ import {
 } from "../../data/assets";
 import { useFavorites } from "../../favorites/context";
 import { Sparkline, seriesFromSeed } from "../Sparkline";
-import { SideMenu } from "../SideMenu";
 import { AmountDisplay } from "../AmountDisplay";
-import { EdgeSwipeOpener } from "../EdgeSwipeOpener";
 
 const USDT_RATE = 1200; // ARS per USDT mock
 
@@ -29,7 +27,6 @@ export function ProHome() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { favorites } = useFavorites();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const { equityArs, pnlArs, pnlPct } = useMemo(() => {
     const held = assets.filter((a) => a.held);
@@ -72,13 +69,6 @@ export function ProHome() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => setMenuOpen(true)}
-          hitSlop={8}
-        >
-          <Feather name="menu" size={18} color={c.text} />
-        </Pressable>
         <View style={s.topActions}>
           <Pressable
             style={[s.topPill, { backgroundColor: c.surfaceHover }]}
@@ -368,9 +358,6 @@ export function ProHome() {
           <Feather name="chevron-right" size={16} color={c.textMuted} />
         </View>
       </ScrollView>
-
-      <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
-      <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -440,7 +427,7 @@ const s = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     paddingHorizontal: 20,
     paddingBottom: 8,
   },

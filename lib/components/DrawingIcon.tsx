@@ -183,4 +183,7 @@ export const tabPaths = {
   /** Chat bubble with a tail pointing to bottom-left + three dots inside */
   support:
     "M5 4 H19 A2 2 0 0 1 21 6 V15 A2 2 0 0 1 19 17 H12 L7 21 V17 H5 A2 2 0 0 1 3 15 V6 A2 2 0 0 1 5 4 Z M8 10 H9 M12 10 H13 M16 10 H17",
+  /** Álamo stylized: tall triangular canopy + small trunk at bottom. */
+  alamo:
+    "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z",
 } as const;

@@ -35,10 +35,8 @@ import { useAuth } from "../../../lib/auth/context";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
-import { SideMenu } from "../../../lib/components/SideMenu";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
-import { EdgeSwipeOpener } from "../../../lib/components/EdgeSwipeOpener";
 
 type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
@@ -70,7 +68,6 @@ function BaseHome() {
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
@@ -181,14 +178,6 @@ function BaseHome() {
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Tap
           style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => setMenuOpen(true)}
-          hitSlop={8}
-          haptic="selection"
-        >
-          <Feather name="menu" size={18} color={c.text} />
-        </Tap>
-        <Tap
-          style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.push("/(app)/activity")}
           hitSlop={8}
           haptic="selection"
@@ -280,8 +269,6 @@ function BaseHome() {
 
       </ScrollView>
 
-      <EdgeSwipeOpener onOpen={() => setMenuOpen(true)} />
-      <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -754,7 +741,7 @@ const s = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
   topBtn: {
     width: 36,

@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import {
   Linking,
   ScrollView,
@@ -6,12 +5,11 @@ import {
   Text,
   View,
 } from "react-native";
-import { useNavigation, useRouter } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily, radius } from "../../../lib/theme";
-import { Tap } from "../../../lib/components/Tap";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { Tap } from "../../lib/components/Tap";
 
 /* ─── Data ─── */
 
@@ -19,11 +17,8 @@ interface Article {
   id: string;
   title: string;
   subtitle: string;
-  /** Categoría visual para la pill superior de la card. */
   tag: string;
-  /** Minutos estimados de lectura. */
   readMins: number;
-  /** Slug para formar la URL (https://alamos.capital/academy/:slug). */
   slug: string;
 }
 
@@ -70,18 +65,6 @@ export default function SupportScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const router = useRouter();
-  const navigation = useNavigation();
-  const isFocused = useIsFocused();
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Scroll-top al tapear la tab Soporte estando ya en Soporte.
-  useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    });
-    return unsub;
-  }, [navigation, isFocused]);
 
   const openArticle = (slug?: string) => {
     const url = slug ? `${ACADEMY_URL}/${slug}` : ACADEMY_URL;
@@ -99,12 +82,20 @@ export default function SupportScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={[s.title, { color: c.text }]}>Soporte</Text>
+        <Tap
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+          haptic="selection"
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Tap>
+        <Text style={[s.headerTitle, { color: c.text }]}>Soporte</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 180 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── ALAMOS ACADEMY ── */}
@@ -147,10 +138,7 @@ export default function SupportScreen() {
                 ]}
               >
                 <View
-                  style={[
-                    s.articleTag,
-                    { backgroundColor: c.surfaceHover },
-                  ]}
+                  style={[s.articleTag, { backgroundColor: c.surfaceHover }]}
                 >
                   <Text style={[s.articleTagText, { color: c.textSecondary }]}>
                     {art.tag}
@@ -192,16 +180,13 @@ export default function SupportScreen() {
             </View>
           </View>
 
-          {/* Opción 1: IA — inmediata */}
           <Tap
             onPress={openChatAI}
             haptic="medium"
             style={[s.chatCta, { backgroundColor: c.ink }]}
           >
             <View style={s.chatCtaLeft}>
-              <View
-                style={[s.chatCtaIcon, { backgroundColor: c.green }]}
-              >
+              <View style={[s.chatCtaIcon, { backgroundColor: c.green }]}>
                 <Feather name="zap" size={18} color={c.ink} />
               </View>
               <View style={{ flex: 1 }}>
@@ -221,7 +206,6 @@ export default function SupportScreen() {
             <Feather name="chevron-right" size={20} color={c.bg} />
           </Tap>
 
-          {/* Opción 2: persona — escalamiento */}
           <Tap
             onPress={openChatHuman}
             haptic="selection"
@@ -253,22 +237,29 @@ export default function SupportScreen() {
   );
 }
 
-/* ─── Styles ─── */
-
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 8,
+    gap: 12,
   },
-  title: {
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
     fontFamily: fontFamily[700],
-    fontSize: 32,
-    lineHeight: 36,
-    letterSpacing: -1.2,
+    fontSize: 16,
+    letterSpacing: -0.25,
   },
-
-  /* Section */
   section: {
     marginTop: 24,
   },
@@ -305,8 +296,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.1,
   },
-
-  /* Academy articles */
   articlesRow: {
     paddingHorizontal: 20,
     gap: 12,
@@ -353,8 +342,6 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: -0.05,
   },
-
-  /* Chat CTAs */
   chatCta: {
     marginHorizontal: 20,
     flexDirection: "row",

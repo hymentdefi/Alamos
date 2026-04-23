@@ -46,6 +46,7 @@ export default function AppLayout() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="security" />
       <Stack.Screen name="chat" />
+      <Stack.Screen name="support" />
       <Stack.Screen name="about" />
       <Stack.Screen name="account" />
       <Stack.Screen
