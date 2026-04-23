@@ -1,53 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
   Pressable,
   StyleSheet,
-  Animated,
   Dimensions,
-  PanResponder,
-  Easing,
   Image,
-  type StyleProp,
-  type ViewStyle,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
+import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-/** Constantes del swipe-to-submit. Calibradas contra el feeling real de
- * Robinhood (amortiguación + umbral bajo + snap con spring).
- *
- * Comportamiento:
- *  1. Resistencia progresiva: el botón se mueve ~1:1 con el dedo al inicio
- *     y progresivamente menos cuanto más alto estás. Al 100% del
- *     SWIPE_RANGE, el botón visual está al 70% (30% de damping).
- *  2. Commit al 45% del recorrido del dedo: basta con media banda elástica
- *     para enganchar y dejar que la animación termine sola.
- *  3. Al confirmar: spring real (stiffness 300, damping 20, mass 1) para
- *     tener micro-bounce físico al llegar al tope.
- *  4. Si no llegás: regreso lento y elástico (380 ms ease-out), no un
- *     snap agresivo. */
-const SWIPE_RANGE = 280;
-/** Fracción del recorrido del dedo (no del visual) para confirmar. */
-const SWIPE_COMMIT_FRACTION = 0.45;
-/** Velocidad mínima para confirmar por flick, px/ms. */
-const SWIPE_FLICK_VELOCITY = 0.6;
-/** Distancia mínima combinada con flick (fracción del range). */
-const SWIPE_FLICK_MIN_FRACTION = 0.35;
-/** Fracción máxima de damping al 100% del recorrido (0.3 = al 100% del
- * dedo, el botón visual está al 70%). */
-const SWIPE_DAMPING_MAX = 0.3;
-/** Alto visible de la franja verde en reposo. */
+/** Alto visible de la franja verde (pill del SwipeToSubmit) en reposo. */
 const STRIP_HEIGHT = 72;
 /** Radio inferior de la card blanca. */
 const CARD_RADIUS = 28;
@@ -92,105 +77,69 @@ export default function ConfirmScreen() {
   const fee = Math.round(numAmount * 0.005);
   const net = isSell ? numAmount - fee : numAmount + fee;
 
-  // ─── Animated values ───
-  const greenProgress = useRef(new Animated.Value(0)).current;
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const spinLoop = useRef(new Animated.Value(0)).current;
-  // Texto: solo fade, sin slide. Feel Robinhood.
-  const statusOpacity = useRef(new Animated.Value(0)).current;
-  // Morph logo→check: 0 = logo visible, 1 = check visible.
-  const morph = useRef(new Animated.Value(0)).current;
-  // Cross-fade del spinner arc al full-circle estático.
-  const fullCircleOpacity = useRef(new Animated.Value(0)).current;
-  // Offset del stroke-draw del check (no es Animated.Value porque el
-  // interop con react-native-svg es buggy; usamos RAF + state).
-  const [checkOffset, setCheckOffset] = useState(CHECK_PATH_LEN);
+  // ─── Shared values (todos viven en UI thread) ───
+  // Progreso del swipe (0..1). Lo escribe SwipeToSubmit desde su worklet
+  // y lo leemos acá en useAnimatedStyle para el cover verde.
+  const greenProgress = useSharedValue(0);
+  // Fade-in del overlay de ejecución entero.
+  const overlayOpacity = useSharedValue(0);
+  // Rotación del spinner en grados (loop infinito).
+  const spinDeg = useSharedValue(0);
+  // Opacidad del status text (cross-fade entre fases).
+  const statusOpacity = useSharedValue(0);
+  // Morph logo→check: 0 = logo, 1 = check.
+  const morph = useSharedValue(0);
+  // Cross-fade del spinning arc al full-circle estático.
+  const fullCircleOpacity = useSharedValue(0);
+  // strokeDashoffset del check: CHECK_PATH_LEN = invisible, 0 = dibujado.
+  const checkOffset = useSharedValue(CHECK_PATH_LEN);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("");
 
-  // Spinner loop — 1000ms por vuelta (Robinhood ~900-1100).
+  // Spinner loop — 1000 ms por vuelta (Robinhood ~900-1100).
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spinLoop, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
+    spinDeg.value = withRepeat(
+      withTiming(360, { duration: 1000, easing: Easing.linear }),
+      -1,
+      false,
     );
-    loop.start();
-    return () => loop.stop();
-  }, [spinLoop]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Un solo haptic "medium" al cruzar el commit threshold (70%) —
-  // feedback que te avisa "ya podés soltar".
-  const crossedCommit = useRef(false);
-  useEffect(() => {
-    const id = greenProgress.addListener(({ value }) => {
-      if (value > SWIPE_COMMIT_FRACTION && !crossedCommit.current) {
-        crossedCommit.current = true;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      } else if (value < SWIPE_COMMIT_FRACTION - 0.1) {
-        crossedCommit.current = false;
-      }
-    });
-    return () => greenProgress.removeListener(id);
-  }, [greenProgress]);
-
-  /** Cross-fade del texto: rápido (200 ms cada dirección), sin slide. */
+  /** Cross-fade del texto: fade-out, swap, fade-in. La transición del
+   * sharedValue usa el callback de withTiming (worklet) + runOnJS para
+   * bridgear a setStatusText y resolve. */
   const transitionText = (next: string): Promise<void> => {
     return new Promise((resolve) => {
-      Animated.timing(statusOpacity, {
-        toValue: 0,
-        duration: FADE_MS,
-        easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        setStatusText(next);
-        Animated.timing(statusOpacity, {
-          toValue: 1,
-          duration: FADE_MS,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }).start(() => resolve());
-      });
-    });
-  };
-
-  /** Dibuja el checkmark con stroke-draw (RAF-driven, reliable cross-
-   * platform, evita bugs de Animated + react-native-svg). */
-  const drawCheckmark = (duration: number): Promise<void> => {
-    return new Promise((resolve) => {
-      setCheckOffset(CHECK_PATH_LEN);
-      let start: number | null = null;
-      const tick = (t: number) => {
-        if (start === null) start = t;
-        const elapsed = t - start;
-        const p = Math.min(1, elapsed / duration);
-        // ease-out cubic
-        const eased = 1 - Math.pow(1 - p, 3);
-        setCheckOffset((1 - eased) * CHECK_PATH_LEN);
-        if (p < 1) {
-          requestAnimationFrame(tick);
-        } else {
-          resolve();
-        }
-      };
-      requestAnimationFrame(tick);
+      statusOpacity.value = withTiming(
+        0,
+        { duration: FADE_MS, easing: Easing.inOut(Easing.quad) },
+        (finished) => {
+          "worklet";
+          if (!finished) return;
+          runOnJS(setStatusText)(next);
+          statusOpacity.value = withTiming(
+            1,
+            { duration: FADE_MS, easing: Easing.inOut(Easing.quad) },
+            (done) => {
+              "worklet";
+              if (done) runOnJS(resolve)();
+            },
+          );
+        },
+      );
     });
   };
 
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // Fade-in del overlay completo.
-    Animated.timing(overlayOpacity, {
-      toValue: 1,
+    // Fade-in del overlay entero (UI thread).
+    overlayOpacity.value = withTiming(1, {
       duration: 340,
       easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
+    });
 
     // Haptic "success fuerte" al tocar tierra tras el swipe.
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -199,15 +148,12 @@ export default function ConfirmScreen() {
 
     // Fase 1: "Orden Enviada..." aparece con fade-in.
     setStatusText("Orden Enviada...");
-    Animated.timing(statusOpacity, {
-      toValue: 1,
+    statusOpacity.value = withTiming(1, {
       duration: FADE_MS,
       easing: Easing.inOut(Easing.quad),
-      useNativeDriver: true,
-    }).start();
+    });
 
     // Mínimo 600 ms de loading incluso si el "API" respondiera instantáneo.
-    // La pausa intencional da seriedad al flujo.
     const apiCall = wait(PHASE_SENDING_MS);
     const minLoading = wait(MIN_LOADING_MS);
     await Promise.all([apiCall, minLoading]);
@@ -224,25 +170,25 @@ export default function ConfirmScreen() {
       () => {},
     );
 
-    // Cross-fade del spinning arc al full-circle estático.
-    Animated.timing(fullCircleOpacity, {
-      toValue: 1,
+    // Cross-fade del spinning arc al full-circle estático (UI thread).
+    fullCircleOpacity.value = withTiming(1, {
       duration: MORPH_MS,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-
-    // Cross-fade del logo → checkmark (scale + opacity).
-    Animated.timing(morph, {
-      toValue: 1,
+    });
+    // Cross-fade logo → checkmark (scale + opacity, UI thread).
+    morph.value = withTiming(1, {
       duration: MORPH_MS,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    });
+    // Stroke-draw del check un toque después del morph — ahora en UI
+    // thread también vía useAnimatedProps.
+    setTimeout(() => {
+      checkOffset.value = withTiming(0, {
+        duration: CHECK_DRAW_MS,
+        easing: Easing.out(Easing.cubic),
+      });
+    }, MORPH_MS * 0.5);
 
-    // Stroke-draw del check se dispara un toque más tarde (cuando el logo
-    // empezó a desaparecer). Corre en paralelo con el cross-fade del texto.
-    setTimeout(() => drawCheckmark(CHECK_DRAW_MS), MORPH_MS * 0.5);
     await transitionText("Orden Ejecutada");
 
     // Hold 1.8 s sobre el estado success.
@@ -259,109 +205,85 @@ export default function ConfirmScreen() {
     });
   };
 
-  const completeSwipe = () => {
-    if (phase !== "idle") return;
-    // Spring físico: al pasar el umbral, el botón "se engancha" y vuela
-    // arriba con micro-bounce. Parámetros de Robinhood aprox.
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    Animated.spring(greenProgress, {
-      toValue: 1,
-      stiffness: 300,
-      damping: 20,
-      mass: 1,
-      useNativeDriver: true,
-    }).start(() => {
-      runOrderFlow();
-    });
-  };
+  /* ─── Estilos animados (todos UI thread) ─────────────────────── */
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponder: (_, g) =>
-          phase === "idle" && g.dy < -2,
-        onMoveShouldSetPanResponderCapture: (_, g) =>
-          phase === "idle" && g.dy < -2,
-        onPanResponderGrant: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  // Cover verde fullscreen: translateY desde (SCREEN_H - strip - safe)
+  // hasta 0, bindeado directamente a greenProgress (que SwipeToSubmit
+  // escribe desde su worklet).
+  const greenCoverStyle = useAnimatedStyle(() => {
+    const startY = SCREEN_H - (STRIP_HEIGHT + insets.bottom);
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            greenProgress.value,
+            [0, 1],
+            [startY, 0],
+            Extrapolation.CLAMP,
+          ),
         },
-        onPanResponderMove: (_, g) => {
-          if (phase !== "idle") return;
-          const dy = -g.dy;
-          if (dy <= 0) {
-            greenProgress.setValue(0);
-            return;
-          }
-          // RESISTENCIA PROGRESIVA: el botón visual va siempre un poco
-          // atrás del dedo, y el "lag" aumenta con el recorrido — como
-          // estirar una banda elástica.
-          //   raw = dedo / range  (puede superar 1)
-          //   visual = raw * (1 - DAMPING_MAX * clamp(raw, 0, 1))
-          // Al 0% del recorrido: visual = raw (1:1).
-          // Al 100%: visual = 1 * 0.7 = 0.7 (30% de damping).
-          const raw = dy / SWIPE_RANGE;
-          const clamped = Math.min(1, raw);
-          const damped = raw * (1 - SWIPE_DAMPING_MAX * clamped);
-          greenProgress.setValue(Math.min(1, damped));
-        },
-        onPanResponderRelease: (_, g) => {
-          if (phase !== "idle") return;
-          const dy = -g.dy;
-          const vy = -g.vy;
-          const rawProgress = dy / SWIPE_RANGE;
-          const passedThreshold = rawProgress >= SWIPE_COMMIT_FRACTION;
-          const validFlick =
-            vy > SWIPE_FLICK_VELOCITY &&
-            rawProgress > SWIPE_FLICK_MIN_FRACTION;
-          if (passedThreshold || validFlick) {
-            completeSwipe();
-          } else {
-            // Regreso lento y elástico: 380 ms ease-out. Da sensación de
-            // "no llegué" sin agresividad.
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-              () => {},
-            );
-            Animated.timing(greenProgress, {
-              toValue: 0,
-              duration: 380,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
-          if (phase !== "idle") return;
-          Animated.timing(greenProgress, {
-            toValue: 0,
-            duration: 380,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }).start();
-        },
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [phase],
-  );
+      ],
+    };
+  });
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const statusStyle = useAnimatedStyle(() => ({
+    opacity: statusOpacity.value,
+  }));
+
+  const spinnerStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spinDeg.value}deg` }],
+    // El arc se cross-fadea al full-circle cuando llegamos a "done".
+    opacity: interpolate(
+      fullCircleOpacity.value,
+      [0, 1],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const fullCircleStyle = useAnimatedStyle(() => ({
+    opacity: fullCircleOpacity.value,
+  }));
+
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(morph.value, [0, 1], [1, 0], Extrapolation.CLAMP),
+    transform: [
+      {
+        scale: interpolate(
+          morph.value,
+          [0, 1],
+          [1, 0.8],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: morph.value,
+    transform: [
+      {
+        scale: interpolate(
+          morph.value,
+          [0, 1],
+          [0.8, 1],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  // Animated props sobre el Path SVG: strokeDashoffset viene del shared
+  // value, entonces el stroke-draw corre 100% en UI thread.
+  const checkPathProps = useAnimatedProps(() => ({
+    strokeDashoffset: checkOffset.value,
+  }));
 
   if (!asset) return null;
-
-  // Translate del cover verde: en reposo, translateY = SCREEN_H - strip, así
-  // solo se ve la franja al fondo. Al completar swipe, translateY = 0 = cubre.
-  const greenCoverStartY = SCREEN_H - (STRIP_HEIGHT + insets.bottom);
-  const greenCoverY = greenProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [greenCoverStartY, 0],
-  });
-  const hintOpacity = greenProgress.interpolate({
-    inputRange: [0, 0.4],
-    outputRange: [1, 0],
-  });
-  const spin = spinLoop.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
 
   const rows: { label: string; value: string; strong?: boolean }[] = [
     { label: "Precio estimado", value: formatARS(asset.price) },
@@ -375,10 +297,7 @@ export default function ConfirmScreen() {
   ];
 
   return (
-    <View
-      style={[s.root, { backgroundColor: brand.green }]}
-      {...panResponder.panHandlers}
-    >
+    <View style={[s.root, { backgroundColor: brand.green }]}>
       {/* Card blanca con contenido */}
       <View
         style={[
@@ -461,77 +380,39 @@ export default function ConfirmScreen() {
         </View>
       </View>
 
-      {/* Cover verde que sube desde abajo con translateY (nativo, smooth) */}
+      {/* Cover verde fullscreen: traslada hacia arriba bindeado al
+          greenProgress que escribe SwipeToSubmit desde su worklet. */}
       <Animated.View
         pointerEvents="none"
-        style={[
-          s.greenCover,
-          {
-            height: SCREEN_H,
-            transform: [{ translateY: greenCoverY }],
-          },
-        ]}
+        style={[s.greenCover, { height: SCREEN_H }, greenCoverStyle]}
       />
 
-      {/* Hint "Deslizá para ejecutar" anclado al bottom, se desvanece al subir.
-          El Shimmer wrappea chevron + texto juntos: el brillo pasa por todo
-          el contenido del pill. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          s.hintBar,
-          {
-            height: STRIP_HEIGHT + insets.bottom,
-            paddingBottom: insets.bottom,
-            opacity: hintOpacity,
-          },
-        ]}
-      >
-        <Shimmer
-          style={{
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 6,
-          }}
+      {/* SwipeToSubmit — pill anclado al bottom. Todo el gesto y la
+          animación de swipe viven en UI thread. Una vez que arrancó el
+          flujo de ejecución lo desmontamos para que el overlay quede
+          limpio. */}
+      {phase === "idle" ? (
+        <View
+          style={[s.swipeAnchor, { paddingBottom: insets.bottom }]}
         >
-          <Feather
-            name="chevron-up"
-            size={14}
-            color="rgba(255,255,255,0.85)"
-            style={{ marginBottom: 2 }}
+          <SwipeToSubmit
+            onSubmit={runOrderFlow}
+            progressOut={greenProgress}
           />
-          <Text style={[s.hintText, { color: "rgba(255,255,255,0.75)" }]}>
-            Deslizá para ejecutar
-          </Text>
-        </Shimmer>
-      </Animated.View>
+        </View>
+      ) : null}
 
-      {/* Overlay de ejecución — layout calibrado contra el video de
-          Robinhood: logo a ~40% del top, texto a ~56%, disclaimer pinned
-          al bottom con safe-area. */}
+      {/* Overlay de ejecución — todo con reanimated shared values. */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
-          style={[s.execOverlay, { opacity: overlayOpacity }]}
+          style={[s.execOverlay, overlayStyle]}
         >
-          {/* Spacer hasta el logo: empuja el logo al ~33% del top,
-              centro del logo a ~40%. */}
           <View style={{ height: SCREEN_H * 0.33 }} />
 
           <View style={s.logoWrap}>
-            {/* Spinning arc (visible en sending/received). */}
-            <Animated.View
-              style={[
-                s.spinnerWrap,
-                {
-                  transform: [{ rotate: spin }],
-                  opacity: fullCircleOpacity.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0],
-                  }),
-                },
-              ]}
-            >
+            {/* Spinning arc (sending/received) — rotación native thread. */}
+            <Animated.View style={[s.spinnerWrap, spinnerStyle]}>
               <Svg width={140} height={140} viewBox="0 0 100 100">
                 <Circle
                   cx="50"
@@ -554,10 +435,8 @@ export default function ConfirmScreen() {
               </Svg>
             </Animated.View>
 
-            {/* Full circle estático (visible en done) — cross-fade con el arc. */}
-            <Animated.View
-              style={[s.spinnerWrap, { opacity: fullCircleOpacity }]}
-            >
+            {/* Full circle estático (done) — cross-fade con el arc. */}
+            <Animated.View style={[s.spinnerWrap, fullCircleStyle]}>
               <Svg width={140} height={140} viewBox="0 0 100 100">
                 <Circle
                   cx="50"
@@ -570,26 +449,8 @@ export default function ConfirmScreen() {
               </Svg>
             </Animated.View>
 
-            {/* Logo Alamos (~60% del diámetro interior) — se apaga al morph. */}
-            <Animated.View
-              style={[
-                s.logoOverlay,
-                {
-                  opacity: morph.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0],
-                  }),
-                  transform: [
-                    {
-                      scale: morph.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 0.8],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
+            {/* Logo Alamos (~60% del diámetro) — se apaga al morph. */}
+            <Animated.View style={[s.logoOverlay, logoStyle]}>
               <Image
                 source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
                 style={s.logoImg}
@@ -597,26 +458,11 @@ export default function ConfirmScreen() {
               />
             </Animated.View>
 
-            {/* Checkmark SVG — aparece con scale + opacity, y el trazo se
-                dibuja vía strokeDashoffset controlado por RAF. */}
-            <Animated.View
-              style={[
-                s.logoOverlay,
-                {
-                  opacity: morph,
-                  transform: [
-                    {
-                      scale: morph.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
+            {/* Checkmark — scale + opacity en UI thread; stroke-draw via
+                useAnimatedProps sobre el Path. */}
+            <Animated.View style={[s.logoOverlay, checkStyle]}>
               <Svg width={78} height={78} viewBox="0 0 24 24">
-                <Path
+                <AnimatedPath
                   d="M5 12 L10 17 L19 7"
                   stroke="#FFFFFF"
                   strokeWidth={3}
@@ -624,20 +470,18 @@ export default function ConfirmScreen() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeDasharray={`${CHECK_PATH_LEN} ${CHECK_PATH_LEN}`}
-                  strokeDashoffset={checkOffset}
+                  animatedProps={checkPathProps}
                 />
               </Svg>
             </Animated.View>
           </View>
 
-          {/* Gap fijo hasta el texto — logo queda a ~40%, texto a ~56%. */}
           <View style={{ height: SCREEN_H * 0.08 }} />
 
-          <Animated.Text style={[s.execText, { opacity: statusOpacity }]}>
+          <Animated.Text style={[s.execText, statusStyle]}>
             {statusText}
           </Animated.Text>
 
-          {/* Flex fill hacia el disclaimer. */}
           <View style={{ flex: 1 }} />
 
           <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 24 }]}>
@@ -648,87 +492,6 @@ export default function ConfirmScreen() {
               tamaño y tipo de orden, y las condiciones del mercado.
             </Text>
           </View>
-        </Animated.View>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * Texto con shimmer estilo Robinhood: un brillo suave y ancho se desliza
- * de izquierda a derecha en 2.2s con una pausa de ~900ms entre ciclos.
- * El gradiente está encima del texto; donde es semi-opaco suma blanco
- * sobre la base (texto al 65% de opacidad). Los bordes se difuminan
- * gradualmente con stops progresivos.
- */
-function Shimmer({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const shimmer = useRef(new Animated.Value(0)).current;
-  const [w, setW] = useState(0);
-
-  useEffect(() => {
-    if (w <= 0) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 1,
-          duration: 2200,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.delay(900),
-        Animated.timing(shimmer, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer, w]);
-
-  const gradientW = w * 0.55;
-  const translateX = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-gradientW, w],
-  });
-
-  return (
-    <View
-      onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={[{ overflow: "hidden" }, style]}
-    >
-      {children}
-      {w > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            width: gradientW,
-            transform: [{ translateX }],
-          }}
-        >
-          <LinearGradient
-            colors={[
-              "rgba(255,255,255,0)",
-              "rgba(255,255,255,0.22)",
-              "rgba(255,255,255,0.55)",
-              "rgba(255,255,255,0.22)",
-              "rgba(255,255,255,0)",
-            ]}
-            locations={[0, 0.3, 0.5, 0.7, 1]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={{ flex: 1 }}
-          />
         </Animated.View>
       ) : null}
     </View>
@@ -836,20 +599,12 @@ const s = StyleSheet.create({
     backgroundColor: brand.green,
   },
 
-  /* Hint "Deslizá para ejecutar" — fixed bottom strip */
-  hintBar: {
+  /* Anchor del SwipeToSubmit al bottom del screen. */
+  swipeAnchor: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hintText: {
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    color: "#FFFFFF",
-    letterSpacing: -0.2,
   },
 
   /* Execution overlay — layout estilo Robinhood, no vertical-center */
