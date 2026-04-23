@@ -157,15 +157,16 @@ export function DrawingIcon({
 
 const s = StyleSheet.create({
   wrap: {
-    width: 48,
-    height: 38,
+    width: 52,
+    height: 42,
     alignItems: "center",
-    paddingTop: 2,
-    gap: 5,
+    // Sin padding top: el marker toca el borde del island.
+    paddingTop: 0,
+    gap: 7,
   },
   marker: {
-    width: 22,
-    height: 3,
+    width: 26,
+    height: 3.5,
     borderRadius: 2,
   },
 });
