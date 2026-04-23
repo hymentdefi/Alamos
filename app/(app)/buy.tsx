@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import {
   type AssetCategory,
 } from "../../lib/data/assets";
 import { Tap } from "../../lib/components/Tap";
+import { PercentSlider } from "../../lib/components/PercentSlider";
 
 function unitWordFor(cat: AssetCategory): string {
   switch (cat) {
@@ -73,39 +74,30 @@ export default function BuyScreen() {
 
   const unitWord = unitWordFor(asset.category);
 
-  const quick = useMemo(() => {
+  /** Porcentaje de lo disponible que representa el input actual. */
+  const currentPct =
+    inputMode === "amount"
+      ? maxCash > 0
+        ? Math.min(100, Math.max(0, (arsAmount / maxCash) * 100))
+        : 0
+      : maxQty > 0
+      ? Math.min(100, Math.max(0, (qtyAmount / maxQty) * 100))
+      : 0;
+
+  const applyPct = (pct: number) => {
+    const ratio = pct / 100;
     if (inputMode === "amount") {
-      if (isSell) {
-        return [
-          { label: "25%", value: String(Math.round(maxCash * 0.25)) },
-          { label: "50%", value: String(Math.round(maxCash * 0.5)) },
-          { label: "Todo", value: String(Math.round(maxCash)) },
-          { label: "Max", value: String(Math.round(maxCash)) },
-        ];
-      }
-      return [
-        { label: formatARS(5000), value: "5000" },
-        { label: formatARS(20000), value: "20000" },
-        { label: formatARS(100000), value: "100000" },
-        { label: "Max", value: String(Math.floor(maxCash)) },
-      ];
+      const next = Math.round(maxCash * ratio);
+      setInput(String(next));
+    } else {
+      const next = maxQty * ratio;
+      const formatted = next
+        .toFixed(4)
+        .replace(/0+$/, "")
+        .replace(/\.$/, "");
+      setInput(formatted || "0");
     }
-    // qty mode
-    if (isSell) {
-      return [
-        { label: "25%", value: (maxQty * 0.25).toFixed(4) },
-        { label: "50%", value: (maxQty * 0.5).toFixed(4) },
-        { label: "Todo", value: maxQty.toFixed(4) },
-        { label: "Max", value: maxQty.toFixed(4) },
-      ];
-    }
-    return [
-      { label: "1", value: "1" },
-      { label: "5", value: "5" },
-      { label: "10", value: "10" },
-      { label: "Max", value: maxQty.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") },
-    ];
-  }, [inputMode, isSell, maxCash, maxQty]);
+  };
 
   const handleKey = (k: string) => {
     if (k === "back") {
@@ -125,10 +117,6 @@ export default function BuyScreen() {
       }
       return p + k;
     });
-  };
-
-  const setQuick = (val: string) => {
-    setInput(val);
   };
 
   const switchInputMode = (next: InputMode) => {
@@ -278,20 +266,12 @@ export default function BuyScreen() {
           </Text>
         </View>
 
-        <View style={s.quickRow}>
-          {quick.map((q) => (
-            <Tap
-              key={q.label}
-              onPress={() => setQuick(q.value)}
-              haptic="light"
-              style={[
-                s.quickPill,
-                { backgroundColor: c.surfaceHover, borderColor: c.border },
-              ]}
-            >
-              <Text style={[s.quickText, { color: c.text }]}>{q.label}</Text>
-            </Tap>
-          ))}
+        <View style={s.sliderRow}>
+          <PercentSlider
+            value={currentPct}
+            onChange={applyPct}
+            disabled={maxCash <= 0}
+          />
         </View>
 
         <View style={s.keypad}>
@@ -458,24 +438,10 @@ const s = StyleSheet.create({
     marginTop: 4,
     letterSpacing: -0.1,
   },
-  quickRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+  sliderRow: {
+    paddingHorizontal: 28,
+    paddingTop: 8,
     paddingBottom: 2,
-  },
-  quickPill: {
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-  },
-  quickText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
   },
   keypad: {
     paddingHorizontal: 20,

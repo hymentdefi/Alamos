@@ -6,8 +6,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Animated,
-  Easing,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -31,6 +29,7 @@ import {
   type HorizontalPagerHandle,
 } from "../../../lib/components/HorizontalPager";
 import { Tap } from "../../../lib/components/Tap";
+import { isMarketOpen, marketClosedMessage } from "../../../lib/market/hours";
 
 type Filter = "todo" | AssetCategory;
 
@@ -134,10 +133,29 @@ function BaseExplore() {
     return pageRefSetters.current[id];
   }, []);
 
+  const marketOpen = isMarketOpen();
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+
+        {!marketOpen ? (
+          <View
+            style={[
+              s.closedBanner,
+              { backgroundColor: c.surfaceHover, borderColor: c.border },
+            ]}
+          >
+            <View style={[s.closedDot, { backgroundColor: c.red }]} />
+            <Text
+              style={[s.closedText, { color: c.textSecondary }]}
+              numberOfLines={2}
+            >
+              {marketClosedMessage()}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={s.searchRow}>
           <View
@@ -389,10 +407,12 @@ function MarketPage({
   );
 }
 
-/* ─── Carrusel infinito (marquee) de destacados ─── */
+/* ─── Carrusel horizontal de destacados ─── */
 
 const CARD_W = 160;
 const GAP = 12;
+/** Velocidad del auto-scroll en px/s. */
+const AUTO_SPEED = 22;
 
 function MoversMarquee({
   movers,
@@ -402,75 +422,59 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const paused = useRef(false);
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // Cada "ciclo" recorre el ancho de una copia completa.
+  const scrollRef = useRef<ScrollView>(null);
+  const posRef = useRef(0);
+  const interactingRef = useRef(false);
+  // Ancho de una copia completa; como duplicamos el contenido, al cruzarlo
+  // reseteamos la posición para simular un loop infinito.
   const loopWidth = movers.length * (CARD_W + GAP);
 
   useEffect(() => {
-    const run = () => {
-      scrollX.setValue(0);
-      animRef.current = Animated.loop(
-        Animated.timing(scrollX, {
-          toValue: -loopWidth,
-          duration: loopWidth * 40, // velocidad: ~25 px/s
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-      );
-      animRef.current.start();
+    let rafId: number;
+    let last = Date.now();
+    const tick = () => {
+      const now = Date.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      if (!interactingRef.current && loopWidth > 0) {
+        posRef.current += AUTO_SPEED * dt;
+        if (posRef.current >= loopWidth) posRef.current -= loopWidth;
+        scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
+      }
+      rafId = requestAnimationFrame(tick);
     };
-    run();
-    return () => {
-      animRef.current?.stop();
-    };
-  }, [loopWidth, scrollX]);
-
-  const handlePressIn = () => {
-    paused.current = true;
-    animRef.current?.stop();
-  };
-
-  const handlePressOut = () => {
-    // Reanudar desde donde quedó
-    paused.current = false;
-    // @ts-expect-error — Animated.Value tiene _value aunque no está tipado.
-    const current: number = scrollX._value ?? 0;
-    const remaining = loopWidth + current; // positivo
-    const ratio = remaining / loopWidth;
-    animRef.current = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scrollX, {
-          toValue: -loopWidth,
-          duration: loopWidth * 40 * ratio,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollX, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollX, {
-          toValue: -loopWidth,
-          duration: loopWidth * 40,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animRef.current.start();
-  };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [loopWidth]);
 
   return (
     <View style={s.marqueeWrap}>
-      <Animated.View
-        style={[
-          s.marqueeTrack,
-          { transform: [{ translateX: scrollX }] },
-        ]}
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.marqueeTrack}
+        scrollEventThrottle={16}
+        decelerationRate="normal"
+        onScrollBeginDrag={() => {
+          interactingRef.current = true;
+        }}
+        onScrollEndDrag={(e) => {
+          posRef.current = e.nativeEvent.contentOffset.x;
+        }}
+        onMomentumScrollEnd={(e) => {
+          posRef.current = e.nativeEvent.contentOffset.x;
+          if (loopWidth > 0 && posRef.current >= loopWidth) {
+            posRef.current -= loopWidth;
+            scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
+          }
+          interactingRef.current = false;
+        }}
+        onScroll={(e) => {
+          if (interactingRef.current) {
+            posRef.current = e.nativeEvent.contentOffset.x;
+          }
+        }}
       >
         {[...movers, ...movers].map((asset, idx) => {
           const up = asset.change >= 0;
@@ -478,8 +482,6 @@ function MoversMarquee({
             <Pressable
               key={`${asset.ticker}-${idx}`}
               onPress={() => onOpen(asset)}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
               style={[
                 s.moverCard,
                 { backgroundColor: c.surface, borderColor: c.border },
@@ -508,7 +510,7 @@ function MoversMarquee({
             </Pressable>
           );
         })}
-      </Animated.View>
+      </ScrollView>
     </View>
   );
 }
@@ -525,6 +527,28 @@ const s = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -1.2,
     marginBottom: 14,
+  },
+  closedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  closedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  closedText: {
+    flex: 1,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
   searchRow: {
     flexDirection: "row",

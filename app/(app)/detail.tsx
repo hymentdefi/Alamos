@@ -301,26 +301,20 @@ export default function DetailScreen() {
         >
           <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
         </Tap>
-        <Tap
-          style={[s.btn, { backgroundColor: c.surfaceHover }]}
-          haptic="light"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/buy",
-              params: { ticker: asset.ticker, mode: "sell" },
-            })
-          }
-          disabled={position === 0}
-        >
-          <Text
-            style={[
-              s.btnText,
-              { color: position > 0 ? c.text : c.textMuted },
-            ]}
+        {position > 0 ? (
+          <Tap
+            style={[s.btn, { backgroundColor: c.surfaceHover }]}
+            haptic="light"
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/buy",
+                params: { ticker: asset.ticker, mode: "sell" },
+              })
+            }
           >
-            Vender
-          </Text>
-        </Tap>
+            <Text style={[s.btnText, { color: c.text }]}>Vender</Text>
+          </Tap>
+        ) : null}
       </View>
     </View>
   );
