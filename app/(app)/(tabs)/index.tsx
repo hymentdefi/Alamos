@@ -39,6 +39,7 @@ import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
 type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
+type TabId = "dinero" | "portfolio";
 
 const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
@@ -67,6 +68,7 @@ function BaseHome() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
+  const [tab, setTab] = useState<TabId>("portfolio");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -182,7 +184,7 @@ function BaseHome() {
           hitSlop={8}
           haptic="selection"
         >
-          <Feather name="clock" size={18} color={c.text} />
+          <Feather name="activity" size={18} color={c.text} />
         </Tap>
       </View>
 
@@ -264,8 +266,17 @@ function BaseHome() {
           </View>
         </View>
 
-        <Dinero byCategory={byCategory} />
-        <Portfolio byCategory={byCategory} onOpen={openDetail} />
+        <View style={s.tabsWrap}>
+          <TabStrip tab={tab} onChange={setTab} />
+        </View>
+
+        <View style={s.tabContent}>
+          {tab === "dinero" ? (
+            <Dinero byCategory={byCategory} />
+          ) : (
+            <Portfolio byCategory={byCategory} onOpen={openDetail} />
+          )}
+        </View>
 
       </ScrollView>
 
@@ -361,6 +372,47 @@ function indexLabel(r: Range, index: number, length: number): string {
 
 /* ─── Subcomponentes ─── */
 
+/* ─── TabStrip Dinero / Portfolio ─── */
+function TabStrip({
+  tab,
+  onChange,
+}: {
+  tab: TabId;
+  onChange: (t: TabId) => void;
+}) {
+  const { c } = useTheme();
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "dinero", label: "Dinero" },
+    { id: "portfolio", label: "Portfolio" },
+  ];
+  return (
+    <View style={[s.tabGroup, { backgroundColor: c.surfaceHover }]}>
+      {tabs.map((t) => {
+        const active = tab === t.id;
+        return (
+          <Pressable
+            key={t.id}
+            style={[
+              s.tab,
+              active && [
+                s.tabActive,
+                { backgroundColor: c.surface, shadowColor: c.ink },
+              ],
+            ]}
+            onPress={() => onChange(t.id)}
+          >
+            <Text
+              style={[s.tabLabel, { color: active ? c.text : c.textMuted }]}
+            >
+              {t.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /* ─── Dinero: cash positions + acciones de Ingresar/Retirar ─── */
 function Dinero({
   byCategory,
@@ -381,10 +433,6 @@ function Dinero({
 
   return (
     <View style={s.sectionBlock}>
-      <View style={s.sectionHead}>
-        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>DINERO</Text>
-      </View>
-
       {ars ? (
         <View style={s.moneyRow}>
           <View style={{ flex: 1 }}>
@@ -506,8 +554,8 @@ function Portfolio({
     <View>
       {/* Header editorial: total invertido grande, rendimiento abajo */}
       <View style={s.portfolioHero}>
-        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
-          PORTFOLIO
+        <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
+          TOTAL INVERTIDO
         </Text>
         <Text style={[s.portfolioTotal, { color: c.text }]}>
           {formatARS(invested)}
@@ -750,13 +798,44 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  /* TabStrip Dinero / Portfolio */
+  tabsWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 10,
+  },
+  tabGroup: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: radius.md,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+  },
+  tabActive: {
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  tabLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  tabContent: {
+    marginTop: 4,
+  },
+
   /* Secciones editoriales (Dinero / Portfolio) */
   sectionBlock: {
-    marginTop: 36,
+    marginTop: 8,
     paddingHorizontal: 20,
-  },
-  sectionHead: {
-    marginBottom: 14,
   },
   sectionEyebrow: {
     fontFamily: fontFamily[700],
@@ -802,8 +881,14 @@ const s = StyleSheet.create({
   /* Portfolio hero */
   portfolioHero: {
     paddingHorizontal: 20,
-    marginTop: 36,
+    marginTop: 8,
     marginBottom: 20,
+  },
+  summaryEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 6,
   },
   portfolioTotal: {
     fontFamily: fontFamily[800],

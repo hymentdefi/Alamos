@@ -273,8 +273,11 @@ export default function NewsScreen() {
   }, []);
 
   const { height: screenH } = Dimensions.get("window");
-  const tabBarH = Platform.OS === "ios" ? 92 : 78;
-  const cardH = screenH - tabBarH - headerH - footerH;
+  // Alto real del nav bar flotante (island_top + island + bottom gap).
+  // iOS con home indicator ≈ 110, android ≈ 92.
+  const tabBarH = Platform.OS === "ios" ? 110 : 92;
+  const hintH = showSwipeHint ? 48 : 0;
+  const cardH = screenH - tabBarH - headerH - footerH - hintH;
 
   const filterForTab = useCallback(
     (t: { id: Category | "todas" }) =>
@@ -366,6 +369,10 @@ export default function NewsScreen() {
         </ScrollView>
       </View>
 
+      {/* Hint no-absolute arriba del pager: así la primera noticia
+          queda exactamente debajo, sin superponerse. */}
+      <SwipeHint visible={showSwipeHint} />
+
       <View style={{ flex: 1 }}>
         <HorizontalPager
           ref={pagerRef}
@@ -388,13 +395,12 @@ export default function NewsScreen() {
             />
           )}
         />
-        {/* Hint arriba-de-todo, renderizado al nivel de NewsScreen para
-            evitar el problema del FlatList PureComponent del pager, que
-            no re-renderiza sus cells cuando sólo cambia el closure. */}
-        <SwipeHint visible={showSwipeHint} />
       </View>
 
-      <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
+      <View
+        style={{ marginBottom: tabBarH }}
+        onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
+      >
         <DisclaimerFooter onOpen={() => setLegalOpen(true)} />
       </View>
 
@@ -595,6 +601,7 @@ function SwipeHint({ visible }: { visible: boolean }) {
   const { c } = useTheme();
   const opacity = useRef(new Animated.Value(0)).current;
   const bounce = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
   const [mounted, setMounted] = useState(visible);
 
   // Fade in al aparecer / fade out al descartarse. Se desmonta al terminar.
@@ -617,28 +624,51 @@ function SwipeHint({ visible }: { visible: boolean }) {
     }
   }, [visible, opacity]);
 
-  // Bounce sutil de la flecha mientras está visible.
+  // Bounce agresivo de la pill entera hacia abajo + pulse de scale
+  // mientras está visible. Se siente como un llamado de atención:
+  // "tocame y deslizá".
   useEffect(() => {
     if (!visible) return;
-    const loop = Animated.loop(
+    const bounceLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(bounce, {
-          toValue: 4,
-          duration: 720,
-          easing: Easing.inOut(Easing.quad),
+          toValue: 14,
+          duration: 440,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(bounce, {
           toValue: 0,
-          duration: 720,
-          easing: Easing.inOut(Easing.quad),
+          duration: 360,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(220),
+      ]),
+    );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1.06,
+          duration: 440,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 580,
+          easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
       ]),
     );
-    loop.start();
-    return () => loop.stop();
-  }, [visible, bounce]);
+    bounceLoop.start();
+    pulseLoop.start();
+    return () => {
+      bounceLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [visible, bounce, pulse]);
 
   if (!mounted) return null;
 
@@ -652,12 +682,15 @@ function SwipeHint({ visible }: { visible: boolean }) {
           hint.pill,
           {
             backgroundColor: c.ink,
-            transform: [{ translateY: bounce }],
+            transform: [
+              { translateY: bounce },
+              { scale: pulse },
+            ],
           },
         ]}
       >
-        <Feather name="chevron-up" size={14} color={c.bg} />
         <Text style={[hint.text, { color: c.bg }]}>Deslizá para pasar</Text>
+        <Feather name="chevrons-down" size={16} color={c.bg} />
       </Animated.View>
     </Animated.View>
   );
@@ -936,26 +969,22 @@ const card = StyleSheet.create({
 
 const hint = StyleSheet.create({
   wrap: {
-    position: "absolute",
-    top: 12,
-    left: 0,
-    right: 0,
+    paddingTop: 8,
+    paddingBottom: 6,
     alignItems: "center",
-    zIndex: 20,
   },
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    opacity: 0.85,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
   text: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.05,
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
 });
 
