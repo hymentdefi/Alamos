@@ -109,6 +109,8 @@ export const radius = {
   lg: 16,
   xl: 20,
   xxl: 28,
+  /** Radio para botones CTA grandes (height 48+). Menos redondeado que pill. */
+  btn: 18,
   pill: 999,
 } as const;
 

@@ -650,7 +650,7 @@ const s = StyleSheet.create({
   btn: {
     flex: 1,
     height: 52,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -28,6 +28,7 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
   DisclaimerFooter,
@@ -234,6 +235,8 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
   { id: "macro", label: "Macro" },
 ];
 
+const SWIPE_HINT_KEY = "news:swipe_hint_seen";
+
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -244,6 +247,7 @@ export default function NewsScreen() {
   const [headerH, setHeaderH] = useState(120);
   const [footerH, setFooterH] = useState(40);
   const [legalOpen, setLegalOpen] = useState(false);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const pagerRef = useRef<HorizontalPagerHandle>(null);
   const catScrollRef = useRef<ScrollView>(null);
   const pageListRefs = useRef<Record<string, FlatList | null>>({});
@@ -253,6 +257,28 @@ export default function NewsScreen() {
 
   const { hasAccepted, loading: consentLoading, accept } = useLegalConsent();
   const showOnboarding = !consentLoading && !hasAccepted && isFocused;
+
+  // Hint de "deslizá para pasar": solo la primera vez, una única vez.
+  useEffect(() => {
+    let cancelled = false;
+    SecureStore.getItemAsync(SWIPE_HINT_KEY)
+      .then((seen) => {
+        if (cancelled) return;
+        if (!seen) setShowSwipeHint(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissSwipeHint = useCallback(() => {
+    setShowSwipeHint((prev) => {
+      if (!prev) return prev;
+      SecureStore.setItemAsync(SWIPE_HINT_KEY, "1").catch(() => {});
+      return false;
+    });
+  }, []);
 
   const { height: screenH } = Dimensions.get("window");
   const tabBarH = Platform.OS === "ios" ? 92 : 78;
@@ -359,6 +385,8 @@ export default function NewsScreen() {
             items={filterForTab(t)}
             cardH={cardH}
             listRef={setPageRef(t.id)}
+            showSwipeHint={showSwipeHint}
+            onDismissHint={dismissSwipeHint}
             onOpenDetail={(n) => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
                 () => {},
@@ -389,11 +417,15 @@ function NewsPage({
   items,
   cardH,
   listRef,
+  showSwipeHint,
+  onDismissHint,
   onOpenDetail,
 }: {
   items: NewsItem[];
   cardH: number;
   listRef: (ref: FlatList | null) => void;
+  showSwipeHint: boolean;
+  onDismissHint: () => void;
   onOpenDetail: (n: NewsItem) => void;
 }) {
   const { c } = useTheme();
@@ -414,49 +446,54 @@ function NewsPage({
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const y = e.nativeEvent.contentOffset.y;
+      if (y > 12) onDismissHint();
       const idx = Math.round(y / cardH);
       if (idx !== activeIdxRef.current) {
         activeIdxRef.current = idx;
         Haptics.selectionAsync().catch(() => {});
       }
     },
-    [cardH],
+    [cardH, onDismissHint],
   );
 
   return (
-    <FlatList
-      ref={listRef}
-      data={items}
-      keyExtractor={(n) => n.id}
-      pagingEnabled
-      snapToInterval={cardH}
-      decelerationRate="fast"
-      showsVerticalScrollIndicator={false}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={c.textMuted}
-          colors={[c.textMuted]}
-          progressBackgroundColor={c.surface}
-        />
-      }
-      renderItem={({ item }) => (
-        <NewsCard
-          item={item}
-          height={cardH}
-          onOpenDetail={() => onOpenDetail(item)}
-        />
-      )}
-      ListEmptyComponent={
-        <View style={[s.empty, { height: cardH }]}>
-          <Text style={s.emptyTitle}>Sin noticias</Text>
-          <Text style={s.emptySub}>Probá con otra categoría.</Text>
-        </View>
-      }
-    />
+    <View style={{ flex: 1 }}>
+      <FlatList
+        ref={listRef}
+        data={items}
+        keyExtractor={(n) => n.id}
+        pagingEnabled
+        snapToInterval={cardH}
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        onScrollBeginDrag={onDismissHint}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.textMuted}
+            colors={[c.textMuted]}
+            progressBackgroundColor={c.surface}
+          />
+        }
+        renderItem={({ item }) => (
+          <NewsCard
+            item={item}
+            height={cardH}
+            onOpenDetail={() => onOpenDetail(item)}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={[s.empty, { height: cardH }]}>
+            <Text style={s.emptyTitle}>Sin noticias</Text>
+            <Text style={s.emptySub}>Probá con otra categoría.</Text>
+          </View>
+        }
+      />
+      <SwipeHint visible={showSwipeHint} />
+    </View>
   );
 }
 
@@ -503,9 +540,6 @@ function NewsCard({
 
   return (
     <View style={{ height, backgroundColor: c.bg }}>
-      {/* Scroll hint a la derecha */}
-      <ScrollHint />
-
       {/* Imagen que ocupa todo el espacio entre header y contenido */}
       <Pressable style={card.imageWrap} onPress={onOpenDetail}>
         <Animated.View
@@ -560,71 +594,77 @@ function NewsCard({
   );
 }
 
-/* ─── Indicador animado de scroll ─── */
+/* ─── Hint de primer uso: "deslizá para pasar" ─── */
 
-function ScrollHint() {
+function SwipeHint({ visible }: { visible: boolean }) {
   const { c } = useTheme();
+  const opacity = useRef(new Animated.Value(0)).current;
   const bounce = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0.4)).current;
+  const [mounted, setMounted] = useState(visible);
 
+  // Fade in al aparecer / fade out al descartarse. Se desmonta al terminar.
   useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+  }, [visible, opacity]);
+
+  // Bounce sutil de la flecha mientras está visible.
+  useEffect(() => {
+    if (!visible) return;
     const loop = Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(bounce, {
-            toValue: 10,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounce, {
-            toValue: 0,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(fade, {
-            toValue: 0.9,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(fade, {
-            toValue: 0.4,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-        ]),
+      Animated.sequence([
+        Animated.timing(bounce, {
+          toValue: 4,
+          duration: 720,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounce, {
+          toValue: 0,
+          duration: 720,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [bounce, fade]);
+  }, [visible, bounce]);
+
+  if (!mounted) return null;
 
   return (
-    <View pointerEvents="none" style={hint.wrap}>
-      <View style={hint.pill}>
-        <Animated.View
-          style={{
-            opacity: fade,
+    <Animated.View
+      pointerEvents="none"
+      style={[hint.wrap, { opacity }]}
+    >
+      <Animated.View
+        style={[
+          hint.pill,
+          {
+            backgroundColor: c.ink,
             transform: [{ translateY: bounce }],
-            alignItems: "center",
-          }}
-        >
-          <Feather
-            name="chevron-down"
-            size={18}
-            color="#FFFFFF"
-            style={{ opacity: 0.55 }}
-          />
-          <Feather
-            name="chevron-down"
-            size={18}
-            color="#FFFFFF"
-            style={{ marginTop: -10 }}
-          />
-        </Animated.View>
-      </View>
-    </View>
+          },
+        ]}
+      >
+        <Feather name="chevron-up" size={14} color={c.bg} />
+        <Text style={[hint.text, { color: c.bg }]}>Deslizá para pasar</Text>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -890,7 +930,7 @@ const card = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
   },
   readBtnText: {
     fontFamily: fontFamily[700],
@@ -902,23 +942,25 @@ const card = StyleSheet.create({
 const hint = StyleSheet.create({
   wrap: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
-    right: 14,
+    top: 12,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    justifyContent: "center",
     zIndex: 20,
   },
   pill: {
-    backgroundColor: "rgba(14,15,12,0.55)",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    opacity: 0.85,
+  },
+  text: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.05,
   },
 });
 

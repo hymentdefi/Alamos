@@ -273,7 +273,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

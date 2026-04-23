@@ -546,7 +546,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
   },
