@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet, Animated, Text } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -105,18 +106,20 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeContext.Provider value={themeValue}>
-      <AuthProvider>
-        <LegalConsentProvider>
-          <FavoritesProvider>
-            <ProProvider>
-              <StatusBar style={mode === "light" ? "dark" : "light"} />
-              <AuthGate />
-            </ProProvider>
-          </FavoritesProvider>
-        </LegalConsentProvider>
-      </AuthProvider>
-    </ThemeContext.Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeContext.Provider value={themeValue}>
+        <AuthProvider>
+          <LegalConsentProvider>
+            <FavoritesProvider>
+              <ProProvider>
+                <StatusBar style={mode === "light" ? "dark" : "light"} />
+                <AuthGate />
+              </ProProvider>
+            </FavoritesProvider>
+          </LegalConsentProvider>
+        </AuthProvider>
+      </ThemeContext.Provider>
+    </GestureHandlerRootView>
   );
 }
 
