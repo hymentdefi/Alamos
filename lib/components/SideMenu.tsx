@@ -362,7 +362,7 @@ const s = StyleSheet.create({
   proPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 0,
     marginHorizontal: 20,
     marginTop: 8,
     paddingHorizontal: 16,
@@ -382,9 +382,12 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
   },
   proPillAccent: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[700],
     fontSize: 17,
     letterSpacing: -0.3,
+    // El lockupShort tiene aire a la derecha del texto 'Alamos';
+    // compensamos con un margin negativo para que 'Pro' quede pegado.
+    marginLeft: -8,
   },
   /* Identity */
   identity: {
