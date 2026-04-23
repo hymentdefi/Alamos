@@ -72,8 +72,6 @@ function BaseHome() {
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
   const tabOpacity = useRef(new Animated.Value(1)).current;
-  const chartOpacity = useRef(new Animated.Value(1)).current;
-  const prevRangeRef = useRef<Range>("1D");
 
   useEffect(() => {
     if (tab === displayTab) return;
@@ -90,23 +88,6 @@ function BaseHome() {
       }).start();
     });
   }, [tab, displayTab, tabOpacity]);
-
-  useEffect(() => {
-    if (prevRangeRef.current === range) return;
-    prevRangeRef.current = range;
-    Animated.sequence([
-      Animated.timing(chartOpacity, {
-        toValue: 0.35,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(chartOpacity, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [range, chartOpacity]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -261,12 +242,7 @@ function BaseHome() {
           <Text style={[s.greet, { color: c.textMuted }]}>
             {firstName ? `Hola, ${firstName}` : "Hola"}
           </Text>
-          <AmountDisplay
-            value={current}
-            size={46}
-            animateOnMount
-            style={{ marginBottom: 8 }}
-          />
+          <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
           <View style={s.deltaRow}>
             <AntDesign
               name={displayIsUp ? "caret-up" : "caret-down"}
@@ -285,17 +261,16 @@ function BaseHome() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <Animated.View style={{ opacity: chartOpacity, marginTop: 18 }}>
-            <Sparkline
-              series={series}
-              color={trendColor}
-              onScrub={(idx) => setScrubIndex(idx)}
-              onScrubEnd={() => {
-                setScrubIndex(null);
-                Haptics.selectionAsync().catch(() => {});
-              }}
-            />
-          </Animated.View>
+          <Sparkline
+            series={series}
+            color={trendColor}
+            onScrub={(idx) => setScrubIndex(idx)}
+            onScrubEnd={() => {
+              setScrubIndex(null);
+              Haptics.selectionAsync().catch(() => {});
+            }}
+            style={{ marginTop: 18 }}
+          />
 
           <View style={s.rangeRow}>
             {ranges.map((r) => {
