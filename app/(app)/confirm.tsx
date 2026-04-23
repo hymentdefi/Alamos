@@ -61,9 +61,9 @@ const DONE_HOLD_MS = 1700;
 /** Longitud del path del checkmark (viewBox 0 0 24 24). */
 const CHECK_PATH_LEN = 24;
 /** Fracción del ancho de pantalla que ocupa el ring. */
-const RING_DIAMETER_FRACTION = 0.22;
-/** Stroke width como fracción del diámetro del ring. */
-const RING_STROKE_FRACTION = 0.033;
+const RING_DIAMETER_FRACTION = 0.24;
+/** Stroke width como fracción del diámetro del ring (2.5 px en ring 100). */
+const RING_STROKE_FRACTION = 0.028;
 /** Duración del loop de rotación del spinner (ms). */
 const SPIN_DURATION_MS = 1000;
 /** Circunferencia en unidades del viewBox (r=44). */
@@ -96,8 +96,10 @@ export default function ConfirmScreen() {
 
   // Ring sizing basado en el viewport actual (no Dimensions.get).
   const ringSize = Math.round(windowW * RING_DIAMETER_FRACTION);
+  // Stroke: target fijo 2.5 px en pantalla (spec), pero con floor para
+  // que en phones muy chiquitos no se vea demasiado fino.
   const ringStrokeScreen = Math.max(
-    2.2,
+    2.5,
     Math.round(ringSize * RING_STROKE_FRACTION * 10) / 10,
   );
   // Stroke en unidades del viewBox 100. El viewBox escala a ringSize px.
@@ -121,16 +123,17 @@ export default function ConfirmScreen() {
   // Rotación continua del spinner (se enciende cuando el draw termina).
   const spinDeg = useSharedValue(-90);
 
-  // Opacidades/escalas de cada texto (stacked, no condicionales).
+  // Opacidades/escalas/Y de cada texto (stacked, no condicionales).
+  // Iniciales: scale 0.82 + translateY +12 (entra desde atrás y abajo).
   const txSendingOpacity = useSharedValue(0);
-  const txSendingScale = useSharedValue(0.9);
-  const txSendingY = useSharedValue(0);
+  const txSendingScale = useSharedValue(0.82);
+  const txSendingY = useSharedValue(12);
   const txReceivedOpacity = useSharedValue(0);
-  const txReceivedScale = useSharedValue(0.9);
-  const txReceivedY = useSharedValue(0);
+  const txReceivedScale = useSharedValue(0.82);
+  const txReceivedY = useSharedValue(12);
   const txDoneOpacity = useSharedValue(0);
-  const txDoneScale = useSharedValue(0.9);
-  const txDoneY = useSharedValue(0);
+  const txDoneScale = useSharedValue(0.82);
+  const txDoneY = useSharedValue(12);
 
   // Morph logo→check.
   const logoOpacity = useSharedValue(1);
@@ -163,9 +166,9 @@ export default function ConfirmScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinnerRunning]);
 
-  /** Anima out el texto actual + in el siguiente usando escalas (z-depth)
-   * y translateY sutil. Sin spring — timings con easings específicos.
-   * Todo queda montado: stackeamos y animamos opacidad/scale. */
+  /** Cross-fade de textos con z-depth fuerte. El saliente sube y se
+   * desvanece; el entrante viene desde abajo con scale y translateY.
+   * Ambos 400 ms — deliberadamente lentos (feel Robinhood). */
   const crossfadeText = (
     fromOpacity: SharedValueOf<number>,
     fromScale: SharedValueOf<number>,
@@ -174,28 +177,34 @@ export default function ConfirmScreen() {
     toScale: SharedValueOf<number>,
     toY: SharedValueOf<number>,
   ) => {
-    // Saliente: 200 ms ease-in.
+    // Saliente: 400 ms ease-in, sube ligeramente (-8) mientras hace fade.
     fromOpacity.value = withTiming(0, {
-      duration: 200,
+      duration: 400,
       easing: Easing.in(Easing.quad),
     });
     fromScale.value = withTiming(0.95, {
-      duration: 200,
+      duration: 400,
       easing: Easing.in(Easing.quad),
     });
-    fromY.value = withTiming(-4, {
-      duration: 200,
+    fromY.value = withTiming(-8, {
+      duration: 400,
       easing: Easing.in(Easing.quad),
     });
-    // Entrante: 250 ms ease-out-expo (scale 0.90→1.0 da z-depth).
-    toY.value = 0;
-    toScale.value = 0.9;
+    // Entrante: 400 ms ease-out-expo. scale 0.82→1 + translateY +12→0.
+    // El recorrido simultáneo de scale y Y es lo que da el "viene desde
+    // atrás y abajo" que tiene Robinhood.
+    toScale.value = 0.82;
+    toY.value = 12;
     toOpacity.value = withTiming(1, {
-      duration: 250,
+      duration: 400,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
     toScale.value = withTiming(1, {
-      duration: 250,
+      duration: 400,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    toY.value = withTiming(0, {
+      duration: 400,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
   };
@@ -203,44 +212,51 @@ export default function ConfirmScreen() {
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // ─── Entry staggered ──────────────────────────────────────────
-    // t=0: logo con spring (overshoot visible, dampingRatio ~0.65).
+    // ─── Entry staggered (secuencia ~1.6 s) ────────────────────────
+    // t=0: logo con spring lento (stiffness 120 = se ve todo el
+    // recorrido, no un pop). Viene desde translateY +80.
     logoEntry.value = withSpring(1, {
       mass: 1,
-      stiffness: 180,
-      damping: 14,
+      stiffness: 120,
+      damping: 16,
     });
-    // t=250: circulo se dibuja (strokeDashoffset) + orbit rotation.
-    //   ease-out-quint para desaceleración suave.
+    // t=300: círculo se dibuja (strokeDashoffset) + orbit rotation.
+    // Duración 1100 ms ease-out-quint.
     circleDraw.value = withDelay(
-      250,
+      300,
       withTiming(
         1,
-        { duration: 900, easing: Easing.bezier(0.22, 1, 0.36, 1) },
+        { duration: 1100, easing: Easing.bezier(0.22, 1, 0.36, 1) },
         (finished) => {
           "worklet";
           if (finished) {
-            // Al terminar el draw arrancamos el spinner loop (transición
-            // a la rotación continua).
             runOnJS(setSpinnerRunning)(true);
           }
         },
       ),
     );
-    // t=350: texto con z-depth. Primero settear el valor inicial del
-    // estado "sending" y animarlo in.
-    txSendingScale.value = 0.88;
+    // t=600: texto "Orden Enviada..." con z-depth fuerte (scale
+    // 0.82 → 1.0 + translateY +12 → 0) en 450 ms ease-out-expo.
+    txSendingScale.value = 0.82;
+    txSendingY.value = 12;
     txSendingOpacity.value = withDelay(
-      350,
+      600,
       withTiming(1, {
-        duration: 280,
+        duration: 450,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
       }),
     );
     txSendingScale.value = withDelay(
-      350,
+      600,
       withTiming(1, {
-        duration: 280,
+        duration: 450,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+      }),
+    );
+    txSendingY.value = withDelay(
+      600,
+      withTiming(0, {
+        duration: 450,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
       }),
     );
@@ -353,7 +369,8 @@ export default function ConfirmScreen() {
     };
   });
 
-  // ── Entry: logo cae con rotate + scale ──
+  // ── Entry: logo "planea" desde abajo con rotate + scale ──
+  // translateY de +80 → 0 para que se vea el recorrido (no pop).
   const logoEntryStyle = useAnimatedStyle(() => ({
     opacity: logoEntry.value,
     transform: [
@@ -372,7 +389,7 @@ export default function ConfirmScreen() {
         translateY: interpolate(
           logoEntry.value,
           [0, 1],
-          [30, 0],
+          [80, 0],
           Extrapolation.CLAMP,
         ),
       },
@@ -592,8 +609,8 @@ export default function ConfirmScreen() {
             { paddingTop: insets.top, paddingBottom: insets.bottom },
           ]}
         >
-          {/* flex 1: spacer top */}
-          <View style={{ flex: 1 }} />
+          {/* flex 1.2: spacer top */}
+          <View style={{ flex: 1.2 }} />
 
           {/* flex 3: hero (ring + logo + check) */}
           <View style={s.hero}>
@@ -718,21 +735,26 @@ export default function ConfirmScreen() {
             </View>
           </View>
 
-          {/* flex 2: texto stackeado (3 Animated.Text en el mismo slot) */}
+          {/* flex 3: texto en la parte alta de la zona (15% del tope del
+              propio flex). Los 3 Animated.Text siempre montados en el
+              mismo slot, stacked con position absolute. */}
           <View style={s.textStack}>
-            <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
-              Orden Enviada...
-            </Animated.Text>
-            <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
-              Orden Recibida...
-            </Animated.Text>
-            <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
-              Orden Ejecutada
-            </Animated.Text>
+            <View style={{ flex: 0.15 }} />
+            <View style={s.textSlot}>
+              <Animated.Text style={[s.execText, s.textAbs, txSendingStyle]}>
+                Orden Enviada...
+              </Animated.Text>
+              <Animated.Text style={[s.execText, s.textAbs, txReceivedStyle]}>
+                Orden Recibida...
+              </Animated.Text>
+              <Animated.Text style={[s.execText, s.textAbs, txDoneStyle]}>
+                Orden Ejecutada
+              </Animated.Text>
+            </View>
           </View>
 
-          {/* flex 2: spacer bottom (aire premium) */}
-          <View style={{ flex: 2 }} />
+          {/* flex 1.5: spacer bottom (aire premium) */}
+          <View style={{ flex: 1.5 }} />
         </View>
       ) : null}
     </View>
@@ -853,9 +875,10 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
   },
-  /* Hero: ocupa flex 3 del overlay, centra el ring vertical y horiz. */
+  /* Hero: ocupa flex 2 del overlay, centra el ring vertical y horiz.
+     (el texto va en flex 3 debajo, con paddingTop del 15%). */
   hero: {
-    flex: 3,
+    flex: 2,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -871,26 +894,33 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Slot del texto: flex 2, los 3 Animated.Text stackeados dentro. */
+  /* Slot del texto: flex 3 con un inner flex 0.15 arriba que actúa
+     como paddingTop del 15% de la zona. El textSlot contiene los 3
+     Animated.Text stackeados con position absolute. */
   textStack: {
-    flex: 2,
+    flex: 3,
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingTop: 28,
+  },
+  textSlot: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    position: "relative",
   },
   textAbs: {
     position: "absolute",
-    top: 28,
+    top: 0,
     left: 0,
     right: 0,
   },
   execText: {
     fontFamily: fontFamily[600],
-    fontSize: 28,
+    fontSize: 34,
     color: "#FFFFFF",
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
     textAlign: "center",
     paddingHorizontal: 24,
+    lineHeight: 40,
   },
 });
