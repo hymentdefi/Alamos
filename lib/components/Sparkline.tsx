@@ -193,6 +193,40 @@ function computePath(series: number[]): {
   return { points, d, fillD };
 }
 
+interface MiniProps {
+  series: number[];
+  color: string;
+  width?: number;
+  height?: number;
+  strokeWidth?: number;
+}
+
+/**
+ * Sparkline chica y pasiva para mostrar al costado de un precio en una lista.
+ * Sin pan responder, sin fill, sin ejes — sólo el trazo.
+ */
+export function MiniSparkline({
+  series,
+  color,
+  width = 56,
+  height = 24,
+  strokeWidth = 1.6,
+}: MiniProps) {
+  const d = useMemo(() => computePath(series).d, [series]);
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${VB_W} ${VB_H}`}>
+      <Path
+        d={d}
+        stroke={color}
+        strokeWidth={(strokeWidth * VB_W) / width}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /** Genera una serie determinística a partir de un seed y tendencia. */
 export function seriesFromSeed(
   seed: string,

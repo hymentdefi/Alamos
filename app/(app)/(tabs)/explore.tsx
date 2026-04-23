@@ -22,6 +22,7 @@ import {
   type AssetCategory,
 } from "../../../lib/data/assets";
 import { useFavorites } from "../../../lib/favorites/context";
+import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 import { useProMode } from "../../../lib/pro/context";
 import { Tap } from "../../../lib/components/Tap";
@@ -35,6 +36,7 @@ const filters: { id: Filter; label: string }[] = [
   { id: "bonos", label: "Bonos" },
   { id: "fci", label: "Fondos" },
   { id: "acciones", label: "Acciones" },
+  { id: "cripto", label: "Cripto" },
   { id: "obligaciones", label: "ONs" },
   { id: "letras", label: "Letras" },
   { id: "caucion", label: "Caución" },
@@ -360,6 +362,16 @@ function MarketPage({
                     {asset.subLabel}
                   </Text>
                 </View>
+                <View style={s.rowChart}>
+                  <MiniSparkline
+                    series={seriesFromSeed(
+                      asset.ticker,
+                      28,
+                      asset.change >= 0 ? "up" : "down",
+                    )}
+                    color={asset.change >= 0 ? c.greenDark : c.red}
+                  />
+                </View>
                 <View style={{ alignItems: "flex-end" }}>
                   <Text style={[s.rowPrice, { color: c.text }]}>
                     {formatARS(asset.price)}
@@ -611,6 +623,13 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 13,
     marginTop: 2,
+  },
+  rowChart: {
+    width: 56,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4,
   },
   rowPrice: {
     fontFamily: fontFamily[700],

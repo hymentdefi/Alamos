@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   Easing,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +21,10 @@ import { useAuth } from "../auth/context";
 import { useProMode } from "../pro/context";
 
 const { width: SCREEN_W } = Dimensions.get("window");
-const PANEL_W = Math.min(SCREEN_W * 0.88, 380);
+// Panel ocupa el 100% de la pantalla — sin dejar un borde a la derecha.
+const PANEL_W = SCREEN_W;
+// Umbral de arrastre para cerrar con swipe-a-la-izquierda.
+const CLOSE_THRESHOLD = SCREEN_W * 0.25;
 
 interface Props {
   visible: boolean;
@@ -43,40 +47,81 @@ export function SideMenu({ visible, onClose }: Props) {
 
   const [rendered, setRendered] = useState(visible);
   const tx = useRef(new Animated.Value(-PANEL_W)).current;
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setRendered(true);
-      Animated.parallel([
-        Animated.timing(tx, {
-          toValue: 0,
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      Animated.spring(tx, {
+        toValue: 0,
+        tension: 70,
+        friction: 14,
+        restSpeedThreshold: 0.5,
+        restDisplacementThreshold: 0.5,
+        useNativeDriver: true,
+      }).start();
     } else if (rendered) {
-      Animated.parallel([
-        Animated.timing(tx, {
-          toValue: -PANEL_W,
-          duration: 220,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start(() => setRendered(false));
+      Animated.timing(tx, {
+        toValue: -PANEL_W,
+        duration: 240,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setRendered(false);
+      });
     }
-  }, [visible, rendered, tx, overlayOpacity]);
+  }, [visible, rendered, tx]);
+
+  // Swipe-a-la-izquierda sobre el panel para cerrarlo: el panel sigue
+  // al dedo durante el drag y al soltar se anima hasta el borde.
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy),
+        onMoveShouldSetPanResponderCapture: (_, g) =>
+          g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderMove: (_, g) => {
+          if (g.dx < 0) tx.setValue(g.dx);
+          else tx.setValue(0);
+        },
+        onPanResponderRelease: (_, g) => {
+          const shouldClose = g.dx < -CLOSE_THRESHOLD || g.vx < -0.6;
+          if (shouldClose) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+              () => {},
+            );
+            Animated.timing(tx, {
+              toValue: -PANEL_W,
+              duration: 220,
+              easing: Easing.in(Easing.cubic),
+              useNativeDriver: true,
+            }).start(({ finished }) => {
+              if (finished) {
+                setRendered(false);
+                onClose();
+              }
+            });
+          } else {
+            Animated.spring(tx, {
+              toValue: 0,
+              tension: 90,
+              friction: 14,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(tx, {
+            toValue: 0,
+            tension: 90,
+            friction: 14,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [tx, onClose],
+  );
 
   if (!rendered) return null;
 
@@ -163,26 +208,14 @@ export function SideMenu({ visible, onClose }: Props) {
     >
       <Animated.View
         style={[
-          s.overlay,
-          {
-            opacity: overlayOpacity,
-            backgroundColor: "rgba(14,15,12,0.45)",
-          },
-        ]}
-      >
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
           s.panel,
           {
             width: PANEL_W,
             backgroundColor: c.bg,
             transform: [{ translateX: tx }],
-            shadowOffset: { width: 6, height: 0 },
           },
         ]}
+        {...panResponder.panHandlers}
       >
         <ScrollView
           contentContainerStyle={{
@@ -311,18 +344,11 @@ export function SideMenu({ visible, onClose }: Props) {
 }
 
 const s = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
   panel: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
   },
   closeRow: {
     flexDirection: "row",
