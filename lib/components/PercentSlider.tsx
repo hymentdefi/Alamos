@@ -45,7 +45,11 @@ export function PercentSlider({
   const pctFromX = useCallback(
     (x: number) => {
       if (trackW <= 0) return value;
-      const clamped = Math.max(0, Math.min(trackW, x));
+      // x viene relativo al touchPad (full-width), pero el track empieza
+      // THUMB_SIZE/2 adentro — le restamos el offset para convertirlo
+      // a coordenada del track.
+      const xInTrack = x - THUMB_SIZE / 2;
+      const clamped = Math.max(0, Math.min(trackW, xInTrack));
       let pct = (clamped / trackW) * 100;
       for (const s of SNAPS) {
         if (Math.abs(pct - s) < SNAP_TOLERANCE) {
@@ -94,16 +98,19 @@ export function PercentSlider({
 
   return (
     <View style={s.wrap}>
-      <View style={s.touchPad}>
+      <View
+        style={s.touchPad}
+        onStartShouldSetResponder={() => !disabled}
+        onMoveShouldSetResponder={() => !disabled}
+        onResponderGrant={onGrant}
+        onResponderMove={onMove}
+        onResponderRelease={onEnd}
+        onResponderTerminate={onEnd}
+      >
         <View
           style={s.trackArea}
+          pointerEvents="none"
           onLayout={(e) => setTrackW(e.nativeEvent.layout.width)}
-          onStartShouldSetResponder={() => !disabled}
-          onMoveShouldSetResponder={() => !disabled}
-          onResponderGrant={onGrant}
-          onResponderMove={onMove}
-          onResponderRelease={onEnd}
-          onResponderTerminate={onEnd}
         >
           {/* Línea fina de fondo */}
           <View
