@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
-  Pressable,
   StyleSheet,
   type GestureResponderEvent,
 } from "react-native";
@@ -90,13 +89,6 @@ export function PercentSlider({
     onRelease?.(pct);
   };
 
-  const onLabelTap = (v: number) => {
-    if (disabled) return;
-    Haptics.selectionAsync().catch(() => {});
-    onChange(v);
-    onRelease?.(v);
-  };
-
   const thumbLeft = (value / 100) * trackW;
   const pctRounded = Math.round(value);
 
@@ -172,32 +164,6 @@ export function PercentSlider({
             </View>
           ) : null}
         </View>
-      </View>
-
-      <View style={s.labelsRow}>
-        {SNAPS.map((v) => {
-          const active = Math.abs(value - v) < 0.5;
-          return (
-            <Pressable
-              key={v}
-              onPress={() => onLabelTap(v)}
-              hitSlop={8}
-              style={s.labelHit}
-            >
-              <Text
-                style={[
-                  s.label,
-                  {
-                    color: active ? c.text : c.textMuted,
-                    fontFamily: active ? fontFamily[700] : fontFamily[600],
-                  },
-                ]}
-              >
-                {v}%
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
     </View>
   );
@@ -284,19 +250,5 @@ const s = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     marginTop: -1,
-  },
-  labelsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 2,
-    marginTop: 2,
-  },
-  labelHit: {
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-  },
-  label: {
-    fontSize: 12,
-    letterSpacing: -0.1,
   },
 });

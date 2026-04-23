@@ -19,7 +19,13 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
       <Stack.Screen name="detail" />
       <Stack.Screen name="trade" />
-      <Stack.Screen name="buy" />
+      {/* Buy: fullscreen gesture OFF para que arrastrar el slider no
+          dispare el swipe-back. El swipe desde el borde izquierdo sigue
+          andando como back. */}
+      <Stack.Screen
+        name="buy"
+        options={{ fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen
         name="confirm"
         options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
