@@ -8,9 +8,16 @@ import {
   Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Stop,
+} from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import Animated, {
   Easing,
@@ -97,10 +104,10 @@ export default function ConfirmScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusText, setStatusText] = useState("");
 
-  // Spinner loop — 1000 ms por vuelta (Robinhood ~900-1100).
+  // Spinner loop — 1100 ms por vuelta (spec).
   useEffect(() => {
     spinDeg.value = withRepeat(
-      withTiming(360, { duration: 1000, easing: Easing.linear }),
+      withTiming(360, { duration: 1100, easing: Easing.linear }),
       -1,
       false,
     );
@@ -135,9 +142,11 @@ export default function ConfirmScreen() {
   const runOrderFlow = async () => {
     setPhase("sending");
 
-    // Fade-in del overlay entero (UI thread).
+    // Entry del grupo circulo+logo+texto: fade + scale 0.9→1.0 en
+    // 200 ms ease-out. Va atado a overlayOpacity (la misma sharedValue
+    // también drivea el scale vía interpolate en overlayStyle).
     overlayOpacity.value = withTiming(1, {
-      duration: 340,
+      duration: 200,
       easing: Easing.out(Easing.quad),
     });
 
@@ -226,8 +235,19 @@ export default function ConfirmScreen() {
     };
   });
 
+  // Overlay entra con fade + scale (0.9 → 1.0) en 200 ms ease-out.
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: overlayOpacity.value,
+    transform: [
+      {
+        scale: interpolate(
+          overlayOpacity.value,
+          [0, 1],
+          [0.9, 1],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
   }));
 
   const statusStyle = useAnimatedStyle(() => ({
@@ -296,8 +316,14 @@ export default function ConfirmScreen() {
     },
   ];
 
+  // Status bar: si estamos en fase "idle" respetamos el tema (la card es
+  // blanca); en cualquier otra fase el verde full-bleed necesita iconos
+  // blancos (light).
+  const statusBarStyle = phase === "idle" ? "dark" : "light";
+
   return (
     <View style={[s.root, { backgroundColor: brand.green }]}>
+      <StatusBar style={statusBarStyle} translucent />
       {/* Card blanca con contenido */}
       <View
         style={[
@@ -402,34 +428,70 @@ export default function ConfirmScreen() {
         </View>
       ) : null}
 
-      {/* Overlay de ejecución — todo con reanimated shared values. */}
+      {/* Overlay de ejecución — todo con reanimated shared values.
+          Layout: grupo círculo+logo+texto en el tercio superior (top
+          del círculo ~38% del safe-area), sin disclaimer. El aire
+          abajo es intencional. */}
       {phase !== "idle" ? (
         <Animated.View
           pointerEvents="none"
           style={[s.execOverlay, overlayStyle]}
         >
-          <View style={{ height: SCREEN_H * 0.33 }} />
+          <View
+            style={{
+              height:
+                insets.top +
+                (SCREEN_H - insets.top - insets.bottom) * 0.38,
+            }}
+          />
 
           <View style={s.logoWrap}>
-            {/* Spinning arc (sending/received) — rotación native thread. */}
+            {/* Spinning arc (sending/received) con gradiente radial
+                transparent→white para simular el "tirón" del leading
+                edge. Al rotar, el gradient rota también. */}
             <Animated.View style={[s.spinnerWrap, spinnerStyle]}>
-              <Svg width={140} height={140} viewBox="0 0 100 100">
+              <Svg width={80} height={80} viewBox="0 0 100 100">
+                <Defs>
+                  <SvgLinearGradient
+                    id="arcGrad"
+                    x1="0"
+                    y1="50"
+                    x2="100"
+                    y2="50"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <Stop
+                      offset="0"
+                      stopColor="#FFFFFF"
+                      stopOpacity="0"
+                    />
+                    <Stop
+                      offset="1"
+                      stopColor="#FFFFFF"
+                      stopOpacity="0.9"
+                    />
+                  </SvgLinearGradient>
+                </Defs>
+                {/* Track: apenas sugerido (13%). */}
                 <Circle
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="rgba(255,255,255,0.22)"
+                  stroke="rgba(255,255,255,0.13)"
                   strokeWidth="3"
                   fill="none"
                 />
+                {/* Arco activo: ~100° visible (75 de 276 de circunferencia),
+                    strokeWidth 3 en viewBox = 2.4 px en pantalla (fino y
+                    elegante). Gradient del transparente al blanco 90%. */}
                 <Circle
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="#FFFFFF"
-                  strokeWidth="3.5"
+                  stroke="url(#arcGrad)"
+                  strokeWidth="3"
                   fill="none"
-                  strokeDasharray="100 176"
+                  strokeDasharray="75 201"
                   strokeLinecap="round"
                 />
               </Svg>
@@ -437,19 +499,20 @@ export default function ConfirmScreen() {
 
             {/* Full circle estático (done) — cross-fade con el arc. */}
             <Animated.View style={[s.spinnerWrap, fullCircleStyle]}>
-              <Svg width={140} height={140} viewBox="0 0 100 100">
+              <Svg width={80} height={80} viewBox="0 0 100 100">
                 <Circle
                   cx="50"
                   cy="50"
                   r="44"
                   stroke="#FFFFFF"
-                  strokeWidth="3.5"
+                  strokeOpacity="0.9"
+                  strokeWidth="3"
                   fill="none"
                 />
               </Svg>
             </Animated.View>
 
-            {/* Logo Alamos (~60% del diámetro) — se apaga al morph. */}
+            {/* Logo Alamos — sólido blanco, ~60% del diámetro interior. */}
             <Animated.View style={[s.logoOverlay, logoStyle]}>
               <Image
                 source={require("../../assets/brand-assets/empresa-mono/png/brand-mono-white-isotipo-1024.png")}
@@ -458,14 +521,13 @@ export default function ConfirmScreen() {
               />
             </Animated.View>
 
-            {/* Checkmark — scale + opacity en UI thread; stroke-draw via
-                useAnimatedProps sobre el Path. */}
+            {/* Checkmark — stroke-draw via useAnimatedProps. */}
             <Animated.View style={[s.logoOverlay, checkStyle]}>
-              <Svg width={78} height={78} viewBox="0 0 24 24">
+              <Svg width={46} height={46} viewBox="0 0 24 24">
                 <AnimatedPath
                   d="M5 12 L10 17 L19 7"
                   stroke="#FFFFFF"
-                  strokeWidth={3}
+                  strokeWidth={2.5}
                   fill="none"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -476,22 +538,12 @@ export default function ConfirmScreen() {
             </Animated.View>
           </View>
 
-          <View style={{ height: SCREEN_H * 0.08 }} />
+          {/* Gap fijo de 28 px entre círculo y texto (spec). */}
+          <View style={{ height: 28 }} />
 
           <Animated.Text style={[s.execText, statusStyle]}>
             {statusText}
           </Animated.Text>
-
-          <View style={{ flex: 1 }} />
-
-          <View style={[s.disclaimerWrap, { paddingBottom: insets.bottom + 24 }]}>
-            <Text style={s.disclaimerText}>
-              La respuesta del sistema, el precio y velocidad de ejecución, la
-              liquidez, los datos del mercado y los tiempos de acceso pueden
-              verse afectados por muchos factores, incluidos la volatilidad, el
-              tamaño y tipo de orden, y las condiciones del mercado.
-            </Text>
-          </View>
         </Animated.View>
       ) : null}
     </View>
@@ -613,15 +665,15 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   logoWrap: {
-    width: 140,
-    height: 140,
+    width: 80,
+    height: 80,
     alignItems: "center",
     justifyContent: "center",
   },
   spinnerWrap: {
     position: "absolute",
-    width: 140,
-    height: 140,
+    width: 80,
+    height: 80,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -631,32 +683,20 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   logoImg: {
-    // ~60% del diámetro interior del spinner (radio 44 en viewBox 100,
-    // escala 1.4x → ~123 px interior → 60% ≈ 78 px).
-    width: 78,
-    height: 78,
+    // ~60% del diámetro del spinner (80 * 0.6 ≈ 48; bumpeamos a 52 para
+    // que el mark se sienta sólido, no chiquito).
+    width: 52,
+    height: 52,
     tintColor: "#FFFFFF",
   },
   execText: {
-    fontFamily: fontFamily[700],
-    fontSize: 30,
+    // Status text: 22 px, weight 600 (SemiBold), letter-spacing -0.2,
+    // blanco puro. Corto y premium.
+    fontFamily: fontFamily[600],
+    fontSize: 22,
     color: "#FFFFFF",
-    letterSpacing: -0.7,
+    letterSpacing: -0.2,
     textAlign: "center",
     paddingHorizontal: 24,
-  },
-
-  /* Disclaimer al pie del overlay */
-  disclaimerWrap: {
-    paddingHorizontal: 24,
-    alignItems: "center",
-  },
-  disclaimerText: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    lineHeight: 22,
-    color: "rgba(255,255,255,0.88)",
-    textAlign: "center",
-    letterSpacing: -0.1,
   },
 });
