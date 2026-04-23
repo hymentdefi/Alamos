@@ -24,6 +24,9 @@ interface Props {
   withFill?: boolean;
   /** Grosor del trazo. Default 2.4. */
   strokeWidth?: number;
+  /** Suavizado con cubic bezier. Default true. En false usa L — picos
+   * filosos estilo Robinhood. */
+  smooth?: boolean;
   /** Callback mientras el usuario arrastra el dedo sobre el chart. */
   onScrub?: (index: number, value: number) => void;
   onScrubStart?: () => void;
@@ -42,6 +45,7 @@ export function Sparkline({
   height = 140,
   withFill = true,
   strokeWidth = 2.4,
+  smooth = true,
   onScrub,
   onScrubStart,
   onScrubEnd,
@@ -51,7 +55,10 @@ export function Sparkline({
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const lastIndexRef = useRef<number | null>(null);
 
-  const { points, d, fillD } = useMemo(() => computePath(series), [series]);
+  const { points, d, fillD } = useMemo(
+    () => computePath(series, smooth),
+    [series, smooth],
+  );
 
   const xToIndex = (x: number): number => {
     if (!layoutWidth || series.length === 0) return 0;
@@ -165,7 +172,10 @@ export function Sparkline({
   );
 }
 
-function computePath(series: number[]): {
+function computePath(
+  series: number[],
+  smooth = true,
+): {
   points: { x: number; y: number }[];
   d: string;
   fillD: string;
@@ -183,13 +193,20 @@ function computePath(series: number[]): {
     return { x, y };
   });
 
-  // Smooth cubic through midpoints for natural curve
   let d = `M${points[0].x},${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const cx = (prev.x + curr.x) / 2;
-    d += ` C${cx},${prev.y} ${cx},${curr.y} ${curr.x},${curr.y}`;
+  if (smooth) {
+    // Smooth cubic through midpoints for natural curve.
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const cx = (prev.x + curr.x) / 2;
+      d += ` C${cx},${prev.y} ${cx},${curr.y} ${curr.x},${curr.y}`;
+    }
+  } else {
+    // Trazo lineal — picos filosos estilo Robinhood.
+    for (let i = 1; i < points.length; i++) {
+      d += ` L${points[i].x},${points[i].y}`;
+    }
   }
 
   const fillD = `${d} L${points[points.length - 1].x},${VB_H} L${points[0].x},${VB_H} Z`;

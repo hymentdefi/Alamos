@@ -301,7 +301,8 @@ function BaseHome() {
             color={chartColor}
             height={260}
             withFill={false}
-            strokeWidth={3.4}
+            strokeWidth={2.2}
+            smooth={false}
             onScrub={(idx) => setScrubIndex(idx)}
             onScrubEnd={() => setScrubIndex(null)}
             style={{ marginTop: 18 }}
