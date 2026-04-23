@@ -419,9 +419,9 @@ const s = StyleSheet.create({
   },
   heroValue: {
     fontFamily: fontFamily[800],
-    fontSize: 56,
-    letterSpacing: -2.2,
-    lineHeight: 62,
+    fontSize: 64,
+    letterSpacing: -0.8,
+    lineHeight: 70,
     textAlign: "center",
     includeFontPadding: false,
   },
@@ -438,7 +438,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
   sliderRow: {
-    paddingHorizontal: 28,
+    paddingHorizontal: 56,
     paddingTop: 8,
     paddingBottom: 2,
   },
