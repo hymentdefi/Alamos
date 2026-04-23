@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   Easing,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import {
+  PanGestureHandler,
+  State,
+  type PanGestureHandlerGestureEvent,
+  type PanGestureHandlerStateChangeEvent,
+} from "react-native-gesture-handler";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -71,64 +76,51 @@ export function SideMenu({ visible, onClose }: Props) {
     }
   }, [visible, rendered, tx]);
 
-  // Swipe-a-la-izquierda sobre el panel para cerrarlo: el panel sigue
-  // al dedo durante el drag y al soltar se anima hasta el borde. Usamos
-  // capture para ganarle al ScrollView interno desde el primer ε de
-  // movimiento horizontal — si esperamos mucho, iOS le da el gesto al
-  // scroll vertical y nunca podemos reclaimearlo.
-  const panResponder = useMemo(() => {
-    const isHorizontalLeft = (dx: number, dy: number) =>
-      dx < -4 && Math.abs(dx) > Math.abs(dy) * 1.1;
+  // Swipe-a-la-izquierda sobre el panel para cerrarlo. Usamos
+  // PanGestureHandler de react-native-gesture-handler porque convive
+  // mucho mejor con el ScrollView interno que PanResponder: los
+  // activeOffsetX / failOffsetY se evalúan a nivel nativo y resuelven
+  // el conflicto de gestos sin esperar al JS.
+  const onGestureEvent = (e: PanGestureHandlerGestureEvent) => {
+    const { translationX } = e.nativeEvent;
+    if (translationX < 0) tx.setValue(translationX);
+    else tx.setValue(0);
+  };
 
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, g) => isHorizontalLeft(g.dx, g.dy),
-      onMoveShouldSetPanResponderCapture: (_, g) =>
-        isHorizontalLeft(g.dx, g.dy),
-      // Una vez capturado el gesto, no lo soltamos — si no, el ScrollView
-      // lo vuelve a reclamar y el swipe-to-close queda muerto.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, g) => {
-        if (g.dx < 0) tx.setValue(g.dx);
-        else tx.setValue(0);
-      },
-      onPanResponderRelease: (_, g) => {
-        const shouldClose = g.dx < -CLOSE_THRESHOLD || g.vx < -0.5;
-        if (shouldClose) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-            () => {},
-          );
-          Animated.timing(tx, {
-            toValue: -PANEL_W,
-            duration: 220,
-            easing: Easing.in(Easing.cubic),
-            useNativeDriver: true,
-          }).start(({ finished }) => {
-            if (finished) {
-              setRendered(false);
-              onClose();
-            }
-          });
-        } else {
-          Animated.spring(tx, {
-            toValue: 0,
-            tension: 90,
-            friction: 14,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
+  const onHandlerStateChange = (e: PanGestureHandlerStateChangeEvent) => {
+    if (
+      e.nativeEvent.state === State.END ||
+      e.nativeEvent.state === State.CANCELLED ||
+      e.nativeEvent.state === State.FAILED
+    ) {
+      const tX = e.nativeEvent.translationX ?? 0;
+      const vX = e.nativeEvent.velocityX ?? 0;
+      const shouldClose = tX < -CLOSE_THRESHOLD || vX < -500;
+      if (shouldClose) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+          () => {},
+        );
+        Animated.timing(tx, {
+          toValue: -PANEL_W,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished) {
+            setRendered(false);
+            onClose();
+          }
+        });
+      } else {
         Animated.spring(tx, {
           toValue: 0,
           tension: 90,
           friction: 14,
           useNativeDriver: true,
         }).start();
-      },
-    });
-  }, [tx, onClose]);
+      }
+    }
+  };
 
   if (!rendered) return null;
 
@@ -218,18 +210,25 @@ export function SideMenu({ visible, onClose }: Props) {
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View
-        style={[
-          s.panel,
-          {
-            width: PANEL_W,
-            backgroundColor: c.bg,
-            transform: [{ translateX: tx }],
-          },
-        ]}
-        {...panResponder.panHandlers}
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        // Sólo activar cuando el gesto es claramente horizontal-izquierda.
+        // Esto evita que se active durante scroll vertical.
+        activeOffsetX={[-10, 9999]}
+        failOffsetY={[-20, 20]}
       >
-        <ScrollView
+        <Animated.View
+          style={[
+            s.panel,
+            {
+              width: PANEL_W,
+              backgroundColor: c.bg,
+              transform: [{ translateX: tx }],
+            },
+          ]}
+        >
+          <ScrollView
           contentContainerStyle={{
             paddingTop: insets.top + 12,
             paddingBottom: insets.bottom + 40,
@@ -333,7 +332,8 @@ export function SideMenu({ visible, onClose }: Props) {
             <Text style={[s.logoutText, { color: c.red }]}>Cerrar sesión</Text>
           </Pressable>
         </ScrollView>
-      </Animated.View>
+        </Animated.View>
+      </PanGestureHandler>
     </Modal>
   );
 }

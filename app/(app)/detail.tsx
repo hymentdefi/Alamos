@@ -123,6 +123,25 @@ export default function DetailScreen() {
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Banner de mercado cerrado — arriba de todo, sólo si el activo
+            cotiza en horario BYMA (crypto opera 24/7 así que lo omitimos). */}
+        {!isMarketOpen() && asset.category !== "crypto" ? (
+          <View
+            style={[
+              s.closedBanner,
+              { backgroundColor: c.surfaceHover, borderColor: c.border },
+            ]}
+          >
+            <View style={[s.closedDot, { backgroundColor: c.green }]} />
+            <Text
+              style={[s.closedText, { color: c.textSecondary }]}
+              numberOfLines={2}
+            >
+              {marketClosedMessage()}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={s.heroBlock}>
           <View style={s.identRow}>
             <View
@@ -200,25 +219,6 @@ export default function DetailScreen() {
             })}
           </View>
         </View>
-
-        {/* Banner de mercado cerrado — sólo si el activo cotiza en horario
-            BYMA. Crypto opera 24/7 así que lo omitimos. */}
-        {!isMarketOpen() && asset.category !== "crypto" ? (
-          <View
-            style={[
-              s.closedBanner,
-              { backgroundColor: c.surfaceHover, borderColor: c.border },
-            ]}
-          >
-            <View style={[s.closedDot, { backgroundColor: c.green }]} />
-            <Text
-              style={[s.closedText, { color: c.textSecondary }]}
-              numberOfLines={2}
-            >
-              {marketClosedMessage()}
-            </Text>
-          </View>
-        ) : null}
 
         {position > 0 ? (
           <View
