@@ -15,6 +15,7 @@ import {
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useFavorites } from "../../lib/favorites/context";
+import { isMarketOpen, marketClosedMessage } from "../../lib/market/hours";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -199,6 +200,25 @@ export default function DetailScreen() {
             })}
           </View>
         </View>
+
+        {/* Banner de mercado cerrado — sólo si el activo cotiza en horario
+            BYMA. Crypto opera 24/7 así que lo omitimos. */}
+        {!isMarketOpen() && asset.category !== "crypto" ? (
+          <View
+            style={[
+              s.closedBanner,
+              { backgroundColor: c.surfaceHover, borderColor: c.border },
+            ]}
+          >
+            <View style={[s.closedDot, { backgroundColor: c.green }]} />
+            <Text
+              style={[s.closedText, { color: c.textSecondary }]}
+              numberOfLines={2}
+            >
+              {marketClosedMessage()}
+            </Text>
+          </View>
+        ) : null}
 
         {position > 0 ? (
           <View
@@ -566,6 +586,29 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.4,
+  },
+  closedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  closedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  closedText: {
+    flex: 1,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
   positionCard: {
     marginHorizontal: 20,

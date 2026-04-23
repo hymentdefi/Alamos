@@ -6,6 +6,8 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
+  Animated,
+  Easing,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -26,7 +28,6 @@ import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 import { useProMode } from "../../../lib/pro/context";
 import { Tap } from "../../../lib/components/Tap";
-import { isMarketOpen, marketClosedMessage } from "../../../lib/market/hours";
 
 type Filter = "todo" | AssetCategory;
 
@@ -117,29 +118,10 @@ function BaseExplore() {
     return unsub;
   }, [navigation, isFocused]);
 
-  const marketOpen = isMarketOpen();
-
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
-
-        {!marketOpen ? (
-          <View
-            style={[
-              s.closedBanner,
-              { backgroundColor: c.surfaceHover, borderColor: c.border },
-            ]}
-          >
-            <View style={[s.closedDot, { backgroundColor: c.green }]} />
-            <Text
-              style={[s.closedText, { color: c.textSecondary }]}
-              numberOfLines={2}
-            >
-              {marketClosedMessage()}
-            </Text>
-          </View>
-        ) : null}
 
         <View style={s.searchRow}>
           <View
@@ -398,6 +380,8 @@ function MarketPage({
 
 const CARD_W = 160;
 const GAP = 12;
+/** Velocidad del auto-scroll en px/s. */
+const MARQUEE_SPEED = 24;
 
 function MoversMarquee({
   movers,
@@ -407,19 +391,42 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
+  const tx = useRef(new Animated.Value(0)).current;
+  const loopWidth = movers.length * (CARD_W + GAP);
+
+  // Auto-scroll infinito con Animated.loop y native driver: no toca el
+  // JS thread, así que los taps sobre las cards siguen funcionando sin
+  // lag ni necesidad de pausar la animación al tocar.
+  useEffect(() => {
+    if (loopWidth <= 0) return;
+    tx.setValue(0);
+    const duration = (loopWidth / MARQUEE_SPEED) * 1000;
+    const anim = Animated.loop(
+      Animated.timing(tx, {
+        toValue: -loopWidth,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [loopWidth, tx]);
+
+  // Duplicamos la lista para que al llegar al final del primer set, el
+  // segundo set esté exactamente alineado → loop imperceptible.
+  const items = [...movers, ...movers];
+
   return (
     <View style={s.marqueeWrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.marqueeTrack}
-        decelerationRate="normal"
+      <Animated.View
+        style={[s.marqueeTrack, { transform: [{ translateX: tx }] }]}
       >
-        {movers.map((asset) => {
+        {items.map((asset, idx) => {
           const up = asset.change >= 0;
           return (
             <Pressable
-              key={asset.ticker}
+              key={`${asset.ticker}-${idx}`}
               onPress={() => onOpen(asset)}
               style={[
                 s.moverCard,
@@ -449,7 +456,7 @@ function MoversMarquee({
             </Pressable>
           );
         })}
-      </ScrollView>
+      </Animated.View>
     </View>
   );
 }
@@ -466,28 +473,6 @@ const s = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -1.2,
     marginBottom: 14,
-  },
-  closedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  closedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  closedText: {
-    flex: 1,
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.1,
   },
   searchRow: {
     flexDirection: "row",
