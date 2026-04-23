@@ -72,56 +72,63 @@ export function SideMenu({ visible, onClose }: Props) {
   }, [visible, rendered, tx]);
 
   // Swipe-a-la-izquierda sobre el panel para cerrarlo: el panel sigue
-  // al dedo durante el drag y al soltar se anima hasta el borde.
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, g) =>
-          g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy),
-        onMoveShouldSetPanResponderCapture: (_, g) =>
-          g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy),
-        onPanResponderMove: (_, g) => {
-          if (g.dx < 0) tx.setValue(g.dx);
-          else tx.setValue(0);
-        },
-        onPanResponderRelease: (_, g) => {
-          const shouldClose = g.dx < -CLOSE_THRESHOLD || g.vx < -0.6;
-          if (shouldClose) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-              () => {},
-            );
-            Animated.timing(tx, {
-              toValue: -PANEL_W,
-              duration: 220,
-              easing: Easing.in(Easing.cubic),
-              useNativeDriver: true,
-            }).start(({ finished }) => {
-              if (finished) {
-                setRendered(false);
-                onClose();
-              }
-            });
-          } else {
-            Animated.spring(tx, {
-              toValue: 0,
-              tension: 90,
-              friction: 14,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
+  // al dedo durante el drag y al soltar se anima hasta el borde. Usamos
+  // capture para ganarle al ScrollView interno desde el primer ε de
+  // movimiento horizontal — si esperamos mucho, iOS le da el gesto al
+  // scroll vertical y nunca podemos reclaimearlo.
+  const panResponder = useMemo(() => {
+    const isHorizontalLeft = (dx: number, dy: number) =>
+      dx < -4 && Math.abs(dx) > Math.abs(dy) * 1.1;
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => isHorizontalLeft(g.dx, g.dy),
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        isHorizontalLeft(g.dx, g.dy),
+      // Una vez capturado el gesto, no lo soltamos — si no, el ScrollView
+      // lo vuelve a reclamar y el swipe-to-close queda muerto.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        if (g.dx < 0) tx.setValue(g.dx);
+        else tx.setValue(0);
+      },
+      onPanResponderRelease: (_, g) => {
+        const shouldClose = g.dx < -CLOSE_THRESHOLD || g.vx < -0.5;
+        if (shouldClose) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+            () => {},
+          );
+          Animated.timing(tx, {
+            toValue: -PANEL_W,
+            duration: 220,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true,
+          }).start(({ finished }) => {
+            if (finished) {
+              setRendered(false);
+              onClose();
+            }
+          });
+        } else {
           Animated.spring(tx, {
             toValue: 0,
             tension: 90,
             friction: 14,
             useNativeDriver: true,
           }).start();
-        },
-      }),
-    [tx, onClose],
-  );
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(tx, {
+          toValue: 0,
+          tension: 90,
+          friction: 14,
+          useNativeDriver: true,
+        }).start();
+      },
+    });
+  }, [tx, onClose]);
 
   if (!rendered) return null;
 
@@ -376,8 +383,8 @@ const s = StyleSheet.create({
   },
   proPillAccent: {
     fontFamily: fontFamily[500],
-    fontSize: 22,
-    letterSpacing: -0.5,
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
   /* Identity */
   identity: {

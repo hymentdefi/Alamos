@@ -246,7 +246,7 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
               <AlamosLogo
                 variant="lockupShort"
                 tone={logoTone}
-                size={58}
+                size={88}
               />
             </Animated.View>
 
@@ -297,7 +297,7 @@ const s = StyleSheet.create({
   },
   accentText: {
     fontFamily: fontFamily[500],
-    fontSize: 44,
-    letterSpacing: -1.4,
+    fontSize: 54,
+    letterSpacing: -1.8,
   },
 });
