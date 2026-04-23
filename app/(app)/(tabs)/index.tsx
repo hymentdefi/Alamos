@@ -296,6 +296,8 @@ function BaseHome() {
           <Sparkline
             series={series}
             color={trendColor}
+            height={210}
+            withFill={false}
             onScrub={(idx) => setScrubIndex(idx)}
             onScrubEnd={() => setScrubIndex(null)}
             style={{ marginTop: 18 }}
