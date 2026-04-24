@@ -3,9 +3,12 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { formatARS } from "../../lib/data/assets";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
+import { useAuth } from "../../lib/auth/context";
+import { Tap } from "../../lib/components/Tap";
 
 const BALANCE = 342180;
 const BANK = {
@@ -15,7 +18,24 @@ const BANK = {
   cbu: "0070•••••••••••••3847",
 };
 
+/** Datos propios para recibir transferencias — mockeados por ahora. */
+const RECEIVE = {
+  ars: {
+    alias: "chris.alamos.ars",
+    cvu: "0000003100083868047594",
+    legend: null as string | null,
+  },
+  usd: {
+    alias: "aceite.ronco.inca",
+    cvu: "3220001888042412530014",
+    legend:
+      "Al ingresar o transferir dólares, se verá como destino al Banco Industrial (BIND).",
+  },
+};
+const RECEIVE_PHONE = "+54 11 6933-5756";
+
 type Screen = "hub" | "deposit" | "withdraw";
+type DepositCurrency = "ars" | "usd";
 
 export default function TransferScreen() {
   const router = useRouter();
@@ -26,13 +46,11 @@ export default function TransferScreen() {
     mode === "deposit" || mode === "withdraw" ? mode : "hub";
   const [screen, setScreen] = useState<Screen>(initial);
 
-  if (screen !== "hub") {
-    return (
-      <AmountFlow
-        mode={screen}
-        onBack={() => setScreen("hub")}
-      />
-    );
+  if (screen === "deposit") {
+    return <DepositInfo onBack={() => setScreen("hub")} />;
+  }
+  if (screen === "withdraw") {
+    return <AmountFlow mode="withdraw" onBack={() => setScreen("hub")} />;
   }
 
   return (
@@ -163,6 +181,243 @@ function ActionCard({
       <Text style={[s.actionLabel, { color: c.text }]}>{label}</Text>
       <Text style={[s.actionHint, { color: c.textMuted }]}>{hint}</Text>
     </Pressable>
+  );
+}
+
+/* ─── Deposit info: alias + CVU para recibir ARS/USD ─── */
+
+function DepositInfo({ onBack }: { onBack: () => void }) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [cur, setCur] = useState<DepositCurrency>("ars");
+
+  const data = RECEIVE[cur];
+  const email = user?.email ?? "christian@alamos.capital";
+
+  return (
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={onBack}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <Text style={[s.headerTitle, { color: c.text }]}>Ingresar dinero</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[s.depositTitle, { color: c.text }]}>
+          Ingresá dinero con tus datos
+        </Text>
+
+        {/* Pill switch Pesos / Dólares */}
+        <View style={s.curPillsWrap}>
+          <View
+            style={[s.curPills, { backgroundColor: c.surfaceHover }]}
+          >
+            <CurPill
+              label="Pesos"
+              sign="$"
+              active={cur === "ars"}
+              accent={c.greenDark}
+              onPress={() => {
+                if (cur !== "ars") {
+                  Haptics.selectionAsync().catch(() => {});
+                }
+                setCur("ars");
+              }}
+            />
+            <CurPill
+              label="Dólares"
+              sign="US$"
+              active={cur === "usd"}
+              accent={c.greenDark}
+              onPress={() => {
+                if (cur !== "usd") {
+                  Haptics.selectionAsync().catch(() => {});
+                }
+                setCur("usd");
+              }}
+            />
+          </View>
+        </View>
+
+        {/* Card 1: desde un banco o billetera */}
+        <Text style={[s.depositEyebrow, { color: c.text }]}>
+          Desde un banco o billetera
+        </Text>
+        <View
+          style={[
+            s.depositCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <CopyRow
+            label="Alias"
+            value={data.alias}
+            onCopy={() => copyHaptic()}
+          />
+          <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+          <CopyRow
+            label={cur === "ars" ? "CVU" : "CBU"}
+            value={data.cvu}
+            mono
+            onCopy={() => copyHaptic()}
+          />
+          {data.legend ? (
+            <>
+              <View
+                style={[s.depositRowDivider, { backgroundColor: c.border }]}
+              />
+              <Text style={[s.depositLegend, { color: c.textMuted }]}>
+                {data.legend}
+              </Text>
+            </>
+          ) : null}
+        </View>
+
+        {/* Card 2: Mercado Pago */}
+        <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
+          Desde Mercado Pago
+        </Text>
+        <View
+          style={[
+            s.depositCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <CopyRow
+            label="Celular"
+            value={RECEIVE_PHONE}
+            onCopy={() => copyHaptic()}
+          />
+          <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+          <CopyRow
+            label="E-mail"
+            value={email}
+            onCopy={() => copyHaptic()}
+          />
+        </View>
+
+        <View
+          style={[
+            s.noteCard,
+            {
+              backgroundColor: c.surfaceHover,
+              borderColor: c.border,
+              marginTop: 24,
+            },
+          ]}
+        >
+          <Feather name="clock" size={14} color={c.textSecondary} />
+          <Text style={[s.noteText, { color: c.textSecondary }]}>
+            Los ingresos acreditan de inmediato cuando el banco confirme la
+            transferencia.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function copyHaptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
+function CurPill({
+  label,
+  sign,
+  active,
+  accent,
+  onPress,
+}: {
+  label: string;
+  sign: string;
+  active: boolean;
+  accent: string;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.curPill,
+        active && {
+          backgroundColor: c.surface,
+          shadowColor: c.ink,
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 2,
+        },
+      ]}
+    >
+      <View
+        style={[
+          s.curSignBadge,
+          {
+            backgroundColor: active ? accent : c.textFaint,
+          },
+        ]}
+      >
+        <Text style={[s.curSignText, { color: c.bg }]}>{sign}</Text>
+      </View>
+      <Text
+        style={[
+          s.curPillLabel,
+          { color: active ? c.text : c.textMuted },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function CopyRow({
+  label,
+  value,
+  mono,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  onCopy: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={s.copyRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.copyLabel, { color: c.textMuted }]}>{label}</Text>
+        <Text
+          style={[
+            s.copyValue,
+            { color: c.text },
+            mono && { letterSpacing: 0.2 },
+          ]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
+      <Tap
+        haptic="light"
+        onPress={onCopy}
+        style={[s.copyBtn, { backgroundColor: c.surfaceHover }]}
+        hitSlop={8}
+      >
+        <Feather name="copy" size={16} color={c.greenDark} />
+      </Tap>
+    </View>
   );
 }
 
@@ -490,6 +745,103 @@ const s = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     letterSpacing: -0.1,
+  },
+
+  /* Deposit info (alias + CVU por divisa) */
+  depositTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 24,
+    letterSpacing: -0.7,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  curPillsWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  curPills: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: radius.pill,
+    gap: 4,
+  },
+  curPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+  },
+  curSignBadge: {
+    minWidth: 26,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  curSignText: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    letterSpacing: -0.2,
+  },
+  curPillLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  depositEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  depositCard: {
+    marginHorizontal: 20,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  depositRowDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: -16,
+  },
+  copyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 12,
+  },
+  copyLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginBottom: 4,
+  },
+  copyValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  copyBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  depositLegend: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: -0.1,
+    paddingVertical: 12,
   },
 
   /* Amount flow */

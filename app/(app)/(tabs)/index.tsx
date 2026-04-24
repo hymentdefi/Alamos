@@ -388,7 +388,7 @@ function BaseHome() {
             <Sparkline
               series={series}
               color={chartColor}
-              height={340}
+              height={260}
               withFill={false}
               sheen
               strokeWidth={1.4}
@@ -464,7 +464,15 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
   const length = 40;
   const startValue = total / (1 + pct / 100);
   const noise = seriesFromSeed(seed, length, "flat");
-  const noiseScale = total * 0.018;
+  // Escalamos el ruido proporcional a la magnitud del movimiento del
+  // rango (con piso para que rangos muy planos igual tengan textura).
+  // Sin esto, rangos cortos como 1min (pct ~0.1%) se veían como un
+  // cardiograma porque el ruido constante dominaba la tendencia,
+  // mientras que YTD (+15%) se veía como una línea smooth — aunque
+  // ambos están normalizados al mismo alto de viewBox. Ahora todos
+  // los rangos tienen una relación trend/noise parecida.
+  const trendAbs = Math.abs(total - startValue);
+  const noiseScale = Math.max(trendAbs * 0.22, total * 0.0025);
   const out: number[] = [];
   for (let i = 0; i < length; i++) {
     const t = i / (length - 1);
