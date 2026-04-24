@@ -38,7 +38,7 @@ const MARKER_COLOR = "#5ac43e";
 // Dentro de cada icono, el tiempo se reparte proporcional al largo
 // de cada segmento — así la velocidad del lápiz es uniforme dentro
 // de cada dibujo, y el "principio a fin" es igual entre dibujos.
-const TOTAL_DURATION = 900;
+const TOTAL_DURATION = 550;
 // Gap entre segmentos (simula al lápiz levantándose al próximo
 // subpath). Se descuenta del total para que TOTAL_DURATION sea la
 // duración real de principio a fin, contando gaps.
