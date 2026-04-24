@@ -369,14 +369,23 @@ function MarketPage({
                   <Text style={[s.rowPrice, { color: c.text }]}>
                     {formatARS(asset.price)}
                   </Text>
-                  <Text
-                    style={[
-                      s.rowChange,
-                      { color: asset.change >= 0 ? c.greenDark : c.red },
-                    ]}
-                  >
-                    {formatPct(asset.change)}
-                  </Text>
+                  {asset.annualYield != null ? (
+                    /* FCI: mostramos TNA (o rendimiento 12M para RV)
+                       en vez del % del día — mucho más representativo
+                       para el usuario cuando mira un fondo. */
+                    <Text style={[s.rowYield, { color: c.greenDark }]}>
+                      TNA {formatPct(asset.annualYield)}
+                    </Text>
+                  ) : (
+                    <Text
+                      style={[
+                        s.rowChange,
+                        { color: asset.change >= 0 ? c.greenDark : c.red },
+                      ]}
+                    >
+                      {formatPct(asset.change)}
+                    </Text>
+                  )}
                 </View>
               </Pressable>
             );
@@ -615,6 +624,12 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
+  },
+  rowYield: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
   },
   empty: {
     alignItems: "center",

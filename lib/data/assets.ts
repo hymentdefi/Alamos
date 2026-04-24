@@ -34,6 +34,12 @@ export interface Asset {
   maxLeverage?: number;
   /** Funding rate % cada 8h (solo futuros perpetuos). */
   fundingRate?: number;
+  /**
+   * Tasa anual de rendimiento — para FCI money-market/renta fija es la
+   * TNA; para FCI renta variable es el rendimiento histórico 12M.
+   * Si no está, no se muestra esa columna en listas.
+   */
+  annualYield?: number;
 }
 
 export const assets: Asset[] = [
@@ -256,6 +262,7 @@ export const assets: Asset[] = [
     change: -0.1,
     held: true,
     qty: 1,
+    annualYield: 42.5,
   },
   {
     ticker: "FIMA-AHO",
@@ -266,6 +273,7 @@ export const assets: Asset[] = [
     price: 4250,
     change: 0.09,
     held: false,
+    annualYield: 38.8,
   },
   {
     ticker: "FIMA-RFP",
@@ -276,6 +284,7 @@ export const assets: Asset[] = [
     price: 6120,
     change: 0.11,
     held: false,
+    annualYield: 48.2,
   },
   {
     ticker: "FIMA-ACC",
@@ -286,6 +295,7 @@ export const assets: Asset[] = [
     price: 8340,
     change: 2.45,
     held: false,
+    annualYield: 85.3,
   },
   {
     ticker: "GAL-AHO",
@@ -296,6 +306,7 @@ export const assets: Asset[] = [
     price: 3890,
     change: 0.08,
     held: false,
+    annualYield: 40.1,
   },
   {
     ticker: "SBS-RV",
@@ -306,6 +317,7 @@ export const assets: Asset[] = [
     price: 12450,
     change: 1.87,
     held: false,
+    annualYield: 74.6,
   },
 
   // ─── Acciones argentinas ───
