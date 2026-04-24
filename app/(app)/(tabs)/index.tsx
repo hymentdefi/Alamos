@@ -280,6 +280,12 @@ function BaseHome() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <Text
+          style={[s.topBarGreet, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {greeting}, {firstName}
+        </Text>
         <Tap
           style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.push("/(app)/activity")}
@@ -308,10 +314,6 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
-          <Text style={[s.greet, { color: c.textMuted }]}>
-            {greeting}, {firstName}
-          </Text>
-
           <Pressable
             style={s.amountRow}
             onPress={() => {
@@ -1072,7 +1074,14 @@ const s = StyleSheet.create({
     paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+  },
+  topBarGreet: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    letterSpacing: -0.15,
+    flex: 1,
+    marginRight: 12,
   },
   topBtn: {
     width: 36,
@@ -1332,12 +1341,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 0,
     paddingBottom: 12,
-  },
-  greet: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    letterSpacing: -0.15,
-    marginBottom: 20,
   },
   amountRow: {
     flexDirection: "row",
