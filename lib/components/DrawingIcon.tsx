@@ -100,7 +100,17 @@ export function DrawingIcon({
           toValue: 0,
           duration: dur,
           delay,
-          easing: Easing.out(Easing.cubic),
+          // Linear a propósito: el ease-out cubic que usábamos antes
+          // "mentía" la duración percibida — completaba visualmente
+          // ~87% del trazo en el 50% del tiempo y el último tramo era
+          // un arrastre imperceptible. Con trazos únicos (home, alamo)
+          // se veía terminado a ~540ms aunque el animation seguía 360ms
+          // más. Con multi-segmento el último segmento corto hacía que
+          // el arrastre no se notara, así que parecían terminar a 900.
+          // Con linear, el lápiz va a velocidad constante dentro de
+          // cada segmento, y el momento visual de "terminó" coincide
+          // con TOTAL_DURATION para todos los iconos.
+          easing: Easing.linear,
           useNativeDriver: false, // strokeDashoffset no soporta native driver
         }).start();
         delay += dur + INTER_SEGMENT_DELAY;
