@@ -20,10 +20,16 @@ const DASH_LEN = 220;
 const MARKER_COLOR = "#5ac43e";
 
 /**
- * Ícono de tab: marker pill verde arriba que aparece cuando la tab
- * está activa, y el ícono SVG se 'dibuja' (stroke draw) en cada
- * activación. Animaciones via Animated.Value para que sean
- * confiables — el haptic vive en el listener del layout.
+ * Ícono de tab con animación combinada al activarse:
+ *   · marker pill verde crece y aparece arriba
+ *   · el ícono cae desde arriba (translateY) y escala desde chico con
+ *     overshoot (spring bouncy)
+ *   · paralelo al movimiento, el stroke se 'dibuja' via dashoffset
+ *     animado
+ *
+ * Tres animaciones superpuestas aseguran que AL MENOS una se note
+ * bien, sin depender sólo del stroke draw que en algunas versiones
+ * de react-native-svg no rerenderiza suave.
  */
 export function DrawingIcon({
   path,
@@ -33,15 +39,16 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 720,
 }: Props) {
-  const scale = useRef(new Animated.Value(focused ? 1 : 1)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  const dashOffset = useRef(new Animated.Value(focused ? 0 : 0)).current;
+  const dashOffset = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!focused) {
-      // Reset estados sin animación intensa — sólo el marker fade.
       scale.stopAnimation(() => scale.setValue(1));
+      translateY.stopAnimation(() => translateY.setValue(0));
       dashOffset.setValue(0);
       Animated.parallel([
         Animated.timing(markerOpacity, {
@@ -58,14 +65,23 @@ export function DrawingIcon({
       return;
     }
 
-    // Focus: scale pop + marker grow + drawing del stroke.
+    // Focus animation combo.
     scale.setValue(0.25);
-    const iconSpring = Animated.spring(scale, {
-      toValue: 1,
-      tension: 110,
-      friction: 5,
-      useNativeDriver: true,
-    });
+    translateY.setValue(-8);
+    const transformAnim = Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 110,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        tension: 90,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]);
 
     markerOpacity.setValue(0);
     markerScale.setValue(0);
@@ -83,8 +99,6 @@ export function DrawingIcon({
       }),
     ]);
 
-    // Drawing del stroke con Animated.Value — useNativeDriver:false
-    // porque strokeDashoffset es prop de SVG y no soporta native.
     dashOffset.setValue(DASH_LEN);
     const drawAnim = Animated.timing(dashOffset, {
       toValue: 0,
@@ -93,16 +107,24 @@ export function DrawingIcon({
       useNativeDriver: false,
     });
 
-    iconSpring.start();
+    transformAnim.start();
     markerAnim.start();
     drawAnim.start();
 
     return () => {
-      iconSpring.stop();
+      transformAnim.stop();
       markerAnim.stop();
       drawAnim.stop();
     };
-  }, [focused, duration, scale, markerScale, markerOpacity, dashOffset]);
+  }, [
+    focused,
+    duration,
+    scale,
+    translateY,
+    markerScale,
+    markerOpacity,
+    dashOffset,
+  ]);
 
   return (
     <View style={s.wrap}>
@@ -116,7 +138,11 @@ export function DrawingIcon({
           },
         ]}
       />
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View
+        style={{
+          transform: [{ translateY }, { scale }],
+        }}
+      >
         <Svg width={size} height={size} viewBox={viewBox}>
           <AnimatedPath
             d={path}
