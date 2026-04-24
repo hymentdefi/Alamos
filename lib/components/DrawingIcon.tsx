@@ -1,19 +1,11 @@
-import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Path } from "react-native-svg";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 
 interface TabPath {
   d: string;
-  /** Legacy, ya no se usa. Queda en el tipo por compat. */
+  /** Legacy, no se usa. Queda por compat. */
   len: number;
 }
 
@@ -29,18 +21,14 @@ interface Props {
 const MARKER_COLOR = "#5ac43e";
 
 /**
- * Icono de tab con reveal left-to-right al activarse.
+ * Icono de tab con reveal al activarse.
  *
- * Este componente asume que está renderizado en un árbol de React
- * VANILLA (no dentro del tabBarIcon de @react-navigation/bottom-tabs,
- * que tiene un double-render que congela focused). Ver
- * app/(app)/(tabs)/_layout.tsx — la barra vive como sibling de <Tabs>
- * y consume usePathname() directo.
- *
- * Tres shared values independientes:
- *   - reveal (0→1): ancho de la mask que revela el icono.
- *   - markerActive (0→1): opacity + scaleX del marker verde de arriba.
- *   - pop: scale del icono (spring pop al activarse).
+ * Usamos la Animated API CORE de React Native (no Reanimated).
+ * Rationale: Reanimated 4 + Expo Go SDK 54 + react-native-svg tiró
+ * errores raros de propagación que no pudimos diagnosticar del todo.
+ * La Animated core API viene con React Native mismo, sin plugins de
+ * babel ni worklets ni new-arch hooks — si React Native corre, esto
+ * corre.
  */
 export function DrawingIcon({
   path,
@@ -50,64 +38,68 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 520,
 }: Props) {
-  // reveal: 0 = icono oculto (mask vacío), 1 = icono completo.
-  // Al mount inicializamos según focused:
-  //   - focused=true  → arrancamos en 0 para que useEffect lo anime a 1.
-  //   - focused=false → arrancamos en 1 (icono ya visible, sin anim).
-  const reveal = useSharedValue(focused ? 0 : 1);
-  const markerActive = useSharedValue(focused ? 1 : 0);
-  const pop = useSharedValue(focused ? 1 : 0.92);
+  // Inicializamos según focused para que el mount inicial arranque en
+  // el estado correcto sin flicker.
+  const reveal = useRef(new Animated.Value(focused ? 1 : 1)).current;
+  const markerActive = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const pop = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
 
   useEffect(() => {
     if (focused) {
-      // withSequence: primero ASEGURA que el valor está en 0 (si
-      // venimos de un ciclo previo de reveal quedaba en 1), después
-      // anima a 1. Sin withSequence, los dos assignments sueltos
-      // pueden carrear con el withTiming leyendo el startValue
-      // anterior.
-      reveal.value = withSequence(
-        withTiming(0, { duration: 0 }),
-        withTiming(1, { duration, easing: Easing.out(Easing.cubic) }),
-      );
+      // Reset invisible, después reveal a 1.
+      reveal.setValue(0);
+      Animated.timing(reveal, {
+        toValue: 1,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // width no es nativeDriver-friendly
+      }).start();
     } else {
-      // Saliendo de focused: el icono queda dibujado, sin animación de
-      // wipe-out. El cambio visual del estado inactivo viene por el
-      // color prop + markerActive fadeando a 0.
-      reveal.value = 1;
+      // Saliendo: el icono queda dibujado, sin wipe-out.
+      reveal.setValue(1);
     }
-    markerActive.value = withTiming(focused ? 1 : 0, {
+    Animated.timing(markerActive, {
+      toValue: focused ? 1 : 0,
       duration: focused ? 280 : 180,
       easing: Easing.out(Easing.cubic),
-    });
-    pop.value = withSpring(focused ? 1 : 0.92, {
-      damping: 12,
-      stiffness: 180,
-    });
+      useNativeDriver: true,
+    }).start();
+    Animated.spring(pop, {
+      toValue: focused ? 1 : 0.92,
+      friction: 6,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
   }, [focused, duration, reveal, markerActive, pop]);
 
-  const iconScaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pop.value }],
-  }));
-  const maskStyle = useAnimatedStyle(() => ({
-    width: reveal.value * size,
-  }));
-  const markerStyle = useAnimatedStyle(() => ({
-    opacity: markerActive.value,
-    transform: [{ scaleX: markerActive.value }],
-  }));
+  const revealWidth = reveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, size],
+  });
 
   return (
     <View style={s.wrap}>
       <Animated.View
-        style={[s.marker, { backgroundColor: MARKER_COLOR }, markerStyle]}
+        style={[
+          s.marker,
+          {
+            backgroundColor: MARKER_COLOR,
+            opacity: markerActive,
+            transform: [{ scaleX: markerActive }],
+          },
+        ]}
       />
-      <Animated.View style={iconScaleStyle}>
+      <Animated.View style={{ transform: [{ scale: pop }] }}>
         <MaskedView
           style={{ width: size, height: size }}
           maskElement={
             <View style={{ width: size, height: size, flexDirection: "row" }}>
               <Animated.View
-                style={[{ height: size, backgroundColor: "black" }, maskStyle]}
+                style={{
+                  height: size,
+                  width: revealWidth,
+                  backgroundColor: "black",
+                }}
               />
             </View>
           }
