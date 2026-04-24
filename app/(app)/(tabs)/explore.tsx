@@ -14,7 +14,10 @@ import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
+
+const FAVS_FILTER_KEY = "explore:only_favs";
 import {
   assets,
   assetIconCode,
@@ -63,6 +66,16 @@ function BaseExplore() {
   const filterScrollRef = useRef<ScrollView>(null);
   const listRef = useRef<ScrollView | null>(null);
 
+  // Cargamos la preferencia del filtro 'solo favoritos' al montar.
+  // Así sobrevive entre sesiones.
+  useEffect(() => {
+    SecureStore.getItemAsync(FAVS_FILTER_KEY)
+      .then((v) => {
+        if (v === "1") setOnlyFavs(true);
+      })
+      .catch(() => {});
+  }, []);
+
   const filter = filters[activeIdx];
 
   const topMovers = useMemo(
@@ -91,7 +104,13 @@ function BaseExplore() {
   );
 
   const toggleFavs = () => {
-    setOnlyFavs((v) => !v);
+    setOnlyFavs((v) => {
+      const next = !v;
+      SecureStore.setItemAsync(FAVS_FILTER_KEY, next ? "1" : "0").catch(
+        () => {},
+      );
+      return next;
+    });
     Haptics.selectionAsync().catch(() => {});
   };
 
@@ -391,36 +410,69 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-  const tx = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+  const posRef = useRef(0);
+  const interactingRef = useRef(false);
   const loopWidth = movers.length * (CARD_W + GAP);
 
-  // Auto-scroll infinito con Animated.loop y native driver: no toca el
-  // JS thread, así que los taps sobre las cards siguen funcionando sin
-  // lag ni necesidad de pausar la animación al tocar.
+  // Auto-scroll horizontal controlado por RAF sobre el ScrollView.
+  // Cuando el usuario arrastra con el dedo la flag interactingRef se
+  // enciende y la animación se pausa; al soltar sigue desde donde quedó.
+  // Así el marquee se mueve solo PERO el drag manual funciona.
   useEffect(() => {
     if (loopWidth <= 0) return;
-    tx.setValue(0);
-    const duration = (loopWidth / MARQUEE_SPEED) * 1000;
-    const anim = Animated.loop(
-      Animated.timing(tx, {
-        toValue: -loopWidth,
-        duration,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [loopWidth, tx]);
+    let raf: number;
+    let last = Date.now();
+    const tick = () => {
+      const now = Date.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      if (!interactingRef.current) {
+        posRef.current += MARQUEE_SPEED * dt;
+        if (posRef.current >= loopWidth) posRef.current -= loopWidth;
+        scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [loopWidth]);
 
   // Duplicamos la lista para que al llegar al final del primer set, el
-  // segundo set esté exactamente alineado → loop imperceptible.
+  // segundo set esté alineado → loop imperceptible.
   const items = [...movers, ...movers];
 
   return (
     <View style={s.marqueeWrap}>
-      <Animated.View
-        style={[s.marqueeTrack, { transform: [{ translateX: tx }] }]}
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.marqueeTrack}
+        scrollEventThrottle={16}
+        decelerationRate="normal"
+        onScrollBeginDrag={() => {
+          interactingRef.current = true;
+        }}
+        onScrollEndDrag={(e) => {
+          posRef.current = e.nativeEvent.contentOffset.x;
+        }}
+        onMomentumScrollEnd={(e) => {
+          posRef.current = e.nativeEvent.contentOffset.x;
+          if (loopWidth > 0 && posRef.current >= loopWidth) {
+            posRef.current -= loopWidth;
+            scrollRef.current?.scrollTo({
+              x: posRef.current,
+              animated: false,
+            });
+          }
+          interactingRef.current = false;
+        }}
+        onScroll={(e) => {
+          if (interactingRef.current) {
+            posRef.current = e.nativeEvent.contentOffset.x;
+          }
+        }}
       >
         {items.map((asset, idx) => {
           const up = asset.change >= 0;
@@ -456,7 +508,7 @@ function MoversMarquee({
             </Pressable>
           );
         })}
-      </Animated.View>
+      </ScrollView>
     </View>
   );
 }

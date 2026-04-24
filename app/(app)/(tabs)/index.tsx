@@ -241,8 +241,8 @@ function BaseHome() {
           </Text>
 
           <View style={s.amountRow} {...currencyPan.panHandlers}>
-            <Pressable onPress={toggleCurrency} hitSlop={8}>
-              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={40} />
+            <Pressable onPress={toggleCurrency} hitSlop={10}>
+              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
             </Pressable>
             <AmountDisplay
               value={currency === "ARS" ? current : current / USD_RATE}
@@ -292,7 +292,10 @@ function BaseHome() {
               return (
                 <Pressable
                   key={r}
-                  onPress={() => setRange(r)}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setRange(r);
+                  }}
                   style={[
                     s.rangePill,
                     active && { backgroundColor: chartColor },
@@ -452,7 +455,10 @@ function TabStrip({
                 { backgroundColor: c.surface, shadowColor: c.ink },
               ],
             ]}
-            onPress={() => onChange(t.id)}
+            onPress={() => {
+              if (t.id !== tab) Haptics.selectionAsync().catch(() => {});
+              onChange(t.id);
+            }}
           >
             <Text
               style={[s.tabLabel, { color: active ? c.text : c.textMuted }]}
@@ -1237,12 +1243,12 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 15,
     letterSpacing: -0.15,
-    marginBottom: 14,
+    marginBottom: 20,
   },
   amountRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
     marginBottom: 10,
   },
   balance: {

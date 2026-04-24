@@ -50,7 +50,6 @@ export default function AlamoScreen() {
     .slice(0, 2)
     .map((w) => w.charAt(0).toUpperCase())
     .join("");
-  const handle = "@" + (user?.email?.split("@")[0] ?? firstName.toLowerCase());
 
   const appearanceLabel =
     pref === "dark"
@@ -69,43 +68,52 @@ export default function AlamoScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Alamos Pro pill (toggle hacia el otro modo) ── */}
-        <Pressable
-          onPress={() => requestSwitch()}
-          style={({ pressed }) => [
-            s.proPill,
-            {
-              backgroundColor: c.surface,
-              borderColor: c.border,
-              opacity: pressed ? 0.8 : 1,
-              transform: [{ scale: pressed ? 0.99 : 1 }],
-            },
+        {/* ── Card de identidad: avatar + nombre a la izq, pill Pro
+            a la der (misma altura). */}
+        <View
+          style={[
+            s.identityCard,
+            { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <AlamosLogo variant="lockupShort" tone="light" size={34} />
-          {!isPro ? (
-            <Text style={[s.proPillAccent, { color: c.greenDark }]}>Pro</Text>
-          ) : null}
-          <View style={{ flex: 1 }} />
-          <Feather name="chevron-right" size={18} color={c.textFaint} />
-        </Pressable>
-
-        {/* ── Hero: avatar + nombre + handle ── */}
-        <View style={s.hero}>
-          <View style={[s.avatar, { backgroundColor: c.greenDim }]}>
-            <Text style={[s.avatarText, { color: c.greenDark }]}>
-              {initials}
-            </Text>
+          <View style={s.identityLeft}>
+            <View style={[s.avatar, { backgroundColor: c.greenDim }]}>
+              <Text style={[s.avatarText, { color: c.greenDark }]}>
+                {initials}
+              </Text>
+            </View>
+            <View style={s.identityNameBlock}>
+              <Text
+                style={[s.userName, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {fullName}
+              </Text>
+              <Text
+                style={[s.userMeta, { color: c.textMuted }]}
+                numberOfLines={1}
+              >
+                {user?.email ?? ""}
+              </Text>
+            </View>
           </View>
-          <Text style={[s.userName, { color: c.text }]}>{fullName}</Text>
+
           <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-            }}
-            style={s.handleRow}
+            onPress={() => requestSwitch()}
+            style={({ pressed }) => [
+              s.proBtn,
+              {
+                backgroundColor: c.ink,
+                opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              },
+            ]}
+            hitSlop={6}
           >
-            <Text style={[s.handle, { color: c.greenDark }]}>{handle}</Text>
-            <Feather name="copy" size={13} color={c.greenDark} />
+            <AlamosLogo variant="mark" tone="dark" size={16} />
+            <Text style={[s.proBtnAccent, { color: c.green }]}>
+              {isPro ? "Lite" : "Pro"}
+            </Text>
           </Pressable>
         </View>
 
@@ -311,58 +319,64 @@ function Divider() {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Pro pill */
-  proPill: {
+  /* Card de identidad (avatar + nombre + email a la izq, pill Pro
+     a la der — misma altura). */
+  identityCard: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     marginHorizontal: 20,
-    marginBottom: 18,
+    marginBottom: 22,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 14,
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  proPillAccent: {
-    fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.4,
-    marginLeft: -10,
-  },
-
-  /* Hero (avatar + name + handle) */
-  hero: {
+  identityLeft: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 22,
+    gap: 12,
+  },
+  identityNameBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   avatar: {
-    width: 76,
-    height: 76,
+    width: 48,
+    height: 48,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
   },
   avatarText: {
     fontFamily: fontFamily[700],
-    fontSize: 26,
-    letterSpacing: -0.8,
+    fontSize: 18,
+    letterSpacing: -0.5,
   },
   userName: {
     fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.6,
-    marginBottom: 4,
+    fontSize: 17,
+    letterSpacing: -0.35,
   },
-  handleRow: {
+  userMeta: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  proBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
   },
-  handle: {
-    fontFamily: fontFamily[600],
+  proBtnAccent: {
+    fontFamily: fontFamily[800],
     fontSize: 14,
-    letterSpacing: -0.1,
+    letterSpacing: -0.3,
   },
 
   /* Groups + rows */
