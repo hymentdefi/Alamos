@@ -216,7 +216,7 @@ function BaseHome() {
           <AmountDisplay
             value={current}
             size={58}
-            weight={800}
+            weight={700}
             stretchY={1.18}
             style={{ marginBottom: 10 }}
           />

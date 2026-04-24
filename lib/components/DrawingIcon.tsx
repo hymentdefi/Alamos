@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 interface Props {
   path: string;
@@ -18,12 +20,10 @@ const DASH_LEN = 220;
 const MARKER_COLOR = "#5ac43e";
 
 /**
- * Ícono de tab que se dibuja al activarse + un pill verde arriba
- * que marca la tab activa. Haptic + scale-pop en cada cambio.
- *
- * La animación dispara siempre que `focused` pasa a true: haptic,
- * scale pop del ícono, drawing del stroke, y fade-in del marker.
- * Cuando `focused` pasa a false, el marker fade-out y reset.
+ * Ícono de tab: marker pill verde arriba que aparece cuando la tab
+ * está activa, y el ícono SVG se 'dibuja' (stroke draw) en cada
+ * activación. Animaciones via Animated.Value para que sean
+ * confiables — el haptic vive en el listener del layout.
  */
 export function DrawingIcon({
   path,
@@ -31,18 +31,18 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 620,
+  duration = 720,
 }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(focused ? 1 : 1)).current;
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  const [dashOffset, setDashOffset] = useState(0);
+  const dashOffset = useRef(new Animated.Value(focused ? 0 : 0)).current;
 
   useEffect(() => {
     if (!focused) {
       // Reset estados sin animación intensa — sólo el marker fade.
       scale.stopAnimation(() => scale.setValue(1));
-      setDashOffset(0);
+      dashOffset.setValue(0);
       Animated.parallel([
         Animated.timing(markerOpacity, {
           toValue: 0,
@@ -58,17 +58,14 @@ export function DrawingIcon({
       return;
     }
 
-    // Focus: scale pop pronunciado del icono + marker grow + drawing
-    // del stroke. (El haptic lo dispara screenListeners.tabPress arriba
-    // en el layout, no acá.)
-    scale.setValue(0.2);
+    // Focus: scale pop + marker grow + drawing del stroke.
+    scale.setValue(0.25);
     const iconSpring = Animated.spring(scale, {
       toValue: 1,
       tension: 110,
       friction: 5,
       useNativeDriver: true,
     });
-    iconSpring.start();
 
     markerOpacity.setValue(0);
     markerScale.setValue(0);
@@ -85,31 +82,27 @@ export function DrawingIcon({
         useNativeDriver: true,
       }),
     ]);
-    markerAnim.start();
 
-    setDashOffset(DASH_LEN);
-    let start: number | null = null;
-    let raf: number;
-    const tick = (t: number) => {
-      if (start === null) start = t;
-      const elapsed = t - start;
-      const progress = Math.min(1, elapsed / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDashOffset((1 - eased) * DASH_LEN);
-      if (progress < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        setDashOffset(0);
-      }
-    };
-    raf = requestAnimationFrame(tick);
+    // Drawing del stroke con Animated.Value — useNativeDriver:false
+    // porque strokeDashoffset es prop de SVG y no soporta native.
+    dashOffset.setValue(DASH_LEN);
+    const drawAnim = Animated.timing(dashOffset, {
+      toValue: 0,
+      duration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+
+    iconSpring.start();
+    markerAnim.start();
+    drawAnim.start();
 
     return () => {
-      cancelAnimationFrame(raf);
       iconSpring.stop();
       markerAnim.stop();
+      drawAnim.stop();
     };
-  }, [focused, duration, scale, markerScale, markerOpacity]);
+  }, [focused, duration, scale, markerScale, markerOpacity, dashOffset]);
 
   return (
     <View style={s.wrap}>
@@ -125,7 +118,7 @@ export function DrawingIcon({
       />
       <Animated.View style={{ transform: [{ scale }] }}>
         <Svg width={size} height={size} viewBox={viewBox}>
-          <Path
+          <AnimatedPath
             d={path}
             stroke={color}
             strokeWidth={2}
