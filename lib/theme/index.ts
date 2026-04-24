@@ -125,16 +125,27 @@ export const spacing = {
 } as const;
 
 /* ─── Context ─── */
+/** Preferencia del usuario. 'system' sigue la config del celular. */
+export type ThemeModePref = "light" | "dark" | "system";
+
 interface ThemeContextValue {
+  /** Tema efectivo que está renderizándose (nunca 'system'). */
   mode: ThemeMode;
+  /** Preferencia elegida por el usuario (puede ser 'system'). */
+  pref: ThemeModePref;
   c: ThemeColors;
+  /** Toggle light/dark rápido. */
   toggle: () => void;
+  /** Setear la preferencia explícitamente. */
+  setPref: (p: ThemeModePref) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
   mode: "light",
+  pref: "light",
   c: light,
   toggle: () => {},
+  setPref: () => {},
 });
 
 export const useTheme = () => useContext(ThemeContext);

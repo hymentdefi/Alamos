@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View, StyleSheet, Animated, Text } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Text,
+  Appearance,
+  type ColorSchemeName,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SecureStore from "expo-secure-store";
 
@@ -18,7 +25,14 @@ import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
 import { ProProvider } from "../lib/pro/context";
 import { LegalConsentProvider } from "../lib/legal/context";
-import { ThemeContext, themes, type ThemeMode, brand, fontFamily } from "../lib/theme";
+import {
+  ThemeContext,
+  themes,
+  type ThemeMode,
+  type ThemeModePref,
+  brand,
+  fontFamily,
+} from "../lib/theme";
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   const scale = useState(new Animated.Value(0.85))[0];
@@ -88,28 +102,46 @@ export default function RootLayout() {
     PlusJakartaSans_800ExtraBold,
   });
 
-  const [mode, setMode] = useState<ThemeMode>("light");
+  const [pref, setPrefState] = useState<ThemeModePref>("light");
+  const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(
+    Appearance.getColorScheme() ?? "light",
+  );
 
-  // Cargar preferencia de tema persistida al iniciar la app.
+  // Cargar preferencia persistida al iniciar la app.
   useEffect(() => {
     SecureStore.getItemAsync(THEME_STORAGE_KEY)
       .then((v) => {
-        if (v === "dark" || v === "light") setMode(v);
+        if (v === "dark" || v === "light" || v === "system") setPrefState(v);
       })
       .catch(() => {});
   }, []);
 
-  const toggle = useCallback(() => {
-    setMode((m) => {
-      const next = m === "light" ? "dark" : "light";
-      SecureStore.setItemAsync(THEME_STORAGE_KEY, next).catch(() => {});
-      return next;
+  // Escuchar cambios del color scheme del sistema.
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme ?? "light");
     });
+    return () => sub.remove();
   }, []);
 
+  const setPref = useCallback((p: ThemeModePref) => {
+    setPrefState(p);
+    SecureStore.setItemAsync(THEME_STORAGE_KEY, p).catch(() => {});
+  }, []);
+
+  // Modo efectivo: si pref es 'system', seguimos el device; si no, es
+  // el pref mismo.
+  const mode: ThemeMode = pref === "system"
+    ? systemScheme === "dark" ? "dark" : "light"
+    : pref;
+
+  const toggle = useCallback(() => {
+    setPref(mode === "light" ? "dark" : "light");
+  }, [mode, setPref]);
+
   const themeValue = useMemo(
-    () => ({ mode, c: themes[mode], toggle }),
-    [mode, toggle],
+    () => ({ mode, pref, c: themes[mode], toggle, setPref }),
+    [mode, pref, toggle, setPref],
   );
 
   if (!fontsLoaded) {

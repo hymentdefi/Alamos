@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -10,30 +12,29 @@ import { useRouter, useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
+import * as Haptics from "expo-haptics";
+import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
 import { useProMode } from "../../../lib/pro/context";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import { Tap } from "../../../lib/components/Tap";
+import { AppearanceSheet } from "../../../lib/components/AppearanceSheet";
 
-interface NavItem {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  hint?: string;
-  path?: string;
-}
+const APP_VERSION = "v1.0.0";
 
 export default function AlamoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const { c } = useTheme();
+  const { c, pref } = useTheme();
   const { user, logout } = useAuth();
   const { isPro, requestSwitch } = useProMode();
   const scrollRef = useRef<ScrollView>(null);
 
-  // Scroll al tope cuando volvés a tapear la tab estando acá.
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+
   useEffect(() => {
     const unsub = navigation.addListener("tabPress" as never, () => {
       if (!isFocused) return;
@@ -43,76 +44,32 @@ export default function AlamoScreen() {
   }, [navigation, isFocused]);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
-  const initial = (user?.fullName ?? "M").charAt(0).toUpperCase();
+  const fullName = user?.fullName ?? firstName;
+  const initials = fullName
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join("");
+  const handle = "@" + (user?.email?.split("@")[0] ?? firstName.toLowerCase());
 
-  const groups: { title: string; items: NavItem[] }[] = [
-    {
-      title: "CUENTA",
-      items: [
-        {
-          icon: "user",
-          label: "Datos personales",
-          hint: "Nombre, DNI, domicilio",
-          path: "/(app)/account",
-        },
-        {
-          icon: "credit-card",
-          label: "Transferencias y CBU",
-          hint: "Alias, cuenta bancaria",
-          path: "/(app)/transfer",
-        },
-        {
-          icon: "bell",
-          label: "Notificaciones",
-          path: "/(app)/notifications",
-        },
-        {
-          icon: "sliders",
-          label: "Preferencias de la app",
-          path: "/(app)/settings",
-        },
-      ],
-    },
-    {
-      title: "SEGURIDAD",
-      items: [
-        {
-          icon: "lock",
-          label: "Contraseña y factor doble",
-          path: "/(app)/security",
-        },
-      ],
-    },
-    {
-      title: "AYUDA",
-      items: [
-        {
-          icon: "message-circle",
-          label: "Centro de soporte",
-          hint: "Academy + chat con IA o persona",
-          path: "/(app)/support",
-        },
-        {
-          icon: "info",
-          label: "Sobre Alamos Capital",
-          path: "/(app)/about",
-        },
-      ],
-    },
-  ];
+  const appearanceLabel =
+    pref === "dark"
+      ? "Dark mode"
+      : pref === "system"
+      ? "Device settings"
+      : "Light mode";
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={[s.title, { color: c.text }]}>Tu Alamo</Text>
-      </View>
-
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 180 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 14,
+          paddingBottom: 220,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Alamos Pro pill ── */}
+        {/* ── Alamos Pro pill (toggle hacia el otro modo) ── */}
         <Pressable
           onPress={() => requestSwitch()}
           style={({ pressed }) => [
@@ -120,206 +77,356 @@ export default function AlamoScreen() {
             {
               backgroundColor: c.surface,
               borderColor: c.border,
-              opacity: pressed ? 0.7 : 1,
-              transform: [{ scale: pressed ? 0.985 : 1 }],
+              opacity: pressed ? 0.8 : 1,
+              transform: [{ scale: pressed ? 0.99 : 1 }],
             },
           ]}
         >
-          <AlamosLogo variant="lockupShort" tone="light" size={44} />
+          <AlamosLogo variant="lockupShort" tone="light" size={34} />
           {!isPro ? (
             <Text style={[s.proPillAccent, { color: c.greenDark }]}>Pro</Text>
           ) : null}
           <View style={{ flex: 1 }} />
-          <Feather name="chevron-right" size={20} color={c.textFaint} />
+          <Feather name="chevron-right" size={18} color={c.textFaint} />
         </Pressable>
 
-        {/* ── Identidad del usuario ── */}
-        <View style={s.identity}>
-          <View style={[s.avatar, { backgroundColor: c.ink }]}>
-            <Text style={[s.avatarText, { color: c.bg }]}>{initial}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.userName, { color: c.text }]}>
-              {user?.fullName ?? firstName}
-            </Text>
-            <Text style={[s.userMeta, { color: c.textMuted }]}>
-              {user?.email ?? "—"}
+        {/* ── Hero: avatar + nombre + handle ── */}
+        <View style={s.hero}>
+          <View style={[s.avatar, { backgroundColor: c.greenDim }]}>
+            <Text style={[s.avatarText, { color: c.greenDark }]}>
+              {initials}
             </Text>
           </View>
+          <Text style={[s.userName, { color: c.text }]}>{fullName}</Text>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+            }}
+            style={s.handleRow}
+          >
+            <Text style={[s.handle, { color: c.greenDark }]}>{handle}</Text>
+            <Feather name="copy" size={13} color={c.greenDark} />
+          </Pressable>
         </View>
 
-        {/* ── Groups ── */}
-        {groups.map((g) => (
-          <View key={g.title} style={s.group}>
-            <Text style={[s.groupTitle, { color: c.textMuted }]}>
-              {g.title}
-            </Text>
-            {g.items.map((it, i) => (
-              <Pressable
-                key={it.label}
-                onPress={() => it.path && router.push(it.path as never)}
-                style={[
-                  s.row,
-                  i > 0 && {
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: c.border,
-                  },
-                ]}
-              >
-                <View
-                  style={[s.rowIcon, { backgroundColor: c.surfaceHover }]}
-                >
-                  <Feather name={it.icon} size={15} color={c.text} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.rowLabel, { color: c.text }]}>
-                    {it.label}
-                  </Text>
-                  {it.hint ? (
-                    <Text style={[s.rowHint, { color: c.textMuted }]}>
-                      {it.hint}
-                    </Text>
-                  ) : null}
-                </View>
-                <Feather name="chevron-right" size={16} color={c.textFaint} />
-              </Pressable>
-            ))}
-          </View>
-        ))}
+        {/* ── Sección 1: cuenta ── */}
+        <View style={s.group}>
+          <Row
+            icon="user"
+            label="Datos personales"
+            onPress={() => router.push("/(app)/account")}
+          />
+          <Row
+            icon="credit-card"
+            label="Transferencias y CBU"
+            onPress={() => router.push("/(app)/transfer")}
+          />
+        </View>
 
-        {/* ── Logout ── */}
-        <Tap
-          style={[
-            s.logoutBtn,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-          onPress={() => logout()}
-          haptic="light"
+        <Divider />
+
+        {/* ── Sección 2: preferencias ── */}
+        <View style={s.group}>
+          <ToggleRow
+            icon="bell"
+            label="Allow push notifications"
+            value={pushEnabled}
+            onValueChange={(v) => {
+              Haptics.selectionAsync().catch(() => {});
+              setPushEnabled(v);
+            }}
+          />
+          <Row
+            icon="moon"
+            label="Apariencia"
+            sub={appearanceLabel}
+            onPress={() => setAppearanceOpen(true)}
+          />
+          <Row
+            icon="shield"
+            label="Seguridad"
+            onPress={() => router.push("/(app)/security")}
+          />
+        </View>
+
+        <Divider />
+
+        {/* ── Sección 3: ayuda ── */}
+        <View style={s.group}>
+          <Row
+            icon="message-circle"
+            label="Centro de soporte"
+            onPress={() => router.push("/(app)/support")}
+          />
+          <Row
+            icon="info"
+            label="Sobre Alamos Capital"
+            onPress={() => router.push("/(app)/about")}
+          />
+        </View>
+
+        <Divider />
+
+        {/* ── Sign out ── */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+              () => {},
+            );
+            logout();
+          }}
+          style={s.group}
         >
-          <Feather name="log-out" size={15} color={c.red} />
-          <Text style={[s.logoutText, { color: c.red }]}>Cerrar sesión</Text>
-        </Tap>
+          <View style={s.row}>
+            <View style={[s.iconWrap, { backgroundColor: c.surfaceHover }]}>
+              <Feather name="log-out" size={15} color={c.red} />
+            </View>
+            <Text style={[s.rowLabel, { color: c.red }]}>Cerrar sesión</Text>
+          </View>
+        </Pressable>
+
+        {/* ── Footer ── */}
+        <View style={s.footer}>
+          <Pressable
+            onPress={() =>
+              Linking.openURL("https://alamos.capital/terms").catch(() => {})
+            }
+          >
+            <Text style={[s.footerText, { color: c.textMuted }]}>
+              <Text style={{ fontFamily: fontFamily[600] }}>Alamos</Text>{" "}
+              <Text style={s.underline}>
+                Términos y Condiciones y Política de Privacidad
+              </Text>
+            </Text>
+          </Pressable>
+
+          <View style={s.socialRow}>
+            <Pressable
+              hitSlop={10}
+              onPress={() =>
+                Linking.openURL(
+                  "https://instagram.com/alamos.capital",
+                ).catch(() => {})
+              }
+            >
+              <Feather name="instagram" size={18} color={c.textMuted} />
+            </Pressable>
+            <Pressable
+              hitSlop={10}
+              onPress={() =>
+                Linking.openURL("https://x.com/alamoscapital").catch(() => {})
+              }
+            >
+              <Text style={[s.xIcon, { color: c.textMuted }]}>𝕏</Text>
+            </Pressable>
+          </View>
+
+          <Text style={[s.version, { color: c.textMuted }]}>
+            {APP_VERSION}
+          </Text>
+        </View>
       </ScrollView>
+
+      <AppearanceSheet
+        visible={appearanceOpen}
+        onClose={() => setAppearanceOpen(false)}
+      />
     </View>
+  );
+}
+
+/* ─── Primitives ─── */
+
+function Row({
+  icon,
+  label,
+  sub,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  sub?: string;
+  onPress?: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <Tap
+      style={s.row}
+      onPress={onPress}
+      haptic="selection"
+    >
+      <View style={[s.iconWrap, { backgroundColor: c.surfaceHover }]}>
+        <Feather name={icon} size={15} color={c.text} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowLabel, { color: c.text }]}>{label}</Text>
+        {sub ? (
+          <Text style={[s.rowSub, { color: c.textMuted }]}>{sub}</Text>
+        ) : null}
+      </View>
+      <Feather name="chevron-right" size={16} color={c.textFaint} />
+    </Tap>
+  );
+}
+
+function ToggleRow({
+  icon,
+  label,
+  value,
+  onValueChange,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={s.row}>
+      <View style={[s.iconWrap, { backgroundColor: c.surfaceHover }]}>
+        <Feather name={icon} size={15} color={c.text} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowLabel, { color: c.text }]}>{label}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: c.surfaceSunken, true: c.greenDark }}
+        thumbColor="#FFFFFF"
+      />
+    </View>
+  );
+}
+
+function Divider() {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[s.divider, { backgroundColor: c.border }]}
+    />
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-  title: {
-    fontFamily: fontFamily[700],
-    fontSize: 32,
-    lineHeight: 36,
-    letterSpacing: -1.2,
-  },
 
   /* Pro pill */
   proPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 0,
     marginHorizontal: 20,
-    marginTop: 16,
+    marginBottom: 18,
     paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingVertical: 8,
     borderRadius: radius.lg,
     borderWidth: 1,
   },
   proPillAccent: {
     fontFamily: fontFamily[800],
-    fontSize: 18,
+    fontSize: 16,
     letterSpacing: -0.4,
-    marginLeft: -14,
+    marginLeft: -10,
   },
 
-  /* Identity */
-  identity: {
-    flexDirection: "row",
+  /* Hero (avatar + name + handle) */
+  hero: {
     alignItems: "center",
-    gap: 12,
-    marginHorizontal: 20,
-    marginTop: 22,
-    marginBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 22,
   },
   avatar: {
-    width: 44,
-    height: 44,
+    width: 76,
+    height: 76,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 14,
   },
   avatarText: {
     fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.6,
+    fontSize: 26,
+    letterSpacing: -0.8,
   },
   userName: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 22,
+    letterSpacing: -0.6,
+    marginBottom: 4,
   },
-  userMeta: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
+  handleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  handle: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
     letterSpacing: -0.1,
   },
 
-  /* Groups */
+  /* Groups + rows */
   group: {
-    marginTop: 18,
     paddingHorizontal: 20,
   },
-  groupTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.2,
-    marginBottom: 6,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 20,
+    marginVertical: 10,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: spacing.md + 2,
+    gap: 14,
+    paddingVertical: 14,
   },
-  rowIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
   rowLabel: {
     fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
-  rowHint: {
+  rowSub: {
     fontFamily: fontFamily[500],
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
   },
 
-  /* Logout */
-  logoutBtn: {
-    marginHorizontal: 20,
-    marginTop: 24,
-    paddingVertical: 14,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: "row",
+  /* Footer */
+  footer: {
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    paddingTop: 32,
+    paddingHorizontal: 20,
+    gap: 14,
   },
-  logoutText: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.2,
+  footerText: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    textAlign: "center",
+    letterSpacing: -0.05,
+  },
+  underline: {
+    textDecorationLine: "underline",
+  },
+  socialRow: {
+    flexDirection: "row",
+    gap: 22,
+    marginTop: 4,
+  },
+  xIcon: {
+    fontSize: 18,
+    fontFamily: fontFamily[700],
+  },
+  version: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
   },
 });
