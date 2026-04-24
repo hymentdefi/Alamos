@@ -106,7 +106,7 @@ export default function AlamoScreen() {
             ]}
             hitSlop={6}
           >
-            <AlamosLogo variant="lockupShort" tone="light" size={20} />
+            <AlamosLogo variant="lockupShort" tone="light" size={28} />
             {!isPro ? (
               <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
                 Pro
@@ -114,7 +114,7 @@ export default function AlamoScreen() {
             ) : null}
             <Feather
               name="chevron-right"
-              size={14}
+              size={16}
               color={c.textFaint}
               style={{ marginLeft: 2 }}
             />

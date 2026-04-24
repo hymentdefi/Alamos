@@ -312,15 +312,15 @@ function BaseHome() {
             {greeting}, {firstName}
           </Text>
 
-          <View style={s.amountRow} {...currencyPan.panHandlers}>
-            <Pressable
-              onPress={() => {
-                toggleCurrency();
-                if (!currencyHintSeen) markCurrencyHintSeen();
-              }}
-              hitSlop={10}
-              style={s.flagWrap}
-            >
+          <Pressable
+            style={s.amountRow}
+            onPress={() => {
+              toggleCurrency();
+              if (!currencyHintSeen) markCurrencyHintSeen();
+            }}
+            {...currencyPan.panHandlers}
+          >
+            <View style={s.flagWrap} pointerEvents="none">
               <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
               {/* Indicador persistente — chip chiquito con icono de
                   swap en el borde. Le avisa al ojo que la bandera es
@@ -330,11 +330,10 @@ function BaseHome() {
                   s.flagSwapBadge,
                   { backgroundColor: c.ink, borderColor: c.bg },
                 ]}
-                pointerEvents="none"
               >
                 <Feather name="repeat" size={7} color={c.bg} />
               </View>
-            </Pressable>
+            </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
               size={58}
@@ -364,7 +363,7 @@ function BaseHome() {
                 </View>
               </Animated.View>
             ) : null}
-          </View>
+          </Pressable>
 
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color: trendColor }]}>
