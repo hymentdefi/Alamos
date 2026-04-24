@@ -2,10 +2,12 @@ import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -54,11 +56,20 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
  *            aparentemente React Navigation memoriza el output de
  *            tabBarIcon y los updates no llegaban.
  *
- * Intento 4 (este, y funciona): Reanimated. useSharedValue + worklets
- * corren en el UI thread, no dependen de React reconciliation ni de
- * que el tab bar re-renderice. Cambiamos el value → Reanimated propaga
- * directamente al native Path a través de useAnimatedProps. Anima
- * siempre, en cada cambio de tab, sin depender de keys ni remounts.
+ * Intento 4: Reanimated con dos assignments sueltos (`value = path.len`
+ *            seguido de `value = withTiming(0)`). Funcionaba solo en el
+ *            primer launch porque useSharedValue arrancaba ya en
+ *            path.len. En cambios de tab posteriores withTiming
+ *            capturaba el startValue ANTES de que el primer assignment
+ *            aterrizara en el UI thread, así que animaba de 0 → 0.
+ *
+ * Intento 5 (este, y funciona): Reanimated con withSequence. El reset y
+ * la animación van en UNA sola asignación a `.value`, y withSequence
+ * garantiza que el reset (duration 0) corre primero en el UI thread y
+ * recién después arranca withTiming leyendo el valor ya reseteado. Sin
+ * race, el trazo anima en CADA cambio de tab, no solo en el primer
+ * mount. cancelAnimation antes de asignar evita que taps rápidos dejen
+ * animaciones colgadas cuyo startValue era el viejo.
  */
 export function DrawingIcon({
   path,
@@ -77,23 +88,40 @@ export function DrawingIcon({
   const markerScaleX = useSharedValue(focused ? 0 : 0);
 
   useEffect(() => {
+    // Cancelamos cualquier animación en vuelo antes de arrancar la
+    // siguiente. Si no lo hacemos y el user tapea fast, queda una
+    // withTiming en curso cuyo 'startValue' se leyó antes de nuestro
+    // reset, y termina animando de 0 a 0 (invisible).
+    cancelAnimation(dashOffset);
+    cancelAnimation(scale);
+    cancelAnimation(markerOpacity);
+    cancelAnimation(markerScaleX);
+
     if (focused) {
-      // Reseteamos el dashOffset al largo completo (trazo invisible)
-      // y después animamos a 0 (trazo revelado). Reanimated nota el
-      // cambio inmediato y lo aplica antes de la animación, así que el
-      // trazo arranca realmente invisible aunque vengamos de un estado
-      // previo en que era visible.
-      dashOffset.value = path.len;
-      dashOffset.value = withTiming(0, {
-        duration,
-        easing: Easing.out(Easing.cubic),
-      });
-      scale.value = 0.8;
-      scale.value = withSpring(1, { damping: 12, stiffness: 160 });
-      markerOpacity.value = 0;
-      markerOpacity.value = withTiming(1, { duration: 260 });
-      markerScaleX.value = 0;
-      markerScaleX.value = withSpring(1, { damping: 10, stiffness: 140 });
+      // withSequence garantiza que el reset (duration 0) corre primero
+      // en el UI thread y DESPUÉS arranca la animación leyendo el valor
+      // recién reseteado. Si hacíamos dos assignments sueltos
+      // (`.value = path.len; .value = withTiming(0)`) el withTiming
+      // capturaba el startValue antes de que el primer assignment
+      // aterrizara, y terminaba animando de 0 a 0 — trazo invisible.
+      // Por eso solo se veía la animación en el primer mount (donde
+      // useSharedValue ya arrancaba en path.len).
+      dashOffset.value = withSequence(
+        withTiming(path.len, { duration: 0 }),
+        withTiming(0, { duration, easing: Easing.out(Easing.cubic) }),
+      );
+      scale.value = withSequence(
+        withTiming(0.8, { duration: 0 }),
+        withSpring(1, { damping: 12, stiffness: 160 }),
+      );
+      markerOpacity.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withTiming(1, { duration: 260 }),
+      );
+      markerScaleX.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withSpring(1, { damping: 10, stiffness: 140 }),
+      );
     } else {
       // Tab inactiva: icono completo, marker oculto, sin drama.
       dashOffset.value = 0;
