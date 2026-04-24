@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 interface TabPath {
@@ -25,23 +25,26 @@ interface Props {
 
 const MARKER_COLOR = "#5ac43e";
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
 /**
  * Ícono de tab con dibujado real del SVG: el trazo se traza de punta
  * a punta, como si lo estuviera haciendo una mano.
  *
- * Implementación:
- * - Usamos el patrón clásico de stroke-dasharray + stroke-dashoffset.
- *   Arrancamos con dashoffset = pathLen (trazo invisible), animamos a
- *   0 (trazo completo).
- * - Los props de SVG se animan vía Animated.createAnimatedComponent(Path)
- *   con useNativeDriver: false (obligatorio: los atributos de SVG no
- *   están en la shadow tree nativa).
- * - En paralelo, un pop de scale y el fade-in del marker verde — esas
- *   sí corren en native driver porque son transforms/opacity.
- * - Easing.out(cubic) — arranca rápido, termina lento, como un lápiz
- *   que va frenando al final del trazo.
+ * ¿Por qué setState + RAF en vez de Animated.Value + AnimatedPath?
+ *
+ * Probé el approach 'correcto' con Animated.createAnimatedComponent(Path)
+ * + useNativeDriver:false. La animación del trazo funcionaba la PRIMERA
+ * vez (al montar la app en Home), pero NO volvía a dispararse al
+ * cambiar de tab. Parece un bug conocido de react-native-svg 15: el
+ * AnimatedPath no re-bindea el nuevo valor cuando el Animated.Value
+ * cambia a base de setValue/timing después del primer ciclo.
+ *
+ * La solución confiable: manejar el dashOffset como un state de React
+ * y actualizarlo desde un requestAnimationFrame loop. Cada frame es un
+ * setState → re-render del Path. React Native redibuja el stroke, y
+ * el trazo se anima como se debe, SIEMPRE, en cada cambio de tab.
+ *
+ * Scale del icono y marker verde siguen en Animated con native driver
+ * — transforms y opacity sí funcionan con setValue repetidos.
  */
 export function DrawingIcon({
   path,
@@ -51,45 +54,50 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 720,
 }: Props) {
-  // strokeDashoffset: arranca en pathLen (todo invisible) si focused,
-  // o 0 (todo visible) si no. El useEffect anima cuando cambia a true.
-  const dashOffset = useRef(
-    new Animated.Value(focused ? path.len : 0),
-  ).current;
-  const scale = useRef(new Animated.Value(1)).current;
+  // Offset driven por setState — garantiza que Path re-renderice.
+  // Si focused arranca en true, partimos con offset=pathLen (invisible)
+  // así el useEffect puede tracear. Si arranca en false, offset=0
+  // (visible) para que el icono esté ahí quieto.
+  const [offset, setOffset] = useState(focused ? path.len : 0);
+
+  const scale = useRef(new Animated.Value(focused ? 0.8 : 1)).current;
   const markerOpacity = useRef(
-    new Animated.Value(focused ? 1 : 0),
+    new Animated.Value(focused ? 0 : 0),
   ).current;
-  const markerScale = useRef(
-    new Animated.Value(focused ? 1 : 0),
-  ).current;
+  const markerScale = useRef(new Animated.Value(focused ? 0 : 0)).current;
 
   useEffect(() => {
     if (!focused) {
-      // Inactivo: icono completo, marker oculto. Sin animación — la
-      // tab que queda atrás no necesita dramatismo.
-      dashOffset.stopAnimation(() => dashOffset.setValue(0));
+      setOffset(0);
+      scale.stopAnimation(() => scale.setValue(1));
       markerOpacity.stopAnimation(() => markerOpacity.setValue(0));
       markerScale.stopAnimation(() => markerScale.setValue(0));
-      scale.stopAnimation(() => scale.setValue(1));
       return;
     }
 
-    // Focused: reseteamos y animamos el trazo + el resto.
-    dashOffset.setValue(path.len);
+    // Arranque limpio.
+    setOffset(path.len);
     scale.setValue(0.8);
     markerOpacity.setValue(0);
     markerScale.setValue(0);
 
-    // El trazo del path — JS driver porque es un prop de SVG.
-    const stroke = Animated.timing(dashOffset, {
-      toValue: 0,
-      duration,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    });
+    // Loop RAF que va bajando el offset de pathLen a 0 con ease-out
+    // cubic — arranca rápido, frena al final, como un trazo humano.
+    const startTime = performance.now();
+    let raf: number;
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      setOffset(path.len * (1 - eased));
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
 
-    // Pop del icono + marker — native driver porque son transforms.
+    // Pop del icono + marker en native driver.
     const pop = Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
@@ -109,15 +117,13 @@ export function DrawingIcon({
         useNativeDriver: true,
       }),
     ]);
-
-    stroke.start();
     pop.start();
 
     return () => {
-      stroke.stop();
+      cancelAnimationFrame(raf);
       pop.stop();
     };
-  }, [focused, path.len, duration, dashOffset, scale, markerOpacity, markerScale]);
+  }, [focused, path.len, duration, scale, markerOpacity, markerScale]);
 
   return (
     <View style={s.wrap}>
@@ -133,7 +139,7 @@ export function DrawingIcon({
       />
       <Animated.View style={{ transform: [{ scale }] }}>
         <Svg width={size} height={size} viewBox={viewBox}>
-          <AnimatedPath
+          <Path
             d={path.d}
             stroke={color}
             strokeWidth={2}
@@ -141,7 +147,7 @@ export function DrawingIcon({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeDasharray={path.len}
-            strokeDashoffset={dashOffset as unknown as number}
+            strokeDashoffset={offset}
           />
         </Svg>
       </Animated.View>
