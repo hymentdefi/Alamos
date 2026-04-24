@@ -91,6 +91,19 @@ function DepositInfo() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [cur, setCur] = useState<DepositCurrency>("ars");
+  // Si el usuario toca una cuenta vinculada, nos movemos al sub-flow
+  // de ingresar desde esa cuenta (amount + success). Volver desde ahí
+  // nos devuelve a la info screen sin perder la moneda elegida.
+  const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
+
+  if (depositFrom) {
+    return (
+      <DepositFromAccount
+        account={depositFrom}
+        onBack={() => setDepositFrom(null)}
+      />
+    );
+  }
 
   const data = RECEIVE[cur];
   const linkedForCur = LINKED_ACCOUNTS.filter((a) => a.currency === cur);
@@ -209,7 +222,10 @@ function DepositInfo() {
                     ]}
                   />
                 ) : null}
-                <LinkedAccountRow acc={acc} />
+                <LinkedAccountRow
+                  acc={acc}
+                  onPress={() => setDepositFrom(acc)}
+                />
               </View>
             ))}
           </View>
@@ -376,11 +392,16 @@ function CopyRow({
   );
 }
 
-function LinkedAccountRow({ acc }: { acc: LinkedAccount }) {
+function LinkedAccountRow({
+  acc,
+  onPress,
+}: {
+  acc: LinkedAccount;
+  onPress: () => void;
+}) {
   const { c } = useTheme();
-  const { copied, copy } = useCopyFeedback();
   return (
-    <View style={s.linkedRow}>
+    <Tap style={s.linkedRow} haptic="light" onPress={onPress}>
       <View style={[s.linkedIcon, { backgroundColor: c.surfaceHover }]}>
         <Feather name="home" size={16} color={c.text} />
       </View>
@@ -395,24 +416,12 @@ function LinkedAccountRow({ acc }: { acc: LinkedAccount }) {
           {acc.alias}
         </Text>
       </View>
-      <Tap
-        haptic="none"
-        onPress={() => copy(acc.alias)}
-        style={[
-          s.copyBtn,
-          {
-            backgroundColor: copied ? c.greenDim : c.surfaceHover,
-          },
-        ]}
-        hitSlop={8}
-      >
-        <Feather
-          name={copied ? "check" : "copy"}
-          size={16}
-          color={c.greenDark}
-        />
-      </Tap>
-    </View>
+      {/* Flechita al tocar: dispara el sub-flow de ingresar desde
+          esta cuenta. */}
+      <View style={[s.linkedArrow, { backgroundColor: c.greenDim }]}>
+        <Feather name="arrow-down-left" size={16} color={c.greenDark} />
+      </View>
+    </Tap>
   );
 }
 
@@ -826,6 +835,203 @@ function SendSuccess({
   );
 }
 
+/* ─── Deposit desde una cuenta vinculada (sub-flow de Ingresar) ───
+   Tap en una cuenta → pantalla de monto + slider + keypad + CTA.
+   La moneda es fija (la de la cuenta). Confirmar → success. */
+
+const DEPOSIT_LIMITS = {
+  ars: 5_000_000,
+  usd: 10_000,
+};
+
+function DepositFromAccount({
+  account,
+  onBack,
+}: {
+  account: LinkedAccount;
+  onBack: () => void;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const cur = account.currency;
+  const [amount, setAmount] = useState("0");
+  const [done, setDone] = useState(false);
+
+  const limit = DEPOSIT_LIMITS[cur];
+  const parsed = Number.parseFloat(amount) || 0;
+  const hasAmount = parsed > 0;
+  const exceeds = parsed > limit;
+
+  const currentPct = useMemo(() => {
+    if (limit <= 0) return 0;
+    return Math.min(100, (parsed / limit) * 100);
+  }, [parsed, limit]);
+
+  const applyPct = (pct: number) => {
+    const ratio = pct / 100;
+    const raw = limit * ratio;
+    const v =
+      pct >= 100
+        ? Math.floor(limit)
+        : cur === "ars"
+        ? Math.round(raw)
+        : Math.round(raw * 100) / 100;
+    setAmount(String(v));
+  };
+
+  const handleKey = (k: string) => {
+    if (k === "back") {
+      setAmount((p) => (p.length <= 1 ? "0" : p.slice(0, -1)));
+      return;
+    }
+    if (k === ".") {
+      if (amount.includes(".")) return;
+      setAmount((p) => p + ".");
+      return;
+    }
+    setAmount((p) => {
+      if (p === "0") return k;
+      if (p.includes(".") && p.split(".")[1].length >= 2) return p;
+      return p + k;
+    });
+  };
+
+  const sign = cur === "ars" ? "$" : "US$";
+
+  if (done) {
+    return (
+      <View style={[s.root, { backgroundColor: c.bg, paddingTop: insets.top + 24 }]}>
+        <View style={s.successBlock}>
+          <View style={[s.checkCircle, { backgroundColor: c.green }]}>
+            <Feather name="check" size={32} color={c.ink} />
+          </View>
+          <Text style={[s.successTitle, { color: c.text }]}>
+            Ingreso en camino
+          </Text>
+          <Text style={[s.successBody, { color: c.textMuted }]}>
+            Esperamos {formatMoney(parsed, cur)} desde {account.bankName}{" "}
+            (••••{account.tail}). Cuando el banco confirme, el saldo queda
+            acreditado al toque.
+          </Text>
+        </View>
+        <View style={{ flex: 1 }} />
+        <View style={[{ paddingBottom: insets.bottom + 14, paddingHorizontal: 20 }]}>
+          <Pressable
+            style={[s.cta, { backgroundColor: c.ink }]}
+            onPress={() => router.replace("/(app)")}
+          >
+            <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={onBack}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <View style={s.headerCenter}>
+          <Text style={[s.headerTitle, { color: c.text }]}>Ingresar</Text>
+          <Text style={[s.headerSub, { color: c.textMuted }]} numberOfLines={1}>
+            Desde {account.bankName} · ••••{account.tail}
+          </Text>
+        </View>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={s.sendAmountSection}>
+        <Text style={[s.amountLabel, { color: c.textMuted }]}>
+          ¿Cuánto querés ingresar?
+        </Text>
+        <View style={s.amountRow}>
+          <Text style={[s.amountSign, { color: c.textMuted }]}>{sign}</Text>
+          <Text
+            style={[s.amountValue, { color: exceeds ? c.red : c.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {Number.parseFloat(amount || "0").toLocaleString("es-AR", {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            })}
+            {amount.endsWith(".") ? "," : ""}
+          </Text>
+        </View>
+        <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
+          {exceeds
+            ? `Supera el límite diario (${formatMoney(limit, cur)})`
+            : `Límite diario ${formatMoney(limit, cur)}`}
+        </Text>
+      </View>
+
+      <View style={s.sendSliderRow}>
+        <PercentSlider
+          value={currentPct}
+          onChange={applyPct}
+          disabled={limit <= 0}
+        />
+      </View>
+
+      <View style={s.keypad}>
+        {keys.map((row, ri) => (
+          <View key={ri} style={s.keyRow}>
+            {row.map((k) => (
+              <Tap
+                key={k}
+                onPress={() => handleKey(k)}
+                haptic="selection"
+                pressScale={0.92}
+                style={s.keyBtn}
+              >
+                {k === "back" ? (
+                  <Feather name="delete" size={22} color={c.text} />
+                ) : (
+                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                )}
+              </Tap>
+            ))}
+          </View>
+        ))}
+      </View>
+
+      <View style={[{ paddingBottom: insets.bottom + 14, paddingHorizontal: 20 }]}>
+        <Pressable
+          style={[
+            s.cta,
+            { backgroundColor: hasAmount && !exceeds ? c.ink : c.surfaceHover },
+          ]}
+          onPress={() => {
+            if (!hasAmount || exceeds) return;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+            setDone(true);
+          }}
+          disabled={!hasAmount || exceeds}
+        >
+          <Text
+            style={[
+              s.ctaText,
+              { color: hasAmount && !exceeds ? c.bg : c.textMuted },
+            ]}
+          >
+            Confirmar ingreso
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
@@ -960,6 +1166,15 @@ const s = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Flechita verde al lado de cada cuenta vinculada — invita a
+     ingresar plata desde esa cuenta. */
+  linkedArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
