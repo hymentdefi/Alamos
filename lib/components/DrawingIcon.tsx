@@ -4,7 +4,8 @@ import Svg, { Path } from "react-native-svg";
 
 interface TabPath {
   d: string;
-  /** Legacy, no se usa. Queda por compat. */
+  /** Largo total del trazo en unidades del viewBox (24x24). Con un
+   *  poco de overshoot para que el trazo llegue completo siempre. */
   len: number;
 }
 
@@ -19,21 +20,25 @@ interface Props {
 
 const MARKER_COLOR = "#5ac43e";
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 /**
- * Icono de tab con reveal al activarse.
+ * Icono de tab que SE DIBUJA trazo a trazo (efecto lápiz) cada vez
+ * que el tab se activa.
  *
- * Técnica de reveal: wrapper con overflow:"hidden" y width animado
- * (0 → size). El Svg adentro tiene width fijo = size, así que a
- * medida que el wrapper crece se va "destapando" de izquierda a
- * derecha. Visualmente idéntico a MaskedView pero sin depender de
- * react-native-masked-view, que en Fabric + useNativeDriver:false
- * tiene un bug donde el mask se congela después del primer render
- * (los Animated.Value cambian pero el mask visual no). Ese bug era
- * la causa real de que las animaciones no se vieran en taps
- * posteriores al primer mount.
+ * Técnica: strokeDasharray = path.len + strokeDashoffset animado
+ * desde path.len (trazo invisible, offseteado fuera) hasta 0 (trazo
+ * completo). Al animar el offset con Animated.timing en el thread de
+ * JS (useNativeDriver:false), el Path de react-native-svg redibuja
+ * frame a frame y se ve el trazo "creciendo" siguiendo el contorno.
  *
- * Animated API core (no Reanimated) — viene bundled con RN, sin
- * plugins de babel ni worklets.
+ * Nota histórica: antes habíamos descartado este approach pensando
+ * que react-native-svg no propagaba updates de Animated.Value al
+ * Path nativo después del primer render. Ese diagnóstico estaba
+ * contaminado por otro bug (MaskedView congelándose en Fabric). Con
+ * la arquitectura actual (FloatingTabBar propio fuera del tabBar de
+ * react-navigation + Animated API core) este approach funciona en
+ * cada tap.
  */
 export function DrawingIcon({
   path,
@@ -41,24 +46,30 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 520,
+  duration = 720,
 }: Props) {
-  const reveal = useRef(new Animated.Value(focused ? 0 : 1)).current;
-  const markerActive = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  // dashOffset: path.len = trazo invisible, 0 = trazo completo.
+  const dashOffset = useRef(
+    new Animated.Value(focused ? path.len : 0),
+  ).current;
+  const markerActive = useRef(
+    new Animated.Value(focused ? 1 : 0),
+  ).current;
   const pop = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
 
   useEffect(() => {
     if (focused) {
-      reveal.setValue(0);
-      Animated.timing(reveal, {
-        toValue: 1,
+      // Reset invisible, después animamos a 0 (trazo revelado).
+      dashOffset.setValue(path.len);
+      Animated.timing(dashOffset, {
+        toValue: 0,
         duration,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false, // width no soporta native driver
+        useNativeDriver: false, // strokeDashoffset no soporta native driver
       }).start();
     } else {
-      // Saliendo: el icono queda completo (no hacemos wipe-out).
-      reveal.setValue(1);
+      // Tab inactiva: trazo completo, sin drama.
+      dashOffset.setValue(0);
     }
     Animated.timing(markerActive, {
       toValue: focused ? 1 : 0,
@@ -72,12 +83,7 @@ export function DrawingIcon({
       tension: 120,
       useNativeDriver: true,
     }).start();
-  }, [focused, duration, reveal, markerActive, pop]);
-
-  const revealWidth = reveal.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, size],
-  });
+  }, [focused, duration, path.len, dashOffset, markerActive, pop]);
 
   return (
     <View style={s.wrap}>
@@ -92,24 +98,18 @@ export function DrawingIcon({
         ]}
       />
       <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <Animated.View
-          style={{
-            width: revealWidth,
-            height: size,
-            overflow: "hidden",
-          }}
-        >
-          <Svg width={size} height={size} viewBox={viewBox}>
-            <Path
-              d={path.d}
-              stroke={color}
-              strokeWidth={2}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
-        </Animated.View>
+        <Svg width={size} height={size} viewBox={viewBox}>
+          <AnimatedPath
+            d={path.d}
+            stroke={color}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={path.len}
+            strokeDashoffset={dashOffset}
+          />
+        </Svg>
       </Animated.View>
     </View>
   );
