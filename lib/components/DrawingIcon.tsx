@@ -32,38 +32,35 @@ interface Props {
 
 const MARKER_COLOR = "#5ac43e";
 
-// Velocidad del "lápiz". Con 10ms/unidad un path de 76 unidades dura
-// 760ms, que es el baseline que funciona bien en Inicio.
-const MS_PER_UNIT = 10;
-// Piso por segmento — los trazos cortos (4-7 unidades) a 10ms/unidad
-// darían 40-70ms y se flashean antes de que la retina los agarre.
-// Con 180ms de piso, cada trazo se ve dibujarse.
-const MIN_SEGMENT_MS = 180;
-// Pausa entre trazos — simula al lápiz "levantándose y moviéndose"
-// al próximo subpath. Si ponemos 0 queda una secuencia muy robótica.
-const INTER_SEGMENT_DELAY = 40;
+// Duración total de la animación — IGUAL para todos los iconos, de
+// principio a fin. Así aunque alamo tenga 56 unidades de trazo y
+// news 111, los dos tardan lo mismo en terminar de dibujarse.
+// Dentro de cada icono, el tiempo se reparte proporcional al largo
+// de cada segmento — así la velocidad del lápiz es uniforme dentro
+// de cada dibujo, y el "principio a fin" es igual entre dibujos.
+const TOTAL_DURATION = 900;
+// Gap entre segmentos (simula al lápiz levantándose al próximo
+// subpath). Se descuenta del total para que TOTAL_DURATION sea la
+// duración real de principio a fin, contando gaps.
+const INTER_SEGMENT_DELAY = 20;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-const segmentDuration = (segLen: number) =>
-  Math.max(MIN_SEGMENT_MS, segLen * MS_PER_UNIT);
 
 /**
  * Icono de tab que SE DIBUJA trazo a trazo (efecto lápiz).
  *
- * Por qué segmentos en vez de un solo Path con strokeDashoffset: un
- * <Path d="M... M... M..."> tiene múltiples subpaths, y con un solo
- * strokeDasharray el dash se distribuye proporcionalmente a lo largo
- * del total. Resultado: los subpaths cortos reciben una fracción
- * proporcional del tiempo (por ej. las 3 rayitas de noticias a 7+7+4
- * unidades sobre 108 totales = menos del 20% del tiempo, que a 1080ms
- * total da ~200ms repartidos entre 3 rayitas = ~65ms cada una). Por
- * eso no se veían: se flasheaban fuera del umbral de percepción.
+ * Duración total IGUAL para todos los iconos: TOTAL_DURATION ms de
+ * principio a fin, sin importar cuántos trazos ni qué tan largos.
  *
- * Fix: splitear cada subpath en su propio <Path> con su propia
- * Animated.Value. Secuenciamos las animaciones con delay proporcional
- * a la duración de cada una. Cada trazo corto ahora tiene MIN_SEGMENT_MS
- * (180ms) mínimo, y los largos escalan por MS_PER_UNIT (10ms/unidad).
+ * Cada subpath es su propio <Path> con su propia Animated.Value (si
+ * lo hacíamos con un solo Path multi-subpath, el strokeDashoffset
+ * distribuía el tiempo proporcional al largo total y los subpaths
+ * cortos se flasheaban). Dentro de cada icono, el tiempo se reparte
+ * PROPORCIONAL al largo de cada segmento — así la velocidad del
+ * lápiz es uniforme dentro del dibujo. Entre iconos, como el total
+ * es fijo, iconos con más trazo total (news) dibujan más rápido
+ * por unidad que iconos con menos (alamo), pero tardan lo mismo en
+ * completarse.
  */
 export function DrawingIcon({
   path,
@@ -89,11 +86,16 @@ export function DrawingIcon({
       path.segments.forEach((seg, i) => {
         segmentOffsets[i].setValue(seg.len);
       });
-      // Secuenciamos: cada segmento arranca su animación con un delay
-      // igual a la suma de duraciones + gaps de los anteriores.
+      // Reparto TOTAL_DURATION entre los segmentos proporcional al
+      // largo de cada uno, descontando los gaps. Así el total de
+      // principio a fin (incluyendo gaps) es exactamente
+      // TOTAL_DURATION para todos los iconos.
+      const totalLen = path.segments.reduce((a, s) => a + s.len, 0);
+      const totalGap = Math.max(0, path.segments.length - 1) * INTER_SEGMENT_DELAY;
+      const drawingTime = Math.max(0, TOTAL_DURATION - totalGap);
       let delay = 0;
       path.segments.forEach((seg, i) => {
-        const dur = segmentDuration(seg.len);
+        const dur = (seg.len / totalLen) * drawingTime;
         Animated.timing(segmentOffsets[i], {
           toValue: 0,
           duration: dur,
