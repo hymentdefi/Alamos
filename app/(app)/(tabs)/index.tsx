@@ -20,6 +20,7 @@ import { Tap } from "../../../lib/components/Tap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   useTheme,
@@ -85,6 +86,46 @@ function BaseHome() {
     Haptics.selectionAsync().catch(() => {});
     setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
   }, []);
+
+  // Coachmark: la primera vez que el user entra al Inicio, mostramos
+  // una pill debajo de la bandera explicando que es tappeable. Se
+  // auto-dismissea a los 6s, o cuando el user toca la bandera. Se
+  // persiste en SecureStore para no volver a aparecer.
+  const [currencyHintSeen, setCurrencyHintSeen] = useState(true);
+  const currencyHintOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    SecureStore.getItemAsync("hero:currency_hint_seen")
+      .then((v) => {
+        if (!v) setCurrencyHintSeen(false);
+      })
+      .catch(() => {});
+  }, []);
+  const markCurrencyHintSeen = useCallback(() => {
+    Animated.timing(currencyHintOpacity, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => setCurrencyHintSeen(true));
+    SecureStore.setItemAsync("hero:currency_hint_seen", "1").catch(() => {});
+  }, [currencyHintOpacity]);
+  useEffect(() => {
+    if (currencyHintSeen) return;
+    // Fade in con un pequeño delay para que no aparezca exactamente
+    // al mount.
+    const t = setTimeout(() => {
+      Animated.timing(currencyHintOpacity, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }).start();
+    }, 450);
+    // Auto-dismiss a los 6s.
+    const d = setTimeout(markCurrencyHintSeen, 6000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(d);
+    };
+  }, [currencyHintSeen, currencyHintOpacity, markCurrencyHintSeen]);
   // Swipe horizontal sobre el hero para cambiar de moneda.
   const currencyPan = useRef(
     PanResponder.create({
@@ -149,10 +190,32 @@ function BaseHome() {
   }, []);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
-  const total = useMemo(
-    () => held.reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0),
+  // Portfolios separados: los activos denominados en pesos van por un
+  // lado y los denominados en dólares por otro. No convertimos — sólo
+  // sumamos los que ya cotizan en cada moneda.
+  const arsTotal = useMemo(
+    () =>
+      held
+        .filter((a) => a.category !== "crypto" && a.ticker !== "USD")
+        .reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0),
     [held],
   );
+  const usdTotal = useMemo(
+    () =>
+      held
+        .filter((a) => a.category === "crypto" || a.ticker === "USD")
+        .reduce((sum, a) => {
+          // Los USD ya están en USD (qty directo). Crypto acá está
+          // priceada en ARS mock, así que sacamos su equivalente USD
+          // para exhibir la tenencia en su moneda nativa.
+          if (a.ticker === "USD") return sum + (a.qty ?? 0);
+          return sum + (a.price * (a.qty ?? 1)) / USD_RATE;
+        }, 0),
+    [held],
+  );
+  // `total` sigue siendo el valor combinado en ARS — se usa para el
+  // chart del período (la serie de puntos se genera en base a este).
+  const total = arsTotal + usdTotal * USD_RATE;
 
   const series = useMemo(
     () => generateSeries(total, rangeChanges[range], `home-${range}`),
@@ -171,6 +234,15 @@ function BaseHome() {
   const displayDelta = current - rangeStart;
   const displayPct = (displayDelta / rangeStart) * 100;
   const displayIsUp = displayDelta >= 0;
+  // Valores 'vigentes' por moneda — durante el scrub, cada portfolio
+  // escala por el mismo ratio que el total (current/total).
+  const scrubRatio = total > 0 ? current / total : 1;
+  const arsCurrent = arsTotal * scrubRatio;
+  const usdCurrent = usdTotal * scrubRatio;
+  // Delta del período expresado en cada moneda.
+  const deltaRatio = total > 0 ? displayDelta / total : 0;
+  const arsDelta = arsTotal * deltaRatio;
+  const usdDelta = usdTotal * deltaRatio;
 
   const timeLabel =
     scrubIndex != null
@@ -241,15 +313,57 @@ function BaseHome() {
           </Text>
 
           <View style={s.amountRow} {...currencyPan.panHandlers}>
-            <Pressable onPress={toggleCurrency} hitSlop={10}>
+            <Pressable
+              onPress={() => {
+                toggleCurrency();
+                if (!currencyHintSeen) markCurrencyHintSeen();
+              }}
+              hitSlop={10}
+              style={s.flagWrap}
+            >
               <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
+              {/* Indicador persistente — chip chiquito con icono de
+                  swap en el borde. Le avisa al ojo que la bandera es
+                  interactiva. */}
+              <View
+                style={[
+                  s.flagSwapBadge,
+                  { backgroundColor: c.ink, borderColor: c.bg },
+                ]}
+                pointerEvents="none"
+              >
+                <Feather name="repeat" size={7} color={c.bg} />
+              </View>
             </Pressable>
             <AmountDisplay
-              value={currency === "ARS" ? current : current / USD_RATE}
+              value={currency === "ARS" ? arsCurrent : usdCurrent}
               size={58}
               weight={700}
               prefix={currency === "ARS" ? "$" : "US$"}
             />
+            {/* Coachmark: sólo la primera vez, pill debajo de la
+                bandera con una flecha para arriba indicando que sea
+                tappeada. */}
+            {!currencyHintSeen ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  s.currencyHintWrap,
+                  { opacity: currencyHintOpacity },
+                ]}
+              >
+                <View
+                  style={[s.currencyHintArrow, { borderBottomColor: c.ink }]}
+                />
+                <View
+                  style={[s.currencyHintPill, { backgroundColor: c.ink }]}
+                >
+                  <Text style={[s.currencyHintText, { color: c.bg }]}>
+                    Tocá para ver en {currency === "ARS" ? "USD" : "ARS"}
+                  </Text>
+                </View>
+              </Animated.View>
+            ) : null}
           </View>
 
           <View style={s.deltaRow}>
@@ -258,11 +372,10 @@ function BaseHome() {
             </Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
               {currency === "ARS"
-                ? formatARS(Math.abs(displayDelta))
-                : `US$ ${(Math.abs(displayDelta) / USD_RATE).toLocaleString(
-                    "es-AR",
-                    { maximumFractionDigits: 2 },
-                  )}`}
+                ? formatARS(Math.abs(arsDelta))
+                : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
+                    maximumFractionDigits: 2,
+                  })}`}
             </Text>
             <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
@@ -1250,6 +1363,48 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     marginBottom: 10,
+    position: "relative",
+  },
+  flagWrap: {
+    position: "relative",
+  },
+  flagSwapBadge: {
+    position: "absolute",
+    bottom: -3,
+    right: -4,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  currencyHintWrap: {
+    position: "absolute",
+    top: 62,
+    left: -4,
+    alignItems: "flex-start",
+    zIndex: 20,
+  },
+  currencyHintArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    marginLeft: 16,
+  },
+  currencyHintPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.md,
+  },
+  currencyHintText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
   balance: {
     fontFamily: fontFamily[700],
