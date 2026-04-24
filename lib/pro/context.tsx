@@ -8,6 +8,7 @@ import {
 } from "react";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
+import { useRouter } from "expo-router";
 import { ProTransition } from "./Transition";
 
 const STORAGE_KEY = "pro_mode";
@@ -33,6 +34,7 @@ const ProContext = createContext<ProContextValue>({
 });
 
 export function ProProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [isPro, setIsPro] = useState(false);
   const [target, setTarget] = useState<ProTransitionTarget>(null);
 
@@ -59,7 +61,12 @@ export function ProProvider({ children }: { children: React.ReactNode }) {
       SecureStore.setItemAsync(STORAGE_KEY, next ? "1" : "0").catch(() => {});
       return next;
     });
-  }, []);
+    // Después de switchear de modo, llevar SIEMPRE al usuario al
+    // Inicio. La nav ocurre por detrás del overlay opaco del
+    // Transition, así que el user no ve el salto — al hacer fade-out
+    // queda directamente en el home del modo nuevo.
+    router.replace("/(app)/(tabs)");
+  }, [router]);
 
   const endTransition = useCallback(() => {
     setTarget(null);

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import * as Haptics from "expo-haptics";
 
 interface Props {
   path: string;
@@ -38,29 +37,10 @@ export function DrawingIcon({
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const [dashOffset, setDashOffset] = useState(0);
-  const didMount = useRef(false);
 
   useEffect(() => {
-    // Primer render: snapshot del estado sin animación — evita que
-    // el tab inicialmente activo dispare haptic al abrir la app.
-    if (!didMount.current) {
-      didMount.current = true;
-      if (focused) {
-        scale.setValue(1);
-        markerOpacity.setValue(1);
-        markerScale.setValue(1);
-        setDashOffset(0);
-      } else {
-        scale.setValue(1);
-        markerOpacity.setValue(0);
-        markerScale.setValue(0);
-        setDashOffset(0);
-      }
-      return;
-    }
-
-    // Unfocus: fade del marker + reset del ícono.
     if (!focused) {
+      // Reset estados sin animación intensa — sólo el marker fade.
       scale.stopAnimation(() => scale.setValue(1));
       setDashOffset(0);
       Animated.parallel([
@@ -78,9 +58,10 @@ export function DrawingIcon({
       return;
     }
 
-    // Focus: haptic + secuencia completa de entrada.
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-
+    // Focus: scale pop del icono + marker grow + drawing del stroke.
+    // (El haptic lo dispara screenListeners.tabPress arriba en el
+    // layout para garantizar que suene aunque este efecto no se re-
+    // ejecute por algún motivo.)
     scale.setValue(0.3);
     const iconSpring = Animated.spring(scale, {
       toValue: 1,
@@ -95,7 +76,7 @@ export function DrawingIcon({
     const markerAnim = Animated.parallel([
       Animated.timing(markerOpacity, {
         toValue: 1,
-        duration: 220,
+        duration: 240,
         useNativeDriver: true,
       }),
       Animated.spring(markerScale, {
@@ -107,8 +88,6 @@ export function DrawingIcon({
     ]);
     markerAnim.start();
 
-    // Drawing del stroke vía RAF — evita bugs conocidos con
-    // strokeDashoffset animado nativo en react-native-svg.
     setDashOffset(DASH_LEN);
     let start: number | null = null;
     let raf: number;

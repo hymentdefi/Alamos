@@ -229,7 +229,7 @@ function BaseHome() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <View style={[s.chartWrap, { marginTop: 18 }]}>
+          <View style={[s.chartWrap, { marginTop: 14 }]}>
             <ChartSheen color={chartColor} height={300} />
             <Sparkline
               series={series}
@@ -382,13 +382,9 @@ function indexLabel(r: Range, index: number, length: number): string {
 /* ─── Subcomponentes ─── */
 
 /* ─── Sheen animado detrás del chart — pasaje de luz infinito ─── */
-const SHEEN_WIDTH = 140;
+const SHEEN_WIDTH = 160;
 function ChartSheen({ color, height }: { color: string; height: number }) {
   const { width: SCREEN_W } = Dimensions.get("window");
-  // Padding horizontal del sparkline es 0 (está dentro del heroBlock que
-  // tiene paddingHorizontal:24). El sheen barre el ancho visible del
-  // chart, que es SCREEN_W - 48.
-  const travel = SCREEN_W - 48 + SHEEN_WIDTH;
   const tx = useRef(new Animated.Value(-SHEEN_WIDTH)).current;
 
   useEffect(() => {
@@ -396,11 +392,11 @@ function ChartSheen({ color, height }: { color: string; height: number }) {
       Animated.sequence([
         Animated.timing(tx, {
           toValue: SCREEN_W - 48,
-          duration: 4200,
+          duration: 5600,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.delay(1600),
+        Animated.delay(2400),
         Animated.timing(tx, {
           toValue: -SHEEN_WIDTH,
           duration: 0,
@@ -410,7 +406,7 @@ function ChartSheen({ color, height }: { color: string; height: number }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [tx, SCREEN_W, travel]);
+  }, [tx, SCREEN_W]);
 
   return (
     <Animated.View
@@ -421,18 +417,21 @@ function ChartSheen({ color, height }: { color: string; height: number }) {
         top: 0,
         bottom: 0,
         width: SHEEN_WIDTH,
-        transform: [{ translateX: tx }, { skewX: "-12deg" }],
+        transform: [{ translateX: tx }, { skewX: "-14deg" }],
       }}
     >
+      {/* Sheen muy sutil: alpha max ~6% en el centro, transparente
+          a los costados. Apenas un reflejo que se nota si estás
+          mirando, no una barra luminosa. */}
       <LinearGradient
         colors={[
-          "rgba(90, 196, 62, 0)",
-          color + "30",
-          color + "60",
-          color + "30",
-          "rgba(90, 196, 62, 0)",
+          color + "00",
+          color + "0A",
+          color + "12",
+          color + "0A",
+          color + "00",
         ]}
-        locations={[0, 0.3, 0.5, 0.7, 1]}
+        locations={[0, 0.35, 0.5, 0.65, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={{ flex: 1, height }}
@@ -882,7 +881,7 @@ const s = StyleSheet.create({
   heroDivider: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 8,
   },
   chartWrap: {
     position: "relative",
@@ -1123,7 +1122,7 @@ const s = StyleSheet.create({
   rangeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: 0,
     paddingHorizontal: 4,
   },
   rangePill: {

@@ -1,6 +1,8 @@
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
@@ -11,7 +13,11 @@ import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 // absolute usando estas constantes.
 const ISLAND_HEIGHT = 66;
 const ISLAND_SIDE_GAP = 28;
-const ISLAND_TOP_GAP = 10;
+// Reserva de espacio arriba del island: la mitad inferior es backdrop
+// sólido, la mitad superior es un gradient que va de transparente al
+// color del backdrop. Así no hay línea divisoria visible.
+const ISLAND_TOP_GAP = 28;
+const BACKDROP_FADE = 28;
 
 export default function TabsLayout() {
   const { mode, c } = useTheme();
@@ -36,15 +42,35 @@ export default function TabsLayout() {
       // dentro de cada tab el usuario navega con push/back, pero entre
       // tabs solo se mueve vía el nav bar.
       backBehavior="none"
+      // Garantizamos haptic en CADA tap, sin depender del lifecycle del
+      // tabBarIcon (que en algunos casos no dispara la anim).
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+            () => {},
+          );
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
         tabBarBackground: () => (
           <View style={StyleSheet.absoluteFillObject}>
-            {/* Backdrop semi-opaco que arranca EXACTAMENTE donde arranca
-                el island — no un píxel más arriba. Cubre toda la franja
-                inferior del island hacia abajo (incluido el gap hasta
-                el piso del celular). */}
+            {/* Fade gradient: arriba del backdrop hace la transición
+                suave desde transparente al color del backdrop. Evita
+                la 'línea divisoria' notable entre el contenido y el
+                nav bar. */}
+            <LinearGradient
+              colors={[backdropBg.replace(/[\d.]+\)$/, "0)"), backdropBg]}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: BACKDROP_FADE,
+              }}
+            />
+            {/* Backdrop sólido desde donde arranca el island hasta el piso. */}
             <View
               style={{
                 position: "absolute",
