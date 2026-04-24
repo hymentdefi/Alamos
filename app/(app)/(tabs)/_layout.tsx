@@ -11,12 +11,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
+import MaskedView from "@react-native-masked-view/masked-view";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
 const ISLAND_HEIGHT = 68;
 const ISLAND_SIDE_GAP = 16;
+// Cuánto se extiende el blur de backdrop ABAJO del nav, hasta el bottom
+// del teléfono. Este es el área "tapada" por blur.
+// Cuánto se extiende ARRIBA del nav, fadeando suavemente. El blur va de
+// transparente (top de esta zona) a full (donde arranca el nav).
+const BACKDROP_FADE_HEIGHT = 60;
 
 const ACTIVE_COLOR = "#5ac43e";
 
@@ -35,15 +42,19 @@ const TAB_ROUTES: TabRoute[] = [
 ];
 
 /**
- * Nav bar flotante estilo glassmorphism (inspirada en Naranja X).
+ * Nav bar flotante glassmorphism con backdrop blur extendido.
  *
- * - Base: <BlurView> para el efecto vidrio real — deja pasar el
- *   contenido de atrás difuminado. Sin backdrop sólido debajo: la
- *   isla flota encima del contenido.
- * - Tab activa: rounded pill semi-opaco detrás del icono+label, que
- *   aparece con fade/scale al focusear. Ese es el "menos translúcido
- *   en la sección activa".
- * - Sin marker verde arriba del icono (el pill lo reemplaza).
+ * Layers (bottom to top):
+ *   1. Backdrop blur — cubre desde BACKDROP_FADE_HEIGHT arriba del nav
+ *      hasta el bottom del teléfono. Hace el efecto "el contenido
+ *      detrás del nav está borroso". Tiene un fade-in suave en el
+ *      borde superior (LinearGradient como mask) para que el inicio
+ *      del blur no sea brusco.
+ *   2. Floating island — la pill propia con su propio blur (más
+ *      intenso) y los tab items adentro.
+ *
+ * Tab activa: pill verde brand atrás del icono+label que aparece con
+ * fade al focusear.
  */
 function FloatingTabBar() {
   const router = useRouter();
@@ -60,47 +71,86 @@ function FloatingTabBar() {
     router.navigate(route.href as never);
   };
 
+  const totalBackdropHeight = BACKDROP_FADE_HEIGHT + ISLAND_HEIGHT + bottomGap;
+
   return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        styles.container,
-        { bottom: bottomGap, left: ISLAND_SIDE_GAP, right: ISLAND_SIDE_GAP },
-      ]}
-    >
-      <BlurView
-        tint={isDark ? "dark" : "light"}
-        intensity={Platform.OS === "ios" ? 60 : 90}
-        style={[
-          styles.island,
-          {
-            height: ISLAND_HEIGHT,
-            // Con bg blanco puro (light) o negro puro (dark) el glass
-            // necesita un tinte que lo distinga del bg. Blanco-sobre-
-            // blanco y negro-sobre-negro desaparecen.
-            backgroundColor: isDark
-              ? "rgba(18, 18, 18, 0.70)"
-              : "rgba(250, 250, 250, 0.78)",
-            borderColor: isDark
-              ? "rgba(255, 255, 255, 0.06)"
-              : "rgba(0, 0, 0, 0.06)",
-          },
-        ]}
+    <View pointerEvents="box-none" style={styles.container}>
+      {/* Layer 1: backdrop blur full-width, con fade suave en el top.
+          MaskedView aplica el LinearGradient como alpha mask sobre el
+          BlurView — donde el mask es transparente, el blur no se ve;
+          donde es opaco, se ve full. Locations limita el fade al
+          BACKDROP_FADE_HEIGHT superior; el resto queda full. */}
+      <MaskedView
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: totalBackdropHeight,
+        }}
+        maskElement={
+          <LinearGradient
+            colors={["transparent", "black"]}
+            locations={[0, BACKDROP_FADE_HEIGHT / totalBackdropHeight]}
+            style={{ flex: 1 }}
+          />
+        }
       >
-        {TAB_ROUTES.map((route, index) => {
-          const focused = index === activeIndex;
-          return (
-            <TabItem
-              key={route.name}
-              route={route}
-              focused={focused}
-              isDark={isDark}
-              inactiveColor={c.textSecondary}
-              onPress={() => onPressTab(route, index)}
-            />
-          );
-        })}
-      </BlurView>
+        <BlurView
+          tint={isDark ? "dark" : "light"}
+          intensity={Platform.OS === "ios" ? 28 : 50}
+          style={{
+            flex: 1,
+            // Tinte muy sutil para reforzar el efecto vidrio sin
+            // tapar tanto el contenido detrás.
+            backgroundColor: isDark
+              ? "rgba(0, 0, 0, 0.20)"
+              : "rgba(255, 255, 255, 0.25)",
+          }}
+        />
+      </MaskedView>
+
+      {/* Layer 2: floating island sobre el backdrop */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: bottomGap,
+          left: ISLAND_SIDE_GAP,
+          right: ISLAND_SIDE_GAP,
+        }}
+      >
+        <BlurView
+          tint={isDark ? "dark" : "light"}
+          intensity={Platform.OS === "ios" ? 60 : 90}
+          style={[
+            styles.island,
+            {
+              height: ISLAND_HEIGHT,
+              backgroundColor: isDark
+                ? "rgba(18, 18, 18, 0.70)"
+                : "rgba(250, 250, 250, 0.78)",
+              borderColor: isDark
+                ? "rgba(255, 255, 255, 0.06)"
+                : "rgba(0, 0, 0, 0.06)",
+            },
+          ]}
+        >
+          {TAB_ROUTES.map((route, index) => {
+            const focused = index === activeIndex;
+            return (
+              <TabItem
+                key={route.name}
+                route={route}
+                focused={focused}
+                isDark={isDark}
+                inactiveColor={c.textSecondary}
+                onPress={() => onPressTab(route, index)}
+              />
+            );
+          })}
+        </BlurView>
+      </View>
     </View>
   );
 }
@@ -114,8 +164,6 @@ interface TabItemProps {
 }
 
 function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProps) {
-  // pillOpacity: 0 inactivo, 1 activo. Drivea el highlight detrás del
-  // icono+label (el "menos translúcido" de Naranja X).
   const pillOpacity = useRef(
     new Animated.Value(focused ? 1 : 0),
   ).current;
@@ -146,10 +194,6 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
           styles.activePill,
           {
             opacity: pillOpacity,
-            // Tinte verde brand en la pill activa — sobre glass neutra
-            // el verde firma "este es el tab activo" on-brand. En
-            // trading apps es más informativo que un blanco más
-            // opaco (white-on-white no lee).
             backgroundColor: isDark
               ? "rgba(14, 203, 129, 0.14)"
               : "rgba(0, 200, 5, 0.10)",
@@ -189,6 +233,9 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   container: {
     position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   island: {
     flexDirection: "row",
