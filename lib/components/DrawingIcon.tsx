@@ -1,22 +1,19 @@
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Path } from "react-native-svg";
 import Animated, {
   Easing,
   useAnimatedStyle,
-  useDerivedValue,
+  useSharedValue,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 
 interface TabPath {
-  /** SVG `d` del icono. */
   d: string;
-  /**
-   * Largo total del trazo (legacy, del approach viejo con
-   * strokeDashoffset). Se mantiene en el tipo por compat con el resto
-   * del código; ya no lo usamos.
-   */
+  /** Legacy, ya no se usa. Queda en el tipo por compat. */
   len: number;
 }
 
@@ -34,39 +31,16 @@ const MARKER_COLOR = "#5ac43e";
 /**
  * Icono de tab con reveal left-to-right al activarse.
  *
- * Historia (que no vuelva a romperse):
+ * Este componente asume que está renderizado en un árbol de React
+ * VANILLA (no dentro del tabBarIcon de @react-navigation/bottom-tabs,
+ * que tiene un double-render que congela focused). Ver
+ * app/(app)/(tabs)/_layout.tsx — la barra vive como sibling de <Tabs>
+ * y consume usePathname() directo.
  *
- * 1-6. Todo intento de animar strokeDashoffset sobre un react-native-
- *      svg Path falló con el mismo síntoma: anima solo en el primer
- *      mount. Probamos Animated, Reanimated, withSequence, setState+
- *      RAF, key-based remount... nada. TL;DR: react-native-svg no
- *      propaga updates de animated props al Path nativo después del
- *      primer render.
- *
- * 7. Pasamos a MaskedView + Animated.View width. El Path se renderiza
- *    estático y la animación va en una View común. Esto DEBÍA andar.
- *    No andaba tampoco.
- *
- * Causa raíz encontrada (deep research): el renderer interno de
- * @react-navigation/bottom-tabs (el nav que envuelve expo-router) NO
- * pasa focused actualizado al componente que devuelve tabBarIcon.
- * Monta DOS instancias simultáneas — una con focused:true y otra con
- * focused:false — y solo hace cross-fade de opacity en el padre. Las
- * dos instancias hijas tienen focused CONSTANTE todo el ciclo de vida.
- * Por eso useEffect([focused]) nunca volvía a correr y ninguna de
- * nuestras animaciones disparaba. Confirmado en el source:
- * github.com/react-navigation/react-navigation/blob/main/packages/
- * bottom-tabs/src/views/TabBarIcon.tsx
- *
- * Fix: sacar el render del pipeline de bottom-tabs pasando tabBar
- * propio al <Tabs>, donde focused sí cambia en cada render. Ver
- * app/(app)/(tabs)/_layout.tsx — FloatingTabBar.
- *
- * Patrón de animación: useDerivedValue con withTiming/withSpring. El
- * worklet re-corre en cada render (nuevo closure con focused nuevo),
- * así Reanimated encadena automáticamente la nueva animación sobre la
- * anterior. No hay useEffect ni withSequence reset — más idiomático
- * en Reanimated 4.
+ * Tres shared values independientes:
+ *   - reveal (0→1): ancho de la mask que revela el icono.
+ *   - markerActive (0→1): opacity + scaleX del marker verde de arriba.
+ *   - pop: scale del icono (spring pop al activarse).
  */
 export function DrawingIcon({
   path,
@@ -76,29 +50,50 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 520,
 }: Props) {
-  // progress: 0 (inactive) → 1 (active). Drivea reveal, marker opacity
-  // y marker scaleX.
-  const progress = useDerivedValue(() =>
-    withTiming(focused ? 1 : 0, {
-      duration: focused ? duration : 200,
-      easing: Easing.out(Easing.cubic),
-    }),
-  );
+  // reveal: 0 = icono oculto (mask vacío), 1 = icono completo.
+  // Al mount inicializamos según focused:
+  //   - focused=true  → arrancamos en 0 para que useEffect lo anime a 1.
+  //   - focused=false → arrancamos en 1 (icono ya visible, sin anim).
+  const reveal = useSharedValue(focused ? 0 : 1);
+  const markerActive = useSharedValue(focused ? 1 : 0);
+  const pop = useSharedValue(focused ? 1 : 0.92);
 
-  // pop: scale del icono al activarse.
-  const pop = useDerivedValue(() =>
-    withSpring(focused ? 1 : 0.92, { damping: 12, stiffness: 180 }),
-  );
+  useEffect(() => {
+    if (focused) {
+      // withSequence: primero ASEGURA que el valor está en 0 (si
+      // venimos de un ciclo previo de reveal quedaba en 1), después
+      // anima a 1. Sin withSequence, los dos assignments sueltos
+      // pueden carrear con el withTiming leyendo el startValue
+      // anterior.
+      reveal.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withTiming(1, { duration, easing: Easing.out(Easing.cubic) }),
+      );
+    } else {
+      // Saliendo de focused: el icono queda dibujado, sin animación de
+      // wipe-out. El cambio visual del estado inactivo viene por el
+      // color prop + markerActive fadeando a 0.
+      reveal.value = 1;
+    }
+    markerActive.value = withTiming(focused ? 1 : 0, {
+      duration: focused ? 280 : 180,
+      easing: Easing.out(Easing.cubic),
+    });
+    pop.value = withSpring(focused ? 1 : 0.92, {
+      damping: 12,
+      stiffness: 180,
+    });
+  }, [focused, duration, reveal, markerActive, pop]);
 
   const iconScaleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pop.value }],
   }));
   const maskStyle = useAnimatedStyle(() => ({
-    width: progress.value * size,
+    width: reveal.value * size,
   }));
   const markerStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ scaleX: progress.value }],
+    opacity: markerActive.value,
+    transform: [{ scaleX: markerActive.value }],
   }));
 
   return (

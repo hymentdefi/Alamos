@@ -1,5 +1,4 @@
-import { Tabs } from "expo-router";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,32 +14,65 @@ const BACKDROP_FADE = 28;
 
 const ACTIVE_COLOR = "#5ac43e";
 
-// Ruta (file-based) → TabPath del DrawingIcon.
-const pathsByRoute: Record<string, (typeof tabPaths)[keyof typeof tabPaths]> = {
-  index: tabPaths.home,
-  explore: tabPaths.markets,
-  news: tabPaths.news,
-  alamo: tabPaths.alamo,
+type TabRoute = {
+  /** Pathname que devuelve usePathname() cuando esta tab está activa. */
+  pathname: string;
+  /** Ruta para navegar via router.navigate(). En expo-router, mismo
+   *  que pathname. */
+  href: string;
+  title: string;
+  path: (typeof tabPaths)[keyof typeof tabPaths];
 };
 
+// Los grupos `(app)` y `(tabs)` son segmentos "silenciosos" en
+// expo-router — no aparecen en el pathname. Así que `index.tsx` es "/"
+// y los demás usan su nombre directo.
+const TAB_ROUTES: TabRoute[] = [
+  { pathname: "/", href: "/", title: "Inicio", path: tabPaths.home },
+  {
+    pathname: "/explore",
+    href: "/explore",
+    title: "Mercado",
+    path: tabPaths.markets,
+  },
+  {
+    pathname: "/news",
+    href: "/news",
+    title: "Noticias",
+    path: tabPaths.news,
+  },
+  {
+    pathname: "/alamo",
+    href: "/alamo",
+    title: "Tu Alamo",
+    path: tabPaths.alamo,
+  },
+];
+
 /**
- * TabBar custom. Renderizamos los tab items nosotros en vez de dejarle
- * el render a @react-navigation/bottom-tabs via tabBarIcon.
+ * Nav bar flotante. Vive como SIBLING de <Tabs>, no como su tabBar.
  *
- * Por qué custom: con tabBarIcon la animación del DrawingIcon se
- * congelaba después del primer mount — ni el useEffect de focused ni
- * los updates de Reanimated/SVG se propagaban al Path nativo. Probé 7
- * approaches distintos (Animated overlay, strokeDashoffset con 3 APIs
- * distintas, withSequence, force-remount con key, MaskedView) y todos
- * morían en el mismo síntoma. El denominador común era que el icon
- * vivía dentro del render pipeline de React Navigation.
+ * Historia: nada de lo que intentamos a través del pipeline de
+ * @react-navigation/bottom-tabs funcionó. El último intento
+ * (tabBar={} prop con state/descriptors/navigation) tampoco, por
+ * motivos que no llegamos a diagnosticar del todo — probablemente el
+ * wrapper de bottom-tabs en expo-router mete algo en el medio que
+ * rompe la propagación de focused aunque lo calculemos nosotros.
  *
- * Moviendo el render a un componente que controlamos nosotros, el
- * árbol de React es vanilla: cuando state.index cambia, el TabBar
- * re-renderiza, cada DrawingIcon recibe el nuevo focused, useEffect
- * corre, Reanimated anima. Sin memoización oculta en el medio.
+ * Solución: sacar la barra ENTERA del árbol de <Tabs>. <Tabs> sigue
+ * ahí para manejar navegación y preservar el estado de cada pantalla
+ * (las 4 quedan montadas), pero pasamos tabBar={() => null} para que
+ * no renderice nada visible. El FloatingTabBar se renderiza como
+ * hermano, consume el pathname global de expo-router con
+ * usePathname() — un hook React normal que triggerea re-render cuando
+ * la ruta cambia — y navega con router.navigate().
+ *
+ * No hay intermediarios: pathname cambia → FloatingTabBar re-renderiza
+ * → DrawingIcon recibe focused nuevo → Reanimated anima.
  */
-function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function FloatingTabBar() {
+  const pathname = usePathname();
+  const router = useRouter();
   const { mode, c } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
@@ -56,105 +88,67 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   return (
     <View
+      pointerEvents="box-none"
       style={[
         styles.container,
         { height: ISLAND_TOP_GAP + ISLAND_HEIGHT + bottomGap },
       ]}
     >
-      {/* Fade gradient arriba — evita la línea divisoria entre
-          contenido y nav bar. */}
       <LinearGradient
         pointerEvents="none"
         colors={[backdropBgTransparent, backdropBg]}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: BACKDROP_FADE,
-        }}
+        style={styles.fadeGradient}
       />
-      {/* Backdrop sólido desde donde arranca el island hasta el piso. */}
       <View
         pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: ISLAND_TOP_GAP,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: backdropBg,
-        }}
+        style={[
+          styles.backdrop,
+          { top: ISLAND_TOP_GAP, backgroundColor: backdropBg },
+        ]}
       />
-      {/* Island flotante con los tab items adentro. */}
       <View
-        style={{
-          position: "absolute",
-          top: ISLAND_TOP_GAP,
-          left: ISLAND_SIDE_GAP,
-          right: ISLAND_SIDE_GAP,
-          height: ISLAND_HEIGHT,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-around",
-          paddingHorizontal: 8,
-          backgroundColor: islandBg,
-          borderRadius: radius.pill,
-          borderWidth: 1,
-          borderColor: c.border,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: 0.14,
-          shadowRadius: 24,
-          elevation: 16,
-        }}
+        style={[
+          styles.island,
+          {
+            top: ISLAND_TOP_GAP,
+            left: ISLAND_SIDE_GAP,
+            right: ISLAND_SIDE_GAP,
+            height: ISLAND_HEIGHT,
+            backgroundColor: islandBg,
+            borderColor: c.border,
+          },
+        ]}
       >
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const { options } = descriptors[route.key];
-          const label =
-            typeof options.tabBarLabel === "string"
-              ? options.tabBarLabel
-              : (options.title ?? route.name);
-          const tabPath = pathsByRoute[route.name];
+        {TAB_ROUTES.map((route) => {
+          const focused = pathname === route.pathname;
           const color = focused ? ACTIVE_COLOR : c.textSecondary;
 
           const onPress = () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
               () => {},
             );
-            const event = navigation.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
+            if (!focused) {
+              router.navigate(route.href);
             }
           };
 
           return (
             <Pressable
-              key={route.key}
+              key={route.pathname}
               accessibilityRole="button"
               accessibilityState={focused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+              accessibilityLabel={route.title}
               onPress={onPress}
               style={styles.tabItem}
               hitSlop={8}
             >
-              {tabPath ? (
-                <DrawingIcon
-                  path={tabPath}
-                  focused={focused}
-                  color={color}
-                />
-              ) : null}
-              <Text
-                numberOfLines={1}
-                style={[styles.label, { color }]}
-              >
-                {label}
+              <DrawingIcon
+                path={route.path}
+                focused={focused}
+                color={color}
+              />
+              <Text numberOfLines={1} style={[styles.label, { color }]}>
+                {route.title}
               </Text>
             </Pressable>
           );
@@ -166,25 +160,56 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      backBehavior="none"
-      tabBar={(props) => <FloatingTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tabs.Screen name="index" options={{ title: "Inicio" }} />
-      <Tabs.Screen name="explore" options={{ title: "Mercado" }} />
-      <Tabs.Screen name="news" options={{ title: "Noticias" }} />
-      <Tabs.Screen name="alamo" options={{ title: "Tu Alamo" }} />
-    </Tabs>
+    <View style={styles.root}>
+      <Tabs
+        backBehavior="none"
+        screenOptions={{ headerShown: false }}
+        tabBar={() => null}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="explore" />
+        <Tabs.Screen name="news" />
+        <Tabs.Screen name="alamo" />
+      </Tabs>
+      <FloatingTabBar />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  fadeGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: BACKDROP_FADE,
+  },
+  backdrop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  island: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 16,
   },
   tabItem: {
     flex: 1,
