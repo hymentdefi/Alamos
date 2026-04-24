@@ -130,6 +130,13 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
+        listeners={{
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+          },
+        }}
         options={{
           title: "Inicio",
           tabBarIcon: ({ focused, color }) => (
@@ -143,6 +150,13 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="explore"
+        listeners={{
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+          },
+        }}
         options={{
           title: "Mercado",
           tabBarIcon: ({ focused, color }) => (
@@ -156,6 +170,13 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="news"
+        listeners={{
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+          },
+        }}
         options={{
           title: "Noticias",
           tabBarIcon: ({ focused, color }) => (
@@ -169,6 +190,13 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="alamo"
+        listeners={{
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+          },
+        }}
         options={{
           title: "Tu Alamo",
           tabBarIcon: ({ focused, color }) => (

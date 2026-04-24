@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   PanResponder,
@@ -9,10 +9,13 @@ import {
 } from "react-native";
 import Svg, {
   Circle,
+  ClipPath,
   Defs,
+  G,
   LinearGradient,
   Line,
   Path,
+  Rect,
   Stop,
 } from "react-native-svg";
 import * as Haptics from "expo-haptics";
@@ -28,6 +31,9 @@ interface Props {
   /** Suavizado con cubic bezier. Default true. En false usa L — picos
    * filosos estilo Robinhood. */
   smooth?: boolean;
+  /** Reflejo animado debajo de la línea — barre horizontalmente.
+   * Clippeado al área bajo la curva, sutil. */
+  sheen?: boolean;
   /** Callback mientras el usuario arrastra el dedo sobre el chart. */
   onScrub?: (index: number, value: number) => void;
   onScrubStart?: () => void;
@@ -40,6 +46,12 @@ const VB_H = 90;
 const TOP_PAD = 10;
 const BOT_PAD = 10;
 
+/** Ancho del rectángulo de sheen en coords del viewBox. */
+const SHEEN_W = 80;
+/** Duración del barrido del sheen + pausa entre ciclos. */
+const SHEEN_TRAVEL_MS = 5400;
+const SHEEN_PAUSE_MS = 2200;
+
 export function Sparkline({
   series,
   color,
@@ -47,6 +59,7 @@ export function Sparkline({
   withFill = true,
   strokeWidth = 2.4,
   smooth = true,
+  sheen = false,
   onScrub,
   onScrubStart,
   onScrubEnd,
@@ -54,12 +67,41 @@ export function Sparkline({
 }: Props) {
   const [layoutWidth, setLayoutWidth] = useState(0);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const [sheenX, setSheenX] = useState(-SHEEN_W);
   const lastIndexRef = useRef<number | null>(null);
 
   const { points, d, fillD } = useMemo(
     () => computePath(series, smooth),
     [series, smooth],
   );
+
+  // Loop del sheen vía RAF (no podemos usar Animated nativo en props
+  // SVG). Easing in-out para que se sienta orgánico, con pausa entre
+  // pasajes para que no sea agobiante.
+  useEffect(() => {
+    if (!sheen) return;
+    let start: number | null = null;
+    let raf: number;
+    const TRAVEL = VB_W + SHEEN_W;
+    const TOTAL = SHEEN_TRAVEL_MS + SHEEN_PAUSE_MS;
+    const tick = (t: number) => {
+      if (start === null) start = t;
+      const elapsedCycle = (t - start) % TOTAL;
+      let x;
+      if (elapsedCycle < SHEEN_TRAVEL_MS) {
+        const p = elapsedCycle / SHEEN_TRAVEL_MS;
+        const eased =
+          p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        x = -SHEEN_W + TRAVEL * eased;
+      } else {
+        x = -SHEEN_W;
+      }
+      setSheenX(x);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [sheen]);
 
   const xToIndex = (x: number): number => {
     if (!layoutWidth || series.length === 0) return 0;
@@ -135,6 +177,35 @@ export function Sparkline({
               </LinearGradient>
             </Defs>
             <Path d={fillD} fill={`url(#${gradId})`} />
+          </>
+        ) : null}
+        {sheen ? (
+          <>
+            <Defs>
+              <LinearGradient
+                id={`sheen-${gradId}`}
+                x1="0"
+                y1="0"
+                x2="1"
+                y2="0"
+              >
+                <Stop offset="0" stopColor={color} stopOpacity={0} />
+                <Stop offset="0.5" stopColor={color} stopOpacity={0.22} />
+                <Stop offset="1" stopColor={color} stopOpacity={0} />
+              </LinearGradient>
+              <ClipPath id={`sheenClip-${gradId}`}>
+                <Path d={fillD} />
+              </ClipPath>
+            </Defs>
+            <G clipPath={`url(#sheenClip-${gradId})`}>
+              <Rect
+                x={sheenX}
+                y={0}
+                width={SHEEN_W}
+                height={VB_H}
+                fill={`url(#sheen-${gradId})`}
+              />
+            </G>
           </>
         ) : null}
         <Path

@@ -31,7 +31,7 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 460,
+  duration = 620,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
@@ -58,31 +58,30 @@ export function DrawingIcon({
       return;
     }
 
-    // Focus: scale pop del icono + marker grow + drawing del stroke.
-    // (El haptic lo dispara screenListeners.tabPress arriba en el
-    // layout para garantizar que suene aunque este efecto no se re-
-    // ejecute por algún motivo.)
-    scale.setValue(0.3);
+    // Focus: scale pop pronunciado del icono + marker grow + drawing
+    // del stroke. (El haptic lo dispara screenListeners.tabPress arriba
+    // en el layout, no acá.)
+    scale.setValue(0.2);
     const iconSpring = Animated.spring(scale, {
       toValue: 1,
-      tension: 160,
+      tension: 110,
       friction: 5,
       useNativeDriver: true,
     });
     iconSpring.start();
 
     markerOpacity.setValue(0);
-    markerScale.setValue(0.2);
+    markerScale.setValue(0);
     const markerAnim = Animated.parallel([
       Animated.timing(markerOpacity, {
         toValue: 1,
-        duration: 240,
+        duration: 320,
         useNativeDriver: true,
       }),
       Animated.spring(markerScale, {
         toValue: 1,
-        tension: 160,
-        friction: 8,
+        tension: 90,
+        friction: 7,
         useNativeDriver: true,
       }),
     ]);

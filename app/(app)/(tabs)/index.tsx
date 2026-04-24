@@ -213,7 +213,12 @@ function BaseHome() {
           <Text style={[s.greet, { color: c.textMuted }]}>
             {greeting}, {firstName}
           </Text>
-          <AmountDisplay value={current} size={46} style={{ marginBottom: 8 }} />
+          <AmountDisplay
+            value={current}
+            size={58}
+            weight={800}
+            style={{ marginBottom: 10 }}
+          />
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color: trendColor }]}>
               {displayIsUp ? "▲" : "▼"}
@@ -229,13 +234,13 @@ function BaseHome() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <View style={[s.chartWrap, { marginTop: 14 }]}>
-            <ChartSheen color={chartColor} height={300} />
+          <View style={[s.chartWrap, { marginTop: 18 }]}>
             <Sparkline
               series={series}
               color={chartColor}
-              height={300}
+              height={340}
               withFill={false}
+              sheen
               strokeWidth={1.4}
               smooth={false}
               onScrub={(idx) => setScrubIndex(idx)}
@@ -381,64 +386,6 @@ function indexLabel(r: Range, index: number, length: number): string {
 
 /* ─── Subcomponentes ─── */
 
-/* ─── Sheen animado detrás del chart — pasaje de luz infinito ─── */
-const SHEEN_WIDTH = 160;
-function ChartSheen({ color, height }: { color: string; height: number }) {
-  const { width: SCREEN_W } = Dimensions.get("window");
-  const tx = useRef(new Animated.Value(-SHEEN_WIDTH)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(tx, {
-          toValue: SCREEN_W - 48,
-          duration: 5600,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.delay(2400),
-        Animated.timing(tx, {
-          toValue: -SHEEN_WIDTH,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [tx, SCREEN_W]);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: SHEEN_WIDTH,
-        transform: [{ translateX: tx }, { skewX: "-14deg" }],
-      }}
-    >
-      {/* Sheen muy sutil: alpha max ~6% en el centro, transparente
-          a los costados. Apenas un reflejo que se nota si estás
-          mirando, no una barra luminosa. */}
-      <LinearGradient
-        colors={[
-          color + "00",
-          color + "0A",
-          color + "12",
-          color + "0A",
-          color + "00",
-        ]}
-        locations={[0, 0.35, 0.5, 0.65, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ flex: 1, height }}
-      />
-    </Animated.View>
-  );
-}
 
 /* ─── TabStrip Dinero / Portfolio ─── */
 function TabStrip({
