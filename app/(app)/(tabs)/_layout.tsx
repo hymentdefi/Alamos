@@ -19,11 +19,13 @@ import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
 const ISLAND_HEIGHT = 68;
 const ISLAND_SIDE_GAP = 16;
-// Cuánto se extiende el blur de backdrop ABAJO del nav, hasta el bottom
-// del teléfono. Este es el área "tapada" por blur.
-// Cuánto se extiende ARRIBA del nav, fadeando suavemente. El blur va de
-// transparente (top de esta zona) a full (donde arranca el nav).
-const BACKDROP_FADE_HEIGHT = 60;
+// Mini-fade DENTRO del backdrop, contado desde el top hacia abajo.
+// El backdrop arranca exactamente en el top del nav (no se extiende
+// arriba) — pero un edge perfecto se ve brusco. Esos primeros pixels
+// hacen el alpha ramp transparente → opaco para que la transición
+// sea suave en las franjas laterales (donde el blur es visible
+// directamente, sin la pill encima).
+const BACKDROP_TOP_FADE = 14;
 
 const ACTIVE_COLOR = "#5ac43e";
 
@@ -71,15 +73,18 @@ function FloatingTabBar() {
     router.navigate(route.href as never);
   };
 
-  const totalBackdropHeight = BACKDROP_FADE_HEIGHT + ISLAND_HEIGHT + bottomGap;
+  // Backdrop empieza EXACTAMENTE en el top del nav (no se extiende
+  // por arriba) y baja hasta el bottom del teléfono.
+  const totalBackdropHeight = ISLAND_HEIGHT + bottomGap;
 
   return (
     <View pointerEvents="box-none" style={styles.container}>
-      {/* Layer 1: backdrop blur full-width, con fade suave en el top.
-          MaskedView aplica el LinearGradient como alpha mask sobre el
-          BlurView — donde el mask es transparente, el blur no se ve;
-          donde es opaco, se ve full. Locations limita el fade al
-          BACKDROP_FADE_HEIGHT superior; el resto queda full. */}
+      {/* Layer 1: backdrop blur full-width. Arranca en el top del nav
+          y cubre hasta el piso. El alpha mask hace un mini-fade en
+          los primeros BACKDROP_TOP_FADE pixels (yendo hacia abajo)
+          para que la transición no se vea como una línea horizontal
+          dura — visible en las franjas laterales donde no hay pill
+          tapando. */}
       <MaskedView
         pointerEvents="none"
         style={{
@@ -92,7 +97,7 @@ function FloatingTabBar() {
         maskElement={
           <LinearGradient
             colors={["transparent", "black"]}
-            locations={[0, BACKDROP_FADE_HEIGHT / totalBackdropHeight]}
+            locations={[0, BACKDROP_TOP_FADE / totalBackdropHeight]}
             style={{ flex: 1 }}
           />
         }
