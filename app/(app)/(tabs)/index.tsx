@@ -6,6 +6,9 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
+  Animated,
+  Easing,
+  Dimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -15,6 +18,7 @@ import { Tap } from "../../../lib/components/Tap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   useTheme,
   fontFamily,
@@ -225,17 +229,19 @@ function BaseHome() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
           </View>
 
-          <Sparkline
-            series={series}
-            color={chartColor}
-            height={300}
-            withFill={false}
-            strokeWidth={1.4}
-            smooth={false}
-            onScrub={(idx) => setScrubIndex(idx)}
-            onScrubEnd={() => setScrubIndex(null)}
-            style={{ marginTop: 18 }}
-          />
+          <View style={[s.chartWrap, { marginTop: 18 }]}>
+            <ChartSheen color={chartColor} height={300} />
+            <Sparkline
+              series={series}
+              color={chartColor}
+              height={300}
+              withFill={false}
+              strokeWidth={1.4}
+              smooth={false}
+              onScrub={(idx) => setScrubIndex(idx)}
+              onScrubEnd={() => setScrubIndex(null)}
+            />
+          </View>
 
           <View style={s.rangeRow}>
             {ranges.map((r) => {
@@ -375,6 +381,66 @@ function indexLabel(r: Range, index: number, length: number): string {
 
 /* ─── Subcomponentes ─── */
 
+/* ─── Sheen animado detrás del chart — pasaje de luz infinito ─── */
+const SHEEN_WIDTH = 140;
+function ChartSheen({ color, height }: { color: string; height: number }) {
+  const { width: SCREEN_W } = Dimensions.get("window");
+  // Padding horizontal del sparkline es 0 (está dentro del heroBlock que
+  // tiene paddingHorizontal:24). El sheen barre el ancho visible del
+  // chart, que es SCREEN_W - 48.
+  const travel = SCREEN_W - 48 + SHEEN_WIDTH;
+  const tx = useRef(new Animated.Value(-SHEEN_WIDTH)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(tx, {
+          toValue: SCREEN_W - 48,
+          duration: 4200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1600),
+        Animated.timing(tx, {
+          toValue: -SHEEN_WIDTH,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [tx, SCREEN_W, travel]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: SHEEN_WIDTH,
+        transform: [{ translateX: tx }, { skewX: "-12deg" }],
+      }}
+    >
+      <LinearGradient
+        colors={[
+          "rgba(90, 196, 62, 0)",
+          color + "30",
+          color + "60",
+          color + "30",
+          "rgba(90, 196, 62, 0)",
+        ]}
+        locations={[0, 0.3, 0.5, 0.7, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ flex: 1, height }}
+      />
+    </Animated.View>
+  );
+}
+
 /* ─── TabStrip Dinero / Portfolio ─── */
 function TabStrip({
   tab,
@@ -436,19 +502,28 @@ function Dinero({
 
   return (
     <View style={s.sectionBlock}>
+      {/* Foco: Pesos argentinos. Card principal con bandera, label, monto
+          prominente y botones Ingresar/Retirar con texto. */}
       {ars ? (
-        <View style={s.moneyRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.moneyRowLabel, { color: c.textSecondary }]}>
+        <View
+          style={[
+            s.pesosCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <View style={s.pesosHead}>
+            <Text style={s.flagEmoji}>🇦🇷</Text>
+            <Text style={[s.pesosLabel, { color: c.textSecondary }]}>
               Pesos argentinos
             </Text>
-            <Text style={[s.moneyRowAmount, { color: c.text }]}>
-              {formatARS(ars.price * (ars.qty ?? 1))}
-            </Text>
           </View>
-          <View style={s.moneyInlineActions}>
+          <Text style={[s.pesosAmount, { color: c.text }]}>
+            {formatARS(ars.price * (ars.qty ?? 1))}
+          </Text>
+
+          <View style={s.pesosActions}>
             <Tap
-              style={[s.moneyIconBtn, { backgroundColor: c.ink }]}
+              style={[s.pesosActionPrimary, { backgroundColor: c.ink }]}
               haptic="medium"
               onPress={() =>
                 router.push({
@@ -456,14 +531,16 @@ function Dinero({
                   params: { mode: "deposit" },
                 })
               }
-              hitSlop={6}
             >
-              <Feather name="arrow-down-left" size={16} color={c.bg} />
+              <Feather name="arrow-down-left" size={15} color={c.bg} />
+              <Text style={[s.pesosActionText, { color: c.bg }]}>
+                Ingresar
+              </Text>
             </Tap>
             <Tap
               style={[
-                s.moneyIconBtn,
-                { backgroundColor: c.surfaceHover, borderColor: c.border, borderWidth: 1 },
+                s.pesosActionSecondary,
+                { backgroundColor: c.surfaceHover, borderColor: c.border },
               ]}
               haptic="light"
               onPress={() =>
@@ -472,38 +549,39 @@ function Dinero({
                   params: { mode: "withdraw" },
                 })
               }
-              hitSlop={6}
             >
-              <Feather name="arrow-up-right" size={16} color={c.text} />
+              <Feather name="arrow-up-right" size={15} color={c.text} />
+              <Text style={[s.pesosActionText, { color: c.text }]}>
+                Retirar
+              </Text>
             </Tap>
           </View>
         </View>
       ) : null}
 
+      {/* Secundario: otras monedas. Más chicas, en listado. */}
       {usd ? (
-        <View
-          style={[
-            s.moneyRow,
-            {
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: c.border,
-            },
-          ]}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={[s.moneyRowLabel, { color: c.textSecondary }]}>
-              Dólares MEP
-            </Text>
-            <Text style={[s.moneyRowAmount, { color: c.text }]}>
+        <View style={s.otherCurrencies}>
+          <Text style={[s.otherEyebrow, { color: c.textMuted }]}>
+            OTRAS MONEDAS
+          </Text>
+          <View style={s.currencyRow}>
+            <Text style={s.flagEmoji}>🇺🇸</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.currencyName, { color: c.text }]}>
+                Dólares MEP
+              </Text>
+              <Text style={[s.currencyEquiv, { color: c.textMuted }]}>
+                {formatARS(usd.price * (usd.qty ?? 1))}
+              </Text>
+            </View>
+            <Text style={[s.currencyAmount, { color: c.text }]}>
               US${" "}
               {(usd.qty ?? 0).toLocaleString("es-AR", {
                 maximumFractionDigits: 2,
               })}
             </Text>
           </View>
-          <Text style={[s.moneyRowEquiv, { color: c.textMuted }]}>
-            {formatARS(usd.price * (usd.qty ?? 1))}
-          </Text>
         </View>
       ) : null}
     </View>
@@ -806,6 +884,10 @@ const s = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 16,
   },
+  chartWrap: {
+    position: "relative",
+    overflow: "hidden",
+  },
   /* TabStrip Dinero / Portfolio */
   tabsWrap: {
     paddingHorizontal: 20,
@@ -851,39 +933,92 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Dinero */
-  moneyRow: {
+  /* Dinero — card protagonista de pesos */
+  pesosCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 20,
+  },
+  pesosHead: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    gap: 14,
-  },
-  moneyRowLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginBottom: 4,
-  },
-  moneyRowAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.6,
-  },
-  moneyRowEquiv: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  moneyInlineActions: {
-    flexDirection: "row",
     gap: 8,
+    marginBottom: 6,
   },
-  moneyIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.pill,
+  flagEmoji: {
+    fontSize: 20,
+  },
+  pesosLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  pesosAmount: {
+    fontFamily: fontFamily[800],
+    fontSize: 34,
+    letterSpacing: -1.2,
+    marginBottom: 16,
+  },
+  pesosActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  pesosActionPrimary: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    height: 44,
+    borderRadius: radius.pill,
+  },
+  pesosActionSecondary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  pesosActionText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+
+  /* Otras monedas — listado secundario */
+  otherCurrencies: {
+    marginTop: 24,
+  },
+  otherEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  currencyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+  currencyName: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  currencyEquiv: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  currencyAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
 
   /* Portfolio hero */

@@ -41,14 +41,19 @@ export default function TabsLayout() {
         tabBarShowLabel: true,
         tabBarBackground: () => (
           <View style={StyleSheet.absoluteFillObject}>
-            {/* Backdrop full-width semi-opaco. Tapa todo lo que está
-                debajo de donde arranca el island (incluido el gap
-                entre el island y el piso). */}
+            {/* Backdrop semi-opaco que arranca EXACTAMENTE donde arranca
+                el island — no un píxel más arriba. Cubre toda la franja
+                inferior del island hacia abajo (incluido el gap hasta
+                el piso del celular). */}
             <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { backgroundColor: backdropBg },
-              ]}
+              style={{
+                position: "absolute",
+                top: ISLAND_TOP_GAP,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: backdropBg,
+              }}
             />
             {/* Island centrado adentro, con forma stadium (pill). */}
             <View
