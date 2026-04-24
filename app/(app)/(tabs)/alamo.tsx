@@ -17,6 +17,7 @@ import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
 import { useProMode } from "../../../lib/pro/context";
 import { AlamosLogo } from "../../../lib/components/Logo";
+import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
 import { Tap } from "../../../lib/components/Tap";
 import { AppearanceSheet } from "../../../lib/components/AppearanceSheet";
 
@@ -45,11 +46,6 @@ export default function AlamoScreen() {
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
   const fullName = user?.fullName ?? firstName;
-  const initials = fullName
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w.charAt(0).toUpperCase())
-    .join("");
 
   const appearanceLabel =
     pref === "dark"
@@ -77,11 +73,10 @@ export default function AlamoScreen() {
           ]}
         >
           <View style={s.identityLeft}>
-            <View style={[s.avatar, { backgroundColor: c.greenDim }]}>
-              <Text style={[s.avatarText, { color: c.greenDark }]}>
-                {initials}
-              </Text>
-            </View>
+            {/* Avatar: alamos isotipo que cicla entre 12 schemes de
+                color al taparlo. Persiste la elección en SecureStore. */}
+            <AlamosAvatar size={48} />
+
             <View style={s.identityNameBlock}>
               <Text
                 style={[s.userName, { color: c.text }]}
@@ -350,18 +345,6 @@ const s = StyleSheet.create({
   identityNameBlock: {
     flex: 1,
     minWidth: 0,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.5,
   },
   userName: {
     fontFamily: fontFamily[700],
