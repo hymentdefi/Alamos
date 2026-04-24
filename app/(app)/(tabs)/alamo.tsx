@@ -108,12 +108,12 @@ export default function AlamoScreen() {
           hitSlop={10}
         >
           <View style={s.proBtn}>
-            {/* Glow blanco-gris muy clarito detrás del contenido —
-                apenas se insinúa, da textura sin teñir el switch. */}
+            {/* Glow casi blanco detrás del contenido — apenas se
+                insinúa una brisa más clara en diagonal, sin teñir. */}
             <LinearGradient
               colors={[
                 "rgba(255, 255, 255, 0)",
-                "rgba(230, 230, 225, 0.55)",
+                "rgba(252, 252, 250, 0.25)",
                 "rgba(255, 255, 255, 0)",
               ]}
               start={{ x: 0, y: 0 }}
