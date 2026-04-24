@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+import { useTheme } from "../theme";
 
 interface Props {
   path: string;
@@ -10,26 +9,25 @@ interface Props {
   color: string;
   size?: number;
   viewBox?: string;
-  /** Duración del drawing en ms. */
+  /** Duración del reveal en ms. */
   duration?: number;
 }
 
-/** Dash length fijo — mayor que cualquier path en viewBox 24x24. */
-const DASH_LEN = 220;
 /** Color del marcador arriba del icono cuando está activa la tab. */
 const MARKER_COLOR = "#5ac43e";
 
 /**
- * Ícono de tab con animación combinada al activarse:
- *   · marker pill verde crece y aparece arriba
- *   · el ícono cae desde arriba (translateY) y escala desde chico con
- *     overshoot (spring bouncy)
- *   · paralelo al movimiento, el stroke se 'dibuja' via dashoffset
- *     animado
+ * Ícono de tab con animación de "dibujo" al activarse:
  *
- * Tres animaciones superpuestas aseguran que AL MENOS una se note
- * bien, sin depender sólo del stroke draw que en algunas versiones
- * de react-native-svg no rerenderiza suave.
+ *   1. Marker pill verde arriba aparece (fade + scaleX spring)
+ *   2. El icono SVG entero se revela de IZQUIERDA A DERECHA con un
+ *      overlay que matchea el color del island y se desliza fuera
+ *      (translateX native driver — 100% confiable, no depende del
+ *      strokeDashoffset de SVG que en algunos setups no re-renderiza).
+ *   3. Scale pop sutil del container para que se sienta alive.
+ *
+ * Todas las animaciones usan native driver, garantizando que corran
+ * suave sin importar el estado del JS thread.
  */
 export function DrawingIcon({
   path,
@@ -37,19 +35,27 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 720,
+  duration = 620,
 }: Props) {
+  const { mode } = useTheme();
+  // El overlay que tapa el icono tiene que matchear el color del
+  // island para que la revelación se sienta transparente. Estos son
+  // los mismos valores que usa (tabs)/_layout.tsx para el island.
+  const coverColor =
+    mode === "dark" ? "rgba(28, 33, 40, 0.98)" : "rgba(255, 255, 255, 0.98)";
+
+  // Reveal: translateX del overlay. Arranca en 0 (cubriendo todo el
+  // icono) y termina en `size` (off-screen a la derecha), revelando
+  // el icono left-to-right.
+  const reveal = useRef(new Animated.Value(focused ? size : size)).current;
   const scale = useRef(new Animated.Value(1)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  const dashOffset = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!focused) {
       scale.stopAnimation(() => scale.setValue(1));
-      translateY.stopAnimation(() => translateY.setValue(0));
-      dashOffset.setValue(0);
+      reveal.setValue(size);
       Animated.parallel([
         Animated.timing(markerOpacity, {
           toValue: 0,
@@ -65,30 +71,22 @@ export function DrawingIcon({
       return;
     }
 
-    // Focus animation combo.
-    scale.setValue(0.25);
-    translateY.setValue(-8);
-    const transformAnim = Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 110,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        tension: 90,
-        friction: 6,
-        useNativeDriver: true,
-      }),
-    ]);
+    // Scale pop del icono.
+    scale.setValue(0.4);
+    const iconSpring = Animated.spring(scale, {
+      toValue: 1,
+      tension: 120,
+      friction: 6,
+      useNativeDriver: true,
+    });
 
+    // Marker fade + scaleX.
     markerOpacity.setValue(0);
     markerScale.setValue(0);
     const markerAnim = Animated.parallel([
       Animated.timing(markerOpacity, {
         toValue: 1,
-        duration: 320,
+        duration: 280,
         useNativeDriver: true,
       }),
       Animated.spring(markerScale, {
@@ -99,32 +97,27 @@ export function DrawingIcon({
       }),
     ]);
 
-    dashOffset.setValue(DASH_LEN);
-    const drawAnim = Animated.timing(dashOffset, {
-      toValue: 0,
+    // Reveal del icono: overlay pasa de translateX:0 (cubriendo) a
+    // translateX:size (fuera de la derecha). Easing lineal-ish para
+    // que se sienta como un lápiz trazando de izquierda a derecha.
+    reveal.setValue(0);
+    const revealAnim = Animated.timing(reveal, {
+      toValue: size,
       duration,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+      easing: Easing.bezier(0.45, 0.05, 0.55, 0.95),
+      useNativeDriver: true,
     });
 
-    transformAnim.start();
+    iconSpring.start();
     markerAnim.start();
-    drawAnim.start();
+    revealAnim.start();
 
     return () => {
-      transformAnim.stop();
+      iconSpring.stop();
       markerAnim.stop();
-      drawAnim.stop();
+      revealAnim.stop();
     };
-  }, [
-    focused,
-    duration,
-    scale,
-    translateY,
-    markerScale,
-    markerOpacity,
-    dashOffset,
-  ]);
+  }, [focused, duration, size, scale, markerScale, markerOpacity, reveal]);
 
   return (
     <View style={s.wrap}>
@@ -138,23 +131,34 @@ export function DrawingIcon({
           },
         ]}
       />
-      <Animated.View
-        style={{
-          transform: [{ translateY }, { scale }],
-        }}
-      >
-        <Svg width={size} height={size} viewBox={viewBox}>
-          <AnimatedPath
-            d={path}
-            stroke={color}
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={`${DASH_LEN} ${DASH_LEN}`}
-            strokeDashoffset={dashOffset}
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <View style={{ width: size, height: size, overflow: "hidden" }}>
+          <Svg width={size} height={size} viewBox={viewBox}>
+            <Path
+              d={path}
+              stroke={color}
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+          {/* Overlay que 'borra' el icono de derecha a izquierda —
+              arrancando lo cubre entero, al animar se corre a la
+              derecha revelándolo left-to-right. */}
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: size,
+              height: size,
+              backgroundColor: coverColor,
+              transform: [{ translateX: reveal }],
+            }}
           />
-        </Svg>
+        </View>
       </Animated.View>
     </View>
   );
