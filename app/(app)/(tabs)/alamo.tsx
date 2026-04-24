@@ -103,17 +103,26 @@ export default function AlamoScreen() {
             style={({ pressed }) => [
               s.proBtn,
               {
-                backgroundColor: c.ink,
-                opacity: pressed ? 0.85 : 1,
+                backgroundColor: c.surfaceHover,
+                borderColor: c.border,
+                opacity: pressed ? 0.75 : 1,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               },
             ]}
             hitSlop={6}
           >
-            <AlamosLogo variant="mark" tone="dark" size={16} />
-            <Text style={[s.proBtnAccent, { color: c.green }]}>
-              {isPro ? "Lite" : "Pro"}
-            </Text>
+            <AlamosLogo variant="lockupShort" tone="light" size={20} />
+            {!isPro ? (
+              <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
+                Pro
+              </Text>
+            ) : null}
+            <Feather
+              name="chevron-right"
+              size={14}
+              color={c.textFaint}
+              style={{ marginLeft: 2 }}
+            />
           </Pressable>
         </View>
 
@@ -368,15 +377,17 @@ const s = StyleSheet.create({
   proBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 2,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: radius.pill,
+    borderWidth: 1,
   },
   proBtnAccent: {
     fontFamily: fontFamily[800],
     fontSize: 14,
     letterSpacing: -0.3,
+    marginLeft: -8,
   },
 
   /* Groups + rows */
