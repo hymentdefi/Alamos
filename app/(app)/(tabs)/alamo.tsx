@@ -233,7 +233,7 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 18,
     letterSpacing: -0.4,
-    marginLeft: -8,
+    marginLeft: -14,
   },
 
   /* Identity */
