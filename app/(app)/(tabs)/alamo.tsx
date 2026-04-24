@@ -93,18 +93,22 @@ export default function AlamoScreen() {
             </View>
           </View>
 
+          {/* Separador vertical sutil entre el perfil y el switch de Pro. */}
+          <View
+            style={[s.proDivider, { backgroundColor: c.border }]}
+            pointerEvents="none"
+          />
+
           <Pressable
             onPress={() => requestSwitch()}
             style={({ pressed }) => [
               s.proBtn,
               {
-                backgroundColor: c.surfaceHover,
-                borderColor: c.border,
-                opacity: pressed ? 0.75 : 1,
+                opacity: pressed ? 0.55 : 1,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               },
             ]}
-            hitSlop={6}
+            hitSlop={10}
           >
             <AlamosLogo variant="lockupShort" tone="light" size={38} />
             {!isPro ? (
@@ -357,20 +361,25 @@ const s = StyleSheet.create({
     marginTop: 2,
     letterSpacing: -0.05,
   },
+  /* Divider vertical entre el bloque perfil y el switch Pro. */
+  proDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    marginVertical: 4,
+  },
   proBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    gap: 0,
+    paddingLeft: 6,
+    paddingRight: 2,
+    paddingVertical: 4,
   },
   proBtnAccent: {
     fontFamily: fontFamily[800],
-    fontSize: 14,
+    fontSize: 16,
     letterSpacing: -0.3,
-    marginLeft: -8,
+    marginLeft: -16,
   },
 
   /* Groups + rows */
