@@ -5,23 +5,25 @@ export const brand = {
   green: "#00C805",
   greenDark: "#00A304",
   ink: "#0E0F0C",
-  bg: "#FAFAF7",
+  bg: "#FFFFFF",
 } as const;
 
-/* ─── Color palettes — tokens copiados del landing ─── */
+/* ─── Color palettes — trading-hardcore aesthetic (Binance-style).
+ *     Light: blanco puro + grises neutros fríos.
+ *     Dark:  negro puro + grises muy oscuros. */
 const light = {
-  bg: "#FAFAF7",
-  bgWarm: "#F2F1EB",
+  bg: "#FFFFFF",
+  bgWarm: "#FAFAFA",
   surface: "#FFFFFF",
   surfaceRaised: "#FFFFFF",
-  surfaceHover: "#F2F1EB",
-  surfaceSunken: "#EBEBE3",
-  border: "#E5E4DC",
-  borderStrong: "#B8B8B0",
+  surfaceHover: "#F5F5F5",
+  surfaceSunken: "#EEEEEE",
+  border: "#E5E5E5",
+  borderStrong: "#BDBDBD",
   text: "#0E0F0C",
-  textSecondary: "#2A2B27",
-  textMuted: "#6B6C66",
-  textFaint: "#B8B8B0",
+  textSecondary: "#2A2A2A",
+  textMuted: "#737373",
+  textFaint: "#A3A3A3",
   green: brand.green,
   greenDark: brand.greenDark,
   greenDim: "rgba(0,200,5,0.14)",
@@ -30,16 +32,16 @@ const light = {
   ink: brand.ink,
 } as const;
 
-/* Dark mode — Alamos Pro. Tokens terminal-style tipo Binance. */
+/* Dark mode — negro puro (pure-black OLED). */
 const dark = {
-  bg: "#0B0E11",
-  bgWarm: "#14171C",
-  surface: "#1E2329",
-  surfaceRaised: "#252A33",
-  surfaceHover: "#2B3139",
-  surfaceSunken: "#14171C",
-  border: "#2B3139",
-  borderStrong: "#474D57",
+  bg: "#000000",
+  bgWarm: "#0A0A0A",
+  surface: "#0D0D0D",
+  surfaceRaised: "#141414",
+  surfaceHover: "#1A1A1A",
+  surfaceSunken: "#050505",
+  border: "#1F1F1F",
+  borderStrong: "#333333",
   text: "#EAECEF",
   textSecondary: "#B7BDC6",
   textMuted: "#848E9C",
@@ -49,7 +51,7 @@ const dark = {
   greenDim: "rgba(14,203,129,0.16)",
   red: "#F6465D",
   redDim: "rgba(246,70,93,0.14)",
-  ink: "#0B0E11",
+  ink: "#000000",
 } as const;
 
 

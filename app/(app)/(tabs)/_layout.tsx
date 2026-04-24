@@ -70,17 +70,20 @@ function FloatingTabBar() {
     >
       <BlurView
         tint={isDark ? "dark" : "light"}
-        intensity={Platform.OS === "ios" ? 55 : 80}
+        intensity={Platform.OS === "ios" ? 60 : 90}
         style={[
           styles.island,
           {
             height: ISLAND_HEIGHT,
+            // Con bg blanco puro (light) o negro puro (dark) el glass
+            // necesita un tinte que lo distinga del bg. Blanco-sobre-
+            // blanco y negro-sobre-negro desaparecen.
             backgroundColor: isDark
-              ? "rgba(28, 33, 40, 0.55)"
-              : "rgba(255, 255, 255, 0.55)",
+              ? "rgba(18, 18, 18, 0.70)"
+              : "rgba(250, 250, 250, 0.78)",
             borderColor: isDark
-              ? "rgba(255, 255, 255, 0.08)"
-              : "rgba(255, 255, 255, 0.6)",
+              ? "rgba(255, 255, 255, 0.06)"
+              : "rgba(0, 0, 0, 0.06)",
           },
         ]}
       >
@@ -143,12 +146,16 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
           styles.activePill,
           {
             opacity: pillOpacity,
+            // Tinte verde brand en la pill activa — sobre glass neutra
+            // el verde firma "este es el tab activo" on-brand. En
+            // trading apps es más informativo que un blanco más
+            // opaco (white-on-white no lee).
             backgroundColor: isDark
-              ? "rgba(255, 255, 255, 0.10)"
-              : "rgba(255, 255, 255, 0.85)",
+              ? "rgba(14, 203, 129, 0.14)"
+              : "rgba(0, 200, 5, 0.10)",
             borderColor: isDark
-              ? "rgba(255, 255, 255, 0.06)"
-              : "rgba(0, 0, 0, 0.04)",
+              ? "rgba(14, 203, 129, 0.20)"
+              : "rgba(0, 200, 5, 0.16)",
           },
         ]}
       />

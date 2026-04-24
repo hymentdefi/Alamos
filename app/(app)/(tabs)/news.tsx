@@ -1013,7 +1013,7 @@ const sheet = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   body: {
-    backgroundColor: "#FAFAF7",
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "92%",

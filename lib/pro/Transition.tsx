@@ -40,7 +40,7 @@ function AnimatedAlamosMark({
   tone: "light" | "dark";
   progress: number;
 }) {
-  const inkColor = tone === "dark" ? "#FAFAF7" : "#0E0F0C";
+  const inkColor = tone === "dark" ? "#FFFFFF" : "#0E0F0C";
 
   // Stagger: el verde se dibuja durante 0-0.65, el negro durante 0.35-1.
   const p1 = Math.min(1, progress / 0.65);
