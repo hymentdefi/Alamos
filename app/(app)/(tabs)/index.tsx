@@ -598,7 +598,7 @@ function TabStrip({
   );
 }
 
-/* ─── Dinero: cuentas que rinden + acciones de Ingresar/Retirar ─── */
+/* ─── Dinero: cuentas que rinden + acciones de Ingresar/Enviar ─── */
 /** TNA que rinde cada moneda por el solo hecho de holdearse. */
 const CURRENCY_TNA: Record<string, { label: string; pct: number }> = {
   ARS: { label: "% TNA", pct: 38.5 },
@@ -625,7 +625,7 @@ function Dinero({
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones Ingresar / Retirar arriba de todo. */}
+      {/* Acciones Ingresar / Enviar arriba de todo. */}
       <View style={s.cashActions}>
         <Tap
           style={[s.cashActionPrimary, { backgroundColor: c.ink }]}
@@ -649,12 +649,12 @@ function Dinero({
           onPress={() =>
             router.push({
               pathname: "/(app)/transfer",
-              params: { mode: "withdraw" },
+              params: { mode: "send" },
             })
           }
         >
           <Feather name="arrow-up-right" size={15} color={c.text} />
-          <Text style={[s.cashActionText, { color: c.text }]}>Retirar</Text>
+          <Text style={[s.cashActionText, { color: c.text }]}>Enviar</Text>
         </Tap>
       </View>
 
@@ -1135,7 +1135,7 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Dinero — acciones arriba (Ingresar / Retirar) */
+  /* Dinero — acciones arriba (Ingresar / Enviar) */
   cashActions: {
     flexDirection: "row",
     gap: 10,

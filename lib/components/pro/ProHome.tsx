@@ -88,13 +88,13 @@ export function ProHome() {
             onPress={() =>
               router.push({
                 pathname: "/(app)/transfer",
-                params: { mode: "withdraw" },
+                params: { mode: "send" },
               })
             }
             hitSlop={8}
           >
             <Feather name="arrow-up-right" size={14} color={c.text} />
-            <Text style={[s.topPillText, { color: c.text }]}>Retirar</Text>
+            <Text style={[s.topPillText, { color: c.text }]}>Enviar</Text>
           </Pressable>
         </View>
       </View>
@@ -163,8 +163,13 @@ export function ProHome() {
           />
           <QuickAction
             icon="arrow-up-right"
-            label="Retirar"
-            onPress={() => router.push("/(app)/transfer")}
+            label="Enviar"
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "send" },
+              })
+            }
           />
           <QuickAction
             icon="repeat"
