@@ -46,8 +46,10 @@ export function DrawingIcon({
 
   // Reveal: translateX del overlay. Arranca en 0 (cubriendo todo el
   // icono) y termina en `size` (off-screen a la derecha), revelando
-  // el icono left-to-right.
-  const reveal = useRef(new Animated.Value(focused ? size : size)).current;
+  // el icono left-to-right. Si el tab está focused al montar, arranca
+  // cubierto (0) y el useEffect lo anima a revelado; si no, arranca
+  // revelado (size) y el icono inactivo se muestra sin animación.
+  const reveal = useRef(new Animated.Value(focused ? 0 : size)).current;
   const scale = useRef(new Animated.Value(1)).current;
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
