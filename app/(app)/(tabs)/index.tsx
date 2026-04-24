@@ -441,7 +441,13 @@ function BaseHome() {
           {tab === "dinero" ? (
             <Dinero byCategory={byCategory} />
           ) : (
-            <Portfolio byCategory={byCategory} onOpen={openDetail} />
+            <Portfolio
+              byCategory={byCategory}
+              onOpen={openDetail}
+              rangePct={displayPct}
+              rangeIsUp={displayIsUp}
+              rangeLabel={timeLabel}
+            />
           )}
         </View>
 
@@ -803,9 +809,17 @@ function EarningsInfoModal({
 function Portfolio({
   byCategory,
   onOpen,
+  rangePct,
+  rangeIsUp,
+  rangeLabel,
 }: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
   onOpen: (a: Asset) => void;
+  /** Rendimiento % del período seleccionado en el chart de arriba. */
+  rangePct: number;
+  rangeIsUp: boolean;
+  /** Etiqueta del período (ej. "hoy", "esta semana", "ahora" en scrub). */
+  rangeLabel: string;
 }) {
   const { c } = useTheme();
 
@@ -813,24 +827,12 @@ function Portfolio({
     () => byCategory.filter(([cat]) => cat !== "efectivo"),
     [byCategory],
   );
+  // Se sigue usando para calcular la proporción por categoría en el
+  // bloque de distribución — no se muestra como monto al usuario.
   const invested = useMemo(
     () => portfolioEntries.reduce((sum, [, data]) => sum + data.total, 0),
     [portfolioEntries],
   );
-  // Rendimiento ponderado del día: Σ (valor × change%) / invertido.
-  const weightedPct = useMemo(() => {
-    if (invested <= 0) return 0;
-    let w = 0;
-    for (const [, data] of portfolioEntries) {
-      for (const a of data.items) {
-        const v = a.price * (a.qty ?? 1);
-        w += v * (a.change / 100);
-      }
-    }
-    return (w / invested) * 100;
-  }, [portfolioEntries, invested]);
-  const rendimientoAbs = invested * (weightedPct / 100);
-  const up = weightedPct >= 0;
 
   if (portfolioEntries.length === 0) {
     return (
@@ -844,50 +846,31 @@ function Portfolio({
 
   return (
     <View>
-      {/* Header editorial: total invertido grande, rendimiento abajo */}
+      {/* Header minimalista: sólo rendimiento % del período — el monto
+          invertido ya está implícito en el chart de arriba. */}
       <View style={s.portfolioHero}>
         <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
-          TOTAL INVERTIDO
+          RENDIMIENTO
         </Text>
-        <Text style={[s.portfolioTotal, { color: c.text }]}>
-          {formatARS(invested)}
-        </Text>
-        <View style={s.portfolioDelta}>
+        <View style={s.portfolioPctRow}>
           <Text
             style={[
-              s.portfolioDeltaTri,
-              { color: up ? c.greenDark : c.red },
+              s.portfolioPctTri,
+              { color: rangeIsUp ? c.greenDark : c.red },
             ]}
           >
-            {up ? "▲" : "▼"}
+            {rangeIsUp ? "▲" : "▼"}
           </Text>
           <Text
             style={[
-              s.portfolioDeltaText,
-              { color: up ? c.greenDark : c.red },
+              s.portfolioPct,
+              { color: rangeIsUp ? c.greenDark : c.red },
             ]}
           >
-            {formatARS(Math.abs(rendimientoAbs))}
+            {formatPct(rangePct)}
           </Text>
-          <Text
-            style={[
-              s.portfolioDeltaSep,
-              { color: up ? c.greenDark : c.red },
-            ]}
-          >
-            ·
-          </Text>
-          <Text
-            style={[
-              s.portfolioDeltaText,
-              { color: up ? c.greenDark : c.red },
-            ]}
-          >
-            {formatPct(weightedPct)}
-          </Text>
-          <Text style={[s.portfolioDeltaSep, { color: c.textMuted }]}>·</Text>
-          <Text style={[s.portfolioDeltaPeriod, { color: c.textMuted }]}>
-            hoy
+          <Text style={[s.portfolioPctPeriod, { color: c.textMuted }]}>
+            {rangeLabel}
           </Text>
         </View>
       </View>
@@ -1303,36 +1286,27 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 6,
   },
-  portfolioTotal: {
-    fontFamily: fontFamily[800],
-    fontSize: 36,
-    letterSpacing: -1.4,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  portfolioDelta: {
+  portfolioPctRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
+    alignItems: "baseline",
+    gap: 8,
     flexWrap: "wrap",
+    marginTop: 4,
   },
-  portfolioDeltaTri: {
+  portfolioPctTri: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
+    fontSize: 18,
   },
-  portfolioDeltaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
+  portfolioPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 32,
+    letterSpacing: -1.1,
   },
-  portfolioDeltaSep: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-  },
-  portfolioDeltaPeriod: {
+  portfolioPctPeriod: {
     fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.1,
+    marginLeft: 2,
   },
   emptyPortfolio: {
     fontFamily: fontFamily[500],

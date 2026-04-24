@@ -57,90 +57,93 @@ export default function AlamoScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
+      {/* ── Card de identidad: fija arriba. No se mueve con el scroll —
+          el usuario siempre ve su nombre + el switch a Pro. */}
+      <View
+        style={[
+          s.identityCard,
+          {
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            marginTop: insets.top + 14,
+          },
+        ]}
+      >
+        <View style={s.identityLeft}>
+          {/* Avatar: alamos isotipo que cicla entre 12 schemes de
+              color al taparlo. Persiste la elección en SecureStore. */}
+          <AlamosAvatar size={48} />
+
+          <View style={s.identityNameBlock}>
+            <Text
+              style={[s.userName, { color: c.text }]}
+              numberOfLines={1}
+            >
+              {fullName}
+            </Text>
+            <Text
+              style={[s.userMeta, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              {user?.email ?? ""}
+            </Text>
+          </View>
+        </View>
+
+        {/* Separador vertical sutil entre el perfil y el switch de Pro. */}
+        <View
+          style={[s.proDivider, { backgroundColor: c.border }]}
+          pointerEvents="none"
+        />
+
+        <Pressable
+          onPress={() => requestSwitch()}
+          style={({ pressed }) => [
+            s.proBtnShadow,
+            {
+              opacity: pressed ? 0.65 : 1,
+              transform: [{ scale: pressed ? 0.97 : 1 }],
+            },
+          ]}
+          hitSlop={10}
+        >
+          <View style={s.proBtn}>
+            {/* Glow blanco-gris muy clarito detrás del contenido —
+                apenas se insinúa, da textura sin teñir el switch. */}
+            <LinearGradient
+              colors={[
+                "rgba(255, 255, 255, 0)",
+                "rgba(230, 230, 225, 0.55)",
+                "rgba(255, 255, 255, 0)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <AlamosLogo variant="lockupShort" tone="light" size={38} />
+            {!isPro ? (
+              <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
+                Pro
+              </Text>
+            ) : null}
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={c.textFaint}
+              style={{ marginLeft: 4 }}
+            />
+          </View>
+        </Pressable>
+      </View>
+
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{
-          paddingTop: insets.top + 14,
+          paddingTop: 10,
           paddingBottom: 220,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Card de identidad: avatar + nombre a la izq, pill Pro
-            a la der (misma altura). */}
-        <View
-          style={[
-            s.identityCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <View style={s.identityLeft}>
-            {/* Avatar: alamos isotipo que cicla entre 12 schemes de
-                color al taparlo. Persiste la elección en SecureStore. */}
-            <AlamosAvatar size={48} />
-
-            <View style={s.identityNameBlock}>
-              <Text
-                style={[s.userName, { color: c.text }]}
-                numberOfLines={1}
-              >
-                {fullName}
-              </Text>
-              <Text
-                style={[s.userMeta, { color: c.textMuted }]}
-                numberOfLines={1}
-              >
-                {user?.email ?? ""}
-              </Text>
-            </View>
-          </View>
-
-          {/* Separador vertical sutil entre el perfil y el switch de Pro. */}
-          <View
-            style={[s.proDivider, { backgroundColor: c.border }]}
-            pointerEvents="none"
-          />
-
-          <Pressable
-            onPress={() => requestSwitch()}
-            style={({ pressed }) => [
-              s.proBtnShadow,
-              {
-                opacity: pressed ? 0.65 : 1,
-                transform: [{ scale: pressed ? 0.97 : 1 }],
-              },
-            ]}
-            hitSlop={10}
-          >
-            <View style={s.proBtn}>
-              {/* Glow verde sutil detrás del contenido — da la
-                  sensación de que el switch 'brilla' en el fondo
-                  sin ser un recuadro gris. */}
-              <LinearGradient
-                colors={[
-                  "rgba(0, 200, 5, 0.04)",
-                  "rgba(0, 200, 5, 0.14)",
-                  "rgba(0, 200, 5, 0.04)",
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <AlamosLogo variant="lockupShort" tone="light" size={38} />
-              {!isPro ? (
-                <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
-                  Pro
-                </Text>
-              ) : null}
-              <Feather
-                name="chevron-right"
-                size={18}
-                color={c.textFaint}
-                style={{ marginLeft: 4 }}
-              />
-            </View>
-          </Pressable>
-        </View>
-
         {/* ── Sección 1: cuenta ── */}
         <View style={s.group}>
           <Row
@@ -383,14 +386,14 @@ const s = StyleSheet.create({
     alignSelf: "stretch",
     marginVertical: 4,
   },
-  /* Sombra verde sutil que envuelve al switch y lo integra con el
+  /* Sombra neutra sutil que envuelve al switch y lo integra con el
      card, para que no se sienta como un logo flotando sobre blanco. */
   proBtnShadow: {
-    shadowColor: "#00C805",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowColor: "#0E0F0C",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
     borderRadius: radius.pill,
   },
   proBtn: {
