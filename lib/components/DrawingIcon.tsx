@@ -2,11 +2,24 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
-interface TabPath {
+interface Segment {
+  /** SVG `d` de este trazo (arranca con su propio M). */
   d: string;
-  /** Largo total del trazo en unidades del viewBox (24x24). Con un
-   *  poco de overshoot para que el trazo llegue completo siempre. */
+  /**
+   * Largo del trazo en unidades del viewBox. Incluye un pequeño
+   * overshoot (~5%) así el dash siempre cubre el path completo.
+   */
   len: number;
+}
+
+interface TabPath {
+  /**
+   * Lista de trazos. Paths de un solo trazo (tipo casa, álamo) tienen
+   * 1 segmento. Paths multi-subpath (gráfico de barras, hoja) tienen
+   * varios, y cada uno se dibuja como un mini-trazo propio con su
+   * propia animación.
+   */
+  segments: readonly Segment[];
 }
 
 interface Props {
@@ -15,30 +28,42 @@ interface Props {
   color: string;
   size?: number;
   viewBox?: string;
-  duration?: number;
 }
 
 const MARKER_COLOR = "#5ac43e";
 
+// Velocidad del "lápiz". Con 10ms/unidad un path de 76 unidades dura
+// 760ms, que es el baseline que funciona bien en Inicio.
+const MS_PER_UNIT = 10;
+// Piso por segmento — los trazos cortos (4-7 unidades) a 10ms/unidad
+// darían 40-70ms y se flashean antes de que la retina los agarre.
+// Con 180ms de piso, cada trazo se ve dibujarse.
+const MIN_SEGMENT_MS = 180;
+// Pausa entre trazos — simula al lápiz "levantándose y moviéndose"
+// al próximo subpath. Si ponemos 0 queda una secuencia muy robótica.
+const INTER_SEGMENT_DELAY = 40;
+
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+const segmentDuration = (segLen: number) =>
+  Math.max(MIN_SEGMENT_MS, segLen * MS_PER_UNIT);
+
 /**
- * Icono de tab que SE DIBUJA trazo a trazo (efecto lápiz) cada vez
- * que el tab se activa.
+ * Icono de tab que SE DIBUJA trazo a trazo (efecto lápiz).
  *
- * Técnica: strokeDasharray = path.len + strokeDashoffset animado
- * desde path.len (trazo invisible, offseteado fuera) hasta 0 (trazo
- * completo). Al animar el offset con Animated.timing en el thread de
- * JS (useNativeDriver:false), el Path de react-native-svg redibuja
- * frame a frame y se ve el trazo "creciendo" siguiendo el contorno.
+ * Por qué segmentos en vez de un solo Path con strokeDashoffset: un
+ * <Path d="M... M... M..."> tiene múltiples subpaths, y con un solo
+ * strokeDasharray el dash se distribuye proporcionalmente a lo largo
+ * del total. Resultado: los subpaths cortos reciben una fracción
+ * proporcional del tiempo (por ej. las 3 rayitas de noticias a 7+7+4
+ * unidades sobre 108 totales = menos del 20% del tiempo, que a 1080ms
+ * total da ~200ms repartidos entre 3 rayitas = ~65ms cada una). Por
+ * eso no se veían: se flasheaban fuera del umbral de percepción.
  *
- * Nota histórica: antes habíamos descartado este approach pensando
- * que react-native-svg no propagaba updates de Animated.Value al
- * Path nativo después del primer render. Ese diagnóstico estaba
- * contaminado por otro bug (MaskedView congelándose en Fabric). Con
- * la arquitectura actual (FloatingTabBar propio fuera del tabBar de
- * react-navigation + Animated API core) este approach funciona en
- * cada tap.
+ * Fix: splitear cada subpath en su propio <Path> con su propia
+ * Animated.Value. Secuenciamos las animaciones con delay proporcional
+ * a la duración de cada una. Cada trazo corto ahora tiene MIN_SEGMENT_MS
+ * (180ms) mínimo, y los largos escalan por MS_PER_UNIT (10ms/unidad).
  */
 export function DrawingIcon({
   path,
@@ -46,17 +71,12 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  // Velocidad del lápiz constante: ~10ms por unidad de path. Si no lo
-  // hacíamos proporcional, paths largos como news (108) se dibujaban
-  // casi 2x más rápido que alamo (56) con el mismo duration fijo — y
-  // además los subpaths cortos (las 3 rayitas de news, los 4 palitos
-  // de markets) se flasheaban en ~45-100ms cada uno. Ahora todos
-  // trazan al mismo ritmo visual.
-  duration = Math.max(500, path.len * 10),
 }: Props) {
-  // dashOffset: path.len = trazo invisible, 0 = trazo completo.
-  const dashOffset = useRef(
-    new Animated.Value(focused ? path.len : 0),
+  // Un Animated.Value por segmento. Inicializamos con el largo del
+  // segmento (trazo invisible) si focused al mount, o en 0 (trazo
+  // visible completo) si inactivo.
+  const segmentOffsets = useRef(
+    path.segments.map((seg) => new Animated.Value(focused ? seg.len : 0)),
   ).current;
   const markerActive = useRef(
     new Animated.Value(focused ? 1 : 0),
@@ -65,17 +85,29 @@ export function DrawingIcon({
 
   useEffect(() => {
     if (focused) {
-      // Reset invisible, después animamos a 0 (trazo revelado).
-      dashOffset.setValue(path.len);
-      Animated.timing(dashOffset, {
-        toValue: 0,
-        duration,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false, // strokeDashoffset no soporta native driver
-      }).start();
+      // Reset todos los segmentos a invisible antes de secuenciar.
+      path.segments.forEach((seg, i) => {
+        segmentOffsets[i].setValue(seg.len);
+      });
+      // Secuenciamos: cada segmento arranca su animación con un delay
+      // igual a la suma de duraciones + gaps de los anteriores.
+      let delay = 0;
+      path.segments.forEach((seg, i) => {
+        const dur = segmentDuration(seg.len);
+        Animated.timing(segmentOffsets[i], {
+          toValue: 0,
+          duration: dur,
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false, // strokeDashoffset no soporta native driver
+        }).start();
+        delay += dur + INTER_SEGMENT_DELAY;
+      });
     } else {
-      // Tab inactiva: trazo completo, sin drama.
-      dashOffset.setValue(0);
+      // Tab inactiva: todos los trazos completos, sin animación.
+      path.segments.forEach((seg, i) => {
+        segmentOffsets[i].setValue(0);
+      });
     }
     Animated.timing(markerActive, {
       toValue: focused ? 1 : 0,
@@ -89,7 +121,7 @@ export function DrawingIcon({
       tension: 120,
       useNativeDriver: true,
     }).start();
-  }, [focused, duration, path.len, dashOffset, markerActive, pop]);
+  }, [focused, path.segments, segmentOffsets, markerActive, pop]);
 
   return (
     <View style={s.wrap}>
@@ -105,16 +137,19 @@ export function DrawingIcon({
       />
       <Animated.View style={{ transform: [{ scale: pop }] }}>
         <Svg width={size} height={size} viewBox={viewBox}>
-          <AnimatedPath
-            d={path.d}
-            stroke={color}
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={path.len}
-            strokeDashoffset={dashOffset}
-          />
+          {path.segments.map((seg, i) => (
+            <AnimatedPath
+              key={i}
+              d={seg.d}
+              stroke={color}
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={seg.len}
+              strokeDashoffset={segmentOffsets[i]}
+            />
+          ))}
         </Svg>
       </Animated.View>
     </View>
@@ -137,29 +172,51 @@ const s = StyleSheet.create({
 });
 
 /* ─── Paths SVG para las tabs ─── */
+// Los largos (len) son aproximados con ~5% de overshoot — no hay
+// Path.getTotalLength() en react-native-svg, así que los calculamos
+// a mano. El overshoot garantiza que el dash cubra el trazo completo.
 export const tabPaths = {
   home: {
-    d: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z",
-    len: 76,
+    segments: [
+      { d: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z", len: 76 },
+    ],
   },
   markets: {
-    d: "M3 21 V4 M3 21 H21 M7 17 V13 M12 17 V9 M17 17 V11 M21 17 V7",
-    len: 65,
+    segments: [
+      { d: "M3 21 V4", len: 18 },    // eje Y
+      { d: "M3 21 H21", len: 19 },   // eje X
+      { d: "M7 17 V13", len: 5 },    // barra 1
+      { d: "M12 17 V9", len: 9 },    // barra 2
+      { d: "M17 17 V11", len: 7 },   // barra 3
+      { d: "M21 17 V7", len: 11 },   // barra 4
+    ],
   },
   news: {
-    d: "M5 4 H18 V20 H5 Z M5 4 V20 A2 2 0 0 1 3 18 V11 H5 M8 8 H15 M8 12 H15 M8 16 H12",
-    len: 108,
+    segments: [
+      { d: "M5 4 H18 V20 H5 Z", len: 60 },                        // rectángulo
+      { d: "M5 4 V20 A2 2 0 0 1 3 18 V11 H5", len: 30 },         // solapa
+      { d: "M8 8 H15", len: 8 },                                  // rayita 1
+      { d: "M8 12 H15", len: 8 },                                 // rayita 2
+      { d: "M8 16 H12", len: 5 },                                 // rayita 3
+    ],
   },
   profile: {
-    d: "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z M4 21 V20 A6 6 0 0 1 10 14 H14 A6 6 0 0 1 20 20 V21",
-    len: 52,
+    segments: [
+      { d: "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z", len: 26 },
+      { d: "M4 21 V20 A6 6 0 0 1 10 14 H14 A6 6 0 0 1 20 20 V21", len: 28 },
+    ],
   },
   support: {
-    d: "M5 4 H19 A2 2 0 0 1 21 6 V15 A2 2 0 0 1 19 17 H12 L7 21 V17 H5 A2 2 0 0 1 3 15 V6 A2 2 0 0 1 5 4 Z M8 10 H9 M12 10 H13 M16 10 H17",
-    len: 70,
+    segments: [
+      { d: "M5 4 H19 A2 2 0 0 1 21 6 V15 A2 2 0 0 1 19 17 H12 L7 21 V17 H5 A2 2 0 0 1 3 15 V6 A2 2 0 0 1 5 4 Z", len: 62 },
+      { d: "M8 10 H9", len: 2 },
+      { d: "M12 10 H13", len: 2 },
+      { d: "M16 10 H17", len: 2 },
+    ],
   },
   alamo: {
-    d: "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z",
-    len: 56,
+    segments: [
+      { d: "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z", len: 56 },
+    ],
   },
 } as const satisfies Record<string, TabPath>;
