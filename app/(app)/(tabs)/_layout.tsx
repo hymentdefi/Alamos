@@ -145,7 +145,6 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             >
               {tabPath ? (
                 <DrawingIcon
-                  key={`${route.name}-${focused}`}
                   path={tabPath}
                   focused={focused}
                   color={color}
