@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
-import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Path } from "react-native-svg";
 
 interface TabPath {
@@ -23,12 +22,18 @@ const MARKER_COLOR = "#5ac43e";
 /**
  * Icono de tab con reveal al activarse.
  *
- * Usamos la Animated API CORE de React Native (no Reanimated).
- * Rationale: Reanimated 4 + Expo Go SDK 54 + react-native-svg tiró
- * errores raros de propagación que no pudimos diagnosticar del todo.
- * La Animated core API viene con React Native mismo, sin plugins de
- * babel ni worklets ni new-arch hooks — si React Native corre, esto
- * corre.
+ * Técnica de reveal: wrapper con overflow:"hidden" y width animado
+ * (0 → size). El Svg adentro tiene width fijo = size, así que a
+ * medida que el wrapper crece se va "destapando" de izquierda a
+ * derecha. Visualmente idéntico a MaskedView pero sin depender de
+ * react-native-masked-view, que en Fabric + useNativeDriver:false
+ * tiene un bug donde el mask se congela después del primer render
+ * (los Animated.Value cambian pero el mask visual no). Ese bug era
+ * la causa real de que las animaciones no se vieran en taps
+ * posteriores al primer mount.
+ *
+ * Animated API core (no Reanimated) — viene bundled con RN, sin
+ * plugins de babel ni worklets.
  */
 export function DrawingIcon({
   path,
@@ -38,24 +43,21 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 520,
 }: Props) {
-  // Inicializamos según focused para que el mount inicial arranque en
-  // el estado correcto sin flicker.
-  const reveal = useRef(new Animated.Value(focused ? 1 : 1)).current;
+  const reveal = useRef(new Animated.Value(focused ? 0 : 1)).current;
   const markerActive = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const pop = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
 
   useEffect(() => {
     if (focused) {
-      // Reset invisible, después reveal a 1.
       reveal.setValue(0);
       Animated.timing(reveal, {
         toValue: 1,
         duration,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false, // width no es nativeDriver-friendly
+        useNativeDriver: false, // width no soporta native driver
       }).start();
     } else {
-      // Saliendo: el icono queda dibujado, sin wipe-out.
+      // Saliendo: el icono queda completo (no hacemos wipe-out).
       reveal.setValue(1);
     }
     Animated.timing(markerActive, {
@@ -90,19 +92,12 @@ export function DrawingIcon({
         ]}
       />
       <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <MaskedView
-          style={{ width: size, height: size }}
-          maskElement={
-            <View style={{ width: size, height: size, flexDirection: "row" }}>
-              <Animated.View
-                style={{
-                  height: size,
-                  width: revealWidth,
-                  backgroundColor: "black",
-                }}
-              />
-            </View>
-          }
+        <Animated.View
+          style={{
+            width: revealWidth,
+            height: size,
+            overflow: "hidden",
+          }}
         >
           <Svg width={size} height={size} viewBox={viewBox}>
             <Path
@@ -114,7 +109,7 @@ export function DrawingIcon({
               strokeLinejoin="round"
             />
           </Svg>
-        </MaskedView>
+        </Animated.View>
       </Animated.View>
     </View>
   );
