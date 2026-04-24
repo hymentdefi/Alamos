@@ -61,18 +61,26 @@ export default function DetailScreen() {
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
+  // IMPORTANT: todos los hooks se corren ANTES del early return para
+  // respetar las reglas de React (mismo orden cada render). Si el
+  // ticker todavía no está resuelto, 'asset' es undefined y los hooks
+  // siguientes usan fallbacks seguros.
   const asset = useMemo(() => assets.find((a) => a.ticker === ticker), [ticker]);
-  if (!asset) return null;
-  const fav = isFavorite(asset.ticker);
 
-  const pctForRange = rangePctFor(asset.ticker, range);
+  const pctForRange = asset ? rangePctFor(asset.ticker, range) : 0;
+  const series = useMemo(
+    () =>
+      asset
+        ? buildPriceSeries(asset.price, pctForRange, `${asset.ticker}-${range}`)
+        : [],
+    [asset, pctForRange, range],
+  );
+
+  if (!asset) return null;
+
+  const fav = isFavorite(asset.ticker);
   const rangeUp = pctForRange >= 0;
   const color = rangeUp ? c.greenDark : c.red;
-
-  const series = useMemo(
-    () => buildPriceSeries(asset.price, pctForRange, `${asset.ticker}-${range}`),
-    [asset.price, asset.ticker, pctForRange, range],
-  );
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];

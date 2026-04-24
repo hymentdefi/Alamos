@@ -391,8 +391,6 @@ function MarketPage({
 
 const CARD_W = 160;
 const GAP = 12;
-/** Velocidad del auto-scroll en px/s. */
-const MARQUEE_SPEED = 24;
 
 function MoversMarquee({
   movers,
@@ -402,87 +400,23 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-  const scrollRef = useRef<ScrollView>(null);
-  const posRef = useRef(0);
-  const interactingRef = useRef(false);
-  const loopWidth = movers.length * (CARD_W + GAP);
 
-  // Auto-scroll horizontal controlado por RAF sobre el ScrollView.
-  // Cuando el usuario arrastra con el dedo la flag interactingRef se
-  // enciende y la animación se pausa; al soltar sigue desde donde quedó.
-  // Así el marquee se mueve solo PERO el drag manual funciona.
-  useEffect(() => {
-    if (loopWidth <= 0) return;
-    let raf: number;
-    let last = Date.now();
-    const tick = () => {
-      const now = Date.now();
-      const dt = (now - last) / 1000;
-      last = now;
-      if (!interactingRef.current) {
-        posRef.current += MARQUEE_SPEED * dt;
-        if (posRef.current >= loopWidth) posRef.current -= loopWidth;
-        scrollRef.current?.scrollTo({ x: posRef.current, animated: false });
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [loopWidth]);
-
-  // Duplicamos la lista para que al llegar al final del primer set, el
-  // segundo set esté alineado → loop imperceptible.
-  const items = [...movers, ...movers];
-
+  // Marquee estático: el usuario scrollea con el dedo. Sacamos el
+  // auto-scroll via RAF porque el scrollTo programático a 60Hz se
+  // estaba comiendo los taps en toda la pantalla de Mercado.
   return (
     <View style={s.marqueeWrap}>
       <ScrollView
-        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.marqueeTrack}
-        scrollEventThrottle={16}
         decelerationRate="normal"
-        /* Pausamos el auto-scroll en cuanto el dedo toca el marquee,
-           antes de que RN decida si es tap o drag. Si no pausamos, el
-           scrollTo programático que corre a 60Hz se come los taps. */
-        onTouchStart={() => {
-          interactingRef.current = true;
-        }}
-        onTouchEnd={() => {
-          interactingRef.current = false;
-        }}
-        onTouchCancel={() => {
-          interactingRef.current = false;
-        }}
-        onScrollBeginDrag={() => {
-          interactingRef.current = true;
-        }}
-        onScrollEndDrag={(e) => {
-          posRef.current = e.nativeEvent.contentOffset.x;
-        }}
-        onMomentumScrollEnd={(e) => {
-          posRef.current = e.nativeEvent.contentOffset.x;
-          if (loopWidth > 0 && posRef.current >= loopWidth) {
-            posRef.current -= loopWidth;
-            scrollRef.current?.scrollTo({
-              x: posRef.current,
-              animated: false,
-            });
-          }
-          interactingRef.current = false;
-        }}
-        onScroll={(e) => {
-          if (interactingRef.current) {
-            posRef.current = e.nativeEvent.contentOffset.x;
-          }
-        }}
       >
-        {items.map((asset, idx) => {
+        {movers.map((asset) => {
           const up = asset.change >= 0;
           return (
             <Pressable
-              key={`${asset.ticker}-${idx}`}
+              key={asset.ticker}
               onPress={() => onOpen(asset)}
               style={[
                 s.moverCard,
