@@ -10,6 +10,9 @@ interface Props {
   /** Color de los decimales. Si no se pasa, se usa textMuted. */
   decimalsColor?: string;
   weight?: FontWeight;
+  /** Multiplicador vertical del entero — útil para 'estirar' el monto
+   * hacia abajo y darle más presencia. Default 1 (sin stretch). */
+  stretchY?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -23,6 +26,7 @@ export function AmountDisplay({
   color,
   decimalsColor,
   weight = 700,
+  stretchY = 1,
   style,
 }: Props) {
   const { c } = useTheme();
@@ -38,9 +42,14 @@ export function AmountDisplay({
         style={{
           fontFamily: fontFamily[weight],
           fontSize: size,
-          lineHeight: size * 1.05,
+          lineHeight: size * 1.05 * stretchY,
           letterSpacing: -size * 0.04,
           color: txt,
+          // scaleY > 1 estira los dígitos hacia abajo. transformOrigin en
+          // RN es 'center' por default, así que el texto se estira en
+          // ambas direcciones — el lineHeight extra compensa para que
+          // no se solape con elementos de arriba/abajo.
+          transform: stretchY === 1 ? undefined : [{ scaleY: stretchY }],
         }}
       >
         {parts.sign} {parts.integer}

@@ -217,6 +217,7 @@ function BaseHome() {
             value={current}
             size={58}
             weight={800}
+            stretchY={1.18}
             style={{ marginBottom: 10 }}
           />
           <View style={s.deltaRow}>
