@@ -12,6 +12,7 @@ import { useRouter, useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
@@ -102,26 +103,41 @@ export default function AlamoScreen() {
           <Pressable
             onPress={() => requestSwitch()}
             style={({ pressed }) => [
-              s.proBtn,
+              s.proBtnShadow,
               {
-                opacity: pressed ? 0.55 : 1,
+                opacity: pressed ? 0.65 : 1,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               },
             ]}
             hitSlop={10}
           >
-            <AlamosLogo variant="lockupShort" tone="light" size={38} />
-            {!isPro ? (
-              <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
-                Pro
-              </Text>
-            ) : null}
-            <Feather
-              name="chevron-right"
-              size={18}
-              color={c.textFaint}
-              style={{ marginLeft: 2 }}
-            />
+            <View style={s.proBtn}>
+              {/* Glow verde sutil detrás del contenido — da la
+                  sensación de que el switch 'brilla' en el fondo
+                  sin ser un recuadro gris. */}
+              <LinearGradient
+                colors={[
+                  "rgba(0, 200, 5, 0.04)",
+                  "rgba(0, 200, 5, 0.14)",
+                  "rgba(0, 200, 5, 0.04)",
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <AlamosLogo variant="lockupShort" tone="light" size={38} />
+              {!isPro ? (
+                <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
+                  Pro
+                </Text>
+              ) : null}
+              <Feather
+                name="chevron-right"
+                size={18}
+                color={c.textFaint}
+                style={{ marginLeft: 4 }}
+              />
+            </View>
           </Pressable>
         </View>
 
@@ -367,19 +383,31 @@ const s = StyleSheet.create({
     alignSelf: "stretch",
     marginVertical: 4,
   },
+  /* Sombra verde sutil que envuelve al switch y lo integra con el
+     card, para que no se sienta como un logo flotando sobre blanco. */
+  proBtnShadow: {
+    shadowColor: "#00C805",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4,
+    borderRadius: radius.pill,
+  },
   proBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 0,
-    paddingLeft: 6,
-    paddingRight: 2,
-    paddingVertical: 4,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    overflow: "hidden",
   },
   proBtnAccent: {
     fontFamily: fontFamily[800],
     fontSize: 16,
     letterSpacing: -0.3,
-    marginLeft: -16,
+    marginLeft: -11,
   },
 
   /* Groups + rows */
