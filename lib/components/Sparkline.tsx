@@ -14,6 +14,7 @@ import Svg, {
   G,
   LinearGradient,
   Line,
+  Mask,
   Path,
   Rect,
   Stop,
@@ -182,6 +183,7 @@ export function Sparkline({
         {sheen ? (
           <>
             <Defs>
+              {/* Gradient horizontal: el reflejo verde que se barre. */}
               <LinearGradient
                 id={`sheen-${gradId}`}
                 x1="0"
@@ -193,11 +195,38 @@ export function Sparkline({
                 <Stop offset="0.5" stopColor={color} stopOpacity={0.22} />
                 <Stop offset="1" stopColor={color} stopOpacity={0} />
               </LinearGradient>
+              {/* Gradient vertical para la mask: blanco arriba, fade
+                  a transparente en el último ~30%. Esto suaviza el
+                  borde inferior del sheen para que no se corte feo
+                  cuando se topa con el timeline. */}
+              <LinearGradient
+                id={`sheenFade-${gradId}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <Stop offset="0" stopColor="#ffffff" stopOpacity={1} />
+                <Stop offset="0.55" stopColor="#ffffff" stopOpacity={1} />
+                <Stop offset="1" stopColor="#ffffff" stopOpacity={0} />
+              </LinearGradient>
+              <Mask id={`sheenMask-${gradId}`}>
+                <Rect
+                  x={0}
+                  y={0}
+                  width={VB_W}
+                  height={VB_H}
+                  fill={`url(#sheenFade-${gradId})`}
+                />
+              </Mask>
               <ClipPath id={`sheenClip-${gradId}`}>
                 <Path d={fillD} />
               </ClipPath>
             </Defs>
-            <G clipPath={`url(#sheenClip-${gradId})`}>
+            <G
+              clipPath={`url(#sheenClip-${gradId})`}
+              mask={`url(#sheenMask-${gradId})`}
+            >
               <Rect
                 x={sheenX}
                 y={0}
