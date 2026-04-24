@@ -63,13 +63,23 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
  *            capturaba el startValue ANTES de que el primer assignment
  *            aterrizara en el UI thread, así que animaba de 0 → 0.
  *
- * Intento 5 (este, y funciona): Reanimated con withSequence. El reset y
- * la animación van en UNA sola asignación a `.value`, y withSequence
- * garantiza que el reset (duration 0) corre primero en el UI thread y
- * recién después arranca withTiming leyendo el valor ya reseteado. Sin
- * race, el trazo anima en CADA cambio de tab, no solo en el primer
- * mount. cancelAnimation antes de asignar evita que taps rápidos dejen
- * animaciones colgadas cuyo startValue era el viejo.
+ * Intento 5: Reanimated + withSequence. En papel sin race, pero en la
+ *            práctica seguía sin animar en cambios de tab posteriores.
+ *            react-native-svg no propaga updates al Path nativo
+ *            después del primer mount — ni con Animated ni con
+ *            Reanimated. Y encima el useEffect de focused no siempre
+ *            se re-ejecuta porque React Navigation retiene el
+ *            component instance cross-focus de una forma que no
+ *            flagea prop change en ciertos casos.
+ *
+ * Intento 6 (este, y funciona de verdad): Reanimated + withSequence
+ * + key={name-${focused}} force-remount en el _layout. En cada
+ * cambio de focus React desmonta el DrawingIcon viejo y monta uno
+ * nuevo — useSharedValue se inicializa de cero en path.len, el Path
+ * nativo es una instancia fresca que SÍ acepta los updates de
+ * animatedProps, y useEffect corre garantizado en mount. withSequence
+ * + cancelAnimation se quedan como defense-in-depth por si alguien
+ * saca el key en el futuro o el patrón de mount cambia.
  */
 export function DrawingIcon({
   path,
