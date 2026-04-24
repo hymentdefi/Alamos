@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
+import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Path } from "react-native-svg";
 import Animated, {
   cancelAnimation,
   Easing,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -16,9 +16,9 @@ interface TabPath {
   /** SVG `d` del icono. */
   d: string;
   /**
-   * Largo total del trazo en unidades del viewBox (24x24). Precomputado
-   * porque react-native-svg no expone getTotalLength(). Con un poquito
-   * de overshoot para que el trazo llegue completo siempre.
+   * Largo total del trazo en unidades del viewBox (24x24). Se mantiene
+   * en el tipo por compat con código viejo pero ya no lo usamos para
+   * animar — la técnica con strokeDashoffset no sobrevivió.
    */
   len: number;
 }
@@ -34,52 +34,45 @@ interface Props {
 
 const MARKER_COLOR = "#5ac43e";
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
 /**
- * Icono de tab con dibujado real del SVG — el trazo se traza de punta
- * a punta como si lo hiciera una mano.
+ * Icono de tab con animación de reveal al activarse.
  *
- * Historia de este componente (para que no vuelva a romperse):
+ * Historia (que no vuelva a romperse):
  *
  * Intento 1: overlay 'cortina' con translateX (Animated native driver).
- *            Funcionaba al montar pero el overlay nunca matcheaba el
- *            color del island, se veía sucio.
+ *            El overlay nunca matcheaba el color del island por el
+ *            stacking de alpha — se veía sucio.
  * Intento 2: Animated.createAnimatedComponent(Path) + strokeDashoffset
- *            con useNativeDriver:false. Funcionaba la primera vez pero
- *            react-native-svg no propaga los updates del Animated.Value
- *            al Path nativo después del primer ciclo, el trazo quedaba
- *            congelado.
- * Intento 3: setState + requestAnimationFrame driveando el offset. En
- *            teoría bulletproof pero en la práctica setState 60×s sobre
- *            un componente dentro del tabBar no re-renderizaba el Path,
- *            aparentemente React Navigation memoriza el output de
- *            tabBarIcon y los updates no llegaban.
+ *            con useNativeDriver:false. Animaba la primera vez y
+ *            después react-native-svg dejaba de propagar updates al
+ *            Path nativo — el trazo quedaba congelado.
+ * Intento 3: setState + requestAnimationFrame driveando el offset.
+ *            setState 60×s dentro del tabBar no re-renderizaba el
+ *            Path, React Navigation parece memorizar el output de
+ *            tabBarIcon.
+ * Intento 4: Reanimated + dos assignments sueltos (value=len;
+ *            value=withTiming(0)). Andaba solo en el primer launch
+ *            porque useSharedValue ya arrancaba en path.len.
+ * Intento 5: Reanimated + withSequence. Mismo síntoma — la animación
+ *            corría en el UI thread pero el Path no se actualizaba
+ *            visualmente.
+ * Intento 6: Reanimated + withSequence + key={name-${focused}} force
+ *            remount en el _layout. Misma historia: el Path nativo
+ *            simplemente no acepta updates de animatedProps en este
+ *            runtime, aunque lo remontes.
  *
- * Intento 4: Reanimated con dos assignments sueltos (`value = path.len`
- *            seguido de `value = withTiming(0)`). Funcionaba solo en el
- *            primer launch porque useSharedValue arrancaba ya en
- *            path.len. En cambios de tab posteriores withTiming
- *            capturaba el startValue ANTES de que el primer assignment
- *            aterrizara en el UI thread, así que animaba de 0 → 0.
+ * Intento 7 (este, y funciona): MaskedView. Sacamos toda la animación
+ * del SVG — el Path se renderiza completo y STATIC, nada animado ahí
+ * adentro. La animación corre sobre un <Animated.View> común que hace
+ * de mask: su width crece de 0 a size, y MaskedView muestra el icono
+ * progresivamente en los píxeles donde el mask es opaco. Al no tocar
+ * props de react-native-svg, esquivamos el bug de propagación. Este
+ * mismo patrón (MaskedView + View animada) lo usamos ya en
+ * SwipeToSubmit.tsx sin problemas.
  *
- * Intento 5: Reanimated + withSequence. En papel sin race, pero en la
- *            práctica seguía sin animar en cambios de tab posteriores.
- *            react-native-svg no propaga updates al Path nativo
- *            después del primer mount — ni con Animated ni con
- *            Reanimated. Y encima el useEffect de focused no siempre
- *            se re-ejecuta porque React Navigation retiene el
- *            component instance cross-focus de una forma que no
- *            flagea prop change en ciertos casos.
- *
- * Intento 6 (este, y funciona de verdad): Reanimated + withSequence
- * + key={name-${focused}} force-remount en el _layout. En cada
- * cambio de focus React desmonta el DrawingIcon viejo y monta uno
- * nuevo — useSharedValue se inicializa de cero en path.len, el Path
- * nativo es una instancia fresca que SÍ acepta los updates de
- * animatedProps, y useEffect corre garantizado en mount. withSequence
- * + cancelAnimation se quedan como defense-in-depth por si alguien
- * saca el key en el futuro o el patrón de mount cambia.
+ * Nota: el efecto cambia sutilmente — antes era un "dibujo a lápiz"
+ * siguiendo el path, ahora es un wipe left-to-right. Priorizamos que
+ * animó de verdad en cada tap sobre el efecto pencil.
  */
 export function DrawingIcon({
   path,
@@ -87,38 +80,30 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 720,
+  duration = 520,
 }: Props) {
-  // dashOffset: de path.len (invisible) a 0 (trazo completo).
-  const dashOffset = useSharedValue(focused ? path.len : 0);
+  // revealWidth: de 0 (mask vacío, icono oculto) a size (mask completo,
+  // icono visible).
+  const revealWidth = useSharedValue(focused ? 0 : size);
   // Pop del icono al entrar.
   const scale = useSharedValue(focused ? 0.8 : 1);
-  // Marker verde arriba del icono (el dotito/barrita que indica activa).
-  const markerOpacity = useSharedValue(focused ? 0 : 0);
-  const markerScaleX = useSharedValue(focused ? 0 : 0);
+  // Marker verde arriba del icono (la barrita que indica activa).
+  const markerOpacity = useSharedValue(0);
+  const markerScaleX = useSharedValue(0);
 
   useEffect(() => {
-    // Cancelamos cualquier animación en vuelo antes de arrancar la
-    // siguiente. Si no lo hacemos y el user tapea fast, queda una
-    // withTiming en curso cuyo 'startValue' se leyó antes de nuestro
-    // reset, y termina animando de 0 a 0 (invisible).
-    cancelAnimation(dashOffset);
+    cancelAnimation(revealWidth);
     cancelAnimation(scale);
     cancelAnimation(markerOpacity);
     cancelAnimation(markerScaleX);
 
     if (focused) {
-      // withSequence garantiza que el reset (duration 0) corre primero
-      // en el UI thread y DESPUÉS arranca la animación leyendo el valor
-      // recién reseteado. Si hacíamos dos assignments sueltos
-      // (`.value = path.len; .value = withTiming(0)`) el withTiming
-      // capturaba el startValue antes de que el primer assignment
-      // aterrizara, y terminaba animando de 0 a 0 — trazo invisible.
-      // Por eso solo se veía la animación en el primer mount (donde
-      // useSharedValue ya arrancaba en path.len).
-      dashOffset.value = withSequence(
-        withTiming(path.len, { duration: 0 }),
-        withTiming(0, { duration, easing: Easing.out(Easing.cubic) }),
+      // withSequence: primero mandamos el valor a 0 (mask vacío) en un
+      // tick, después animamos al tamaño completo. Garantiza orden en
+      // UI thread aunque el component no haya remontado.
+      revealWidth.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withTiming(size, { duration, easing: Easing.out(Easing.cubic) }),
       );
       scale.value = withSequence(
         withTiming(0.8, { duration: 0 }),
@@ -126,23 +111,23 @@ export function DrawingIcon({
       );
       markerOpacity.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withTiming(1, { duration: 260 }),
+        withTiming(1, { duration: 240 }),
       );
       markerScaleX.value = withSequence(
         withTiming(0, { duration: 0 }),
         withSpring(1, { damping: 10, stiffness: 140 }),
       );
     } else {
-      // Tab inactiva: icono completo, marker oculto, sin drama.
-      dashOffset.value = 0;
+      // Tab inactiva: icono completo, marker oculto.
+      revealWidth.value = size;
       scale.value = withTiming(1, { duration: 120 });
       markerOpacity.value = withTiming(0, { duration: 160 });
       markerScaleX.value = withTiming(0, { duration: 180 });
     }
-  }, [focused, path.len, duration, dashOffset, scale, markerOpacity, markerScaleX]);
+  }, [focused, size, duration, revealWidth, scale, markerOpacity, markerScaleX]);
 
-  const pathAnimatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: dashOffset.value,
+  const maskStyle = useAnimatedStyle(() => ({
+    width: revealWidth.value,
   }));
 
   const iconStyle = useAnimatedStyle(() => ({
@@ -160,18 +145,27 @@ export function DrawingIcon({
         style={[s.marker, { backgroundColor: MARKER_COLOR }, markerStyle]}
       />
       <Animated.View style={iconStyle}>
-        <Svg width={size} height={size} viewBox={viewBox}>
-          <AnimatedPath
-            d={path.d}
-            stroke={color}
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={path.len}
-            animatedProps={pathAnimatedProps}
-          />
-        </Svg>
+        <MaskedView
+          style={{ width: size, height: size }}
+          maskElement={
+            <View style={{ width: size, height: size, flexDirection: "row" }}>
+              <Animated.View
+                style={[{ height: size, backgroundColor: "black" }, maskStyle]}
+              />
+            </View>
+          }
+        >
+          <Svg width={size} height={size} viewBox={viewBox}>
+            <Path
+              d={path.d}
+              stroke={color}
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </MaskedView>
       </Animated.View>
     </View>
   );
