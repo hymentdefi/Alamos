@@ -1,9 +1,17 @@
-import { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Share,
+  StyleSheet,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Clipboard from "expo-clipboard";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { useAuth } from "../../lib/auth/context";
 import { Tap } from "../../lib/components/Tap";
@@ -143,13 +151,12 @@ function DepositInfo() {
             { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <CopyRow label="Alias" value={data.alias} onCopy={copyHaptic} />
+          <CopyRow label="Alias" value={data.alias} />
           <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
           <CopyRow
             label={cur === "ars" ? "CVU" : "CBU"}
             value={data.cvu}
             mono
-            onCopy={copyHaptic}
           />
           {data.legend ? (
             <>
@@ -162,6 +169,24 @@ function DepositInfo() {
             </>
           ) : null}
         </View>
+
+        {/* Compartir alias — abre la sheet nativa (WhatsApp, mail,
+            Telegram, etc.) con el alias como mensaje, nada más. */}
+        <Tap
+          style={[
+            s.shareAliasBtn,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+          haptic="light"
+          onPress={() => {
+            Share.share({ message: data.alias }).catch(() => {});
+          }}
+        >
+          <Feather name="share" size={16} color={c.greenDark} />
+          <Text style={[s.shareAliasText, { color: c.greenDark }]}>
+            Compartir alias
+          </Text>
+        </Tap>
 
         {/* ── Card 2: cuentas vinculadas (externas) del usuario ── */}
         <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
@@ -237,10 +262,6 @@ function DepositInfo() {
   );
 }
 
-function copyHaptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-}
-
 function CurPill({
   label,
   flag,
@@ -280,18 +301,45 @@ function CurPill({
   );
 }
 
+/**
+ * Hook que maneja el estado 'recién copiado' — copia al clipboard,
+ * dispara haptic, y retorna `copied` que vuelve a false después de
+ * 1.5s para que el botón pueda mostrar un check breve.
+ */
+function useCopyFeedback() {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const copy = (value: string) => {
+    Clipboard.setStringAsync(value).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 1500);
+  };
+
+  return { copied, copy };
+}
+
 function CopyRow({
   label,
   value,
   mono,
-  onCopy,
 }: {
   label: string;
   value: string;
   mono?: boolean;
-  onCopy: () => void;
 }) {
   const { c } = useTheme();
+  const { copied, copy } = useCopyFeedback();
   return (
     <View style={s.copyRow}>
       <View style={{ flex: 1 }}>
@@ -308,12 +356,21 @@ function CopyRow({
         </Text>
       </View>
       <Tap
-        haptic="light"
-        onPress={onCopy}
-        style={[s.copyBtn, { backgroundColor: c.surfaceHover }]}
+        haptic="none"
+        onPress={() => copy(value)}
+        style={[
+          s.copyBtn,
+          {
+            backgroundColor: copied ? c.greenDim : c.surfaceHover,
+          },
+        ]}
         hitSlop={8}
       >
-        <Feather name="copy" size={16} color={c.greenDark} />
+        <Feather
+          name={copied ? "check" : "copy"}
+          size={16}
+          color={c.greenDark}
+        />
       </Tap>
     </View>
   );
@@ -321,6 +378,7 @@ function CopyRow({
 
 function LinkedAccountRow({ acc }: { acc: LinkedAccount }) {
   const { c } = useTheme();
+  const { copied, copy } = useCopyFeedback();
   return (
     <View style={s.linkedRow}>
       <View style={[s.linkedIcon, { backgroundColor: c.surfaceHover }]}>
@@ -338,12 +396,21 @@ function LinkedAccountRow({ acc }: { acc: LinkedAccount }) {
         </Text>
       </View>
       <Tap
-        haptic="light"
-        onPress={copyHaptic}
-        style={[s.copyBtn, { backgroundColor: c.surfaceHover }]}
+        haptic="none"
+        onPress={() => copy(acc.alias)}
+        style={[
+          s.copyBtn,
+          {
+            backgroundColor: copied ? c.greenDim : c.surfaceHover,
+          },
+        ]}
         hitSlop={8}
       >
-        <Feather name="copy" size={16} color={c.greenDark} />
+        <Feather
+          name={copied ? "check" : "copy"}
+          size={16}
+          color={c.greenDark}
+        />
       </Tap>
     </View>
   );
@@ -923,6 +990,22 @@ const s = StyleSheet.create({
   },
   addAccountText: {
     fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  shareAliasBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 14,
+    paddingVertical: 14,
+    borderRadius: radius.btn,
+    borderWidth: 1,
+  },
+  shareAliasText: {
+    fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.15,
   },
