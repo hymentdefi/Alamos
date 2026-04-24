@@ -46,7 +46,13 @@ export function DrawingIcon({
   color,
   size = 24,
   viewBox = "0 0 24 24",
-  duration = 720,
+  // Velocidad del lápiz constante: ~10ms por unidad de path. Si no lo
+  // hacíamos proporcional, paths largos como news (108) se dibujaban
+  // casi 2x más rápido que alamo (56) con el mismo duration fijo — y
+  // además los subpaths cortos (las 3 rayitas de news, los 4 palitos
+  // de markets) se flasheaban en ~45-100ms cada uno. Ahora todos
+  // trazan al mismo ritmo visual.
+  duration = Math.max(500, path.len * 10),
 }: Props) {
   // dashOffset: path.len = trazo invisible, 0 = trazo completo.
   const dashOffset = useRef(
