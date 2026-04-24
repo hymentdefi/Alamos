@@ -266,6 +266,9 @@ function BaseHome() {
           </View>
         </View>
 
+        {/* Divider sutil entre el bloque del chart y las tabs */}
+        <View style={[s.heroDivider, { backgroundColor: c.border }]} />
+
         <View style={s.tabsWrap}>
           <TabStrip tab={tab} onChange={setTab} />
         </View>
@@ -786,7 +789,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
@@ -798,10 +801,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  heroDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 20,
+    marginTop: 16,
+  },
   /* TabStrip Dinero / Portfolio */
   tabsWrap: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 20,
     paddingBottom: 10,
   },
   tabGroup: {
@@ -935,7 +943,7 @@ const s = StyleSheet.create({
   },
   heroBlock: {
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   greet: {

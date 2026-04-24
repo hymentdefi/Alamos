@@ -276,8 +276,13 @@ export default function NewsScreen() {
   // Alto real del nav bar flotante (island_top + island + bottom gap).
   // iOS con home indicator ≈ 110, android ≈ 92.
   const tabBarH = Platform.OS === "ios" ? 110 : 92;
-  const hintH = showSwipeHint ? 48 : 0;
-  const cardH = screenH - tabBarH - headerH - footerH - hintH;
+  // cardH tiene que ser ESTABLE: si lo hacemos variar con showSwipeHint,
+  // el snapToInterval del FlatList pierde alineación cuando el hint
+  // desaparece a mitad de scroll — el user ve una noticia a medias y
+  // la siguiente a medias. El hint se renderiza como overlay absoluto
+  // y el primer card recibe paddingTop cuando está visible.
+  const cardH = screenH - tabBarH - headerH - footerH;
+  const HINT_SPACE = 56;
 
   const filterForTab = useCallback(
     (t: { id: Category | "todas" }) =>
@@ -369,10 +374,6 @@ export default function NewsScreen() {
         </ScrollView>
       </View>
 
-      {/* Hint no-absolute arriba del pager: así la primera noticia
-          queda exactamente debajo, sin superponerse. */}
-      <SwipeHint visible={showSwipeHint} />
-
       <View style={{ flex: 1 }}>
         <HorizontalPager
           ref={pagerRef}
@@ -380,10 +381,12 @@ export default function NewsScreen() {
           index={activeTab}
           onIndexChange={setActiveTab}
           keyExtractor={(t) => t.id}
+          extraData={showSwipeHint}
           renderItem={(t) => (
             <NewsPage
               items={filterForTab(t)}
               cardH={cardH}
+              firstCardTopPad={showSwipeHint ? HINT_SPACE : 0}
               listRef={setPageRef(t.id)}
               onDismissHint={dismissSwipeHint}
               onOpenDetail={(n) => {
@@ -395,6 +398,10 @@ export default function NewsScreen() {
             />
           )}
         />
+        {/* Hint absoluto arriba del pager — no empuja el layout, pero
+            el primer card tiene paddingTop para que la imagen no quede
+            debajo. */}
+        <SwipeHint visible={showSwipeHint} />
       </View>
 
       <View
@@ -419,12 +426,14 @@ export default function NewsScreen() {
 function NewsPage({
   items,
   cardH,
+  firstCardTopPad,
   listRef,
   onDismissHint,
   onOpenDetail,
 }: {
   items: NewsItem[];
   cardH: number;
+  firstCardTopPad: number;
   listRef: (ref: FlatList | null) => void;
   onDismissHint: () => void;
   onOpenDetail: (n: NewsItem) => void;
@@ -480,10 +489,11 @@ function NewsPage({
             progressBackgroundColor={c.surface}
           />
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <NewsCard
             item={item}
             height={cardH}
+            topPad={index === 0 ? firstCardTopPad : 0}
             onOpenDetail={() => onOpenDetail(item)}
           />
         )}
@@ -503,10 +513,12 @@ function NewsPage({
 function NewsCard({
   item,
   height,
+  topPad = 0,
   onOpenDetail,
 }: {
   item: NewsItem;
   height: number;
+  topPad?: number;
   onOpenDetail: () => void;
 }) {
   const { c } = useTheme();
@@ -540,7 +552,7 @@ function NewsCard({
   });
 
   return (
-    <View style={{ height, backgroundColor: c.bg }}>
+    <View style={{ height, paddingTop: topPad, backgroundColor: c.bg }}>
       {/* Imagen que ocupa todo el espacio entre header y contenido */}
       <Pressable style={card.imageWrap} onPress={onOpenDetail}>
         <Animated.View
@@ -969,9 +981,12 @@ const card = StyleSheet.create({
 
 const hint = StyleSheet.create({
   wrap: {
-    paddingTop: 8,
-    paddingBottom: 6,
+    position: "absolute",
+    top: 10,
+    left: 0,
+    right: 0,
     alignItems: "center",
+    zIndex: 30,
   },
   pill: {
     flexDirection: "row",
