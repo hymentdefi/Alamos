@@ -1,14 +1,22 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 interface TabPath {
   /** SVG `d` del icono. */
   d: string;
   /**
    * Largo total del trazo en unidades del viewBox (24x24). Precomputado
-   * acá porque react-native-svg no expone getTotalLength() — y hardcodear
-   * es más barato que calcular en cada mount.
+   * porque react-native-svg no expone getTotalLength(). Con un poquito
+   * de overshoot para que el trazo llegue completo siempre.
    */
   len: number;
 }
@@ -19,32 +27,38 @@ interface Props {
   color: string;
   size?: number;
   viewBox?: string;
-  /** Duración del trazo en ms. */
   duration?: number;
 }
 
 const MARKER_COLOR = "#5ac43e";
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 /**
- * Ícono de tab con dibujado real del SVG: el trazo se traza de punta
- * a punta, como si lo estuviera haciendo una mano.
+ * Icono de tab con dibujado real del SVG — el trazo se traza de punta
+ * a punta como si lo hiciera una mano.
  *
- * ¿Por qué setState + RAF en vez de Animated.Value + AnimatedPath?
+ * Historia de este componente (para que no vuelva a romperse):
  *
- * Probé el approach 'correcto' con Animated.createAnimatedComponent(Path)
- * + useNativeDriver:false. La animación del trazo funcionaba la PRIMERA
- * vez (al montar la app en Home), pero NO volvía a dispararse al
- * cambiar de tab. Parece un bug conocido de react-native-svg 15: el
- * AnimatedPath no re-bindea el nuevo valor cuando el Animated.Value
- * cambia a base de setValue/timing después del primer ciclo.
+ * Intento 1: overlay 'cortina' con translateX (Animated native driver).
+ *            Funcionaba al montar pero el overlay nunca matcheaba el
+ *            color del island, se veía sucio.
+ * Intento 2: Animated.createAnimatedComponent(Path) + strokeDashoffset
+ *            con useNativeDriver:false. Funcionaba la primera vez pero
+ *            react-native-svg no propaga los updates del Animated.Value
+ *            al Path nativo después del primer ciclo, el trazo quedaba
+ *            congelado.
+ * Intento 3: setState + requestAnimationFrame driveando el offset. En
+ *            teoría bulletproof pero en la práctica setState 60×s sobre
+ *            un componente dentro del tabBar no re-renderizaba el Path,
+ *            aparentemente React Navigation memoriza el output de
+ *            tabBarIcon y los updates no llegaban.
  *
- * La solución confiable: manejar el dashOffset como un state de React
- * y actualizarlo desde un requestAnimationFrame loop. Cada frame es un
- * setState → re-render del Path. React Native redibuja el stroke, y
- * el trazo se anima como se debe, SIEMPRE, en cada cambio de tab.
- *
- * Scale del icono y marker verde siguen en Animated con native driver
- * — transforms y opacity sí funcionan con setValue repetidos.
+ * Intento 4 (este, y funciona): Reanimated. useSharedValue + worklets
+ * corren en el UI thread, no dependen de React reconciliation ni de
+ * que el tab bar re-renderice. Cambiamos el value → Reanimated propaga
+ * directamente al native Path a través de useAnimatedProps. Anima
+ * siempre, en cada cambio de tab, sin depender de keys ni remounts.
  */
 export function DrawingIcon({
   path,
@@ -54,92 +68,62 @@ export function DrawingIcon({
   viewBox = "0 0 24 24",
   duration = 720,
 }: Props) {
-  // Offset driven por setState — garantiza que Path re-renderice.
-  // Si focused arranca en true, partimos con offset=pathLen (invisible)
-  // así el useEffect puede tracear. Si arranca en false, offset=0
-  // (visible) para que el icono esté ahí quieto.
-  const [offset, setOffset] = useState(focused ? path.len : 0);
-
-  const scale = useRef(new Animated.Value(focused ? 0.8 : 1)).current;
-  const markerOpacity = useRef(
-    new Animated.Value(focused ? 0 : 0),
-  ).current;
-  const markerScale = useRef(new Animated.Value(focused ? 0 : 0)).current;
+  // dashOffset: de path.len (invisible) a 0 (trazo completo).
+  const dashOffset = useSharedValue(focused ? path.len : 0);
+  // Pop del icono al entrar.
+  const scale = useSharedValue(focused ? 0.8 : 1);
+  // Marker verde arriba del icono (el dotito/barrita que indica activa).
+  const markerOpacity = useSharedValue(focused ? 0 : 0);
+  const markerScaleX = useSharedValue(focused ? 0 : 0);
 
   useEffect(() => {
-    if (!focused) {
-      setOffset(0);
-      scale.stopAnimation(() => scale.setValue(1));
-      markerOpacity.stopAnimation(() => markerOpacity.setValue(0));
-      markerScale.stopAnimation(() => markerScale.setValue(0));
-      return;
+    if (focused) {
+      // Reseteamos el dashOffset al largo completo (trazo invisible)
+      // y después animamos a 0 (trazo revelado). Reanimated nota el
+      // cambio inmediato y lo aplica antes de la animación, así que el
+      // trazo arranca realmente invisible aunque vengamos de un estado
+      // previo en que era visible.
+      dashOffset.value = path.len;
+      dashOffset.value = withTiming(0, {
+        duration,
+        easing: Easing.out(Easing.cubic),
+      });
+      scale.value = 0.8;
+      scale.value = withSpring(1, { damping: 12, stiffness: 160 });
+      markerOpacity.value = 0;
+      markerOpacity.value = withTiming(1, { duration: 260 });
+      markerScaleX.value = 0;
+      markerScaleX.value = withSpring(1, { damping: 10, stiffness: 140 });
+    } else {
+      // Tab inactiva: icono completo, marker oculto, sin drama.
+      dashOffset.value = 0;
+      scale.value = withTiming(1, { duration: 120 });
+      markerOpacity.value = withTiming(0, { duration: 160 });
+      markerScaleX.value = withTiming(0, { duration: 180 });
     }
+  }, [focused, path.len, duration, dashOffset, scale, markerOpacity, markerScaleX]);
 
-    // Arranque limpio.
-    setOffset(path.len);
-    scale.setValue(0.8);
-    markerOpacity.setValue(0);
-    markerScale.setValue(0);
+  const pathAnimatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: dashOffset.value,
+  }));
 
-    // Loop RAF que va bajando el offset de pathLen a 0 con ease-out
-    // cubic — arranca rápido, frena al final, como un trazo humano.
-    const startTime = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      // easeOutCubic
-      const eased = 1 - Math.pow(1 - t, 3);
-      setOffset(path.len * (1 - eased));
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      }
-    };
-    raf = requestAnimationFrame(tick);
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
-    // Pop del icono + marker en native driver.
-    const pop = Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 130,
-        friction: 6,
-        useNativeDriver: true,
-      }),
-      Animated.timing(markerOpacity, {
-        toValue: 1,
-        duration: 260,
-        useNativeDriver: true,
-      }),
-      Animated.spring(markerScale, {
-        toValue: 1,
-        tension: 95,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-    ]);
-    pop.start();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      pop.stop();
-    };
-  }, [focused, path.len, duration, scale, markerOpacity, markerScale]);
+  const markerStyle = useAnimatedStyle(() => ({
+    opacity: markerOpacity.value,
+    transform: [{ scaleX: markerScaleX.value }],
+  }));
 
   return (
     <View style={s.wrap}>
       <Animated.View
-        style={[
-          s.marker,
-          {
-            backgroundColor: MARKER_COLOR,
-            opacity: markerOpacity,
-            transform: [{ scaleX: markerScale }],
-          },
-        ]}
+        style={[s.marker, { backgroundColor: MARKER_COLOR }, markerStyle]}
       />
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View style={iconStyle}>
         <Svg width={size} height={size} viewBox={viewBox}>
-          <Path
+          <AnimatedPath
             d={path.d}
             stroke={color}
             strokeWidth={2}
@@ -147,7 +131,7 @@ export function DrawingIcon({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeDasharray={path.len}
-            strokeDashoffset={offset}
+            animatedProps={pathAnimatedProps}
           />
         </Svg>
       </Animated.View>
@@ -171,10 +155,6 @@ const s = StyleSheet.create({
 });
 
 /* ─── Paths SVG para las tabs ─── */
-// Los `len` son la suma de los largos de todos los segmentos del path
-// en el viewBox 24x24. Calculados a mano (sum de L/H/V + aprox de arcs).
-// Un pelito de overshoot (+2) para que el trazo llegue completo en
-// todos los casos sin depender de error numérico.
 export const tabPaths = {
   home: {
     d: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z",
