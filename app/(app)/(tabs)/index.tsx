@@ -41,6 +41,8 @@ import { useAuth } from "../../../lib/auth/context";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
+import { FlagIcon } from "../../../lib/components/FlagIcon";
+import { AlamosLogo } from "../../../lib/components/Logo";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -239,14 +241,8 @@ function BaseHome() {
           </Text>
 
           <View style={s.amountRow} {...currencyPan.panHandlers}>
-            <Pressable
-              onPress={toggleCurrency}
-              style={[s.flagCircle, { backgroundColor: c.surfaceHover }]}
-              hitSlop={8}
-            >
-              <Text style={s.flagEmojiHero}>
-                {currency === "ARS" ? "🇦🇷" : "🇺🇸"}
-              </Text>
+            <Pressable onPress={toggleCurrency} hitSlop={8}>
+              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={40} />
             </Pressable>
             <AmountDisplay
               value={currency === "ARS" ? current : current / USD_RATE}
@@ -547,7 +543,7 @@ function Dinero({
 
         {ars ? (
           <EarningsRow
-            flag="🇦🇷"
+            flag="AR"
             ticker="ARS"
             name="Peso argentino"
             tna={CURRENCY_TNA.ARS}
@@ -560,7 +556,7 @@ function Dinero({
         ) : null}
         {usd ? (
           <EarningsRow
-            flag="🇺🇸"
+            flag="US"
             ticker="USD"
             name="Dólar MEP"
             tna={CURRENCY_TNA.USD}
@@ -590,7 +586,7 @@ function EarningsRow({
   amountSecondary,
   withTopDivider,
 }: {
-  flag: string;
+  flag: "AR" | "US";
   ticker: string;
   name: string;
   tna: { label: string; pct: number };
@@ -609,9 +605,7 @@ function EarningsRow({
         },
       ]}
     >
-      <View style={[s.earningsFlag, { backgroundColor: c.surfaceHover }]}>
-        <Text style={s.earningsFlagEmoji}>{flag}</Text>
-      </View>
+      <FlagIcon code={flag} size={40} />
       <View style={{ flex: 1 }}>
         <View style={s.earningsTickerRow}>
           <Text style={[s.earningsTicker, { color: c.text }]}>{ticker}</Text>
@@ -655,10 +649,7 @@ function EarningsInfoModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable
-        style={s.modalBackdrop}
-        onPress={onClose}
-      >
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={[s.modalCard, { backgroundColor: c.surface }]}
@@ -666,15 +657,16 @@ function EarningsInfoModal({
           <View
             style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}
           >
-            <Feather name="trending-up" size={22} color={c.greenDark} />
+            <AlamosLogo variant="mark" tone="light" size={36} />
           </View>
           <Text style={[s.modalTitle, { color: c.text }]}>
-            Tu plata rinde sola
+            Tu saldo genera rendimientos
           </Text>
           <Text style={[s.modalBody, { color: c.textSecondary }]}>
-            Ganás rendimientos por el solo hecho de tener tu plata en
-            Alamos. Sin límite de monto, sin montos mínimos, sin
-            comisiones. Se acreditan todos los días.
+            El saldo que mantengas en tu cuenta rinde de forma
+            automática a la tasa vigente de cada moneda. Sin montos
+            mínimos, sin límites y sin comisiones. Los intereses se
+            acreditan al inicio de cada día hábil.
           </Text>
           <Tap
             onPress={onClose}
@@ -1093,17 +1085,6 @@ const s = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
   },
-  earningsFlag: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  earningsFlagEmoji: {
-    fontSize: 22,
-  },
   earningsTickerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1157,12 +1138,12 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   modalIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    marginBottom: 18,
   },
   modalTitle: {
     fontFamily: fontFamily[700],
@@ -1181,8 +1162,8 @@ const s = StyleSheet.create({
   },
   modalCTA: {
     alignSelf: "stretch",
-    height: 46,
-    borderRadius: radius.pill,
+    height: 48,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1256,24 +1237,13 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 15,
     letterSpacing: -0.15,
-    marginBottom: 6,
+    marginBottom: 14,
   },
   amountRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     marginBottom: 10,
-  },
-  flagCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  flagEmojiHero: {
-    fontSize: 24,
   },
   balance: {
     fontFamily: fontFamily[700],
