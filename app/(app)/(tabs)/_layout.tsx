@@ -1,213 +1,188 @@
-import { Tabs } from "expo-router";
-import { Platform, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Tabs, useRouter } from "expo-router";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
-// Geometría del nav bar flotante.
-// El tabBar ocupa el ancho completo desde el borde superior del island
-// hasta el piso, así todo lo que esté abajo del island queda cubierto
-// por el backdrop traslúcido. El island se posiciona por dentro con
-// absolute usando estas constantes.
 const ISLAND_HEIGHT = 66;
 const ISLAND_SIDE_GAP = 28;
-// Reserva de espacio arriba del island: la mitad inferior es backdrop
-// sólido, la mitad superior es un gradient que va de transparente al
-// color del backdrop. Así no hay línea divisoria visible.
 const ISLAND_TOP_GAP = 28;
 const BACKDROP_FADE = 28;
 
-export default function TabsLayout() {
+const ACTIVE_COLOR = "#5ac43e";
+
+type TabRoute = {
+  name: string;
+  href: string;
+  title: string;
+  path: (typeof tabPaths)[keyof typeof tabPaths];
+};
+
+// Paths de navegación con el grupo `(app)/` prefijado — así navega el
+// resto del código del proyecto (ver transfer.tsx, ProHome.tsx, etc).
+const TAB_ROUTES: TabRoute[] = [
+  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home },
+  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets },
+  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news },
+  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Alamo",path: tabPaths.alamo },
+];
+
+/**
+ * Nav bar flotante. Vive como SIBLING de <Tabs>, no como su tabBar.
+ *
+ * Estado local (useState) maneja qué tab está visualmente activo. El
+ * router se usa sólo para disparar la navegación efectiva; la UI no
+ * depende de leer pathname/segments de expo-router (que tiene
+ * comportamiento inconsistente con groups). Desacople total.
+ */
+function FloatingTabBar() {
+  const router = useRouter();
+  const [activeIndex, setActiveIndex] = useState(0);
   const { mode, c } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
-  // Gap entre el bottom del island y el piso. Mínimo 14 en android,
-  // o el safe area inset (home indicator) en ios — lo que sea más alto.
   const bottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
-  // Backdrop que cubre full-width desde arriba del island hasta el piso.
-  // Casi sólido para que 'tape' el contenido que pase por abajo.
+
   const backdropBg = isDark
     ? "rgba(18, 22, 27, 0.92)"
     : "rgba(250, 250, 247, 0.92)";
-  // Island en sí: sólido al 98% para que se despegue del backdrop.
   const islandBg = isDark
     ? "rgba(28, 33, 40, 0.98)"
     : "rgba(255, 255, 255, 0.98)";
+  const backdropBgTransparent = backdropBg.replace(/[\d.]+\)$/, "0)");
+
+  const onPressTab = (route: TabRoute, index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (index === activeIndex) return;
+    setActiveIndex(index);
+    router.navigate(route.href as never);
+  };
 
   return (
-    <Tabs
-      // Nunca retroceder a una tab "anterior" con el back gesture:
-      // dentro de cada tab el usuario navega con push/back, pero entre
-      // tabs solo se mueve vía el nav bar.
-      backBehavior="none"
-      // Garantizamos haptic en CADA tap, sin depender del lifecycle del
-      // tabBarIcon (que en algunos casos no dispara la anim).
-      screenListeners={{
-        tabPress: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-            () => {},
-          );
-        },
-      }}
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: true,
-        tabBarBackground: () => (
-          <View style={StyleSheet.absoluteFillObject}>
-            {/* Fade gradient: arriba del backdrop hace la transición
-                suave desde transparente al color del backdrop. Evita
-                la 'línea divisoria' notable entre el contenido y el
-                nav bar. */}
-            <LinearGradient
-              colors={[backdropBg.replace(/[\d.]+\)$/, "0)"), backdropBg]}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: BACKDROP_FADE,
-              }}
-            />
-            {/* Backdrop sólido desde donde arranca el island hasta el piso. */}
-            <View
-              style={{
-                position: "absolute",
-                top: ISLAND_TOP_GAP,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: backdropBg,
-              }}
-            />
-            {/* Island centrado adentro, con forma stadium (pill). */}
-            <View
-              style={{
-                position: "absolute",
-                top: ISLAND_TOP_GAP,
-                left: ISLAND_SIDE_GAP,
-                right: ISLAND_SIDE_GAP,
-                height: ISLAND_HEIGHT,
-                backgroundColor: islandBg,
-                borderRadius: radius.pill,
-                borderWidth: 1,
-                borderColor: c.border,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: 0.14,
-                shadowRadius: 24,
-                elevation: 16,
-              }}
-            />
-          </View>
-        ),
-        tabBarStyle: {
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          // Alto total = top gap + island + gap hasta el piso. Los tab
-          // items se acomodan solos dentro de paddingTop/Bottom.
-          height: ISLAND_TOP_GAP + ISLAND_HEIGHT + bottomGap,
-          paddingTop: ISLAND_TOP_GAP,
-          paddingBottom: bottomGap + 8,
-          paddingHorizontal: ISLAND_SIDE_GAP,
-          borderTopWidth: 0,
-          backgroundColor: "transparent",
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarActiveTintColor: "#5ac43e",
-        tabBarInactiveTintColor: c.textSecondary,
-        tabBarLabelStyle: {
-          fontFamily: fontFamily[700],
-          fontSize: 12,
-          letterSpacing: -0.15,
-          marginTop: 2,
-        },
-      }}
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.container,
+        { height: ISLAND_TOP_GAP + ISLAND_HEIGHT + bottomGap },
+      ]}
     >
-      <Tabs.Screen
-        name="index"
-        listeners={{
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-              () => {},
-            );
-          },
-        }}
-        options={{
-          title: "Inicio",
-          tabBarIcon: ({ focused, color }) => (
-            <DrawingIcon
-              path={tabPaths.home}
-              focused={focused}
-              color={color}
-            />
-          ),
-        }}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[backdropBgTransparent, backdropBg]}
+        style={styles.fadeGradient}
       />
-      <Tabs.Screen
-        name="explore"
-        listeners={{
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-              () => {},
-            );
-          },
-        }}
-        options={{
-          title: "Mercado",
-          tabBarIcon: ({ focused, color }) => (
-            <DrawingIcon
-              path={tabPaths.markets}
-              focused={focused}
-              color={color}
-            />
-          ),
-        }}
+      <View
+        pointerEvents="none"
+        style={[styles.backdrop, { top: ISLAND_TOP_GAP, backgroundColor: backdropBg }]}
       />
-      <Tabs.Screen
-        name="news"
-        listeners={{
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-              () => {},
-            );
+      <View
+        style={[
+          styles.island,
+          {
+            top: ISLAND_TOP_GAP,
+            left: ISLAND_SIDE_GAP,
+            right: ISLAND_SIDE_GAP,
+            height: ISLAND_HEIGHT,
+            backgroundColor: islandBg,
+            borderColor: c.border,
           },
-        }}
-        options={{
-          title: "Noticias",
-          tabBarIcon: ({ focused, color }) => (
-            <DrawingIcon
-              path={tabPaths.news}
-              focused={focused}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="alamo"
-        listeners={{
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-              () => {},
-            );
-          },
-        }}
-        options={{
-          title: "Tu Alamo",
-          tabBarIcon: ({ focused, color }) => (
-            <DrawingIcon
-              path={tabPaths.alamo}
-              focused={focused}
-              color={color}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+        ]}
+      >
+        {TAB_ROUTES.map((route, index) => {
+          const focused = index === activeIndex;
+          const color = focused ? ACTIVE_COLOR : c.textSecondary;
+          return (
+            <Pressable
+              key={route.name}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              accessibilityLabel={route.title}
+              onPress={() => onPressTab(route, index)}
+              style={styles.tabItem}
+              hitSlop={8}
+            >
+              <DrawingIcon
+                path={route.path}
+                focused={focused}
+                color={color}
+              />
+              <Text numberOfLines={1} style={[styles.label, { color }]}>
+                {route.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
+
+export default function TabsLayout() {
+  return (
+    <View style={styles.root}>
+      <Tabs
+        backBehavior="none"
+        screenOptions={{ headerShown: false }}
+        tabBar={() => null}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="explore" />
+        <Tabs.Screen name="news" />
+        <Tabs.Screen name="alamo" />
+      </Tabs>
+      <FloatingTabBar />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  container: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  fadeGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: BACKDROP_FADE,
+  },
+  backdrop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  island: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 4,
+  },
+  label: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.15,
+    marginTop: 2,
+  },
+});
