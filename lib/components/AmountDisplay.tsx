@@ -13,6 +13,9 @@ interface Props {
   /** Multiplicador vertical del entero — útil para 'estirar' el monto
    * hacia abajo y darle más presencia. Default 1 (sin stretch). */
   stretchY?: number;
+  /** Prefijo custom (ej. 'US$'). Default es el '$' que devuelve
+   * formatARSParts. */
+  prefix?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -27,10 +30,12 @@ export function AmountDisplay({
   decimalsColor,
   weight = 700,
   stretchY = 1,
+  prefix,
   style,
 }: Props) {
   const { c } = useTheme();
   const parts = formatARSParts(value);
+  const sign = prefix ?? parts.sign;
   const txt = color ?? c.text;
   const dec = decimalsColor ?? c.textMuted;
   const decSize = Math.max(12, Math.round(size * 0.38));
@@ -52,7 +57,7 @@ export function AmountDisplay({
           transform: stretchY === 1 ? undefined : [{ scaleY: stretchY }],
         }}
       >
-        {parts.sign} {parts.integer}
+        {sign} {parts.integer}
       </Text>
       <Text
         style={{

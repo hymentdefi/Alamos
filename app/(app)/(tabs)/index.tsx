@@ -5,6 +5,8 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
+  Modal,
+  PanResponder,
   RefreshControl,
   Animated,
   Easing,
@@ -45,6 +47,9 @@ import { useProMode } from "../../../lib/pro/context";
 type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 type TabId = "dinero" | "portfolio";
 
+/** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
+const USD_RATE = 1200;
+
 const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
 /** Variación % por rango — determina el trend y color del chart. */
@@ -73,6 +78,25 @@ function BaseHome() {
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
   const [tab, setTab] = useState<TabId>("portfolio");
+  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const toggleCurrency = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
+  }, []);
+  // Swipe horizontal sobre el hero para cambiar de moneda.
+  const currencyPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+      onPanResponderRelease: (_, g) => {
+        if (Math.abs(g.dx) > 40) {
+          Haptics.selectionAsync().catch(() => {});
+          setCurrency((p) => (g.dx < 0 ? "USD" : "ARS"));
+        }
+      },
+    }),
+  ).current;
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -213,19 +237,36 @@ function BaseHome() {
           <Text style={[s.greet, { color: c.textMuted }]}>
             {greeting}, {firstName}
           </Text>
-          <AmountDisplay
-            value={current}
-            size={58}
-            weight={700}
-            stretchY={1.18}
-            style={{ marginBottom: 10 }}
-          />
+
+          <View style={s.amountRow} {...currencyPan.panHandlers}>
+            <Pressable
+              onPress={toggleCurrency}
+              style={[s.flagCircle, { backgroundColor: c.surfaceHover }]}
+              hitSlop={8}
+            >
+              <Text style={s.flagEmojiHero}>
+                {currency === "ARS" ? "🇦🇷" : "🇺🇸"}
+              </Text>
+            </Pressable>
+            <AmountDisplay
+              value={currency === "ARS" ? current : current / USD_RATE}
+              size={58}
+              weight={700}
+              prefix={currency === "ARS" ? "$" : "US$"}
+            />
+          </View>
+
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color: trendColor }]}>
               {displayIsUp ? "▲" : "▼"}
             </Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
-              {formatARS(Math.abs(displayDelta))}
+              {currency === "ARS"
+                ? formatARS(Math.abs(displayDelta))
+                : `US$ ${(Math.abs(displayDelta) / USD_RATE).toLocaleString(
+                    "es-AR",
+                    { maximumFractionDigits: 2 },
+                  )}`}
             </Text>
             <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
@@ -429,7 +470,13 @@ function TabStrip({
   );
 }
 
-/* ─── Dinero: cash positions + acciones de Ingresar/Retirar ─── */
+/* ─── Dinero: cuentas que rinden + acciones de Ingresar/Retirar ─── */
+/** TNA que rinde cada moneda por el solo hecho de holdearse. */
+const CURRENCY_TNA: Record<string, { label: string; pct: number }> = {
+  ARS: { label: "% TNA", pct: 38.5 },
+  USD: { label: "% anual", pct: 4.2 },
+};
+
 function Dinero({
   byCategory,
 }: {
@@ -437,6 +484,7 @@ function Dinero({
 }) {
   const { c } = useTheme();
   const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
   const cash = useMemo(
     () => byCategory.find(([cat]) => cat === "efectivo")?.[1].items ?? [],
     [byCategory],
@@ -449,89 +497,195 @@ function Dinero({
 
   return (
     <View style={s.sectionBlock}>
-      {/* Foco: Pesos argentinos. Card principal con bandera, label, monto
-          prominente y botones Ingresar/Retirar con texto. */}
-      {ars ? (
-        <View
-          style={[
-            s.pesosCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
+      {/* Acciones Ingresar / Retirar arriba de todo. */}
+      <View style={s.cashActions}>
+        <Tap
+          style={[s.cashActionPrimary, { backgroundColor: c.ink }]}
+          haptic="medium"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "deposit" },
+            })
+          }
         >
-          <View style={s.pesosHead}>
-            <Text style={s.flagEmoji}>🇦🇷</Text>
-            <Text style={[s.pesosLabel, { color: c.textSecondary }]}>
-              Pesos argentinos
-            </Text>
-          </View>
-          <Text style={[s.pesosAmount, { color: c.text }]}>
-            {formatARS(ars.price * (ars.qty ?? 1))}
-          </Text>
+          <Feather name="arrow-down-left" size={15} color={c.bg} />
+          <Text style={[s.cashActionText, { color: c.bg }]}>Ingresar</Text>
+        </Tap>
+        <Tap
+          style={[
+            s.cashActionSecondary,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+          haptic="light"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "withdraw" },
+            })
+          }
+        >
+          <Feather name="arrow-up-right" size={15} color={c.text} />
+          <Text style={[s.cashActionText, { color: c.text }]}>Retirar</Text>
+        </Tap>
+      </View>
 
-          <View style={s.pesosActions}>
-            <Tap
-              style={[s.pesosActionPrimary, { backgroundColor: c.ink }]}
-              haptic="medium"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "deposit" },
-                })
-              }
-            >
-              <Feather name="arrow-down-left" size={15} color={c.bg} />
-              <Text style={[s.pesosActionText, { color: c.bg }]}>
-                Ingresar
-              </Text>
-            </Tap>
-            <Tap
-              style={[
-                s.pesosActionSecondary,
-                { backgroundColor: c.surfaceHover, borderColor: c.border },
-              ]}
-              haptic="light"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "withdraw" },
-                })
-              }
-            >
-              <Feather name="arrow-up-right" size={15} color={c.text} />
-              <Text style={[s.pesosActionText, { color: c.text }]}>
-                Retirar
-              </Text>
-            </Tap>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Secundario: otras monedas. Más chicas, en listado. */}
-      {usd ? (
-        <View style={s.otherCurrencies}>
-          <Text style={[s.otherEyebrow, { color: c.textMuted }]}>
-            OTRAS MONEDAS
+      {/* Cuentas que rinden — estilo ARQ. */}
+      <View style={s.earningsBlock}>
+        <View style={s.earningsHead}>
+          <Text style={[s.earningsTitle, { color: c.text }]}>
+            Cuentas que rinden
           </Text>
-          <View style={s.currencyRow}>
-            <Text style={s.flagEmoji}>🇺🇸</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.currencyName, { color: c.text }]}>
-                Dólares MEP
-              </Text>
-              <Text style={[s.currencyEquiv, { color: c.textMuted }]}>
-                {formatARS(usd.price * (usd.qty ?? 1))}
-              </Text>
-            </View>
-            <Text style={[s.currencyAmount, { color: c.text }]}>
-              US${" "}
-              {(usd.qty ?? 0).toLocaleString("es-AR", {
-                maximumFractionDigits: 2,
-              })}
-            </Text>
-          </View>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setInfoOpen(true)}
+            style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
+          >
+            <Feather name="info" size={12} color={c.textSecondary} />
+          </Pressable>
         </View>
-      ) : null}
+
+        {ars ? (
+          <EarningsRow
+            flag="🇦🇷"
+            ticker="ARS"
+            name="Peso argentino"
+            tna={CURRENCY_TNA.ARS}
+            amountPrimary={formatARS(ars.price * (ars.qty ?? 1))}
+            amountSecondary={`${((ars.price * (ars.qty ?? 1)) / USD_RATE).toLocaleString(
+              "es-AR",
+              { maximumFractionDigits: 2 },
+            )} USD`}
+          />
+        ) : null}
+        {usd ? (
+          <EarningsRow
+            flag="🇺🇸"
+            ticker="USD"
+            name="Dólar MEP"
+            tna={CURRENCY_TNA.USD}
+            amountPrimary={`US$ ${(usd.qty ?? 0).toLocaleString("es-AR", {
+              maximumFractionDigits: 2,
+            })}`}
+            amountSecondary={formatARS(usd.price * (usd.qty ?? 1))}
+            withTopDivider
+          />
+        ) : null}
+      </View>
+
+      <EarningsInfoModal
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
+  );
+}
+
+function EarningsRow({
+  flag,
+  ticker,
+  name,
+  tna,
+  amountPrimary,
+  amountSecondary,
+  withTopDivider,
+}: {
+  flag: string;
+  ticker: string;
+  name: string;
+  tna: { label: string; pct: number };
+  amountPrimary: string;
+  amountSecondary?: string;
+  withTopDivider?: boolean;
+}) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        s.earningsRow,
+        withTopDivider && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        },
+      ]}
+    >
+      <View style={[s.earningsFlag, { backgroundColor: c.surfaceHover }]}>
+        <Text style={s.earningsFlagEmoji}>{flag}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={s.earningsTickerRow}>
+          <Text style={[s.earningsTicker, { color: c.text }]}>{ticker}</Text>
+          <View style={[s.tnaBadge, { backgroundColor: c.surfaceHover }]}>
+            <Text style={[s.tnaBadgeText, { color: c.textSecondary }]}>
+              {tna.pct.toLocaleString("es-AR", { minimumFractionDigits: 1 })}
+              {tna.label}
+            </Text>
+          </View>
+        </View>
+        <Text style={[s.earningsName, { color: c.textMuted }]}>{name}</Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={[s.earningsPrimary, { color: c.text }]}>
+          {amountPrimary}
+        </Text>
+        {amountSecondary ? (
+          <Text style={[s.earningsSecondary, { color: c.textMuted }]}>
+            {amountSecondary}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function EarningsInfoModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { c } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable
+        style={s.modalBackdrop}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={[s.modalCard, { backgroundColor: c.surface }]}
+        >
+          <View
+            style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}
+          >
+            <Feather name="trending-up" size={22} color={c.greenDark} />
+          </View>
+          <Text style={[s.modalTitle, { color: c.text }]}>
+            Tu plata rinde sola
+          </Text>
+          <Text style={[s.modalBody, { color: c.textSecondary }]}>
+            Ganás rendimientos por el solo hecho de tener tu plata en
+            Alamos. Sin límite de monto, sin montos mínimos, sin
+            comisiones. Se acreditan todos los días.
+          </Text>
+          <Tap
+            onPress={onClose}
+            haptic="light"
+            style={[s.modalCTA, { backgroundColor: c.ink }]}
+          >
+            <Text style={[s.modalCTAText, { color: c.bg }]}>Entendido</Text>
+          </Tap>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -880,92 +1034,162 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Dinero — card protagonista de pesos */
-  pesosCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 20,
-  },
-  pesosHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
-  },
-  flagEmoji: {
-    fontSize: 20,
-  },
-  pesosLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  pesosAmount: {
-    fontFamily: fontFamily[800],
-    fontSize: 34,
-    letterSpacing: -1.2,
-    marginBottom: 16,
-  },
-  pesosActions: {
+  /* Dinero — acciones arriba (Ingresar / Retirar) */
+  cashActions: {
     flexDirection: "row",
     gap: 10,
+    marginBottom: 22,
   },
-  pesosActionPrimary: {
+  cashActionPrimary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 44,
+    height: 46,
     borderRadius: radius.pill,
   },
-  pesosActionSecondary: {
+  cashActionSecondary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 44,
+    height: 46,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
-  pesosActionText: {
+  cashActionText: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
   },
 
-  /* Otras monedas — listado secundario */
-  otherCurrencies: {
-    marginTop: 24,
+  /* Earnings accounts block (estilo ARQ) */
+  earningsBlock: {
+    gap: 2,
   },
-  otherEyebrow: {
+  earningsHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  earningsTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.2,
-    marginBottom: 10,
+    fontSize: 18,
+    letterSpacing: -0.4,
   },
-  currencyRow: {
+  infoDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  earningsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 14,
   },
-  currencyName: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
+  earningsFlag: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  currencyEquiv: {
+  earningsFlagEmoji: {
+    fontSize: 22,
+  },
+  earningsTickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  earningsTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.25,
+  },
+  tnaBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  tnaBadgeText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.1,
+  },
+  earningsName: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
   },
-  currencyAmount: {
+  earningsPrimary: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  earningsSecondary: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+
+  /* Modal del info de TNA */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  modalCard: {
+    width: "100%",
+    borderRadius: radius.xl,
+    padding: 24,
+    alignItems: "center",
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 20,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalBody: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalCTA: {
+    alignSelf: "stretch",
+    height: 46,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCTAText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 
   /* Portfolio hero */
@@ -1033,6 +1257,23 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.15,
     marginBottom: 6,
+  },
+  amountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 10,
+  },
+  flagCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  flagEmojiHero: {
+    fontSize: 24,
   },
   balance: {
     fontFamily: fontFamily[700],
