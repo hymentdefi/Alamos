@@ -21,6 +21,10 @@ const MARKER_COLOR = "#5ac43e";
 /**
  * Ícono de tab que se dibuja al activarse + un pill verde arriba
  * que marca la tab activa. Haptic + scale-pop en cada cambio.
+ *
+ * La animación dispara siempre que `focused` pasa a true: haptic,
+ * scale pop del ícono, drawing del stroke, y fade-in del marker.
+ * Cuando `focused` pasa a false, el marker fade-out y reset.
  */
 export function DrawingIcon({
   path,
@@ -34,13 +38,28 @@ export function DrawingIcon({
   const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const markerOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const [dashOffset, setDashOffset] = useState(0);
-  const prevFocused = useRef(focused);
+  const didMount = useRef(false);
 
   useEffect(() => {
-    const wasFocused = prevFocused.current;
-    prevFocused.current = focused;
+    // Primer render: snapshot del estado sin animación — evita que
+    // el tab inicialmente activo dispare haptic al abrir la app.
+    if (!didMount.current) {
+      didMount.current = true;
+      if (focused) {
+        scale.setValue(1);
+        markerOpacity.setValue(1);
+        markerScale.setValue(1);
+        setDashOffset(0);
+      } else {
+        scale.setValue(1);
+        markerOpacity.setValue(0);
+        markerScale.setValue(0);
+        setDashOffset(0);
+      }
+      return;
+    }
 
-    // Sin foco: reset firme + marker out.
+    // Unfocus: fade del marker + reset del ícono.
     if (!focused) {
       scale.stopAnimation(() => scale.setValue(1));
       setDashOffset(0);
@@ -59,22 +78,9 @@ export function DrawingIcon({
       return;
     }
 
-    // Ya estaba enfocado (re-render, vuelta de subpantalla): asegurar
-    // estado dibujado + marker visible sin re-animar.
-    if (wasFocused) {
-      scale.stopAnimation(() => scale.setValue(1));
-      setDashOffset(0);
-      markerOpacity.setValue(1);
-      markerScale.setValue(1);
-      return;
-    }
-
-    // Haptic con más presencia que selectionAsync — el tap se siente
-    // como un golpecito sutil.
+    // Focus: haptic + secuencia completa de entrada.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-    // Scale pop más pronunciado del ícono para que la entrada sea
-    // visiblemente dinámica.
     scale.setValue(0.3);
     const iconSpring = Animated.spring(scale, {
       toValue: 1,
@@ -84,7 +90,6 @@ export function DrawingIcon({
     });
     iconSpring.start();
 
-    // Marker fade + grow desde el centro.
     markerOpacity.setValue(0);
     markerScale.setValue(0.2);
     const markerAnim = Animated.parallel([
@@ -102,7 +107,8 @@ export function DrawingIcon({
     ]);
     markerAnim.start();
 
-    // Drawing via RAF loop — no depende de Animated/SVG interop.
+    // Drawing del stroke vía RAF — evita bugs conocidos con
+    // strokeDashoffset animado nativo en react-native-svg.
     setDashOffset(DASH_LEN);
     let start: number | null = null;
     let raf: number;
@@ -124,7 +130,6 @@ export function DrawingIcon({
       cancelAnimationFrame(raf);
       iconSpring.stop();
       markerAnim.stop();
-      scale.setValue(1);
     };
   }, [focused, duration, scale, markerScale, markerOpacity]);
 
@@ -179,11 +184,11 @@ export const tabPaths = {
   home: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z",
   markets: "M3 21 V4 M3 21 H21 M7 17 V13 M12 17 V9 M17 17 V11 M21 17 V7",
   news: "M5 4 H18 V20 H5 Z M5 4 V20 A2 2 0 0 1 3 18 V11 H5 M8 8 H15 M8 12 H15 M8 16 H12",
-  profile: "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z M4 21 V20 A6 6 0 0 1 10 14 H14 A6 6 0 0 1 20 20 V21",
+  profile:
+    "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z M4 21 V20 A6 6 0 0 1 10 14 H14 A6 6 0 0 1 20 20 V21",
   /** Chat bubble with a tail pointing to bottom-left + three dots inside */
   support:
     "M5 4 H19 A2 2 0 0 1 21 6 V15 A2 2 0 0 1 19 17 H12 L7 21 V17 H5 A2 2 0 0 1 3 15 V6 A2 2 0 0 1 5 4 Z M8 10 H9 M12 10 H13 M16 10 H17",
   /** Álamo stylized: tall triangular canopy + small trunk at bottom. */
-  alamo:
-    "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z",
+  alamo: "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z",
 } as const;
