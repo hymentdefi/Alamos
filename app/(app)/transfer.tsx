@@ -4,18 +4,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { formatARS } from "../../lib/data/assets";
-import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useAuth } from "../../lib/auth/context";
 import { Tap } from "../../lib/components/Tap";
+import { FlagIcon } from "../../lib/components/FlagIcon";
 
 const BALANCE = 342180;
 const BANK = {
   name: "Banco Galicia",
-  accountNumber: "Caja de ahorro en $ · ••••3847",
-  alias: "alamos.martin.garcia",
-  cbu: "0070•••••••••••••3847",
 };
 
 /** Datos propios para recibir transferencias — mockeados por ahora. */
@@ -32,26 +29,61 @@ const RECEIVE = {
       "Al ingresar o transferir dólares, se verá como destino al Banco Industrial (BIND).",
   },
 };
-const RECEIVE_PHONE = "+54 11 6933-5756";
 
-type Screen = "hub" | "deposit" | "withdraw";
+/** Cuentas externas vinculadas del usuario. Por ahora un mock; la idea
+ *  es que el usuario pueda agregar más desde acá. */
+interface LinkedAccount {
+  id: string;
+  bankName: string;
+  accountType: string;
+  tail: string;
+  alias: string;
+  cbu: string;
+  currency: "ars" | "usd";
+}
+
+const LINKED_ACCOUNTS: LinkedAccount[] = [
+  {
+    id: "galicia-ars",
+    bankName: "Banco Galicia",
+    accountType: "Caja de ahorro en $",
+    tail: "3847",
+    alias: "alamos.christian.ars",
+    cbu: "0070•••••••••••••3847",
+    currency: "ars",
+  },
+  {
+    id: "santander-usd",
+    bankName: "Banco Santander",
+    accountType: "Caja de ahorro en US$",
+    tail: "9012",
+    alias: "chris.santander.usd",
+    cbu: "0720•••••••••••••9012",
+    currency: "usd",
+  },
+];
+
 type DepositCurrency = "ars" | "usd";
 
 export default function TransferScreen() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  // Ya no hay 'hub' — la pantalla default es la de depósito (alias + CVU).
+  // Sólo si vienen con mode=withdraw se va al keypad de extracción.
+  if (mode === "withdraw") return <AmountFlow />;
+  return <DepositInfo />;
+}
+
+/* ─── Deposit info: alias + CVU para recibir ARS/USD ─── */
+
+function DepositInfo() {
+  const { c } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const initial: Screen =
-    mode === "deposit" || mode === "withdraw" ? mode : "hub";
-  const [screen, setScreen] = useState<Screen>(initial);
+  const { user } = useAuth();
+  const [cur, setCur] = useState<DepositCurrency>("ars");
 
-  if (screen === "deposit") {
-    return <DepositInfo onBack={() => setScreen("hub")} />;
-  }
-  if (screen === "withdraw") {
-    return <AmountFlow mode="withdraw" onBack={() => setScreen("hub")} />;
-  }
+  const data = RECEIVE[cur];
+  const linkedForCur = LINKED_ACCOUNTS.filter((a) => a.currency === cur);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -59,148 +91,6 @@ export default function TransferScreen() {
         <Pressable
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
           onPress={() => router.back()}
-          hitSlop={12}
-        >
-          <Feather name="arrow-left" size={18} color={c.text} />
-        </Pressable>
-        <Text style={[s.headerTitle, { color: c.text }]}>Transferencias</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={s.balanceBlock}>
-          <Text style={[s.balanceLabel, { color: c.textMuted }]}>
-            Efectivo disponible
-          </Text>
-          <AmountDisplay value={BALANCE} size={42} />
-        </View>
-
-        <View style={s.actionsRow}>
-          <ActionCard
-            icon="arrow-down-left"
-            label="Ingresar"
-            hint="Desde tu banco"
-            onPress={() => setScreen("deposit")}
-          />
-          <ActionCard
-            icon="arrow-up-right"
-            label="Extraer"
-            hint="A tu banco"
-            onPress={() => setScreen("withdraw")}
-          />
-        </View>
-
-        <View style={s.bankBlock}>
-          <Text style={[s.eyebrow, { color: c.textMuted }]}>
-            Cuenta bancaria vinculada
-          </Text>
-
-          <View
-            style={[
-              s.bankCard,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-          >
-            <View style={s.bankHead}>
-              <View style={[s.bankIcon, { backgroundColor: c.surfaceHover }]}>
-                <Feather name="home" size={16} color={c.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.bankName, { color: c.text }]}>{BANK.name}</Text>
-                <Text style={[s.bankSub, { color: c.textMuted }]}>
-                  {BANK.accountNumber}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[s.bankDivider, { backgroundColor: c.border }]} />
-
-            <View style={s.bankRow}>
-              <Text style={[s.bankRowLabel, { color: c.textMuted }]}>Alias</Text>
-              <Text style={[s.bankRowValue, { color: c.text }]}>
-                {BANK.alias}
-              </Text>
-            </View>
-            <View style={s.bankRow}>
-              <Text style={[s.bankRowLabel, { color: c.textMuted }]}>CBU</Text>
-              <Text style={[s.bankRowValue, { color: c.text }]}>{BANK.cbu}</Text>
-            </View>
-          </View>
-
-          <Pressable style={s.manageBank}>
-            <Feather name="plus" size={14} color={c.text} />
-            <Text style={[s.manageBankText, { color: c.text }]}>
-              Agregar otra cuenta
-            </Text>
-          </Pressable>
-        </View>
-
-        <View
-          style={[
-            s.noteCard,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
-          ]}
-        >
-          <Feather name="clock" size={14} color={c.textSecondary} />
-          <Text style={[s.noteText, { color: c.textSecondary }]}>
-            Los ingresos acreditan de inmediato. Las extracciones demoran hasta 24hs
-            hábiles.
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-function ActionCard({
-  icon,
-  label,
-  hint,
-  onPress,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  hint: string;
-  onPress: () => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        s.actionCard,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
-    >
-      <View style={[s.actionIcon, { backgroundColor: c.greenDim }]}>
-        <Feather name={icon} size={18} color={c.greenDark} />
-      </View>
-      <Text style={[s.actionLabel, { color: c.text }]}>{label}</Text>
-      <Text style={[s.actionHint, { color: c.textMuted }]}>{hint}</Text>
-    </Pressable>
-  );
-}
-
-/* ─── Deposit info: alias + CVU para recibir ARS/USD ─── */
-
-function DepositInfo({ onBack }: { onBack: () => void }) {
-  const { c } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const [cur, setCur] = useState<DepositCurrency>("ars");
-
-  const data = RECEIVE[cur];
-  const email = user?.email ?? "christian@alamos.capital";
-
-  return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={onBack}
           hitSlop={12}
         >
           <Feather name="arrow-left" size={18} color={c.text} />
@@ -217,39 +107,31 @@ function DepositInfo({ onBack }: { onBack: () => void }) {
           Ingresá dinero con tus datos
         </Text>
 
-        {/* Pill switch Pesos / Dólares */}
+        {/* Pill switch Pesos / Dólares con banderas AR/US. */}
         <View style={s.curPillsWrap}>
-          <View
-            style={[s.curPills, { backgroundColor: c.surfaceHover }]}
-          >
+          <View style={[s.curPills, { backgroundColor: c.surfaceHover }]}>
             <CurPill
               label="Pesos"
-              sign="$"
+              flag="AR"
               active={cur === "ars"}
-              accent={c.greenDark}
               onPress={() => {
-                if (cur !== "ars") {
-                  Haptics.selectionAsync().catch(() => {});
-                }
+                if (cur !== "ars") Haptics.selectionAsync().catch(() => {});
                 setCur("ars");
               }}
             />
             <CurPill
               label="Dólares"
-              sign="US$"
+              flag="US"
               active={cur === "usd"}
-              accent={c.greenDark}
               onPress={() => {
-                if (cur !== "usd") {
-                  Haptics.selectionAsync().catch(() => {});
-                }
+                if (cur !== "usd") Haptics.selectionAsync().catch(() => {});
                 setCur("usd");
               }}
             />
           </View>
         </View>
 
-        {/* Card 1: desde un banco o billetera */}
+        {/* ── Card 1: tus datos de recepción ── */}
         <Text style={[s.depositEyebrow, { color: c.text }]}>
           Desde un banco o billetera
         </Text>
@@ -259,17 +141,13 @@ function DepositInfo({ onBack }: { onBack: () => void }) {
             { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <CopyRow
-            label="Alias"
-            value={data.alias}
-            onCopy={() => copyHaptic()}
-          />
+          <CopyRow label="Alias" value={data.alias} onCopy={copyHaptic} />
           <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
           <CopyRow
             label={cur === "ars" ? "CVU" : "CBU"}
             value={data.cvu}
             mono
-            onCopy={() => copyHaptic()}
+            onCopy={copyHaptic}
           />
           {data.legend ? (
             <>
@@ -283,28 +161,58 @@ function DepositInfo({ onBack }: { onBack: () => void }) {
           ) : null}
         </View>
 
-        {/* Card 2: Mercado Pago */}
+        {/* ── Card 2: cuentas vinculadas (externas) del usuario ── */}
         <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
-          Desde Mercado Pago
+          Desde cuentas vinculadas
         </Text>
-        <View
-          style={[
-            s.depositCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
+        {linkedForCur.length > 0 ? (
+          <View
+            style={[
+              s.depositCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            {linkedForCur.map((acc, i) => (
+              <View key={acc.id}>
+                {i > 0 ? (
+                  <View
+                    style={[
+                      s.depositRowDivider,
+                      { backgroundColor: c.border },
+                    ]}
+                  />
+                ) : null}
+                <LinkedAccountRow acc={acc} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View
+            style={[
+              s.depositCard,
+              s.emptyLinkedCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <Text style={[s.emptyLinkedText, { color: c.textMuted }]}>
+              Todavía no tenés cuentas{" "}
+              {cur === "ars" ? "en pesos" : "en dólares"} vinculadas.
+            </Text>
+          </View>
+        )}
+
+        <Tap
+          style={s.addAccountBtn}
+          haptic="light"
+          onPress={() => {
+            /* Flow de agregar cuenta — TODO: wizard. */
+          }}
         >
-          <CopyRow
-            label="Celular"
-            value={RECEIVE_PHONE}
-            onCopy={() => copyHaptic()}
-          />
-          <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
-          <CopyRow
-            label="E-mail"
-            value={email}
-            onCopy={() => copyHaptic()}
-          />
-        </View>
+          <Feather name="plus" size={16} color={c.text} />
+          <Text style={[s.addAccountText, { color: c.text }]}>
+            Agregar otra cuenta
+          </Text>
+        </Tap>
 
         <View
           style={[
@@ -312,7 +220,7 @@ function DepositInfo({ onBack }: { onBack: () => void }) {
             {
               backgroundColor: c.surfaceHover,
               borderColor: c.border,
-              marginTop: 24,
+              marginTop: 20,
             },
           ]}
         >
@@ -333,15 +241,13 @@ function copyHaptic() {
 
 function CurPill({
   label,
-  sign,
+  flag,
   active,
-  accent,
   onPress,
 }: {
   label: string;
-  sign: string;
+  flag: "AR" | "US";
   active: boolean;
-  accent: string;
   onPress: () => void;
 }) {
   const { c } = useTheme();
@@ -360,21 +266,11 @@ function CurPill({
         },
       ]}
     >
-      <View
-        style={[
-          s.curSignBadge,
-          {
-            backgroundColor: active ? accent : c.textFaint,
-          },
-        ]}
-      >
-        <Text style={[s.curSignText, { color: c.bg }]}>{sign}</Text>
+      <View style={{ opacity: active ? 1 : 0.6 }}>
+        <FlagIcon code={flag} size={22} />
       </View>
       <Text
-        style={[
-          s.curPillLabel,
-          { color: active ? c.text : c.textMuted },
-        ]}
+        style={[s.curPillLabel, { color: active ? c.text : c.textMuted }]}
       >
         {label}
       </Text>
@@ -421,6 +317,38 @@ function CopyRow({
   );
 }
 
+function LinkedAccountRow({ acc }: { acc: LinkedAccount }) {
+  const { c } = useTheme();
+  return (
+    <View style={s.linkedRow}>
+      <View style={[s.linkedIcon, { backgroundColor: c.surfaceHover }]}>
+        <Feather name="home" size={16} color={c.text} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.linkedBank, { color: c.text }]} numberOfLines={1}>
+          {acc.bankName}
+        </Text>
+        <Text style={[s.linkedSub, { color: c.textMuted }]} numberOfLines={1}>
+          {acc.accountType} · ••••{acc.tail}
+        </Text>
+        <Text style={[s.linkedAlias, { color: c.textMuted }]} numberOfLines={1}>
+          {acc.alias}
+        </Text>
+      </View>
+      <Tap
+        haptic="light"
+        onPress={copyHaptic}
+        style={[s.copyBtn, { backgroundColor: c.surfaceHover }]}
+        hitSlop={8}
+      >
+        <Feather name="copy" size={16} color={c.greenDark} />
+      </Tap>
+    </View>
+  );
+}
+
+/* ─── Extraer: keypad + confirmación ─── */
+
 const keys = [
   ["1", "2", "3"],
   ["4", "5", "6"],
@@ -428,21 +356,14 @@ const keys = [
   [".", "0", "back"],
 ] as const;
 
-function AmountFlow({
-  mode,
-  onBack,
-}: {
-  mode: "deposit" | "withdraw";
-  onBack: () => void;
-}) {
+function AmountFlow() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [amount, setAmount] = useState("0");
   const [sent, setSent] = useState(false);
 
-  const isDeposit = mode === "deposit";
-  const max = isDeposit ? Infinity : BALANCE;
+  const max = BALANCE;
   const parsed = Number.parseFloat(amount) || 0;
   const hasAmount = parsed > 0;
   const exceeds = parsed > max;
@@ -472,12 +393,11 @@ function AmountFlow({
             <Feather name="check" size={32} color={c.ink} />
           </View>
           <Text style={[s.successTitle, { color: c.text }]}>
-            {isDeposit ? "Ingreso en proceso" : "Extracción enviada"}
+            Extracción enviada
           </Text>
           <Text style={[s.successBody, { color: c.textMuted }]}>
-            {isDeposit
-              ? `Esperamos ${formatARS(parsed)} desde ${BANK.name}. Cuando el banco confirme, vas a ver el saldo acreditado.`
-              : `Vamos a acreditar ${formatARS(parsed)} en ${BANK.name} dentro de las próximas 24hs hábiles.`}
+            Vamos a acreditar {formatARS(parsed)} en {BANK.name} dentro de
+            las próximas 24hs hábiles.
           </Text>
         </View>
         <View style={{ flex: 1 }} />
@@ -498,17 +418,15 @@ function AmountFlow({
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={onBack}
+          onPress={() => router.back()}
           hitSlop={12}
         >
           <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
-          <Text style={[s.headerTitle, { color: c.text }]}>
-            {isDeposit ? "Ingresar dinero" : "Extraer dinero"}
-          </Text>
+          <Text style={[s.headerTitle, { color: c.text }]}>Extraer dinero</Text>
           <Text style={[s.headerSub, { color: c.textMuted }]}>
-            {isDeposit ? `Desde ${BANK.name}` : `Disponible ${formatARS(BALANCE)}`}
+            Disponible {formatARS(BALANCE)}
           </Text>
         </View>
         <View style={{ width: 36 }} />
@@ -530,12 +448,8 @@ function AmountFlow({
             {amount.endsWith(".") ? "," : ""}
           </Text>
         </View>
-        <Text
-          style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}
-        >
-          {exceeds
-            ? `Supera el disponible (${formatARS(max)})`
-            : " "}
+        <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
+          {exceeds ? `Supera el disponible (${formatARS(max)})` : " "}
         </Text>
       </View>
 
@@ -543,11 +457,7 @@ function AmountFlow({
         {keys.map((row, ri) => (
           <View key={ri} style={s.keyRow}>
             {row.map((k) => (
-              <Pressable
-                key={k}
-                onPress={() => handleKey(k)}
-                style={s.keyBtn}
-              >
+              <Pressable key={k} onPress={() => handleKey(k)} style={s.keyBtn}>
                 {k === "back" ? (
                   <Feather name="delete" size={22} color={c.text} />
                 ) : (
@@ -563,9 +473,7 @@ function AmountFlow({
         <Pressable
           style={[
             s.cta,
-            {
-              backgroundColor: hasAmount && !exceeds ? c.ink : c.surfaceHover,
-            },
+            { backgroundColor: hasAmount && !exceeds ? c.ink : c.surfaceHover },
           ]}
           onPress={() => hasAmount && !exceeds && setSent(true)}
           disabled={!hasAmount || exceeds}
@@ -576,7 +484,7 @@ function AmountFlow({
               { color: hasAmount && !exceeds ? c.bg : c.textMuted },
             ]}
           >
-            {isDeposit ? "Confirmar ingreso" : "Confirmar extracción"}
+            Confirmar extracción
           </Text>
         </Pressable>
       </View>
@@ -612,142 +520,8 @@ const s = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-  balanceBlock: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 24,
-    alignItems: "center",
-  },
-  balanceLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  balanceValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 42,
-    letterSpacing: -1.8,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-  },
-  actionCard: {
-    flex: 1,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 16,
-    gap: 10,
-  },
-  actionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  actionHint: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-  },
-  bankBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 28,
-  },
-  eyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: 12,
-  },
-  bankCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 18,
-  },
-  bankHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
-  },
-  bankIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bankName: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  bankSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-  },
-  bankDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginBottom: 10,
-  },
-  bankRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-  },
-  bankRowLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-  },
-  bankRowValue: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  manageBank: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 14,
-    marginTop: 8,
-  },
-  manageBankText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
-  },
-  noteCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 14,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  noteText: {
-    flex: 1,
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 17,
-    letterSpacing: -0.1,
-  },
 
-  /* Deposit info (alias + CVU por divisa) */
+  /* Deposit info */
   depositTitle: {
     fontFamily: fontFamily[700],
     fontSize: 24,
@@ -772,22 +546,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
-  },
-  curSignBadge: {
-    minWidth: 26,
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  curSignText: {
-    fontFamily: fontFamily[800],
-    fontSize: 11,
-    letterSpacing: -0.2,
   },
   curPillLabel: {
     fontFamily: fontFamily[700],
@@ -807,6 +568,16 @@ const s = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 4,
+  },
+  emptyLinkedCard: {
+    paddingVertical: 18,
+    alignItems: "center",
+  },
+  emptyLinkedText: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    textAlign: "center",
   },
   depositRowDivider: {
     height: StyleSheet.hairlineWidth,
@@ -844,7 +615,70 @@ const s = StyleSheet.create({
     paddingVertical: 12,
   },
 
-  /* Amount flow */
+  /* Linked account row */
+  linkedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 12,
+  },
+  linkedIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkedBank: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  linkedSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  linkedAlias: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: 0.1,
+  },
+  addAccountBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  addAccountText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+
+  /* Note */
+  noteCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginHorizontal: 20,
+    padding: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  noteText: {
+    flex: 1,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: -0.1,
+  },
+
+  /* Amount flow (extraer) */
   amountSection: {
     alignItems: "center",
     paddingTop: 32,
