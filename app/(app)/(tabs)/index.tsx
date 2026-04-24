@@ -80,7 +80,20 @@ function BaseHome() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
-  const [tab, setTab] = useState<TabId>("portfolio");
+  // Tab activo (Dinero / Portfolio). Persisto en SecureStore para que
+  // al cerrar y reabrir la app vuelva a la tab que el user dejó.
+  const [tab, setTabState] = useState<TabId>("portfolio");
+  useEffect(() => {
+    SecureStore.getItemAsync("home:active_tab")
+      .then((v) => {
+        if (v === "dinero" || v === "portfolio") setTabState(v);
+      })
+      .catch(() => {});
+  }, []);
+  const setTab = useCallback((next: TabId) => {
+    setTabState(next);
+    SecureStore.setItemAsync("home:active_tab", next).catch(() => {});
+  }, []);
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
   const toggleCurrency = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
@@ -1157,7 +1170,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     height: 46,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
   },
   cashActionSecondary: {
     flex: 1,
@@ -1166,7 +1179,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     height: 46,
-    borderRadius: radius.pill,
+    borderRadius: radius.btn,
     borderWidth: 1,
   },
   cashActionText: {
