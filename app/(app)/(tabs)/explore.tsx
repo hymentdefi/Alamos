@@ -6,8 +6,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Animated,
-  Easing,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -87,18 +85,12 @@ function BaseExplore() {
     [],
   );
 
-  const navLock = useRef(false);
   const openDetail = useCallback(
     (asset: Asset) => {
-      if (navLock.current) return;
-      navLock.current = true;
       router.push({
         pathname: "/(app)/detail",
         params: { ticker: asset.ticker },
       });
-      setTimeout(() => {
-        navLock.current = false;
-      }, 700);
     },
     [router],
   );
@@ -451,6 +443,18 @@ function MoversMarquee({
         contentContainerStyle={s.marqueeTrack}
         scrollEventThrottle={16}
         decelerationRate="normal"
+        /* Pausamos el auto-scroll en cuanto el dedo toca el marquee,
+           antes de que RN decida si es tap o drag. Si no pausamos, el
+           scrollTo programático que corre a 60Hz se come los taps. */
+        onTouchStart={() => {
+          interactingRef.current = true;
+        }}
+        onTouchEnd={() => {
+          interactingRef.current = false;
+        }}
+        onTouchCancel={() => {
+          interactingRef.current = false;
+        }}
         onScrollBeginDrag={() => {
           interactingRef.current = true;
         }}

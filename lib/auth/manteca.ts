@@ -6,7 +6,7 @@ export interface User { id: string; email: string; fullName: string; kycStatus: 
 export interface LoginPayload { email: string; password: string; }
 export interface RegisterPayload { email: string; password: string; fullName: string; cuilCuit: string; }
 
-const MOCK_USER: User = { id: "usr_mock_001", email: "chris@alamos.capital", fullName: "Chris", kycStatus: "approved" };
+const MOCK_USER: User = { id: "usr_mock_001", email: "christian@alamos.capital", fullName: "Christian", kycStatus: "approved" };
 const MOCK_TOKENS: AuthTokens = { accessToken: "mock_access_jwt", refreshToken: "mock_refresh_jwt" };
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
