@@ -1,16 +1,22 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tabs, useRouter } from "expo-router";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
 
-const ISLAND_HEIGHT = 66;
-const ISLAND_SIDE_GAP = 28;
-const ISLAND_TOP_GAP = 28;
-const BACKDROP_FADE = 28;
+const ISLAND_HEIGHT = 68;
+const ISLAND_SIDE_GAP = 16;
 
 const ACTIVE_COLOR = "#5ac43e";
 
@@ -21,8 +27,6 @@ type TabRoute = {
   path: (typeof tabPaths)[keyof typeof tabPaths];
 };
 
-// Paths de navegación con el grupo `(app)/` prefijado — así navega el
-// resto del código del proyecto (ver transfer.tsx, ProHome.tsx, etc).
 const TAB_ROUTES: TabRoute[] = [
   { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home },
   { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets },
@@ -31,12 +35,15 @@ const TAB_ROUTES: TabRoute[] = [
 ];
 
 /**
- * Nav bar flotante. Vive como SIBLING de <Tabs>, no como su tabBar.
+ * Nav bar flotante estilo glassmorphism (inspirada en Naranja X).
  *
- * Estado local (useState) maneja qué tab está visualmente activo. El
- * router se usa sólo para disparar la navegación efectiva; la UI no
- * depende de leer pathname/segments de expo-router (que tiene
- * comportamiento inconsistente con groups). Desacople total.
+ * - Base: <BlurView> para el efecto vidrio real — deja pasar el
+ *   contenido de atrás difuminado. Sin backdrop sólido debajo: la
+ *   isla flota encima del contenido.
+ * - Tab activa: rounded pill semi-opaco detrás del icono+label, que
+ *   aparece con fade/scale al focusear. Ese es el "menos translúcido
+ *   en la sección activa".
+ * - Sin marker verde arriba del icono (el pill lo reemplaza).
  */
 function FloatingTabBar() {
   const router = useRouter();
@@ -45,14 +52,6 @@ function FloatingTabBar() {
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
   const bottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
-
-  const backdropBg = isDark
-    ? "rgba(18, 22, 27, 0.92)"
-    : "rgba(250, 250, 247, 0.92)";
-  const islandBg = isDark
-    ? "rgba(28, 33, 40, 0.98)"
-    : "rgba(255, 255, 255, 0.98)";
-  const backdropBgTransparent = backdropBg.replace(/[\d.]+\)$/, "0)");
 
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -66,57 +65,98 @@ function FloatingTabBar() {
       pointerEvents="box-none"
       style={[
         styles.container,
-        { height: ISLAND_TOP_GAP + ISLAND_HEIGHT + bottomGap },
+        { bottom: bottomGap, left: ISLAND_SIDE_GAP, right: ISLAND_SIDE_GAP },
       ]}
     >
-      <LinearGradient
-        pointerEvents="none"
-        colors={[backdropBgTransparent, backdropBg]}
-        style={styles.fadeGradient}
-      />
-      <View
-        pointerEvents="none"
-        style={[styles.backdrop, { top: ISLAND_TOP_GAP, backgroundColor: backdropBg }]}
-      />
-      <View
+      <BlurView
+        tint={isDark ? "dark" : "light"}
+        intensity={Platform.OS === "ios" ? 55 : 80}
         style={[
           styles.island,
           {
-            top: ISLAND_TOP_GAP,
-            left: ISLAND_SIDE_GAP,
-            right: ISLAND_SIDE_GAP,
             height: ISLAND_HEIGHT,
-            backgroundColor: islandBg,
-            borderColor: c.border,
+            backgroundColor: isDark
+              ? "rgba(28, 33, 40, 0.55)"
+              : "rgba(255, 255, 255, 0.55)",
+            borderColor: isDark
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(255, 255, 255, 0.6)",
           },
         ]}
       >
         {TAB_ROUTES.map((route, index) => {
           const focused = index === activeIndex;
-          const color = focused ? ACTIVE_COLOR : c.textSecondary;
           return (
-            <Pressable
+            <TabItem
               key={route.name}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
-              accessibilityLabel={route.title}
+              route={route}
+              focused={focused}
+              isDark={isDark}
+              inactiveColor={c.textSecondary}
               onPress={() => onPressTab(route, index)}
-              style={styles.tabItem}
-              hitSlop={8}
-            >
-              <DrawingIcon
-                path={route.path}
-                focused={focused}
-                color={color}
-              />
-              <Text numberOfLines={1} style={[styles.label, { color }]}>
-                {route.title}
-              </Text>
-            </Pressable>
+            />
           );
         })}
-      </View>
+      </BlurView>
     </View>
+  );
+}
+
+interface TabItemProps {
+  route: TabRoute;
+  focused: boolean;
+  isDark: boolean;
+  inactiveColor: string;
+  onPress: () => void;
+}
+
+function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProps) {
+  // pillOpacity: 0 inactivo, 1 activo. Drivea el highlight detrás del
+  // icono+label (el "menos translúcido" de Naranja X).
+  const pillOpacity = useRef(
+    new Animated.Value(focused ? 1 : 0),
+  ).current;
+
+  useEffect(() => {
+    Animated.timing(pillOpacity, {
+      toValue: focused ? 1 : 0,
+      duration: focused ? 260 : 180,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [focused, pillOpacity]);
+
+  const color = focused ? ACTIVE_COLOR : inactiveColor;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={focused ? { selected: true } : {}}
+      accessibilityLabel={route.title}
+      onPress={onPress}
+      style={styles.tabItem}
+      hitSlop={6}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.activePill,
+          {
+            opacity: pillOpacity,
+            backgroundColor: isDark
+              ? "rgba(255, 255, 255, 0.10)"
+              : "rgba(255, 255, 255, 0.85)",
+            borderColor: isDark
+              ? "rgba(255, 255, 255, 0.06)"
+              : "rgba(0, 0, 0, 0.04)",
+          },
+        ]}
+      />
+      <DrawingIcon path={route.path} focused={focused} color={color} />
+      <Text numberOfLines={1} style={[styles.label, { color }]}>
+        {route.title}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -142,47 +182,42 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   container: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  fadeGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: BACKDROP_FADE,
-  },
-  backdrop: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   island: {
-    position: "absolute",
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
+    alignItems: "stretch",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
     borderRadius: radius.pill,
     borderWidth: 1,
+    // overflow:"hidden" es clave con BlurView — sin esto los bordes
+    // redondeados del blur se recortan cuadrados en Android.
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.14,
+    shadowOpacity: 0.12,
     shadowRadius: 24,
-    elevation: 16,
+    elevation: 14,
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 4,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  activePill: {
+    position: "absolute",
+    top: 6,
+    bottom: 6,
+    left: 6,
+    right: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
   label: {
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: -0.15,
-    marginTop: 2,
   },
 });

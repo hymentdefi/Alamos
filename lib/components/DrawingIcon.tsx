@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { Animated, Easing } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 interface Segment {
@@ -29,8 +29,6 @@ interface Props {
   size?: number;
   viewBox?: string;
 }
-
-const MARKER_COLOR = "#5ac43e";
 
 // Duración total de la animación — IGUAL para todos los iconos, de
 // principio a fin. Así aunque alamo tenga 56 unidades de trazo y
@@ -75,9 +73,6 @@ export function DrawingIcon({
   const segmentOffsets = useRef(
     path.segments.map((seg) => new Animated.Value(focused ? seg.len : 0)),
   ).current;
-  const markerActive = useRef(
-    new Animated.Value(focused ? 1 : 0),
-  ).current;
   const pop = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
 
   useEffect(() => {
@@ -121,67 +116,34 @@ export function DrawingIcon({
         segmentOffsets[i].setValue(0);
       });
     }
-    Animated.timing(markerActive, {
-      toValue: focused ? 1 : 0,
-      duration: focused ? 280 : 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
     Animated.spring(pop, {
       toValue: focused ? 1 : 0.92,
       friction: 6,
       tension: 120,
       useNativeDriver: true,
     }).start();
-  }, [focused, path.segments, segmentOffsets, markerActive, pop]);
+  }, [focused, path.segments, segmentOffsets, pop]);
 
   return (
-    <View style={s.wrap}>
-      <Animated.View
-        style={[
-          s.marker,
-          {
-            backgroundColor: MARKER_COLOR,
-            opacity: markerActive,
-            transform: [{ scaleX: markerActive }],
-          },
-        ]}
-      />
-      <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <Svg width={size} height={size} viewBox={viewBox}>
-          {path.segments.map((seg, i) => (
-            <AnimatedPath
-              key={i}
-              d={seg.d}
-              stroke={color}
-              strokeWidth={2}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={seg.len}
-              strokeDashoffset={segmentOffsets[i]}
-            />
-          ))}
-        </Svg>
-      </Animated.View>
-    </View>
+    <Animated.View style={{ transform: [{ scale: pop }] }}>
+      <Svg width={size} height={size} viewBox={viewBox}>
+        {path.segments.map((seg, i) => (
+          <AnimatedPath
+            key={i}
+            d={seg.d}
+            stroke={color}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={seg.len}
+            strokeDashoffset={segmentOffsets[i]}
+          />
+        ))}
+      </Svg>
+    </Animated.View>
   );
 }
-
-const s = StyleSheet.create({
-  wrap: {
-    width: 52,
-    height: 42,
-    alignItems: "center",
-    paddingTop: 0,
-    gap: 7,
-  },
-  marker: {
-    width: 26,
-    height: 3.5,
-    borderRadius: 2,
-  },
-});
 
 /* ─── Paths SVG para las tabs ─── */
 // Los largos (len) son aproximados con ~5% de overshoot — no hay
