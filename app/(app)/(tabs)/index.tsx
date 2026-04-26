@@ -12,6 +12,8 @@ import {
   Animated,
   Easing,
   Dimensions,
+  TextInput,
+  Alert,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -23,7 +25,6 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import {
   useTheme,
   fontFamily,
@@ -40,6 +41,14 @@ import {
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
+import {
+  accounts,
+  convertAmount,
+  formatAccountBalance,
+  rateBetween,
+  type Account,
+  type AccountId,
+} from "../../../lib/data/accounts";
 import { useAuth } from "../../../lib/auth/context";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
@@ -57,11 +66,6 @@ const USD_RATE = 1200;
 
 /** Mismo verde que la pill activa del nav bar — ver app/(app)/(tabs)/_layout.tsx. */
 const BRAND_GREEN = "#5ac43e";
-
-/** Constantes del nav bar flotante (espejadas de _layout.tsx) — necesarias
- *  para posicionar la action bar de Inicio justo arriba del nav. */
-const NAV_ISLAND_HEIGHT = 68;
-const NAV_SIDE_GAP = 16;
 
 const ranges: Range[] = ["live", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
@@ -410,7 +414,7 @@ function BaseHome() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 260 }}
+        contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
@@ -520,6 +524,8 @@ function BaseHome() {
             )}
           </View>
 
+          <HeroActions />
+
           <View style={[s.chartWrap, { marginTop: 18 }]}>
             <Sparkline
               series={series}
@@ -584,89 +590,45 @@ function BaseHome() {
         </View>
 
       </ScrollView>
-
-      <HomeActionBar />
     </View>
   );
 }
 
-/* ─── Action bar flotante: Ingresar / Enviar ─── */
-/**
- * Vive en Inicio y se posiciona absoluta arriba del nav island, espejando
- * su tratamiento glassmorphism (mismo BlurView, tint, borde y radio) para
- * que se lea como otra "fila" del sistema de nav y no como una isla
- * suelta flotando arriba. Espacio de 4px contra el nav — apenas el
- * suficiente para que se distingan como pieces separadas pero del mismo
- * sistema. Solo se renderiza cuando el user está en Inicio.
- */
-function HomeActionBar() {
+/* ─── Botones Ingresar / Enviar inline en el hero ─── */
+function HeroActions() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { c, mode } = useTheme();
-  const isDark = mode === "dark";
-  const navBottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
-  const bottom = navBottomGap + NAV_ISLAND_HEIGHT + 4;
-
+  const { c } = useTheme();
   return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        s.actionBarWrap,
-        { bottom, left: NAV_SIDE_GAP, right: NAV_SIDE_GAP },
-      ]}
-    >
-      <BlurView
-        tint={isDark ? "dark" : "light"}
-        intensity={Platform.OS === "ios" ? 60 : 90}
-        style={[
-          s.actionBarBlur,
-          {
-            backgroundColor: isDark
-              ? "rgba(18, 18, 18, 0.70)"
-              : "rgba(250, 250, 250, 0.78)",
-            borderColor: isDark
-              ? "rgba(255, 255, 255, 0.06)"
-              : "rgba(0, 0, 0, 0.06)",
-          },
-        ]}
+    <View style={s.heroActionsRow}>
+      <Tap
+        style={[s.heroActionPrimary, { backgroundColor: c.ink }]}
+        haptic="medium"
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/transfer",
+            params: { mode: "deposit" },
+          })
+        }
       >
-        <Tap
-          style={s.actionSeg}
-          haptic="medium"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "deposit" },
-            })
-          }
-        >
-          <Feather name="arrow-down-left" size={16} color={c.text} />
-          <Text style={[s.actionSegText, { color: c.text }]}>Ingresar</Text>
-        </Tap>
-        <View
-          style={[
-            s.actionDivider,
-            {
-              backgroundColor: isDark
-                ? "rgba(255, 255, 255, 0.10)"
-                : "rgba(0, 0, 0, 0.08)",
-            },
-          ]}
-        />
-        <Tap
-          style={s.actionSeg}
-          haptic="light"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "send" },
-            })
-          }
-        >
-          <Feather name="arrow-up-right" size={16} color={c.text} />
-          <Text style={[s.actionSegText, { color: c.text }]}>Enviar</Text>
-        </Tap>
-      </BlurView>
+        <Feather name="arrow-down-left" size={15} color={c.bg} />
+        <Text style={[s.heroActionText, { color: c.bg }]}>Ingresar</Text>
+      </Tap>
+      <Tap
+        style={[
+          s.heroActionSecondary,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+        haptic="light"
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/transfer",
+            params: { mode: "send" },
+          })
+        }
+      >
+        <Feather name="arrow-up-right" size={15} color={c.text} />
+        <Text style={[s.heroActionText, { color: c.text }]}>Enviar</Text>
+      </Tap>
     </View>
   );
 }
@@ -813,38 +775,25 @@ function TabStrip({
   );
 }
 
-/* ─── Dinero: cuentas que rinden + acciones de Ingresar/Enviar ─── */
-/** TNA que rinde cada moneda por el solo hecho de holdearse. */
-const CURRENCY_TNA: Record<string, { label: string; pct: number }> = {
-  ARS: { label: "% TNA", pct: 38.5 },
-  USD: { label: "% anual", pct: 4.2 },
-};
-
-function Dinero({
-  byCategory,
-}: {
+/* ─── Dinero: cuentas (ARS, USD MEP, USD USA, USDT) + Convertir ─── */
+function Dinero(_: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
 }) {
   const { c } = useTheme();
   const [infoOpen, setInfoOpen] = useState(false);
-  const cash = useMemo(
-    () => byCategory.find(([cat]) => cat === "efectivo")?.[1].items ?? [],
-    [byCategory],
-  );
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertFromId, setConvertFromId] = useState<AccountId | undefined>();
 
-  const ars = cash.find((a) => a.ticker === "ARS");
-  const usd = cash.find((a) => a.ticker === "USD");
-
-  if (!ars && !usd) return null;
+  const openConvertFrom = useCallback((id?: AccountId) => {
+    setConvertFromId(id);
+    setConvertOpen(true);
+  }, []);
 
   return (
     <View style={s.sectionBlock}>
-      {/* Cuentas que rinden — estilo ARQ. */}
       <View style={s.earningsBlock}>
         <View style={s.earningsHead}>
-          <Text style={[s.earningsTitle, { color: c.text }]}>
-            Cuentas que rinden
-          </Text>
+          <Text style={[s.earningsTitle, { color: c.text }]}>Tus cuentas</Text>
           <Pressable
             hitSlop={10}
             onPress={() => setInfoOpen(true)}
@@ -852,64 +801,66 @@ function Dinero({
           >
             <Feather name="info" size={12} color={c.textSecondary} />
           </Pressable>
+          <View style={{ flex: 1 }} />
+          <Tap
+            haptic="medium"
+            onPress={() => openConvertFrom(undefined)}
+            style={[s.convertBtn, { backgroundColor: c.ink }]}
+          >
+            <Feather name="repeat" size={13} color={c.bg} />
+            <Text style={[s.convertBtnText, { color: c.bg }]}>Convertir</Text>
+          </Tap>
         </View>
 
-        {ars ? (
-          <EarningsRow
-            flag="AR"
-            ticker="ARS"
-            name="Peso argentino"
-            tna={CURRENCY_TNA.ARS}
-            amountPrimary={formatARS(ars.price * (ars.qty ?? 1))}
-            amountSecondary={`${((ars.price * (ars.qty ?? 1)) / USD_RATE).toLocaleString(
-              "es-AR",
-              { maximumFractionDigits: 2 },
-            )} USD`}
+        {accounts.map((a, i) => (
+          <AccountRow
+            key={a.id}
+            account={a}
+            withTopDivider={i > 0}
+            onPress={() => openConvertFrom(a.id)}
           />
-        ) : null}
-        {usd ? (
-          <EarningsRow
-            flag="US"
-            ticker="USD"
-            name="Dólar MEP"
-            tna={CURRENCY_TNA.USD}
-            amountPrimary={`US$ ${(usd.qty ?? 0).toLocaleString("es-AR", {
-              maximumFractionDigits: 2,
-            })}`}
-            amountSecondary={formatARS(usd.price * (usd.qty ?? 1))}
-            withTopDivider
-          />
-        ) : null}
+        ))}
       </View>
 
       <EarningsInfoModal
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
       />
+      <ConvertSheet
+        visible={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        initialFromId={convertFromId}
+      />
     </View>
   );
 }
 
-function EarningsRow({
-  flag,
-  ticker,
-  name,
-  tna,
-  amountPrimary,
-  amountSecondary,
+/** Devuelve qué variant de MoneyIcon usar para cada moneda. */
+function moneyVariantFor(c: Account["currency"]): "ars" | "usd" | "usdt" {
+  if (c === "ARS") return "ars";
+  if (c === "USDT") return "usdt";
+  return "usd";
+}
+
+function AccountRow({
+  account,
   withTopDivider,
+  onPress,
 }: {
-  flag: "AR" | "US";
-  ticker: string;
-  name: string;
-  tna: { label: string; pct: number };
-  amountPrimary: string;
-  amountSecondary?: string;
+  account: Account;
   withTopDivider?: boolean;
+  onPress: () => void;
 }) {
   const { c } = useTheme();
+  // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
+  const arsEquiv =
+    account.currency === "ARS"
+      ? null
+      : `≈ ${formatARS(convertAmount(account.balance, account.currency, "ARS"))}`;
+
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={[
         s.earningsRow,
         withTopDivider && {
@@ -918,31 +869,353 @@ function EarningsRow({
         },
       ]}
     >
-      <FlagIcon code={flag} size={40} />
+      <MoneyIcon variant={moneyVariantFor(account.currency)} size={40} />
       <View style={{ flex: 1 }}>
         <View style={s.earningsTickerRow}>
-          <Text style={[s.earningsTicker, { color: c.text }]}>{ticker}</Text>
+          <Text style={[s.earningsTicker, { color: c.text }]}>
+            {account.currency}
+          </Text>
           <View style={[s.tnaBadge, { backgroundColor: c.surfaceHover }]}>
             <Text style={[s.tnaBadgeText, { color: c.textSecondary }]}>
-              {tna.pct.toLocaleString("es-AR", { minimumFractionDigits: 1 })}
-              {tna.label}
+              {account.yield.pct.toLocaleString("es-AR", {
+                minimumFractionDigits: 1,
+              })}
+              {account.yield.label}
             </Text>
           </View>
         </View>
-        <Text style={[s.earningsName, { color: c.textMuted }]}>{name}</Text>
+        <Text style={[s.earningsName, { color: c.textMuted }]} numberOfLines={1}>
+          {account.location}
+        </Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.earningsPrimary, { color: c.text }]}>
-          {amountPrimary}
+          {formatAccountBalance(account)}
         </Text>
-        {amountSecondary ? (
+        {arsEquiv ? (
           <Text style={[s.earningsSecondary, { color: c.textMuted }]}>
-            {amountSecondary}
+            {arsEquiv}
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
+}
+
+/* ─── Bottom sheet de conversión entre cuentas ─── */
+function ConvertSheet({
+  visible,
+  onClose,
+  initialFromId,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  initialFromId?: AccountId;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [fromId, setFromId] = useState<AccountId>("ars-ar");
+  const [toId, setToId] = useState<AccountId>("usd-ar");
+  const [amount, setAmount] = useState("");
+  // null si no hay picker abierto, sino indica para qué slot.
+  const [pickerSlot, setPickerSlot] = useState<null | "from" | "to">(null);
+
+  // Setea defaults razonables al abrir: si llega initialFromId, usa esa
+  // como origen y elige la primera otra como destino.
+  useEffect(() => {
+    if (!visible) return;
+    const from = initialFromId ?? "ars-ar";
+    setFromId(from);
+    const firstOther = accounts.find((a) => a.id !== from)?.id ?? "usd-ar";
+    setToId(firstOther);
+    setAmount("");
+    setPickerSlot(null);
+  }, [visible, initialFromId]);
+
+  const from = accounts.find((a) => a.id === fromId)!;
+  const to = accounts.find((a) => a.id === toId)!;
+  const numericAmount = parseFloat(amount.replace(",", ".")) || 0;
+  const received = convertAmount(numericAmount, from.currency, to.currency);
+  const rate = rateBetween(from.currency, to.currency);
+  const insufficient = numericAmount > from.balance;
+  const canConfirm = numericAmount > 0 && !insufficient && fromId !== toId;
+
+  const swap = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setFromId(toId);
+    setToId(fromId);
+  };
+
+  const onPickAccount = (id: AccountId) => {
+    Haptics.selectionAsync().catch(() => {});
+    if (pickerSlot === "from") {
+      setFromId(id);
+      // Si quedó igual al destino, movemos el destino a otra cuenta.
+      if (id === toId) {
+        setToId(accounts.find((a) => a.id !== id)!.id);
+      }
+    } else if (pickerSlot === "to") {
+      setToId(id);
+      if (id === fromId) {
+        setFromId(accounts.find((a) => a.id !== id)!.id);
+      }
+    }
+    setPickerSlot(null);
+  };
+
+  const onConfirm = () => {
+    if (!canConfirm) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
+    Alert.alert(
+      "Conversión enviada",
+      `Vas a recibir ${formatConvertPreview(received, to.currency)} en ${to.location}.`,
+      [{ text: "Listo", onPress: onClose }],
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={s.convertWrap}>
+        <Pressable style={s.convertBackdrop} onPress={onClose} />
+        <View
+          style={[
+            s.convertSheet,
+            { backgroundColor: c.bg, paddingBottom: insets.bottom + 18 },
+          ]}
+        >
+          <View style={s.convertHandle} />
+          <View style={s.convertHead}>
+            <Text style={[s.convertTitle, { color: c.text }]}>Convertir</Text>
+            <Pressable
+              hitSlop={10}
+              onPress={onClose}
+              style={[s.convertClose, { backgroundColor: c.surfaceHover }]}
+            >
+              <Feather name="x" size={16} color={c.text} />
+            </Pressable>
+          </View>
+
+          {pickerSlot ? (
+            <View style={s.convertPickerBlock}>
+              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>
+                ELEGÍ LA CUENTA
+              </Text>
+              {accounts.map((a) => {
+                const selected =
+                  pickerSlot === "from" ? a.id === fromId : a.id === toId;
+                return (
+                  <Pressable
+                    key={a.id}
+                    onPress={() => onPickAccount(a.id)}
+                    style={[
+                      s.convertPickerRow,
+                      { borderBottomColor: c.border },
+                    ]}
+                  >
+                    <MoneyIcon
+                      variant={moneyVariantFor(a.currency)}
+                      size={36}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[s.convertPickerCurrency, { color: c.text }]}
+                      >
+                        {a.currency}
+                      </Text>
+                      <Text
+                        style={[s.convertPickerLoc, { color: c.textMuted }]}
+                      >
+                        {a.location}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[s.convertPickerBal, { color: c.textSecondary }]}
+                    >
+                      {formatAccountBalance(a)}
+                    </Text>
+                    {selected ? (
+                      <Feather
+                        name="check"
+                        size={18}
+                        color={BRAND_GREEN}
+                        style={{ marginLeft: 8 }}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <>
+              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>DE</Text>
+              <Pressable
+                onPress={() => setPickerSlot("from")}
+                style={[
+                  s.convertSelector,
+                  { backgroundColor: c.surfaceHover, borderColor: c.border },
+                ]}
+              >
+                <MoneyIcon
+                  variant={moneyVariantFor(from.currency)}
+                  size={36}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.convertSelCurrency, { color: c.text }]}>
+                    {from.currency}
+                  </Text>
+                  <Text style={[s.convertSelLoc, { color: c.textMuted }]}>
+                    {from.location} · {formatAccountBalance(from)}
+                  </Text>
+                </View>
+                <Feather name="chevron-down" size={18} color={c.textMuted} />
+              </Pressable>
+
+              <View style={s.convertSwapWrap}>
+                <View style={[s.convertSwapLine, { backgroundColor: c.border }]} />
+                <Pressable
+                  onPress={swap}
+                  style={[s.convertSwap, { backgroundColor: c.ink }]}
+                  hitSlop={8}
+                >
+                  <Feather name="repeat" size={15} color={c.bg} />
+                </Pressable>
+                <View style={[s.convertSwapLine, { backgroundColor: c.border }]} />
+              </View>
+
+              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>A</Text>
+              <Pressable
+                onPress={() => setPickerSlot("to")}
+                style={[
+                  s.convertSelector,
+                  { backgroundColor: c.surfaceHover, borderColor: c.border },
+                ]}
+              >
+                <MoneyIcon variant={moneyVariantFor(to.currency)} size={36} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.convertSelCurrency, { color: c.text }]}>
+                    {to.currency}
+                  </Text>
+                  <Text style={[s.convertSelLoc, { color: c.textMuted }]}>
+                    {to.location}
+                  </Text>
+                </View>
+                <Feather name="chevron-down" size={18} color={c.textMuted} />
+              </Pressable>
+
+              <Text
+                style={[
+                  s.convertEyebrow,
+                  { color: c.textMuted, marginTop: 18 },
+                ]}
+              >
+                CANTIDAD
+              </Text>
+              <View
+                style={[
+                  s.convertAmountWrap,
+                  { backgroundColor: c.surfaceHover, borderColor: c.border },
+                ]}
+              >
+                <Text style={[s.convertAmountCur, { color: c.textMuted }]}>
+                  {from.currency}
+                </Text>
+                <TextInput
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0"
+                  placeholderTextColor={c.textFaint}
+                  keyboardType="decimal-pad"
+                  style={[s.convertAmountInput, { color: c.text }]}
+                />
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setAmount(String(from.balance));
+                  }}
+                  hitSlop={8}
+                  style={[s.convertMaxBtn, { backgroundColor: c.surface }]}
+                >
+                  <Text style={[s.convertMaxText, { color: c.text }]}>MAX</Text>
+                </Pressable>
+              </View>
+
+              <View style={s.convertPreviewBlock}>
+                <View style={s.convertPreviewRow}>
+                  <Text style={[s.convertPreviewLabel, { color: c.textMuted }]}>
+                    Recibís
+                  </Text>
+                  <Text style={[s.convertPreviewValue, { color: c.text }]}>
+                    ≈ {formatConvertPreview(received, to.currency)}
+                  </Text>
+                </View>
+                <View style={s.convertPreviewRow}>
+                  <Text style={[s.convertPreviewLabel, { color: c.textMuted }]}>
+                    Cotización
+                  </Text>
+                  <Text
+                    style={[s.convertPreviewSub, { color: c.textSecondary }]}
+                  >
+                    1 {from.currency} ={" "}
+                    {rate.toLocaleString("es-AR", {
+                      maximumFractionDigits: rate < 1 ? 6 : 2,
+                    })}{" "}
+                    {to.currency}
+                  </Text>
+                </View>
+                {insufficient ? (
+                  <Text style={[s.convertWarn, { color: c.red }]}>
+                    Saldo insuficiente — tenés{" "}
+                    {formatAccountBalance(from)} disponibles.
+                  </Text>
+                ) : null}
+              </View>
+
+              <Tap
+                haptic="medium"
+                onPress={onConfirm}
+                disabled={!canConfirm}
+                style={[
+                  s.convertCTA,
+                  {
+                    backgroundColor: canConfirm ? c.ink : c.surfaceHover,
+                    opacity: canConfirm ? 1 : 0.6,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    s.convertCTAText,
+                    { color: canConfirm ? c.bg : c.textMuted },
+                  ]}
+                >
+                  Convertir
+                </Text>
+              </Tap>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function formatConvertPreview(n: number, currency: Account["currency"]): string {
+  if (currency === "ARS") {
+    return "$ " + Math.round(n).toLocaleString("es-AR");
+  }
+  const sym = currency === "USD" ? "US$" : "USDT";
+  return `${sym} ${n.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function EarningsInfoModal({
@@ -1489,36 +1762,32 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Action bar flotante (Ingresar / Enviar) sobre el nav island.
-     Espeja el glass del nav: BlurView, mismo tint/borde/radio. */
-  actionBarWrap: {
-    position: "absolute",
-  },
-  actionBarBlur: {
+  /* Botones Ingresar / Enviar inline en el hero, abajo del saldo. */
+  heroActionsRow: {
     flexDirection: "row",
-    alignItems: "stretch",
-    height: 56,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 10,
+    gap: 10,
+    marginTop: 18,
   },
-  actionSeg: {
+  heroActionPrimary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    height: 46,
+    borderRadius: radius.pill,
   },
-  actionDivider: {
-    width: StyleSheet.hairlineWidth,
-    marginVertical: 12,
+  heroActionSecondary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 46,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  actionSegText: {
+  heroActionText: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
@@ -1588,6 +1857,205 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
+  },
+  convertBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+  },
+  convertBtnText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+
+  /* ConvertSheet */
+  convertWrap: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  convertBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  convertSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    maxHeight: "92%",
+  },
+  convertHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: "rgba(128,128,128,0.35)",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  convertHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  convertTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
+  },
+  convertClose: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  convertEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  convertSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  convertSelCurrency: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  convertSelLoc: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  convertSwapWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  convertSwapLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  convertSwap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 10,
+  },
+  convertAmountWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  convertAmountCur: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  convertAmountInput: {
+    flex: 1,
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.5,
+    paddingVertical: 6,
+  },
+  convertMaxBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+  },
+  convertMaxText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  convertPreviewBlock: {
+    marginTop: 16,
+    marginBottom: 22,
+    gap: 6,
+  },
+  convertPreviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  convertPreviewLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  convertPreviewValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.3,
+  },
+  convertPreviewSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  convertWarn: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 6,
+  },
+  convertCTA: {
+    height: 52,
+    borderRadius: radius.btn,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  convertCTAText: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  convertPickerBlock: {
+    paddingTop: 4,
+  },
+  convertPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  convertPickerCurrency: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.25,
+  },
+  convertPickerLoc: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  convertPickerBal: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 
   /* Modal del info de TNA */

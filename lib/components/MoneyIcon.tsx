@@ -1,6 +1,6 @@
 import Svg, { Rect, Text as SvgText, Circle } from "react-native-svg";
 
-type Variant = "ars" | "usd";
+type Variant = "ars" | "usd" | "usdt";
 
 interface Props {
   variant: Variant;
@@ -39,23 +39,36 @@ export function MoneyIcon({ variant, size = 40 }: Props) {
     );
   }
 
-  // USD — verde billete con doble rayita
+  if (variant === "usd") {
+    // USD — verde billete con doble rayita
+    return (
+      <Svg width={size} height={size} viewBox="0 0 40 40">
+        <Rect x="0" y="0" width="40" height="40" rx={r} ry={r} fill="#1A6B4A" />
+        {/* Líneas diagonales decorativas sutiles */}
+        <Rect x="-4" y="11" width="48" height="1" fill="rgba(255,255,255,0.12)" />
+        <Rect x="-4" y="28" width="48" height="1" fill="rgba(255,255,255,0.12)" />
+        <SvgText
+          x="20"
+          y="25"
+          fontSize="15"
+          fontWeight="bold"
+          fill="#FFFFFF"
+          textAnchor="middle"
+        >
+          US$
+        </SvgText>
+      </Svg>
+    );
+  }
+
+  // USDT (Tether) — teal con la T blanca tipo logo
   return (
     <Svg width={size} height={size} viewBox="0 0 40 40">
-      <Rect x="0" y="0" width="40" height="40" rx={r} ry={r} fill="#1A6B4A" />
-      {/* Líneas diagonales decorativas sutiles */}
-      <Rect x="-4" y="11" width="48" height="1" fill="rgba(255,255,255,0.12)" />
-      <Rect x="-4" y="28" width="48" height="1" fill="rgba(255,255,255,0.12)" />
-      <SvgText
-        x="20"
-        y="25"
-        fontSize="15"
-        fontWeight="bold"
-        fill="#FFFFFF"
-        textAnchor="middle"
-      >
-        US$
-      </SvgText>
+      <Rect x="0" y="0" width="40" height="40" rx={r} ry={r} fill="#26A17B" />
+      {/* Barra horizontal arriba de la T */}
+      <Rect x="11" y="13" width="18" height="3.6" rx="1" fill="#FFFFFF" />
+      {/* Pilar vertical de la T */}
+      <Rect x="18.2" y="13" width="3.6" height="16" rx="1" fill="#FFFFFF" />
     </Svg>
   );
 }
