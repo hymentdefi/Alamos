@@ -288,6 +288,32 @@ function BaseHome() {
     return () => loop.stop();
   }, [range, livePulse]);
 
+  // Respiración del botón de regalo: scale 1 → 1.10 → 1 con pausa de 1.5s
+  // entre breaths. Suficiente para llamar la atención sin distraer.
+  const giftPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isFocused) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(giftPulse, {
+          toValue: 1.1,
+          duration: 850,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(giftPulse, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1500),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isFocused, giftPulse]);
+
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
@@ -347,20 +373,28 @@ function BaseHome() {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={s.topActions}>
-          <Tap
-            style={[s.giftBtn, { backgroundColor: BRAND_GREEN }]}
-            onPress={() =>
-              Haptics.notificationAsync(
-                Haptics.NotificationFeedbackType.Success,
-              ).catch(() => {})
-            }
-            hitSlop={8}
-            haptic="medium"
+          <Animated.View
+            style={[
+              s.giftBtnWrap,
+              {
+                shadowColor: BRAND_GREEN,
+                transform: [{ scale: giftPulse }],
+              },
+            ]}
           >
-            {/* Anillo interior para el feel "halo" del icono de referencia */}
-            <View style={s.giftRing} pointerEvents="none" />
-            <Ionicons name="gift" size={20} color="#FFFFFF" />
-          </Tap>
+            <Tap
+              style={[s.giftBtn, { backgroundColor: BRAND_GREEN }]}
+              onPress={() =>
+                Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Success,
+                ).catch(() => {})
+              }
+              hitSlop={8}
+              haptic="medium"
+            >
+              <Ionicons name="gift" size={20} color="#FFFFFF" />
+            </Tap>
+          </Animated.View>
           <Tap
             style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
             onPress={() => router.push("/(app)/activity")}
@@ -1228,23 +1262,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  /* Wrapper que vive afuera del Tap para que el shadow no se recorte
+     y para que la animación de scale incluya el glow. */
+  giftBtnWrap: {
+    borderRadius: radius.pill,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 9,
+    elevation: 8,
+  },
   giftBtn: {
     width: 36,
     height: 36,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-  },
-  giftRing: {
-    position: "absolute",
-    top: 4,
-    left: 4,
-    right: 4,
-    bottom: 4,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
   },
   heroDivider: {
     height: StyleSheet.hairlineWidth,
