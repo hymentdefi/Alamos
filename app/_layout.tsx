@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -25,6 +25,7 @@ import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
 import { ProProvider } from "../lib/pro/context";
 import { LegalConsentProvider } from "../lib/legal/context";
+import { GreetingOverlay } from "../lib/components/GreetingOverlay";
 import {
   ThemeContext,
   themes,
@@ -78,6 +79,11 @@ function AuthGate() {
   const segments = useSegments();
   const router = useRouter();
   const [showSplash, setShowSplash] = useState(true);
+  // Saludo personalizado: se muestra una vez por cold start después del
+  // splash, sólo si el usuario está autenticado. Persiste en un ref para
+  // que no se vuelva a mostrar al volver del background o al re-render.
+  const [showGreeting, setShowGreeting] = useState(false);
+  const greetingShownRef = useRef(false);
 
   useEffect(() => {
     if (isLoading || showSplash) return;
@@ -86,11 +92,26 @@ function AuthGate() {
     else if (isAuthenticated && inAuthGroup) router.replace("/(app)");
   }, [isAuthenticated, isLoading, segments, showSplash]);
 
+  useEffect(() => {
+    if (showSplash || isLoading) return;
+    if (!isAuthenticated) return;
+    if (greetingShownRef.current) return;
+    greetingShownRef.current = true;
+    setShowGreeting(true);
+  }, [showSplash, isLoading, isAuthenticated]);
+
   if (showSplash || isLoading) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      {showGreeting ? (
+        <GreetingOverlay onEnd={() => setShowGreeting(false)} />
+      ) : null}
+    </>
+  );
 }
 
 export default function RootLayout() {

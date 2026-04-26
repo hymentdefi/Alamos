@@ -49,7 +49,6 @@ import {
   type Account,
   type AccountId,
 } from "../../../lib/data/accounts";
-import { useAuth } from "../../../lib/auth/context";
 import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
@@ -90,7 +89,6 @@ function BaseHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { user } = useAuth();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
@@ -206,17 +204,6 @@ function BaseHome() {
     });
     return unsub;
   }, [navigation, isFocused, refreshing, onRefresh]);
-
-  const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
-
-  // Saludo según la hora local: 05-12 buen día, 12-20 buenas tardes, resto
-  // buenas noches.
-  const greeting = useMemo(() => {
-    const h = new Date().getHours();
-    if (h >= 5 && h < 12) return "Buen día";
-    if (h >= 12 && h < 20) return "Buenas tardes";
-    return "Buenas noches";
-  }, []);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   // Portfolios separados: los activos denominados en pesos van por un
@@ -430,11 +417,8 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
-          <Text
-            style={[s.heroGreet, { color: c.textMuted }]}
-            numberOfLines={1}
-          >
-            {greeting}, {firstName}
+          <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
+            Tu portfolio
           </Text>
           <Pressable
             style={s.amountRow}
@@ -2187,11 +2171,12 @@ const s = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 12,
   },
-  heroGreet: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    letterSpacing: -0.15,
-    marginBottom: 16,
+  portfolioTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 46,
+    lineHeight: 50,
+    letterSpacing: -2,
+    marginBottom: 4,
   },
   amountRow: {
     flexDirection: "row",
