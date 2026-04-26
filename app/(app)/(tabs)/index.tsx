@@ -50,7 +50,7 @@ import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
 type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
-type TabId = "dinero" | "portfolio";
+type TabId = "dinero" | "portfolio" | "rendimientos";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
@@ -96,7 +96,9 @@ function BaseHome() {
   useEffect(() => {
     SecureStore.getItemAsync("home:active_tab")
       .then((v) => {
-        if (v === "dinero" || v === "portfolio") setTabState(v);
+        if (v === "dinero" || v === "portfolio" || v === "rendimientos") {
+          setTabState(v);
+        }
       })
       .catch(() => {});
   }, []);
@@ -568,7 +570,7 @@ function BaseHome() {
         <View style={s.tabContent}>
           {tab === "dinero" ? (
             <Dinero byCategory={byCategory} />
-          ) : (
+          ) : tab === "portfolio" ? (
             <Portfolio
               byCategory={byCategory}
               onOpen={openDetail}
@@ -576,6 +578,8 @@ function BaseHome() {
               rangeIsUp={displayIsUp}
               rangeLabel={timeLabel}
             />
+          ) : (
+            <Rendimientos byCategory={byCategory} onOpen={openDetail} />
           )}
         </View>
 
@@ -776,6 +780,7 @@ function TabStrip({
   const tabs: { id: TabId; label: string }[] = [
     { id: "dinero", label: "Dinero" },
     { id: "portfolio", label: "Portfolio" },
+    { id: "rendimientos", label: "Rendimientos" },
   ];
   return (
     <View style={[s.tabGroup, { backgroundColor: c.surfaceHover }]}>
@@ -1221,6 +1226,158 @@ function AssetRow({
   );
 }
 
+/* ─── Rendimientos: ganancia del día + ranking de activos ─── */
+function Rendimientos({
+  byCategory,
+  onOpen,
+}: {
+  byCategory: [AssetCategory, { total: number; items: Asset[] }][];
+  onOpen: (a: Asset) => void;
+}) {
+  const { c } = useTheme();
+
+  // Activos no-cash, ordenados de mejor a peor performance del día.
+  const ranked = useMemo(
+    () =>
+      byCategory
+        .filter(([cat]) => cat !== "efectivo")
+        .flatMap(([, data]) => data.items)
+        .slice()
+        .sort((a, b) => b.change - a.change),
+    [byCategory],
+  );
+
+  if (ranked.length === 0) {
+    return (
+      <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+        <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
+          Cuando empieces a invertir, tus rendimientos van a aparecer acá.
+        </Text>
+      </View>
+    );
+  }
+
+  // Ganancia $ del día por activo: tenencia × % cambio.
+  const dayReturn = (a: Asset) => a.price * (a.qty ?? 1) * (a.change / 100);
+  const totalReturn = ranked.reduce((sum, a) => sum + dayReturn(a), 0);
+  const totalIsUp = totalReturn >= 0;
+  const winners = ranked.filter((a) => a.change >= 0).length;
+  const losers = ranked.length - winners;
+
+  return (
+    <View>
+      <View style={s.rendHero}>
+        <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
+          GANANCIA DEL DÍA
+        </Text>
+        <View style={s.rendHeroRow}>
+          <Text
+            style={[
+              s.rendHeroTri,
+              { color: totalIsUp ? c.greenDark : c.red },
+            ]}
+          >
+            {totalIsUp ? "▲" : "▼"}
+          </Text>
+          <Text
+            style={[
+              s.rendHeroAmount,
+              { color: totalIsUp ? c.greenDark : c.red },
+            ]}
+          >
+            {totalIsUp ? "+" : "−"}
+            {formatARS(Math.abs(totalReturn))}
+          </Text>
+        </View>
+        <Text style={[s.rendHeroSub, { color: c.textMuted }]}>
+          {winners} {winners === 1 ? "en alza" : "en alza"}
+          {" · "}
+          {losers} {losers === 1 ? "en baja" : "en baja"}
+        </Text>
+      </View>
+
+      <View style={s.groupBlock}>
+        <View style={s.groupHead}>
+          <Text style={[s.groupTitle, { color: c.text }]}>Ranking del día</Text>
+          <Text style={[s.groupValue, { color: c.textMuted }]}>
+            {ranked.length} {ranked.length === 1 ? "activo" : "activos"}
+          </Text>
+        </View>
+        {ranked.map((asset, i) => (
+          <ReturnRow
+            key={asset.ticker}
+            asset={asset}
+            first={i === 0}
+            dayReturn={dayReturn(asset)}
+            onPress={() => onOpen(asset)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ReturnRow({
+  asset,
+  first,
+  dayReturn,
+  onPress,
+}: {
+  asset: Asset;
+  first?: boolean;
+  dayReturn: number;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const up = asset.change >= 0;
+  const bg =
+    asset.iconTone === "dark"
+      ? c.ink
+      : asset.iconTone === "accent"
+      ? c.green
+      : c.surfaceSunken;
+  const fg =
+    asset.iconTone === "dark"
+      ? c.bg
+      : asset.iconTone === "accent"
+      ? c.ink
+      : c.textSecondary;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.row,
+        !first && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        },
+      ]}
+    >
+      <View style={[s.rowIcon, { backgroundColor: bg }]}>
+        <Text style={[s.rowIconText, { color: fg }]}>
+          {assetIconCode(asset)}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowTicker, { color: c.text }]}>{asset.ticker}</Text>
+        <Text style={[s.rowSub, { color: c.textMuted }]} numberOfLines={1}>
+          {asset.name}
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={[s.rowPrice, { color: up ? c.greenDark : c.red }]}>
+          {up ? "+" : "−"}
+          {formatARS(Math.abs(dayReturn))}
+        </Text>
+        <Text style={[s.rowChange, { color: up ? c.greenDark : c.red }]}>
+          {formatPct(asset.change)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function allocationColor(cat: AssetCategory, c: ThemeColors): string {
   switch (cat) {
     case "efectivo":
@@ -1481,6 +1638,34 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
+  },
+
+  /* Rendimientos hero */
+  rendHero: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  rendHeroRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    marginTop: 4,
+  },
+  rendHeroTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+  },
+  rendHeroAmount: {
+    fontFamily: fontFamily[800],
+    fontSize: 32,
+    letterSpacing: -1.1,
+  },
+  rendHeroSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 8,
   },
 
   /* Portfolio hero */
