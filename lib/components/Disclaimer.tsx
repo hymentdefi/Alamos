@@ -16,6 +16,9 @@ import {
   ALYC,
 } from "../legal/disclaimers";
 
+// Mismo verde que usa la pill activa del nav bar (ver app/(app)/(tabs)/_layout.tsx).
+const BRAND_GREEN = "#5ac43e";
+
 /* ─── Texto corto inline (para detalle, card en activo, etc.) ─── */
 
 export function DisclaimerShort({ muted = true }: { muted?: boolean }) {
@@ -194,13 +197,13 @@ export function DisclaimerOnboarding({
               style={[
                 styles.checkbox,
                 {
-                  backgroundColor: checked ? c.ink : "transparent",
-                  borderColor: checked ? c.ink : c.borderStrong,
+                  backgroundColor: checked ? BRAND_GREEN : "transparent",
+                  borderColor: checked ? BRAND_GREEN : c.borderStrong,
                 },
               ]}
             >
               {checked ? (
-                <Feather name="check" size={14} color={c.bg} />
+                <Feather name="check" size={14} color="#FFFFFF" />
               ) : null}
             </View>
             <Text style={[styles.checkLabel, { color: c.text }]}>
