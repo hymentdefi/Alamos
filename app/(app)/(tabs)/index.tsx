@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Modal,
   PanResponder,
+  Platform,
   RefreshControl,
   Animated,
   Easing,
@@ -52,6 +53,14 @@ type TabId = "dinero" | "portfolio";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
+
+/** Mismo verde que la pill activa del nav bar — ver app/(app)/(tabs)/_layout.tsx. */
+const BRAND_GREEN = "#5ac43e";
+
+/** Constantes del nav bar flotante (espejadas de _layout.tsx) — necesarias
+ *  para posicionar la action bar de Inicio justo arriba del nav. */
+const NAV_ISLAND_HEIGHT = 68;
+const NAV_SIDE_GAP = 16;
 
 const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
@@ -299,19 +308,33 @@ function BaseHome() {
         >
           {greeting}, {firstName}
         </Text>
-        <Tap
-          style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => router.push("/(app)/activity")}
-          hitSlop={8}
-          haptic="selection"
-        >
-          <Feather name="activity" size={18} color={c.text} />
-        </Tap>
+        <View style={s.topActions}>
+          <Tap
+            style={[s.topBtn, { backgroundColor: BRAND_GREEN }]}
+            onPress={() =>
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success,
+              ).catch(() => {})
+            }
+            hitSlop={8}
+            haptic="medium"
+          >
+            <Feather name="gift" size={18} color="#FFFFFF" />
+          </Tap>
+          <Tap
+            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+            onPress={() => router.push("/(app)/activity")}
+            hitSlop={8}
+            haptic="selection"
+          >
+            <Feather name="activity" size={18} color={c.text} />
+          </Tap>
+        </View>
       </View>
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 180 }}
+        contentContainerStyle={{ paddingBottom: 260 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
@@ -468,6 +491,63 @@ function BaseHome() {
 
       </ScrollView>
 
+      <HomeActionBar />
+    </View>
+  );
+}
+
+/* ─── Action bar flotante: Ingresar / Enviar ─── */
+/**
+ * Vive en Inicio y se posiciona absoluta arriba del nav island. El cálculo
+ * de `bottom` espeja la lógica de _layout.tsx (ISLAND_HEIGHT + bottomGap)
+ * para que la barra siempre quede pegada al nav, integrada visualmente.
+ * Sólo se renderiza cuando el user está en Inicio porque vive dentro del
+ * tree de HomeScreen.
+ */
+function HomeActionBar() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { c } = useTheme();
+  const navBottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
+  const bottom = navBottomGap + NAV_ISLAND_HEIGHT + 8;
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        s.actionBarWrap,
+        { bottom, left: NAV_SIDE_GAP, right: NAV_SIDE_GAP },
+      ]}
+    >
+      <Tap
+        style={[s.actionBarPrimary, { backgroundColor: c.ink }]}
+        haptic="medium"
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/transfer",
+            params: { mode: "deposit" },
+          })
+        }
+      >
+        <Feather name="arrow-down-left" size={15} color={c.bg} />
+        <Text style={[s.actionBarText, { color: c.bg }]}>Ingresar</Text>
+      </Tap>
+      <Tap
+        style={[
+          s.actionBarSecondary,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+        haptic="light"
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/transfer",
+            params: { mode: "send" },
+          })
+        }
+      >
+        <Feather name="arrow-up-right" size={15} color={c.text} />
+        <Text style={[s.actionBarText, { color: c.text }]}>Enviar</Text>
+      </Tap>
     </View>
   );
 }
@@ -626,7 +706,6 @@ function Dinero({
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
 }) {
   const { c } = useTheme();
-  const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
   const cash = useMemo(
     () => byCategory.find(([cat]) => cat === "efectivo")?.[1].items ?? [],
@@ -640,39 +719,6 @@ function Dinero({
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones Ingresar / Enviar arriba de todo. */}
-      <View style={s.cashActions}>
-        <Tap
-          style={[s.cashActionPrimary, { backgroundColor: c.ink }]}
-          haptic="medium"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "deposit" },
-            })
-          }
-        >
-          <Feather name="arrow-down-left" size={15} color={c.bg} />
-          <Text style={[s.cashActionText, { color: c.bg }]}>Ingresar</Text>
-        </Tap>
-        <Tap
-          style={[
-            s.cashActionSecondary,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
-          ]}
-          haptic="light"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "send" },
-            })
-          }
-        >
-          <Feather name="arrow-up-right" size={15} color={c.text} />
-          <Text style={[s.cashActionText, { color: c.text }]}>Enviar</Text>
-        </Tap>
-      </View>
-
       {/* Cuentas que rinden — estilo ARQ. */}
       <View style={s.earningsBlock}>
         <View style={s.earningsHead}>
@@ -1096,6 +1142,11 @@ const s = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  topActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   topBtn: {
     width: 36,
     height: 36,
@@ -1157,32 +1208,42 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Dinero — acciones arriba (Ingresar / Enviar) */
-  cashActions: {
+  /* Action bar flotante (Ingresar / Enviar) sobre el nav island. */
+  actionBarWrap: {
+    position: "absolute",
     flexDirection: "row",
     gap: 10,
-    marginBottom: 22,
   },
-  cashActionPrimary: {
+  actionBarPrimary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 46,
-    borderRadius: radius.btn,
+    height: 52,
+    borderRadius: radius.pill,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  cashActionSecondary: {
+  actionBarSecondary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 46,
-    borderRadius: radius.btn,
+    height: 52,
+    borderRadius: radius.pill,
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  cashActionText: {
+  actionBarText: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
