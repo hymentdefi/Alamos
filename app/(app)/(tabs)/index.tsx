@@ -23,6 +23,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import {
   useTheme,
   fontFamily,
@@ -551,18 +552,20 @@ function BaseHome() {
 
 /* ─── Action bar flotante: Ingresar / Enviar ─── */
 /**
- * Vive en Inicio y se posiciona absoluta arriba del nav island. El cálculo
- * de `bottom` espeja la lógica de _layout.tsx (ISLAND_HEIGHT + bottomGap)
- * para que la barra siempre quede pegada al nav, integrada visualmente.
- * Sólo se renderiza cuando el user está en Inicio porque vive dentro del
- * tree de HomeScreen.
+ * Vive en Inicio y se posiciona absoluta arriba del nav island, espejando
+ * su tratamiento glassmorphism (mismo BlurView, tint, borde y radio) para
+ * que se lea como otra "fila" del sistema de nav y no como una isla
+ * suelta flotando arriba. Espacio de 4px contra el nav — apenas el
+ * suficiente para que se distingan como pieces separadas pero del mismo
+ * sistema. Solo se renderiza cuando el user está en Inicio.
  */
 function HomeActionBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
+  const isDark = mode === "dark";
   const navBottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
-  const bottom = navBottomGap + NAV_ISLAND_HEIGHT + 8;
+  const bottom = navBottomGap + NAV_ISLAND_HEIGHT + 4;
 
   return (
     <View
@@ -572,35 +575,58 @@ function HomeActionBar() {
         { bottom, left: NAV_SIDE_GAP, right: NAV_SIDE_GAP },
       ]}
     >
-      <Tap
-        style={[s.actionBarPrimary, { backgroundColor: c.ink }]}
-        haptic="medium"
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/transfer",
-            params: { mode: "deposit" },
-          })
-        }
-      >
-        <Feather name="arrow-down-left" size={15} color={c.bg} />
-        <Text style={[s.actionBarText, { color: c.bg }]}>Ingresar</Text>
-      </Tap>
-      <Tap
+      <BlurView
+        tint={isDark ? "dark" : "light"}
+        intensity={Platform.OS === "ios" ? 60 : 90}
         style={[
-          s.actionBarSecondary,
-          { backgroundColor: c.surface, borderColor: c.border },
+          s.actionBarBlur,
+          {
+            backgroundColor: isDark
+              ? "rgba(18, 18, 18, 0.70)"
+              : "rgba(250, 250, 250, 0.78)",
+            borderColor: isDark
+              ? "rgba(255, 255, 255, 0.06)"
+              : "rgba(0, 0, 0, 0.06)",
+          },
         ]}
-        haptic="light"
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/transfer",
-            params: { mode: "send" },
-          })
-        }
       >
-        <Feather name="arrow-up-right" size={15} color={c.text} />
-        <Text style={[s.actionBarText, { color: c.text }]}>Enviar</Text>
-      </Tap>
+        <Tap
+          style={s.actionSeg}
+          haptic="medium"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "deposit" },
+            })
+          }
+        >
+          <Feather name="arrow-down-left" size={16} color={c.text} />
+          <Text style={[s.actionSegText, { color: c.text }]}>Ingresar</Text>
+        </Tap>
+        <View
+          style={[
+            s.actionDivider,
+            {
+              backgroundColor: isDark
+                ? "rgba(255, 255, 255, 0.10)"
+                : "rgba(0, 0, 0, 0.08)",
+            },
+          ]}
+        />
+        <Tap
+          style={s.actionSeg}
+          haptic="light"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "send" },
+            })
+          }
+        >
+          <Feather name="arrow-up-right" size={16} color={c.text} />
+          <Text style={[s.actionSegText, { color: c.text }]}>Enviar</Text>
+        </Tap>
+      </BlurView>
     </View>
   );
 }
@@ -1254,42 +1280,36 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Action bar flotante (Ingresar / Enviar) sobre el nav island. */
+  /* Action bar flotante (Ingresar / Enviar) sobre el nav island.
+     Espeja el glass del nav: BlurView, mismo tint/borde/radio. */
   actionBarWrap: {
     position: "absolute",
-    flexDirection: "row",
-    gap: 10,
   },
-  actionBarPrimary: {
-    flex: 1,
+  actionBarBlur: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 52,
-    borderRadius: radius.pill,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  actionBarSecondary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 52,
+    alignItems: "stretch",
+    height: 56,
     borderRadius: radius.pill,
     borderWidth: 1,
+    overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  actionBarText: {
+  actionSeg: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  actionDivider: {
+    width: StyleSheet.hairlineWidth,
+    marginVertical: 12,
+  },
+  actionSegText: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
