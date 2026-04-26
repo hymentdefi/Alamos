@@ -509,23 +509,12 @@ function BaseHome() {
                   style={[
                     s.rangePill,
                     active && { backgroundColor: chartColor },
-                    r === "live" && s.rangePillLive,
                   ]}
                   hitSlop={8}
                 >
-                  {r === "live" ? (
-                    <>
-                      <Animated.View
-                        style={[
-                          s.liveDot,
-                          { backgroundColor: fg, opacity: livePulse },
-                        ]}
-                      />
-                      <Text style={[s.rangeText, { color: fg }]}>Live</Text>
-                    </>
-                  ) : (
-                    <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
-                  )}
+                  <Text style={[s.rangeText, { color: fg }]}>
+                    {r === "live" ? "LIVE" : r}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -1570,11 +1559,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: radius.pill,
-  },
-  rangePillLive: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
   },
   rangeText: {
     fontFamily: fontFamily[700],
