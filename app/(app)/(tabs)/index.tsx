@@ -19,7 +19,7 @@ import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { Tap } from "../../../lib/components/Tap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
@@ -348,7 +348,7 @@ function BaseHome() {
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={s.topActions}>
           <Tap
-            style={[s.topBtn, { backgroundColor: BRAND_GREEN }]}
+            style={[s.giftBtn, { backgroundColor: BRAND_GREEN }]}
             onPress={() =>
               Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
@@ -357,7 +357,9 @@ function BaseHome() {
             hitSlop={8}
             haptic="medium"
           >
-            <Feather name="gift" size={18} color="#FFFFFF" />
+            {/* Anillo interior para el feel "halo" del icono de referencia */}
+            <View style={s.giftRing} pointerEvents="none" />
+            <Ionicons name="gift" size={20} color="#FFFFFF" />
           </Tap>
           <Tap
             style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
@@ -1225,6 +1227,24 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+  },
+  giftBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  giftRing: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.32)",
   },
   heroDivider: {
     height: StyleSheet.hairlineWidth,
