@@ -48,7 +48,7 @@ import { AlamosLogo } from "../../../lib/components/Logo";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
-type Range = "1min" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
+type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 type TabId = "dinero" | "portfolio";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
@@ -62,11 +62,11 @@ const BRAND_GREEN = "#5ac43e";
 const NAV_ISLAND_HEIGHT = 68;
 const NAV_SIDE_GAP = 16;
 
-const ranges: Range[] = ["1min", "1H", "1D", "1S", "1M", "3M", "YTD"];
+const ranges: Range[] = ["live", "1H", "1D", "1S", "1M", "3M", "YTD"];
 
 /** Variación % por rango — determina el trend y color del chart. */
 const rangeChanges: Record<Range, number> = {
-  "1min": 0.08,
+  live: 0.08,
   "1H": 0.42,
   "1D": 1.96,
   "1S": 3.24,
@@ -239,10 +239,53 @@ function BaseHome() {
   // chart del período (la serie de puntos se genera en base a este).
   const total = arsTotal + usdTotal * USD_RATE;
 
+  // Tick para el modo Live: cada ~3s rotamos el seed y forzamos
+  // re-render para que el chart "respire" y el último punto se mueva.
+  // Solo corre cuando estás en Inicio + range==="live" — pausa al
+  // cambiar de tab o de rango para no quemar batería.
+  const [liveTick, setLiveTick] = useState(0);
+  useEffect(() => {
+    if (range !== "live" || !isFocused) return;
+    const id = setInterval(() => setLiveTick((t) => t + 1), 3000);
+    return () => clearInterval(id);
+  }, [range, isFocused]);
+
   const series = useMemo(
-    () => generateSeries(total, rangeChanges[range], `home-${range}`),
-    [total, range],
+    () =>
+      generateSeries(
+        total,
+        rangeChanges[range],
+        range === "live" ? `home-live-${liveTick}` : `home-${range}`,
+      ),
+    [total, range, liveTick],
   );
+
+  // Pulse continuo del puntito de Live — corre solo cuando hace falta.
+  const livePulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (range !== "live") {
+      livePulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, {
+          toValue: 0.35,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(livePulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [range, livePulse]);
 
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
@@ -419,7 +462,23 @@ function BaseHome() {
               {formatPct(displayPct)}
             </Text>
             <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-            <Text style={[s.timeLabel, { color: c.textMuted }]}>{timeLabel}</Text>
+            {range === "live" && scrubIndex == null ? (
+              <View style={s.liveLabelInline}>
+                <Animated.View
+                  style={[
+                    s.liveDot,
+                    { backgroundColor: trendColor, opacity: livePulse },
+                  ]}
+                />
+                <Text style={[s.timeLabel, { color: c.textMuted }]}>
+                  en vivo
+                </Text>
+              </View>
+            ) : (
+              <Text style={[s.timeLabel, { color: c.textMuted }]}>
+                {timeLabel}
+              </Text>
+            )}
           </View>
 
           <View style={[s.chartWrap, { marginTop: 18 }]}>
@@ -439,6 +498,7 @@ function BaseHome() {
           <View style={s.rangeRow}>
             {ranges.map((r) => {
               const active = r === range;
+              const fg = active ? c.bg : chartColor;
               return (
                 <Pressable
                   key={r}
@@ -449,19 +509,23 @@ function BaseHome() {
                   style={[
                     s.rangePill,
                     active && { backgroundColor: chartColor },
+                    r === "live" && s.rangePillLive,
                   ]}
                   hitSlop={8}
                 >
-                  <Text
-                    style={[
-                      s.rangeText,
-                      {
-                        color: active ? c.bg : chartColor,
-                      },
-                    ]}
-                  >
-                    {r}
-                  </Text>
+                  {r === "live" ? (
+                    <>
+                      <Animated.View
+                        style={[
+                          s.liveDot,
+                          { backgroundColor: fg, opacity: livePulse },
+                        ]}
+                      />
+                      <Text style={[s.rangeText, { color: fg }]}>Live</Text>
+                    </>
+                  ) : (
+                    <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
+                  )}
                 </Pressable>
               );
             })}
@@ -581,8 +645,8 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
 
 function rangeSubtitle(r: Range): string {
   switch (r) {
-    case "1min":
-      return "último minuto";
+    case "live":
+      return "en vivo";
     case "1H":
       return "última hora";
     case "1D":
@@ -601,7 +665,7 @@ function rangeSubtitle(r: Range): string {
 function indexLabel(r: Range, index: number, length: number): string {
   const t = 1 - index / (length - 1);
   switch (r) {
-    case "1min": {
+    case "live": {
       const s = Math.round(t * 60);
       if (s === 0) return "ahora";
       if (s === 1) return "hace 1s";
@@ -1507,10 +1571,25 @@ const s = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
+  rangePillLive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   rangeText: {
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  liveLabelInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   groupBlock: {
     paddingHorizontal: 20,
