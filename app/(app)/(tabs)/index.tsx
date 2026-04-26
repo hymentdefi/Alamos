@@ -1244,7 +1244,7 @@ const s = StyleSheet.create({
     bottom: 4,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.32)",
+    borderColor: "rgba(255, 255, 255, 0.14)",
   },
   heroDivider: {
     height: StyleSheet.hairlineWidth,
