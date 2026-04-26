@@ -460,7 +460,7 @@ function BaseHome() {
             </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
-              size={58}
+              size={46}
               weight={700}
               prefix={currency === "ARS" ? "$" : "US$"}
             />
