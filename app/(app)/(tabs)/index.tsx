@@ -302,12 +302,6 @@ function BaseHome() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <Text
-          style={[s.topBarGreet, { color: c.textMuted }]}
-          numberOfLines={1}
-        >
-          {greeting}, {firstName}
-        </Text>
         <View style={s.topActions}>
           <Tap
             style={[s.topBtn, { backgroundColor: BRAND_GREEN }]}
@@ -350,6 +344,12 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
+          <Text
+            style={[s.heroGreet, { color: c.textMuted }]}
+            numberOfLines={1}
+          >
+            {greeting}, {firstName}
+          </Text>
           <Pressable
             style={s.amountRow}
             onPress={() => {
@@ -1133,14 +1133,7 @@ const s = StyleSheet.create({
     paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  topBarGreet: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    letterSpacing: -0.15,
-    flex: 1,
-    marginRight: 12,
+    justifyContent: "flex-end",
   },
   topActions: {
     flexDirection: "row",
@@ -1415,6 +1408,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 0,
     paddingBottom: 12,
+  },
+  heroGreet: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    letterSpacing: -0.15,
+    marginBottom: 8,
   },
   amountRow: {
     flexDirection: "row",
