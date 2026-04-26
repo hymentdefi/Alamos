@@ -1413,7 +1413,7 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 15,
     letterSpacing: -0.15,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   amountRow: {
     flexDirection: "row",
