@@ -57,8 +57,8 @@ export default function AlamoScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* ── Card de identidad: fija arriba. No se mueve con el scroll —
-          el usuario siempre ve su nombre + el switch a Pro. */}
+      {/* ── Card de identidad: fija arriba. Layout vertical — perfil
+          (avatar + nombre + email) arriba, switch a Pro abajo. */}
       <View
         style={[
           s.identityCard,
@@ -69,16 +69,13 @@ export default function AlamoScreen() {
           },
         ]}
       >
-        <View style={s.identityLeft}>
-          {/* Avatar: alamos isotipo que cicla entre 12 schemes de
-              color al taparlo. Persiste la elección en SecureStore. */}
-          <AlamosAvatar size={48} />
+        <View style={s.identityTop}>
+          {/* Avatar: inicial del usuario sobre uno de los 12 schemes
+              de color. Tap cicla los colores y persiste en SecureStore. */}
+          <AlamosAvatar size={48} initial={firstName} />
 
           <View style={s.identityNameBlock}>
-            <Text
-              style={[s.userName, { color: c.text }]}
-              numberOfLines={1}
-            >
+            <Text style={[s.userName, { color: c.text }]} numberOfLines={1}>
               {fullName}
             </Text>
             <Text
@@ -90,49 +87,40 @@ export default function AlamoScreen() {
           </View>
         </View>
 
-        {/* Separador vertical sutil entre el perfil y el switch de Pro. */}
+        {/* Separador horizontal entre el bloque de perfil y el switch Pro. */}
         <View
-          style={[s.proDivider, { backgroundColor: c.border }]}
+          style={[s.proDividerH, { backgroundColor: c.border }]}
           pointerEvents="none"
         />
 
         <Pressable
           onPress={() => requestSwitch()}
           style={({ pressed }) => [
-            s.proBtnShadow,
+            s.proRow,
             {
-              opacity: pressed ? 0.65 : 1,
-              transform: [{ scale: pressed ? 0.97 : 1 }],
+              opacity: pressed ? 0.7 : 1,
             },
           ]}
           hitSlop={10}
         >
-          <View style={s.proBtn}>
-            {/* Glow casi blanco detrás del contenido — apenas se
-                insinúa una brisa más clara en diagonal, sin teñir. */}
-            <LinearGradient
-              colors={[
-                "rgba(255, 255, 255, 0)",
-                "rgba(252, 252, 250, 0.25)",
-                "rgba(255, 255, 255, 0)",
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <AlamosLogo variant="lockupShort" tone="light" size={38} />
-            {!isPro ? (
-              <Text style={[s.proBtnAccent, { color: c.greenDark }]}>
-                Pro
-              </Text>
-            ) : null}
-            <Feather
-              name="chevron-right"
-              size={18}
-              color={c.textFaint}
-              style={{ marginLeft: 4 }}
-            />
-          </View>
+          {/* Glow casi blanco detrás del contenido — apenas se
+              insinúa una brisa más clara en diagonal, sin teñir. */}
+          <LinearGradient
+            colors={[
+              "rgba(255, 255, 255, 0)",
+              "rgba(252, 252, 250, 0.25)",
+              "rgba(255, 255, 255, 0)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <AlamosLogo variant="lockupShort" tone="light" size={38} />
+          {!isPro ? (
+            <Text style={[s.proBtnAccent, { color: c.greenDark }]}>Pro</Text>
+          ) : null}
+          <View style={{ flex: 1 }} />
+          <Feather name="chevron-right" size={18} color={c.textFaint} />
         </Pressable>
       </View>
 
@@ -346,12 +334,9 @@ function Divider() {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Card de identidad (avatar + nombre + email a la izq, pill Pro
-     a la der — misma altura). */
+  /* Card de identidad: layout vertical. Arriba perfil (avatar + nombre
+     + email), abajo el switch a Pro como una row tappable full-width. */
   identityCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
     marginHorizontal: 20,
     marginBottom: 22,
     paddingHorizontal: 16,
@@ -359,8 +344,7 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  identityLeft: {
-    flex: 1,
+  identityTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -380,30 +364,18 @@ const s = StyleSheet.create({
     marginTop: 2,
     letterSpacing: -0.05,
   },
-  /* Divider vertical entre el bloque perfil y el switch Pro. */
-  proDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: "stretch",
-    marginVertical: 4,
+  /* Divider horizontal entre perfil y switch Pro. */
+  proDividerH: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 12,
+    marginHorizontal: -16,
   },
-  /* Sombra neutra sutil que envuelve al switch y lo integra con el
-     card, para que no se sienta como un logo flotando sobre blanco. */
-  proBtnShadow: {
-    shadowColor: "#0E0F0C",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-    borderRadius: radius.pill,
-  },
-  proBtn: {
+  /* Row del switch Pro — full width abajo del perfil. */
+  proRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 0,
-    paddingLeft: 10,
-    paddingRight: 4,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
+    gap: 6,
+    paddingVertical: 4,
     overflow: "hidden",
   },
   proBtnAccent: {

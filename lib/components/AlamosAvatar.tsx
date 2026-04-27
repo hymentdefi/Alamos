@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
-import Svg, { Polygon } from "react-native-svg";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
+import { fontFamily } from "../theme";
 
 /**
  * Scheme de color para el avatar. Cada uno tiene esencia — referencia
@@ -159,9 +159,15 @@ interface Props {
   size?: number;
   /** Si la imagen es tap-to-cycle o no. */
   interactive?: boolean;
+  /** Inicial del usuario para mostrar al centro. Default "A". */
+  initial?: string;
 }
 
-export function AlamosAvatar({ size = 48, interactive = true }: Props) {
+export function AlamosAvatar({
+  size = 48,
+  interactive = true,
+  initial = "A",
+}: Props) {
   const [idx, setIdx] = useState(0);
   const scale = useRef(new Animated.Value(1)).current;
   const rotate = useRef(new Animated.Value(0)).current;
@@ -249,27 +255,20 @@ export function AlamosAvatar({ size = 48, interactive = true }: Props) {
         }}
       />
 
-      {/* Isotipo Alamos */}
-      <Svg
-        width={size * 0.66}
-        height={size * 0.66}
-        viewBox="0 0 100 100"
+      {/* Inicial del usuario — color ink del scheme para que sea
+          legible en cualquier fondo (ink siempre tiene contraste con
+          el bg correspondiente). */}
+      <Text
+        style={{
+          fontFamily: fontFamily[800],
+          fontSize: size * 0.5,
+          lineHeight: size * 0.55,
+          letterSpacing: -size * 0.02,
+          color: scheme.ink,
+        }}
       >
-        <Polygon
-          points="38,26 16,86 60,86"
-          stroke={scheme.accent}
-          strokeWidth={7}
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <Polygon
-          points="56,12 29,86 83,86"
-          stroke={scheme.ink}
-          strokeWidth={7}
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </Svg>
+        {(initial || "A").charAt(0).toUpperCase()}
+      </Text>
     </Animated.View>
   );
 
