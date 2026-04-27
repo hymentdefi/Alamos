@@ -72,7 +72,7 @@ export default function AlamoScreen() {
         <View style={s.identityTop}>
           {/* Avatar: inicial del usuario sobre uno de los 12 schemes
               de color. Tap cicla los colores y persiste en SecureStore. */}
-          <AlamosAvatar size={48} initial={firstName} />
+          <AlamosAvatar size={64} initial={firstName} />
 
           <View style={s.identityNameBlock}>
             <Text style={[s.userName, { color: c.text }]} numberOfLines={1}>
@@ -355,14 +355,14 @@ const s = StyleSheet.create({
   },
   userName: {
     fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.35,
+    fontSize: 20,
+    letterSpacing: -0.4,
   },
   userMeta: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: -0.05,
+    fontSize: 14,
+    marginTop: 4,
+    letterSpacing: -0.1,
   },
   /* Divider horizontal entre perfil y switch Pro. */
   proDividerH: {

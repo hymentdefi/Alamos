@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { Animated, Pressable, StyleSheet, Text } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { fontFamily } from "../theme";
@@ -214,9 +213,10 @@ export function AlamosAvatar({
     outputRange: ["-90deg", "90deg"],
   });
 
-  // El specular es un óvalo muy chiquito y desenfocado arriba-izq,
-  // ~30% del tamaño del avatar, que da la ilusión de reflejo de luz.
-  const specularSize = size * 0.48;
+  // Texto contrast-aware: usa scheme.ink (que está pensado para
+  // contrastar con el bg de cada scheme). Para bgs oscuros como noche,
+  // ink es claro; para bgs claros, ink es oscuro.
+  const bg = scheme.bg;
 
   const inner = (
     <Animated.View
@@ -226,38 +226,11 @@ export function AlamosAvatar({
           width: size,
           height: size,
           borderRadius: size / 2,
+          backgroundColor: bg,
           transform: [{ scale }, { rotate: rot }],
         },
       ]}
     >
-      {/* Gradient diagonal de fondo: brillante arriba-izq → profundo
-          abajo-der. Da profundidad 3D. */}
-      <LinearGradient
-        colors={[scheme.bgLight, scheme.bg, scheme.bgDeep]}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0.1, y: 0.05 }}
-        end={{ x: 0.95, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Specular highlight: óvalo con glow que simula reflejo arriba-izq. */}
-      <View
-        style={{
-          position: "absolute",
-          top: size * 0.06,
-          left: size * 0.08,
-          width: specularSize,
-          height: specularSize * 0.7,
-          borderRadius: specularSize,
-          backgroundColor: scheme.glow,
-          transform: [{ rotate: "-20deg" }],
-          opacity: 0.85,
-        }}
-      />
-
-      {/* Inicial del usuario — color ink del scheme para que sea
-          legible en cualquier fondo (ink siempre tiene contraste con
-          el bg correspondiente). */}
       <Text
         style={{
           fontFamily: fontFamily[800],
