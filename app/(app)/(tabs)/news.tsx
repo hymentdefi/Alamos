@@ -693,7 +693,7 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            backgroundColor: c.ink,
+            backgroundColor: "#5ac43e",
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -701,8 +701,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
           },
         ]}
       >
-        <Text style={[hint.text, { color: c.bg }]}>Deslizá para pasar</Text>
-        <Feather name="chevrons-down" size={16} color={c.bg} />
+        <Text style={[hint.text, { color: "#FFFFFF" }]}>
+          Deslizá para pasar
+        </Text>
+        <Feather name="chevrons-down" size={16} color="#FFFFFF" />
       </Animated.View>
     </Animated.View>
   );

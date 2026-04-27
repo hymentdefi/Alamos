@@ -600,13 +600,15 @@ function BaseHome() {
   );
 }
 
-/* ─── Action button: pill estilo Binance, solo texto bold ─── */
+/* ─── Action button: pill estilo Binance con ícono + texto al lado ─── */
 function ActionButton({
+  icon,
   label,
   onPress,
   haptic,
   variant,
 }: {
+  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
@@ -621,6 +623,7 @@ function ActionButton({
       onPress={onPress}
       haptic={haptic}
     >
+      <Feather name={icon} size={14} color={fg} />
       <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
@@ -744,6 +747,7 @@ function Dinero(_: {
       {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
       <View style={s.actionsRow}>
         <ActionButton
+          icon="arrow-down-left"
           label="Ingresar"
           variant="primary"
           haptic="medium"
@@ -755,6 +759,7 @@ function Dinero(_: {
           }
         />
         <ActionButton
+          icon="arrow-up-right"
           label="Enviar"
           variant="secondary"
           haptic="light"
@@ -766,12 +771,14 @@ function Dinero(_: {
           }
         />
         <ActionButton
+          icon="repeat"
           label="Convertir"
           variant="secondary"
           haptic="medium"
           onPress={() => openConvertFrom(undefined)}
         />
         <ActionButton
+          icon="trending-up"
           label="Invertir"
           variant="secondary"
           haptic="medium"
@@ -1551,17 +1558,20 @@ const s = StyleSheet.create({
   },
 
   /* Acciones de Dinero (Ingresar / Enviar / Convertir / Invertir):
-     pills estilo Binance, solo texto bold. Ingresar es primario
+     pills estilo Binance con ícono + texto. Ingresar es primario
      (BRAND_GREEN), el resto secundario (surfaceHover). */
   actionsRow: {
     flexDirection: "row",
     gap: 6,
-    marginBottom: 22,
+    marginTop: 14,
+    marginBottom: 24,
   },
   actionPill: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
     height: 46,
     borderRadius: radius.md,
     paddingHorizontal: 4,
