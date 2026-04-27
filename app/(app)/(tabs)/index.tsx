@@ -559,8 +559,15 @@ function BaseHome() {
           ]}
         />
         <View style={[s.sectionBlock, { marginTop: 24 }]}>
-          <Text style={[s.discoverTitle, { color: c.text }]}>
-            Descubrí más
+          <View style={s.discoverRow}>
+            <AlamoMark size={20} color={BRAND_GREEN} />
+            <Text style={[s.discoverTitle, { color: c.text }]}>
+              Descubrí{" "}
+              <Text style={{ color: BRAND_GREEN }}>más</Text>
+            </Text>
+          </View>
+          <Text style={[s.discoverSub, { color: c.textMuted }]}>
+            Productos pensados para vos
           </Text>
         </View>
 
@@ -2124,11 +2131,23 @@ const s = StyleSheet.create({
     fontSize: 14,
     letterSpacing: -0.2,
   },
-  /* Header "Descubrí más" antes de las CTAs. */
+  /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
+     isotipo verde + acento en "más". */
+  discoverRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   discoverTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontSize: 24,
+    letterSpacing: -0.7,
+  },
+  discoverSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 4,
   },
   /* Invertí en fondos: grid 2x2. */
   fundsGrid: {
