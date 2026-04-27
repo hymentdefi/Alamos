@@ -53,6 +53,7 @@ import {
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { CryptoIcon } from "../../../lib/components/CryptoIcon";
+import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
@@ -550,6 +551,18 @@ function BaseHome() {
         <Dinero byCategory={byCategory} />
 
         <Investments byCategory={byCategory} onOpen={openDetail} />
+
+        <View
+          style={[
+            s.heroDivider,
+            { backgroundColor: c.border, marginTop: 28 },
+          ]}
+        />
+        <View style={[s.sectionBlock, { marginTop: 24 }]}>
+          <Text style={[s.discoverTitle, { color: c.text }]}>
+            Descubrí más
+          </Text>
+        </View>
 
         <Funds />
 
@@ -1456,7 +1469,22 @@ function FundCard({
         { backgroundColor: c.surfaceHover, borderColor: c.border },
       ]}
     >
-      {/* Yield protagonista en su propia row para que no desborde. */}
+      {/* Bandera + 3 alamitos como termómetro de riesgo, arriba. */}
+      <View style={s.fundRiskRow}>
+        <FlagIcon code={flag} size={20} />
+        <View style={[s.flameSep, { backgroundColor: c.borderStrong }]} />
+        <View style={s.flames}>
+          {[1, 2, 3].map((i) => (
+            <AlamoMark
+              key={i}
+              size={14}
+              color={i <= risk ? BRAND_GREEN : c.textFaint}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* Yield debajo de los alamitos. */}
       <View style={s.fundYieldRow}>
         <Text
           style={[s.fundYield, { color: c.greenDark }]}
@@ -1470,21 +1498,6 @@ function FundCard({
             : "—"}
         </Text>
         <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>ANUAL</Text>
-      </View>
-
-      {/* Bandera + 3 alamitos como termómetro de riesgo. */}
-      <View style={s.fundRiskRow}>
-        <FlagIcon code={flag} size={20} />
-        <View style={[s.flameSep, { backgroundColor: c.borderStrong }]} />
-        <View style={s.flames}>
-          {[1, 2, 3].map((i) => (
-            <AlamoMark
-              key={i}
-              size={14}
-              color={i <= risk ? BRAND_GREEN : c.textFaint}
-            />
-          ))}
-        </View>
       </View>
 
       <Text style={[s.fundName, { color: c.text }]} numberOfLines={1}>
@@ -1554,11 +1567,7 @@ function UsMarket() {
         </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.usScrollContent}
-      >
+      <AutoMarquee speed={28} contentStyle={s.marqueeContent}>
         {US_STOCKS.map((stock) => (
           <UsStockCard
             key={stock.ticker}
@@ -1571,7 +1580,7 @@ function UsMarket() {
             }
           />
         ))}
-      </ScrollView>
+      </AutoMarquee>
 
       <UsMarketInfoModal
         visible={infoOpen}
@@ -1798,11 +1807,7 @@ function CryptoMarket() {
         </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.usScrollContent}
-      >
+      <AutoMarquee speed={28} contentStyle={s.marqueeContent}>
         {FEATURED_CRYPTOS.map((crypto) => (
           <CryptoFeatureCard
             key={crypto.ticker}
@@ -1815,7 +1820,7 @@ function CryptoMarket() {
             }
           />
         ))}
-      </ScrollView>
+      </AutoMarquee>
 
       <CryptoMarketInfoModal
         visible={infoOpen}
@@ -2111,6 +2116,12 @@ const s = StyleSheet.create({
     fontSize: 14,
     letterSpacing: -0.2,
   },
+  /* Header "Descubrí más" antes de las CTAs. */
+  discoverTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
+  },
   /* Invertí en fondos: grid 2x2. */
   fundsGrid: {
     flexDirection: "row",
@@ -2170,10 +2181,9 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginBottom: 14,
   },
-  usScrollContent: {
-    paddingHorizontal: 20,
+  marqueeContent: {
     gap: 10,
-    paddingBottom: 4,
+    paddingHorizontal: 5,
   },
   usCard: {
     width: 150,

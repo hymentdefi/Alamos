@@ -14,6 +14,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
+import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 
 const FAVS_FILTER_KEY = "explore:only_favs";
 import {
@@ -409,18 +410,9 @@ function MoversMarquee({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
-
-  // Marquee estático: el usuario scrollea con el dedo. Sacamos el
-  // auto-scroll via RAF porque el scrollTo programático a 60Hz se
-  // estaba comiendo los taps en toda la pantalla de Mercado.
   return (
     <View style={s.marqueeWrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.marqueeTrack}
-        decelerationRate="normal"
-      >
+      <AutoMarquee speed={32} contentStyle={s.marqueeTrack}>
         {movers.map((asset) => {
           const up = asset.change >= 0;
           return (
@@ -455,7 +447,7 @@ function MoversMarquee({
             </Pressable>
           );
         })}
-      </ScrollView>
+      </AutoMarquee>
     </View>
   );
 }
