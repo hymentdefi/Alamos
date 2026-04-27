@@ -1296,6 +1296,7 @@ function Investments({
 function Funds() {
   const { c } = useTheme();
   const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Tomamos los primeros 4 FCIs disponibles para no saturar el home —
   // si querés ver más, vas a Mercado.
@@ -1312,6 +1313,13 @@ function Funds() {
         <Text style={[s.earningsTitle, { color: c.text }]}>
           Invertí en fondos
         </Text>
+        <Pressable
+          hitSlop={10}
+          onPress={() => setInfoOpen(true)}
+          style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
+        >
+          <Feather name="info" size={12} color={c.textSecondary} />
+        </Pressable>
       </View>
 
       <View style={s.fundsGrid}>
@@ -1328,7 +1336,61 @@ function Funds() {
           />
         ))}
       </View>
+
+      <FundsInfoModal
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
+  );
+}
+
+/* ─── Modal de info para FCIs — disclaimer de rendimientos ─── */
+function FundsInfoModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { c } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={[s.modalCard, { backgroundColor: c.surface }]}
+        >
+          <View style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}>
+            <AlamosLogo variant="mark" tone="light" size={36} />
+          </View>
+          <Text style={[s.modalTitle, { color: c.text }]}>
+            Sobre el rendimiento estimado
+          </Text>
+          <Text style={[s.modalBody, { color: c.textSecondary }]}>
+            El % anual estimado se calcula en base al rendimiento histórico
+            del fondo y es referencial. Los rendimientos pasados no
+            garantizan resultados futuros. Cada FCI puede tener distinto
+            riesgo, liquidez (T+0 / T+1) y composición. Antes de invertir,
+            revisá el reglamento de gestión del fondo en su detalle.
+          </Text>
+          <Tap
+            onPress={onClose}
+            haptic="light"
+            style={[s.modalCTA, { backgroundColor: c.ink }]}
+          >
+            <Text style={[s.modalCTAText, { color: c.bg }]}>Entendido</Text>
+          </Tap>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
