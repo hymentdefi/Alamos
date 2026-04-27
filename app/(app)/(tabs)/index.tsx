@@ -600,37 +600,30 @@ function BaseHome() {
   );
 }
 
-/* ─── Action button: pill horizontal con ícono + texto al lado ─── */
+/* ─── Action button: pill estilo Binance, solo texto bold ─── */
 function ActionButton({
-  icon,
   label,
   onPress,
   haptic,
   variant,
 }: {
-  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
   variant: "primary" | "secondary";
 }) {
   const { c } = useTheme();
-  const bg = variant === "primary" ? c.ink : c.surface;
-  const fg = variant === "primary" ? c.bg : c.text;
+  const bg = variant === "primary" ? BRAND_GREEN : c.surfaceHover;
+  const fg = variant === "primary" ? "#FFFFFF" : c.text;
   return (
     <Tap
-      style={[
-        s.actionPill,
-        {
-          backgroundColor: bg,
-          borderColor: variant === "primary" ? c.ink : c.border,
-        },
-      ]}
+      style={[s.actionPill, { backgroundColor: bg }]}
       onPress={onPress}
       haptic={haptic}
     >
-      <Feather name={icon} size={15} color={fg} />
-      <Text style={[s.actionPillText, { color: fg }]}>{label}</Text>
+      <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
+        {label}
+      </Text>
     </Tap>
   );
 }
@@ -748,10 +741,9 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* 3 acciones arriba de todo: Ingresar / Enviar / Convertir. */}
+      {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
       <View style={s.actionsRow}>
         <ActionButton
-          icon="arrow-down-left"
           label="Ingresar"
           variant="primary"
           haptic="medium"
@@ -763,7 +755,6 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="arrow-up-right"
           label="Enviar"
           variant="secondary"
           haptic="light"
@@ -775,11 +766,16 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="repeat"
           label="Convertir"
           variant="secondary"
           haptic="medium"
           onPress={() => openConvertFrom(undefined)}
+        />
+        <ActionButton
+          label="Invertir"
+          variant="secondary"
+          haptic="medium"
+          onPress={() => router.navigate("/(app)/explore" as never)}
         />
       </View>
 
@@ -1554,28 +1550,26 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Acciones de Dinero (Ingresar / Enviar / Convertir): pills
-     horizontales con ícono + texto al lado. Ingresar primario (filled),
-     los otros secundarios (surface con borde). */
+  /* Acciones de Dinero (Ingresar / Enviar / Convertir / Invertir):
+     pills estilo Binance, solo texto bold. Ingresar es primario
+     (BRAND_GREEN), el resto secundario (surfaceHover). */
   actionsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     marginBottom: 22,
   },
   actionPill: {
     flex: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    height: 46,
+    borderRadius: radius.md,
+    paddingHorizontal: 4,
   },
   actionPillText: {
     fontFamily: fontFamily[700],
     fontSize: 13,
-    letterSpacing: -0.15,
+    letterSpacing: -0.2,
   },
   /* Earnings accounts block (estilo ARQ) */
   earningsBlock: {
