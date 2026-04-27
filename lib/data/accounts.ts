@@ -38,7 +38,7 @@ export const accounts: Account[] = [
     id: "usd-ar",
     currency: "USD",
     country: "AR",
-    location: "Cuenta argentina · MEP",
+    location: "Cuenta argentina",
     balance: 850,
     yield: { label: "% anual", pct: 4.2 },
   },
@@ -53,7 +53,7 @@ export const accounts: Account[] = [
   {
     id: "usdt-crypto",
     currency: "USDT",
-    location: "Wallet crypto",
+    location: "Crypto",
     balance: 580,
     yield: { label: "% APY", pct: 8.4 },
   },
