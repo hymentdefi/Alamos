@@ -1936,9 +1936,9 @@ const s = StyleSheet.create({
   },
   portfolioTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 42,
-    lineHeight: 46,
-    letterSpacing: -1.8,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -1.6,
     marginBottom: 4,
   },
   amountRow: {
