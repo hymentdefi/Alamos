@@ -30,12 +30,10 @@ import {
   fontFamily,
   radius,
   spacing,
-  type ThemeColors,
 } from "../../../lib/theme";
 import {
   assets,
   assetIconCode,
-  categoryLabels,
   formatARS,
   formatPct,
   type Asset,
@@ -582,18 +580,7 @@ function BaseHome() {
 
         <View style={[s.heroDivider, { backgroundColor: c.border }]} />
 
-        <View style={s.investmentsHead}>
-          <Text style={[s.investmentsTitle, { color: c.text }]}>
-            Tus inversiones
-          </Text>
-        </View>
-        <Portfolio
-          byCategory={byCategory}
-          onOpen={openDetail}
-          rangePct={displayPct}
-          rangeIsUp={displayIsUp}
-          rangeLabel={timeLabel}
-        />
+        <Investments byCategory={byCategory} onOpen={openDetail} />
 
       </ScrollView>
     </View>
@@ -1255,148 +1242,54 @@ function EarningsInfoModal({
   );
 }
 
-/* ─── Portfolio: activos financieros con métricas y distribución ─── */
-function Portfolio({
+/* ─── Tus inversiones: lista plana de holdings (sin grupos por categoría) ─── */
+function Investments({
   byCategory,
   onOpen,
-  rangePct,
-  rangeIsUp,
-  rangeLabel,
 }: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
   onOpen: (a: Asset) => void;
-  /** Rendimiento % del período seleccionado en el chart de arriba. */
-  rangePct: number;
-  rangeIsUp: boolean;
-  /** Etiqueta del período (ej. "hoy", "esta semana", "ahora" en scrub). */
-  rangeLabel: string;
 }) {
   const { c } = useTheme();
 
-  const portfolioEntries = useMemo(
-    () => byCategory.filter(([cat]) => cat !== "efectivo"),
-    [byCategory],
-  );
-  // Se sigue usando para calcular la proporción por categoría en el
-  // bloque de distribución — no se muestra como monto al usuario.
-  const invested = useMemo(
-    () => portfolioEntries.reduce((sum, [, data]) => sum + data.total, 0),
-    [portfolioEntries],
-  );
-
-  if (portfolioEntries.length === 0) {
-    return (
-      <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
-        <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
-          Todavía no tenés inversiones. Entrá a Mercado para empezar.
-        </Text>
-      </View>
-    );
-  }
+  // Aplanamos todos los held no-cash y ordenamos por valor de tenencia
+  // (la posición más grande primero), así el orden no depende de la
+  // categoría.
+  const items = useMemo(() => {
+    const all = byCategory
+      .filter(([cat]) => cat !== "efectivo")
+      .flatMap(([, data]) => data.items);
+    return all
+      .slice()
+      .sort(
+        (a, b) =>
+          b.price * (b.qty ?? 1) - a.price * (a.qty ?? 1),
+      );
+  }, [byCategory]);
 
   return (
-    <View>
-      {/* Header minimalista: sólo rendimiento % del período — el monto
-          invertido ya está implícito en el chart de arriba. */}
-      <View style={s.portfolioHero}>
-        <Text style={[s.summaryEyebrow, { color: c.textMuted }]}>
-          RENDIMIENTO
-        </Text>
-        <View style={s.portfolioPctRow}>
-          <Text
-            style={[
-              s.portfolioPctTri,
-              { color: rangeIsUp ? c.greenDark : c.red },
-            ]}
-          >
-            {rangeIsUp ? "▲" : "▼"}
-          </Text>
-          <Text
-            style={[
-              s.portfolioPct,
-              { color: rangeIsUp ? c.greenDark : c.red },
-            ]}
-          >
-            {formatPct(rangePct)}
-          </Text>
-          <Text style={[s.portfolioPctPeriod, { color: c.textMuted }]}>
-            {rangeLabel}
+    <View style={s.sectionBlock}>
+      <View style={s.earningsBlock}>
+        <View style={s.earningsHead}>
+          <Text style={[s.earningsTitle, { color: c.text }]}>
+            Tus inversiones
           </Text>
         </View>
-      </View>
 
-      {/* Listado agrupado por categoría */}
-      {portfolioEntries.map(([cat, data]) => (
-        <View key={cat} style={s.groupBlock}>
-          <View style={s.groupHead}>
-            <Text style={[s.groupTitle, { color: c.text }]}>
-              {categoryLabels[cat]}
-            </Text>
-            <Text style={[s.groupValue, { color: c.textMuted }]}>
-              {formatARS(data.total)}
-            </Text>
-          </View>
-          {data.items.map((asset, i) => (
+        {items.length > 0 ? (
+          items.map((asset, i) => (
             <AssetRow
               key={asset.ticker}
               asset={asset}
               first={i === 0}
               onPress={() => onOpen(asset)}
             />
-          ))}
-        </View>
-      ))}
-
-      {/* Distribución al final — contextualiza las tenencias */}
-      <View style={s.distBlock}>
-        <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
-          DISTRIBUCIÓN
-        </Text>
-        <View style={[s.barTrack, { backgroundColor: c.surfaceSunken }]}>
-          {portfolioEntries.map(([cat, data], i) => {
-            const pct = (data.total / invested) * 100;
-            return (
-              <View
-                key={cat}
-                style={{
-                  width: `${pct}%`,
-                  backgroundColor: allocationColor(cat, c),
-                  borderTopLeftRadius: i === 0 ? radius.pill : 0,
-                  borderBottomLeftRadius: i === 0 ? radius.pill : 0,
-                  borderTopRightRadius:
-                    i === portfolioEntries.length - 1 ? radius.pill : 0,
-                  borderBottomRightRadius:
-                    i === portfolioEntries.length - 1 ? radius.pill : 0,
-                }}
-              />
-            );
-          })}
-        </View>
-
-        <View style={{ gap: 10, marginTop: 16 }}>
-          {portfolioEntries.map(([cat, data]) => {
-            const pct = (data.total / invested) * 100;
-            return (
-              <View key={cat} style={s.legendRow}>
-                <View
-                  style={[
-                    s.legendDot,
-                    { backgroundColor: allocationColor(cat, c) },
-                  ]}
-                />
-                <Text style={[s.legendLabel, { color: c.text }]}>
-                  {categoryLabels[cat]}
-                </Text>
-                <Text style={[s.legendPct, { color: c.textMuted }]}>
-                  {pct.toFixed(1)}%
-                </Text>
-                <Text style={[s.legendValue, { color: c.text }]}>
-                  {formatARS(data.total)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+          ))
+        ) : (
+          <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
+            Todavía no tenés inversiones. Entrá a Mercado para empezar.
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -1487,24 +1380,6 @@ function AssetRow({
   );
 }
 
-function allocationColor(cat: AssetCategory, c: ThemeColors): string {
-  switch (cat) {
-    case "efectivo":
-      return c.green;
-    case "cedears":
-      return c.ink;
-    case "bonos":
-      return c.greenDark;
-    case "fci":
-      return c.textSecondary;
-    case "acciones":
-      return c.textMuted;
-    case "obligaciones":
-      return c.borderStrong;
-    default:
-      return c.textFaint;
-  }
-}
 
 const s = StyleSheet.create({
   /* ─── Core layout ─── */
@@ -1553,31 +1428,10 @@ const s = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
-  /* Header de "Tus inversiones" — mismo estilo que earningsHead/Title
-     en Dinero para que las dos secciones se lean como hermanas. */
-  investmentsHead: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
-  investmentsTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.4,
-  },
-
-  /* Secciones editoriales (Dinero / Portfolio) */
+  /* Secciones editoriales (Dinero / Inversiones) */
   sectionBlock: {
     marginTop: 8,
     paddingHorizontal: 20,
-  },
-  sectionEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
   },
 
   /* Acciones de Dinero (Ingresar / Enviar / Convertir / Invertir):
@@ -1906,40 +1760,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Portfolio hero */
-  portfolioHero: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  summaryEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 6,
-  },
-  portfolioPctRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 4,
-  },
-  portfolioPctTri: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-  },
-  portfolioPct: {
-    fontFamily: fontFamily[800],
-    fontSize: 32,
-    letterSpacing: -1.1,
-  },
-  portfolioPctPeriod: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginLeft: 2,
-  },
   emptyPortfolio: {
     fontFamily: fontFamily[500],
     fontSize: 14,
@@ -1947,10 +1767,6 @@ const s = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
     paddingVertical: 24,
-  },
-  distBlock: {
-    paddingHorizontal: 20,
-    marginTop: 32,
   },
   heroBlock: {
     paddingHorizontal: 24,
@@ -2071,26 +1887,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  groupBlock: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  groupHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: 4,
-  },
-  groupTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  groupValue: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -2128,40 +1924,5 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
-  },
-  barTrack: {
-    height: 10,
-    borderRadius: radius.pill,
-    flexDirection: "row",
-    overflow: "hidden",
-  },
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendLabel: {
-    flex: 1,
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
-  },
-  legendPct: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    minWidth: 46,
-    textAlign: "right",
-  },
-  legendValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    minWidth: 92,
-    textAlign: "right",
-    letterSpacing: -0.15,
   },
 });
