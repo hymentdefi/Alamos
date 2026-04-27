@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Tabs, useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import {
   Animated,
   Easing,
@@ -60,7 +60,14 @@ const TAB_ROUTES: TabRoute[] = [
  */
 function FloatingTabBar() {
   const router = useRouter();
-  const [activeIndex, setActiveIndex] = useState(0);
+  const segments = useSegments();
+  // El active index se deriva de los segments de Expo Router para que
+  // cualquier navegación (botones internos, deep links, etc.) sincronice
+  // la pill activa con la ruta real. Antes era state local y se
+  // desincronizaba al navegar desde fuera del tab bar.
+  const tabSegment = (segments[2] as string | undefined) ?? "index";
+  const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
+  const activeIndex = segIdx >= 0 ? segIdx : 0;
   const { mode, c } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
@@ -69,7 +76,6 @@ function FloatingTabBar() {
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     if (index === activeIndex) return;
-    setActiveIndex(index);
     router.navigate(route.href as never);
   };
 
