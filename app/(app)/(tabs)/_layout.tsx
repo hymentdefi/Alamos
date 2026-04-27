@@ -227,7 +227,14 @@ export default function TabsLayout() {
     <View style={styles.root}>
       <Tabs
         backBehavior="none"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          // Slide horizontal entre tabs según la dirección (i.e. de Inicio
+          // a Mercado entra de derecha a izquierda; volver entra de
+          // izquierda a derecha). Implementado nativamente por
+          // react-navigation/bottom-tabs v7.
+          animation: "shift",
+        }}
         tabBar={() => null}
       >
         <Tabs.Screen name="index" />
