@@ -1476,7 +1476,7 @@ const s = StyleSheet.create({
   },
   actionPillText: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: -0.2,
   },
   /* Earnings accounts block (estilo ARQ) */
