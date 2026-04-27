@@ -444,7 +444,7 @@ function BaseHome() {
             </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
-              size={46}
+              size={38}
               weight={700}
               prefix={currency === "ARS" ? "$" : "US$"}
             />
@@ -2173,9 +2173,9 @@ const s = StyleSheet.create({
   },
   portfolioTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 46,
-    lineHeight: 50,
-    letterSpacing: -2,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -1.6,
     marginBottom: 4,
   },
   amountRow: {
