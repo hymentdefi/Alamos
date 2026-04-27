@@ -804,9 +804,15 @@ function Dinero(_: {
 
       {cryptoAccounts.length > 0 ? (
         <View style={[s.earningsBlock, { marginTop: 28 }]}>
-          <View style={s.earningsHead}>
+          <Pressable
+            style={s.earningsHead}
+            onPress={() => router.push("/(app)/crypto-detail")}
+            hitSlop={8}
+          >
             <Text style={[s.earningsTitle, { color: c.text }]}>Crypto</Text>
-          </View>
+            <View style={{ flex: 1 }} />
+            <Feather name="chevron-right" size={18} color={c.textMuted} />
+          </Pressable>
 
           {cryptoAccounts.map((a, i) => (
             <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
@@ -1260,6 +1266,7 @@ function Investments({
   onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
+  const router = useRouter();
 
   // Aplanamos todos los held no-cash y ordenamos por valor de tenencia
   // (la posición más grande primero), así el orden no depende de la
@@ -1279,11 +1286,17 @@ function Investments({
   return (
     <View style={[s.sectionBlock, { marginTop: 28 }]}>
       <View style={s.earningsBlock}>
-        <View style={s.earningsHead}>
+        <Pressable
+          style={s.earningsHead}
+          onPress={() => router.push("/(app)/investments-detail")}
+          hitSlop={8}
+        >
           <Text style={[s.earningsTitle, { color: c.text }]}>
             Tus inversiones
           </Text>
-        </View>
+          <View style={{ flex: 1 }} />
+          <Feather name="chevron-right" size={18} color={c.textMuted} />
+        </Pressable>
 
         {items.length > 0 ? (
           items.map((asset, i) => (
