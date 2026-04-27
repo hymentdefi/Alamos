@@ -549,6 +549,8 @@ function BaseHome() {
 
         <Investments byCategory={byCategory} onOpen={openDetail} />
 
+        <Funds />
+
       </ScrollView>
     </View>
   );
@@ -1281,6 +1283,123 @@ function Investments({
   );
 }
 
+/* ─── Invertí en fondos: CTA grid 2x2 con FCIs ─── */
+/**
+ * Section al final del home que invita a invertir en FCIs (a los
+ * argentinos les encanta esto). Cada card muestra:
+ *   - Bandera del país de denominación de la moneda (ARS / USD)
+ *   - "Termómetro" de riesgo en flames (1-3) según el tipo de FCI
+ *   - Yield anual estimado (`annualYield` del asset)
+ *   - Nombre del fondo
+ * Tap → abre el detalle del activo (mismo flow que tappear desde Mercado).
+ */
+function Funds() {
+  const { c } = useTheme();
+  const router = useRouter();
+
+  // Tomamos los primeros 4 FCIs disponibles para no saturar el home —
+  // si querés ver más, vas a Mercado.
+  const funds = useMemo(
+    () => assets.filter((a) => a.category === "fci").slice(0, 4),
+    [],
+  );
+
+  if (funds.length === 0) return null;
+
+  return (
+    <View style={[s.sectionBlock, { marginTop: 28 }]}>
+      <View style={s.earningsHead}>
+        <Text style={[s.earningsTitle, { color: c.text }]}>
+          Invertí en fondos
+        </Text>
+      </View>
+
+      <View style={s.fundsGrid}>
+        {funds.map((f) => (
+          <FundCard
+            key={f.ticker}
+            asset={f}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/detail",
+                params: { ticker: f.ticker },
+              })
+            }
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** Determina el nivel de riesgo (1-3) en base al tipo de FCI. */
+function fciRiskLevel(asset: Asset): 1 | 2 | 3 {
+  const sub = asset.subLabel.toLowerCase();
+  if (sub.includes("renta variable")) return 3;
+  if (sub.includes("renta fija")) return 2;
+  return 1;
+}
+
+/** Bandera correspondiente al fondo (todos son AR por ahora pero
+ *  preparado para extender cuando se sumen FCIs en USD). */
+function fciFlag(asset: Asset): "AR" | "US" {
+  return asset.subLabel.toLowerCase().includes("dólar") ? "US" : "AR";
+}
+
+function FundCard({
+  asset,
+  onPress,
+}: {
+  asset: Asset;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const risk = fciRiskLevel(asset);
+  const flag = fciFlag(asset);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.fundCard,
+        { backgroundColor: c.surfaceHover, borderColor: c.border },
+      ]}
+    >
+      <View style={s.fundCardTop}>
+        <FlagIcon code={flag} size={24} />
+        <View style={[s.flameSep, { backgroundColor: c.borderStrong }]} />
+        <View style={s.flames}>
+          {[1, 2, 3].map((i) => (
+            <Ionicons
+              key={i}
+              name="flame"
+              size={13}
+              color={i <= risk ? "#1E40AF" : c.textFaint}
+            />
+          ))}
+        </View>
+        <View style={{ flex: 1 }} />
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={[s.fundYield, { color: c.greenDark }]}>
+            {asset.annualYield != null
+              ? `${asset.annualYield.toLocaleString("es-AR", {
+                  maximumFractionDigits: 2,
+                })}%`
+              : "—"}
+          </Text>
+          <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>
+            Anual estimado
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[s.fundName, { color: c.text }]} numberOfLines={1}>
+        {asset.name}
+      </Text>
+    </Pressable>
+  );
+}
+
 function AssetRow({
   asset,
   first,
@@ -1455,6 +1574,51 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
+  },
+  /* Invertí en fondos: grid 2x2. */
+  fundsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  fundCard: {
+    flexBasis: "48%",
+    flexGrow: 1,
+    padding: 14,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 14,
+  },
+  fundCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  flameSep: {
+    width: StyleSheet.hairlineWidth,
+    height: 14,
+    marginHorizontal: 2,
+  },
+  flames: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 1,
+  },
+  fundYield: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  fundYieldLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 10,
+    letterSpacing: -0.05,
+    marginTop: 1,
+  },
+  fundName: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.25,
   },
   /* Earnings accounts block (estilo ARQ) */
   earningsBlock: {
