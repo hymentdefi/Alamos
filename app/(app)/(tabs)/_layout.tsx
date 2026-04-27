@@ -42,7 +42,6 @@ const TAB_ROUTES: TabRoute[] = [
   { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news },
   { name: "alamo",   href: "/(app)/alamo",   title: "Tu Álamo",path: tabPaths.alamo },
 ];
-}
 
 /**
  * Nav bar flotante glassmorphism con backdrop blur extendido.
@@ -177,14 +176,14 @@ interface TabItemProps {
 
 function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProps) {
   const pillOpacity = useRef(
-    new RNAnimated.Value(focused ? 1 : 0),
+    new Animated.Value(focused ? 1 : 0),
   ).current;
 
   useEffect(() => {
-    RNAnimated.timing(pillOpacity, {
+    Animated.timing(pillOpacity, {
       toValue: focused ? 1 : 0,
       duration: focused ? 260 : 180,
-      easing: RNEasing.out(RNEasing.quad),
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   }, [focused, pillOpacity]);
@@ -200,7 +199,7 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
       style={styles.tabItem}
       hitSlop={6}
     >
-      <RNAnimated.View
+      <Animated.View
         pointerEvents="none"
         style={[
           styles.activePill,
