@@ -546,8 +546,6 @@ function BaseHome() {
               );
             })}
           </View>
-
-          <HeroActions />
         </View>
 
         {/* Divider sutil entre el bloque del chart y las tabs */}
@@ -578,49 +576,8 @@ function BaseHome() {
   );
 }
 
-/* ─── Botones de acción del hero: Ingresar / Enviar / Invertir ─── */
-/**
- * Estilo Cash App / Wise: ícono en círculo arriba + label debajo, los
- * tres con el mismo peso visual. Va abajo del rango pills, antes del
- * divider de tabs.
- */
-function HeroActions() {
-  const router = useRouter();
-  return (
-    <View style={s.heroActionsRow}>
-      <HeroActionButton
-        icon="arrow-down-left"
-        label="Ingresar"
-        haptic="medium"
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/transfer",
-            params: { mode: "deposit" },
-          })
-        }
-      />
-      <HeroActionButton
-        icon="arrow-up-right"
-        label="Enviar"
-        haptic="light"
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/transfer",
-            params: { mode: "send" },
-          })
-        }
-      />
-      <HeroActionButton
-        icon="trending-up"
-        label="Invertir"
-        haptic="medium"
-        onPress={() => router.navigate("/(app)/explore" as never)}
-      />
-    </View>
-  );
-}
-
-function HeroActionButton({
+/* ─── Action button (ícono circular + label) — vive en Dinero ─── */
+function ActionButton({
   icon,
   label,
   onPress,
@@ -633,11 +590,11 @@ function HeroActionButton({
 }) {
   const { c } = useTheme();
   return (
-    <Tap style={s.heroActionItem} onPress={onPress} haptic={haptic}>
-      <View style={[s.heroActionCircle, { backgroundColor: c.surfaceHover }]}>
+    <Tap style={s.actionItem} onPress={onPress} haptic={haptic}>
+      <View style={[s.actionCircle, { backgroundColor: c.surfaceHover }]}>
         <Feather name={icon} size={20} color={c.text} />
       </View>
-      <Text style={[s.heroActionLabel, { color: c.text }]}>{label}</Text>
+      <Text style={[s.actionLabel, { color: c.text }]}>{label}</Text>
     </Tap>
   );
 }
@@ -784,11 +741,12 @@ function TabStrip({
   );
 }
 
-/* ─── Dinero: cuentas (ARS, USD MEP, USD USA, USDT) + Convertir ─── */
+/* ─── Dinero: 3 acciones + cuentas (ARS, USD MEP, USD USA, USDT) ─── */
 function Dinero(_: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
 }) {
   const { c } = useTheme();
+  const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertFromId, setConvertFromId] = useState<AccountId | undefined>();
@@ -800,6 +758,38 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
+      {/* 3 acciones arriba de todo: Ingresar / Enviar / Convertir. */}
+      <View style={s.actionsRow}>
+        <ActionButton
+          icon="arrow-down-left"
+          label="Ingresar"
+          haptic="medium"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "deposit" },
+            })
+          }
+        />
+        <ActionButton
+          icon="arrow-up-right"
+          label="Enviar"
+          haptic="light"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "send" },
+            })
+          }
+        />
+        <ActionButton
+          icon="repeat"
+          label="Convertir"
+          haptic="medium"
+          onPress={() => openConvertFrom(undefined)}
+        />
+      </View>
+
       <View style={s.earningsBlock}>
         <View style={s.earningsHead}>
           <Text style={[s.earningsTitle, { color: c.text }]}>Tus cuentas</Text>
@@ -810,15 +800,6 @@ function Dinero(_: {
           >
             <Feather name="info" size={12} color={c.textSecondary} />
           </Pressable>
-          <View style={{ flex: 1 }} />
-          <Tap
-            haptic="medium"
-            onPress={() => openConvertFrom(undefined)}
-            style={[s.convertBtn, { backgroundColor: c.ink }]}
-          >
-            <Feather name="repeat" size={13} color={c.bg} />
-            <Text style={[s.convertBtnText, { color: c.bg }]}>Convertir</Text>
-          </Tap>
         </View>
 
         {accounts.map((a, i) => (
@@ -1771,29 +1752,28 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Botones de acción del hero (Ingresar / Enviar / Invertir): ícono
-     circular + label debajo, los tres equidistribuidos. Estilo Cash App. */
-  heroActionsRow: {
+  /* Acciones de Dinero (Ingresar / Enviar / Convertir): ícono circular
+     + label, los tres equidistribuidos. Estilo Cash App. */
+  actionsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
     paddingHorizontal: 8,
-    marginTop: 22,
-    marginBottom: 4,
+    marginBottom: 22,
   },
-  heroActionItem: {
+  actionItem: {
     alignItems: "center",
     gap: 8,
     paddingVertical: 6,
     paddingHorizontal: 14,
   },
-  heroActionCircle: {
+  actionCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
-  heroActionLabel: {
+  actionLabel: {
     fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.1,
@@ -1863,19 +1843,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
-  },
-  convertBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-  },
-  convertBtnText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
   },
 
   /* ConvertSheet */
