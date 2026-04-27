@@ -1332,12 +1332,20 @@ function Funds() {
   );
 }
 
-/** Determina el nivel de riesgo (1-3) en base al tipo de FCI. */
-function fciRiskLevel(asset: Asset): 1 | 2 | 3 {
+/** Etiqueta de riesgo del FCI según el tipo de instrumento subyacente. */
+function fciRisk(asset: Asset): {
+  level: 1 | 2 | 3;
+  label: string;
+  color: string;
+} {
   const sub = asset.subLabel.toLowerCase();
-  if (sub.includes("renta variable")) return 3;
-  if (sub.includes("renta fija")) return 2;
-  return 1;
+  if (sub.includes("renta variable")) {
+    return { level: 3, label: "Agresivo", color: "#C83B3B" };
+  }
+  if (sub.includes("renta fija")) {
+    return { level: 2, label: "Moderado", color: "#D97706" };
+  }
+  return { level: 1, label: "Conservador", color: "#2E7D32" };
 }
 
 /** Bandera correspondiente al fondo (todos son AR por ahora pero
@@ -1354,7 +1362,7 @@ function FundCard({
   onPress: () => void;
 }) {
   const { c } = useTheme();
-  const risk = fciRiskLevel(asset);
+  const risk = fciRisk(asset);
   const flag = fciFlag(asset);
 
   return (
@@ -1365,37 +1373,42 @@ function FundCard({
         { backgroundColor: c.surfaceHover, borderColor: c.border },
       ]}
     >
-      <View style={s.fundCardTop}>
-        <FlagIcon code={flag} size={24} />
-        <View style={[s.flameSep, { backgroundColor: c.borderStrong }]} />
-        <View style={s.flames}>
-          {[1, 2, 3].map((i) => (
-            <Ionicons
-              key={i}
-              name="flame"
-              size={13}
-              color={i <= risk ? "#1E40AF" : c.textFaint}
-            />
-          ))}
-        </View>
-        <View style={{ flex: 1 }} />
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={[s.fundYield, { color: c.greenDark }]}>
-            {asset.annualYield != null
-              ? `${asset.annualYield.toLocaleString("es-AR", {
-                  maximumFractionDigits: 2,
-                })}%`
-              : "—"}
-          </Text>
-          <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>
-            Anual estimado
-          </Text>
-        </View>
+      {/* Yield protagonista arriba — el número es lo que vende. */}
+      <View>
+        <Text style={[s.fundYield, { color: c.greenDark }]}>
+          {asset.annualYield != null
+            ? `${asset.annualYield.toLocaleString("es-AR", {
+                maximumFractionDigits: 2,
+              })}%`
+            : "—"}
+        </Text>
+        <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>
+          Anual estimado
+        </Text>
       </View>
 
       <Text style={[s.fundName, { color: c.text }]} numberOfLines={1}>
         {asset.name}
       </Text>
+
+      {/* Footer con bandera + nivel de riesgo en pill de texto.
+          Cambia los flames de Cocos por algo más legible / accesible. */}
+      <View style={s.fundCardFooter}>
+        <FlagIcon code={flag} size={18} />
+        <View
+          style={[
+            s.riskPill,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <View
+            style={[s.riskDot, { backgroundColor: risk.color }]}
+          />
+          <Text style={[s.riskLabel, { color: c.textSecondary }]}>
+            {risk.label}
+          </Text>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -1587,38 +1600,47 @@ const s = StyleSheet.create({
     padding: 14,
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 14,
+    gap: 12,
   },
-  fundCardTop: {
+  fundYield: {
+    fontFamily: fontFamily[800],
+    fontSize: 24,
+    letterSpacing: -0.6,
+  },
+  fundYieldLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+  fundName: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.25,
+  },
+  fundCardFooter: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  flameSep: {
-    width: StyleSheet.hairlineWidth,
-    height: 14,
-    marginHorizontal: 2,
-  },
-  flames: {
+  riskPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 1,
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  fundYield: {
+  riskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  riskLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.2,
-  },
-  fundYieldLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: -0.05,
-    marginTop: 1,
-  },
-  fundName: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.25,
   },
   /* Earnings accounts block (estilo ARQ) */
   earningsBlock: {
