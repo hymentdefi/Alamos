@@ -347,7 +347,7 @@ const s = StyleSheet.create({
   identityTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
   },
   identityNameBlock: {
     flex: 1,
