@@ -1436,7 +1436,7 @@ function FundCard({
               key={i}
               name="flame"
               size={13}
-              color={i <= risk ? "#1E40AF" : c.textFaint}
+              color={i <= risk ? BRAND_GREEN : c.textFaint}
             />
           ))}
         </View>
