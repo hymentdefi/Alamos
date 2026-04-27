@@ -742,6 +742,17 @@ function Dinero(_: {
     setConvertOpen(true);
   }, []);
 
+  // Separamos fiat (ARS / USD) de crypto (USDT) — cada uno se renderiza
+  // como su propia sección con título distinto.
+  const fiatAccounts = useMemo(
+    () => accounts.filter((a) => a.currency !== "USDT"),
+    [],
+  );
+  const cryptoAccounts = useMemo(
+    () => accounts.filter((a) => a.currency === "USDT"),
+    [],
+  );
+
   return (
     <View style={s.sectionBlock}>
       {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
@@ -788,7 +799,7 @@ function Dinero(_: {
 
       <View style={s.earningsBlock}>
         <View style={s.earningsHead}>
-          <Text style={[s.earningsTitle, { color: c.text }]}>Tus cuentas</Text>
+          <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
           <Pressable
             hitSlop={10}
             onPress={() => setInfoOpen(true)}
@@ -798,10 +809,22 @@ function Dinero(_: {
           </Pressable>
         </View>
 
-        {accounts.map((a, i) => (
+        {fiatAccounts.map((a, i) => (
           <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
         ))}
       </View>
+
+      {cryptoAccounts.length > 0 ? (
+        <View style={[s.earningsBlock, { marginTop: 28 }]}>
+          <View style={s.earningsHead}>
+            <Text style={[s.earningsTitle, { color: c.text }]}>Crypto</Text>
+          </View>
+
+          {cryptoAccounts.map((a, i) => (
+            <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
+          ))}
+        </View>
+      ) : null}
 
       <EarningsInfoModal
         visible={infoOpen}
