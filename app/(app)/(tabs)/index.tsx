@@ -1444,13 +1444,13 @@ function FundCard({
         <View style={{ alignItems: "flex-end" }}>
           <Text style={[s.fundYield, { color: c.greenDark }]}>
             {asset.annualYield != null
-              ? `${asset.annualYield.toLocaleString("es-AR", {
+              ? `+${asset.annualYield.toLocaleString("es-AR", {
                   maximumFractionDigits: 2,
                 })}%`
               : "—"}
           </Text>
           <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>
-            Anual estimado
+            ANUAL
           </Text>
         </View>
       </View>
