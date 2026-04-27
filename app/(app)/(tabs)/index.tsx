@@ -93,13 +93,10 @@ function BaseHome() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [range, setRange] = useState<Range>("1D");
-  const [currency, setCurrency] = useState<"ARS" | "USD" | "USDT">("ARS");
-  // Cycla forward: ARS → USD → USDT → ARS.
+  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
   const toggleCurrency = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
-    setCurrency((p) =>
-      p === "ARS" ? "USD" : p === "USD" ? "USDT" : "ARS",
-    );
+    setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
   }, []);
 
   // Coachmark: la primera vez que el user entra al Inicio, mostramos
@@ -150,13 +147,7 @@ function BaseHome() {
       onPanResponderRelease: (_, g) => {
         if (Math.abs(g.dx) > 40) {
           Haptics.selectionAsync().catch(() => {});
-          setCurrency((p) => {
-            // Swipe izquierda → next, swipe derecha → previous.
-            if (g.dx < 0) {
-              return p === "ARS" ? "USD" : p === "USD" ? "USDT" : "ARS";
-            }
-            return p === "ARS" ? "USDT" : p === "USDT" ? "USD" : "ARS";
-          });
+          setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
         }
       },
     }),
@@ -327,12 +318,10 @@ function BaseHome() {
   const scrubRatio = total > 0 ? current / total : 1;
   const arsCurrent = arsTotal * scrubRatio;
   const usdCurrent = usdTotal * scrubRatio;
-  const usdtCurrent = usdtTotal * scrubRatio;
   // Delta del período expresado en cada moneda.
   const deltaRatio = total > 0 ? displayDelta / total : 0;
   const arsDelta = arsTotal * deltaRatio;
   const usdDelta = usdTotal * deltaRatio;
-  const usdtDelta = usdtTotal * deltaRatio;
 
   const timeLabel =
     scrubIndex != null
@@ -434,14 +423,7 @@ function BaseHome() {
             {...currencyPan.panHandlers}
           >
             <View style={s.flagWrap} pointerEvents="none">
-              {currency === "USDT" ? (
-                <MoneyIcon variant="usdt" size={26} />
-              ) : (
-                <FlagIcon
-                  code={currency === "ARS" ? "AR" : "US"}
-                  size={26}
-                />
-              )}
+              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
               {/* Indicador persistente — chip chiquito con icono de
                   swap en el borde. Le avisa al ojo que la bandera es
                   interactiva. */}
@@ -455,22 +437,10 @@ function BaseHome() {
               </View>
             </View>
             <AmountDisplay
-              value={
-                currency === "ARS"
-                  ? arsCurrent
-                  : currency === "USD"
-                  ? usdCurrent
-                  : usdtCurrent
-              }
+              value={currency === "ARS" ? arsCurrent : usdCurrent}
               size={42}
               weight={700}
-              prefix={
-                currency === "ARS"
-                  ? "$"
-                  : currency === "USD"
-                  ? "US$"
-                  : "USDT"
-              }
+              prefix={currency === "ARS" ? "$" : "US$"}
             />
             {/* Coachmark: sólo la primera vez, pill debajo de la
                 bandera con una flecha para arriba indicando que sea
@@ -504,11 +474,7 @@ function BaseHome() {
             <Text style={[s.deltaText, { color: trendColor }]}>
               {currency === "ARS"
                 ? formatARS(Math.abs(arsDelta))
-                : currency === "USD"
-                ? `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
-                    maximumFractionDigits: 2,
-                  })}`
-                : `USDT ${Math.abs(usdtDelta).toLocaleString("es-AR", {
+                : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
                     maximumFractionDigits: 2,
                   })}`}
             </Text>
@@ -810,8 +776,7 @@ function Dinero(_: {
             hitSlop={8}
           >
             <Text style={[s.earningsTitle, { color: c.text }]}>Crypto</Text>
-            <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={18} color={c.textMuted} />
+            <Feather name="chevron-right" size={16} color={c.textFaint} />
           </Pressable>
 
           {cryptoAccounts.map((a, i) => (
@@ -1294,8 +1259,7 @@ function Investments({
           <Text style={[s.earningsTitle, { color: c.text }]}>
             Tus inversiones
           </Text>
-          <View style={{ flex: 1 }} />
-          <Feather name="chevron-right" size={18} color={c.textMuted} />
+          <Feather name="chevron-right" size={16} color={c.textFaint} />
         </Pressable>
 
         {items.length > 0 ? (
