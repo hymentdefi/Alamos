@@ -1567,7 +1567,11 @@ function UsMarket() {
         </Text>
       </View>
 
-      <AutoMarquee speed={28} contentStyle={s.marqueeContent}>
+      <AutoMarquee
+        speed={28}
+        style={s.marqueeWrap}
+        contentStyle={s.marqueeContent}
+      >
         {US_STOCKS.map((stock) => (
           <UsStockCard
             key={stock.ticker}
@@ -1807,7 +1811,11 @@ function CryptoMarket() {
         </Text>
       </View>
 
-      <AutoMarquee speed={28} contentStyle={s.marqueeContent}>
+      <AutoMarquee
+        speed={28}
+        style={s.marqueeWrap}
+        contentStyle={s.marqueeContent}
+      >
         {FEATURED_CRYPTOS.map((crypto) => (
           <CryptoFeatureCard
             key={crypto.ticker}
@@ -2181,9 +2189,12 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginBottom: 14,
   },
+  marqueeWrap: {
+    marginHorizontal: 20,
+  },
   marqueeContent: {
     gap: 10,
-    paddingHorizontal: 5,
+    paddingRight: 10,
   },
   usCard: {
     width: 150,
