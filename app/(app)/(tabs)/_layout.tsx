@@ -39,7 +39,7 @@ import AlamoScreen from "./alamo";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const ISLAND_HEIGHT = 54;
+const ISLAND_HEIGHT = 64;
 const ISLAND_SIDE_GAP = 16;
 // Mini-fade DENTRO del backdrop, contado desde el top hacia abajo.
 // El backdrop arranca exactamente en el top del nav (no se extiende
@@ -344,15 +344,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 5,
-    gap: 2,
+    paddingVertical: 7,
+    gap: 3,
   },
   activePill: {
     position: "absolute",
-    top: 5,
-    bottom: 5,
-    left: 5,
-    right: 5,
+    top: 6,
+    bottom: 6,
+    left: 6,
+    right: 6,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
