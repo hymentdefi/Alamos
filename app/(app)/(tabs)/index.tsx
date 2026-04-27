@@ -563,7 +563,14 @@ function BaseHome() {
             <AlamoMark size={20} color={BRAND_GREEN} />
             <Text style={[s.discoverTitle, { color: c.text }]}>
               Descubrí{" "}
-              <Text style={{ color: BRAND_GREEN }}>más</Text>
+              <Text
+                style={{
+                  color: c.greenDark,
+                  fontFamily: fontFamily[800],
+                }}
+              >
+                más
+              </Text>
             </Text>
           </View>
           <Text style={[s.discoverSub, { color: c.textMuted }]}>
