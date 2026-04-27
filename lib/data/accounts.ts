@@ -9,9 +9,14 @@ export type AccountId = "ars-ar" | "usd-ar" | "usd-us" | "usdt-crypto";
 
 export type AccountCurrency = "ARS" | "USD" | "USDT";
 
+/** País donde reside la cuenta. Wallets crypto no tienen país. */
+export type AccountCountry = "AR" | "US";
+
 export interface Account {
   id: AccountId;
   currency: AccountCurrency;
+  /** País donde reside la cuenta — undefined para wallets crypto. */
+  country?: AccountCountry;
   /** Etiqueta del lugar — se muestra debajo del ticker en la lista. */
   location: string;
   /** Saldo en la moneda nativa de la cuenta. */
@@ -24,6 +29,7 @@ export const accounts: Account[] = [
   {
     id: "ars-ar",
     currency: "ARS",
+    country: "AR",
     location: "Cuenta argentina",
     balance: 342180,
     yield: { label: "% TNA", pct: 38.5 },
@@ -31,6 +37,7 @@ export const accounts: Account[] = [
   {
     id: "usd-ar",
     currency: "USD",
+    country: "AR",
     location: "Cuenta argentina · MEP",
     balance: 850,
     yield: { label: "% anual", pct: 4.2 },
@@ -38,6 +45,7 @@ export const accounts: Account[] = [
   {
     id: "usd-us",
     currency: "USD",
+    country: "US",
     location: "Cuenta USA",
     balance: 1240,
     yield: { label: "% APY", pct: 4.7 },

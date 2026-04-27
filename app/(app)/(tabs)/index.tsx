@@ -576,25 +576,37 @@ function BaseHome() {
   );
 }
 
-/* ─── Action button (ícono circular + label) — vive en Dinero ─── */
+/* ─── Action button: pill horizontal con ícono + texto al lado ─── */
 function ActionButton({
   icon,
   label,
   onPress,
   haptic,
+  variant,
 }: {
   icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
+  variant: "primary" | "secondary";
 }) {
   const { c } = useTheme();
+  const bg = variant === "primary" ? c.ink : c.surface;
+  const fg = variant === "primary" ? c.bg : c.text;
   return (
-    <Tap style={s.actionItem} onPress={onPress} haptic={haptic}>
-      <View style={[s.actionCircle, { backgroundColor: c.surfaceHover }]}>
-        <Feather name={icon} size={20} color={c.text} />
-      </View>
-      <Text style={[s.actionLabel, { color: c.text }]}>{label}</Text>
+    <Tap
+      style={[
+        s.actionPill,
+        {
+          backgroundColor: bg,
+          borderColor: variant === "primary" ? c.ink : c.border,
+        },
+      ]}
+      onPress={onPress}
+      haptic={haptic}
+    >
+      <Feather name={icon} size={15} color={fg} />
+      <Text style={[s.actionPillText, { color: fg }]}>{label}</Text>
     </Tap>
   );
 }
@@ -763,6 +775,7 @@ function Dinero(_: {
         <ActionButton
           icon="arrow-down-left"
           label="Ingresar"
+          variant="primary"
           haptic="medium"
           onPress={() =>
             router.push({
@@ -774,6 +787,7 @@ function Dinero(_: {
         <ActionButton
           icon="arrow-up-right"
           label="Enviar"
+          variant="secondary"
           haptic="light"
           onPress={() =>
             router.push({
@@ -785,6 +799,7 @@ function Dinero(_: {
         <ActionButton
           icon="repeat"
           label="Convertir"
+          variant="secondary"
           haptic="medium"
           onPress={() => openConvertFrom(undefined)}
         />
@@ -825,11 +840,50 @@ function Dinero(_: {
   );
 }
 
-/** Devuelve qué variant de MoneyIcon usar para cada moneda. */
-function moneyVariantFor(c: Account["currency"]): "ars" | "usd" | "usdt" {
-  if (c === "ARS") return "ars";
-  if (c === "USDT") return "usdt";
-  return "usd";
+/**
+ * Avatar de la cuenta: bandera/Tether de la moneda como ícono principal,
+ * con un pin chiquito abajo a la derecha que indica el país donde reside
+ * la cuenta. Wallets crypto no tienen país → no se renderiza el pin.
+ */
+function AccountAvatar({
+  account,
+  size = 40,
+}: {
+  account: Account;
+  size?: number;
+}) {
+  const main =
+    account.currency === "ARS" ? (
+      <FlagIcon code="AR" size={size} />
+    ) : account.currency === "USD" ? (
+      <FlagIcon code="US" size={size} />
+    ) : (
+      <MoneyIcon variant="usdt" size={size} />
+    );
+
+  // Pin: ~40% del avatar, con anillo blanco para separar visualmente.
+  const pinOuter = Math.round(size * 0.42);
+  const pinInner = pinOuter - 3;
+
+  return (
+    <View style={{ width: size, height: size }}>
+      {main}
+      {account.country ? (
+        <View
+          style={[
+            s.accountPin,
+            {
+              width: pinOuter,
+              height: pinOuter,
+              borderRadius: pinOuter / 2,
+            },
+          ]}
+        >
+          <FlagIcon code={account.country} size={pinInner} />
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 function AccountRow({
@@ -859,7 +913,7 @@ function AccountRow({
         },
       ]}
     >
-      <MoneyIcon variant={moneyVariantFor(account.currency)} size={40} />
+      <AccountAvatar account={account} size={40} />
       <View style={{ flex: 1 }}>
         <View style={s.earningsTickerRow}>
           <Text style={[s.earningsTicker, { color: c.text }]}>
@@ -1010,10 +1064,7 @@ function ConvertSheet({
                       { borderBottomColor: c.border },
                     ]}
                   >
-                    <MoneyIcon
-                      variant={moneyVariantFor(a.currency)}
-                      size={36}
-                    />
+                    <AccountAvatar account={a} size={36} />
                     <View style={{ flex: 1 }}>
                       <Text
                         style={[s.convertPickerCurrency, { color: c.text }]}
@@ -1053,10 +1104,7 @@ function ConvertSheet({
                   { backgroundColor: c.surfaceHover, borderColor: c.border },
                 ]}
               >
-                <MoneyIcon
-                  variant={moneyVariantFor(from.currency)}
-                  size={36}
-                />
+                <AccountAvatar account={from} size={36} />
                 <View style={{ flex: 1 }}>
                   <Text style={[s.convertSelCurrency, { color: c.text }]}>
                     {from.currency}
@@ -1088,7 +1136,7 @@ function ConvertSheet({
                   { backgroundColor: c.surfaceHover, borderColor: c.border },
                 ]}
               >
-                <MoneyIcon variant={moneyVariantFor(to.currency)} size={36} />
+                <AccountAvatar account={to} size={36} />
                 <View style={{ flex: 1 }}>
                   <Text style={[s.convertSelCurrency, { color: c.text }]}>
                     {to.currency}
@@ -1752,31 +1800,38 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Acciones de Dinero (Ingresar / Enviar / Convertir): ícono circular
-     + label, los tres equidistribuidos. Estilo Cash App. */
+  /* Acciones de Dinero (Ingresar / Enviar / Convertir): pills
+     horizontales con ícono + texto al lado. Ingresar primario (filled),
+     los otros secundarios (surface con borde). */
   actionsRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
+    gap: 8,
     marginBottom: 22,
   },
-  actionItem: {
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  actionCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  actionPill: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
-  actionLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.1,
+  actionPillText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  /* Pin de país abajo a la derecha del avatar de cuenta. Anillo blanco
+     para separarlo visualmente del ícono principal. */
+  accountPin: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   /* Earnings accounts block (estilo ARQ) */
