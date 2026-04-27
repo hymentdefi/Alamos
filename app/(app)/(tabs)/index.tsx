@@ -1572,16 +1572,20 @@ const s = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
-  /* Header de "Tus inversiones" — sección abajo de Dinero. */
+  /* Header de "Tus inversiones" — mismo estilo que earningsHead/Title
+     en Dinero para que las dos secciones se lean como hermanas. */
   investmentsHead: {
     paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 4,
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
   },
   investmentsTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontSize: 18,
+    letterSpacing: -0.4,
   },
 
   /* Secciones editoriales (Dinero / Portfolio) */
