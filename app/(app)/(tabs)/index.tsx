@@ -578,8 +578,6 @@ function BaseHome() {
 
         <Dinero byCategory={byCategory} />
 
-        <View style={[s.heroDivider, { backgroundColor: c.border }]} />
-
         <Investments byCategory={byCategory} onOpen={openDetail} />
 
       </ScrollView>
@@ -1268,7 +1266,7 @@ function Investments({
   }, [byCategory]);
 
   return (
-    <View style={s.sectionBlock}>
+    <View style={[s.sectionBlock, { marginTop: 28 }]}>
       <View style={s.earningsBlock}>
         <View style={s.earningsHead}>
           <Text style={[s.earningsTitle, { color: c.text }]}>
