@@ -29,7 +29,6 @@ import {
   useTheme,
   fontFamily,
   radius,
-  spacing,
 } from "../../../lib/theme";
 import {
   assets,
@@ -1888,8 +1887,8 @@ const s = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: spacing.lg,
-    gap: 14,
+    paddingVertical: 14,
+    gap: 12,
   },
   rowIcon: {
     width: 40,
@@ -1905,8 +1904,8 @@ const s = StyleSheet.create({
   },
   rowTicker: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    letterSpacing: -0.25,
   },
   rowSub: {
     fontFamily: fontFamily[500],
