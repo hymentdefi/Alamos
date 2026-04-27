@@ -539,7 +539,7 @@ function BaseHome() {
             <Sparkline
               series={series}
               color={chartColor}
-              height={260}
+              height={330}
               withFill={false}
               sheen
               strokeWidth={1.4}
