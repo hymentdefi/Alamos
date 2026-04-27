@@ -1,21 +1,14 @@
 import { useEffect, useRef } from "react";
-import { useRouter, useSegments } from "expo-router";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import {
-  Animated as RNAnimated,
-  Dimensions,
-  Easing as RNEasing,
+  Animated,
+  Easing,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import MaskedView from "@react-native-masked-view/masked-view";
@@ -23,21 +16,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
-
-// Importamos cada tab como componente directo. Esto bypassa el
-// `<Tabs>` de expo-router (que sólo monta una a la vez sin slide
-// horizontal) y nos permite renderizar las 4 simultáneas en un
-// horizontal Animated.View para hacer el slide smooth full-screen.
-// Trade-off: `useIsFocused` y el evento `tabPress` ya no funcionan
-// en los screens (las 4 están "focuseadas" siempre). Las animaciones
-// internas siguen corriendo en las 4 — perf cost menor en devices
-// modernos.
-import IndexScreen from "./index";
-import ExploreScreen from "./explore";
-import NewsScreen from "./news";
-import AlamoScreen from "./alamo";
-
-const { width: SCREEN_W } = Dimensions.get("window");
 
 const ISLAND_HEIGHT = 64;
 const ISLAND_SIDE_GAP = 16;
@@ -56,68 +34,14 @@ type TabRoute = {
   href: string;
   title: string;
   path: (typeof tabPaths)[keyof typeof tabPaths];
-  Component: React.ComponentType;
 };
 
 const TAB_ROUTES: TabRoute[] = [
-  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home,    Component: IndexScreen },
-  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets, Component: ExploreScreen },
-  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news,    Component: NewsScreen },
-  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Álamo",path: tabPaths.alamo,   Component: AlamoScreen },
+  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home },
+  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets },
+  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news },
+  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Álamo",path: tabPaths.alamo },
 ];
-
-/**
- * Pager horizontal que monta las 4 tabs y desliza entre ellas.
- *
- * `activeIndex` se deriva de `useSegments()` — cualquier navegación
- * (tap en pill, deep link, router.navigate desde un botón) actualiza
- * la URL primero y el pager reacciona animando el translateX.
- *
- * Usa Reanimated (UI thread) para que la animación NO se vea afectada
- * por el JS thread (las 4 pantallas tienen animaciones propias —
- * sparkline tick, gift pulse, news refresh — y con el Animated API de
- * RN cualquier delay del JS se traducía en un slide a tirones).
- *
- * Duración 460ms con ease-in-out cubic — entrada y salida suaves para
- * que se sienta como "deslizándose tranqui" en vez de un cut con tween.
- */
-function TabPager() {
-  const segments = useSegments();
-  const tabSegment = (segments[2] as string | undefined) ?? "index";
-  const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
-  const activeIndex = segIdx >= 0 ? segIdx : 0;
-
-  const translateX = useSharedValue(-activeIndex * SCREEN_W);
-
-  useEffect(() => {
-    translateX.value = withTiming(-activeIndex * SCREEN_W, {
-      duration: 460,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-    });
-  }, [activeIndex, translateX]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.pager,
-        { width: SCREEN_W * TAB_ROUTES.length },
-        animStyle,
-      ]}
-    >
-      {TAB_ROUTES.map((r) => {
-        const Comp = r.Component;
-        return (
-          <View key={r.name} style={styles.page}>
-            <Comp />
-          </View>
-        );
-      })}
-    </Animated.View>
-  );
 }
 
 /**
@@ -302,7 +226,16 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
 export default function TabsLayout() {
   return (
     <View style={styles.root}>
-      <TabPager />
+      <Tabs
+        backBehavior="none"
+        screenOptions={{ headerShown: false }}
+        tabBar={() => null}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="explore" />
+        <Tabs.Screen name="news" />
+        <Tabs.Screen name="alamo" />
+      </Tabs>
       <FloatingTabBar />
     </View>
   );
@@ -310,14 +243,6 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  pager: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  page: {
-    width: SCREEN_W,
-    flex: 1,
-  },
   container: {
     position: "absolute",
     left: 0,
