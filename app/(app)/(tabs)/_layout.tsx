@@ -63,7 +63,7 @@ const TAB_ROUTES: TabRoute[] = [
   { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home,    Component: IndexScreen },
   { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets, Component: ExploreScreen },
   { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news,    Component: NewsScreen },
-  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Alamo",path: tabPaths.alamo,   Component: AlamoScreen },
+  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Álamo",path: tabPaths.alamo,   Component: AlamoScreen },
 ];
 
 /**
