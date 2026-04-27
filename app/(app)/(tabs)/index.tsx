@@ -551,6 +551,8 @@ function BaseHome() {
 
         <Funds />
 
+        <UsMarket />
+
       </ScrollView>
     </View>
   );
@@ -1462,6 +1464,200 @@ function FundCard({
   );
 }
 
+/* ─── Acciones de USA: CTA con horizontal scroll de stocks ─── */
+/**
+ * Promo del feature de comprar acciones del mercado USA directamente
+ * (NYSE/NASDAQ) sin pasar por CEDEAR. Layout distinto al de Funds —
+ * horizontal scroll en vez de grid — para que se diferencie visualmente
+ * dentro del mismo home.
+ *
+ * Tap en cualquier stock → detail flow del ticker (mock: usa el mismo
+ * detail que el CEDEAR equivalente; cuando conectemos backend real,
+ * pasaríamos `?market=us` para diferenciar la cotización).
+ */
+
+interface UsStock {
+  ticker: string;
+  name: string;
+  /** Precio en USD (sin conversión local). */
+  priceUsd: number;
+  /** Variación del día en %. */
+  change: number;
+}
+
+const US_STOCKS: UsStock[] = [
+  { ticker: "NVDA", name: "NVIDIA", priceUsd: 142.83, change: 3.42 },
+  { ticker: "AAPL", name: "Apple", priceUsd: 201.0, change: 2.4 },
+  { ticker: "TSLA", name: "Tesla", priceUsd: 240.5, change: -2.17 },
+  { ticker: "MSFT", name: "Microsoft", priceUsd: 415.3, change: 0.43 },
+  { ticker: "GOOGL", name: "Alphabet", priceUsd: 163.75, change: 1.14 },
+  { ticker: "META", name: "Meta", priceUsd: 510.2, change: 0.91 },
+  { ticker: "AMZN", name: "Amazon", priceUsd: 237.25, change: 1.52 },
+];
+
+function UsMarket() {
+  const { c } = useTheme();
+  const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
+
+  return (
+    <View style={{ marginTop: 28 }}>
+      <View style={[s.sectionBlock, { marginTop: 0 }]}>
+        <View style={s.earningsHead}>
+          <Text style={[s.earningsTitle, { color: c.text }]}>
+            Acciones de USA
+          </Text>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setInfoOpen(true)}
+            style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
+          >
+            <Feather name="info" size={12} color={c.textSecondary} />
+          </Pressable>
+        </View>
+        <Text style={[s.usSubtitle, { color: c.textMuted }]}>
+          Comprá Apple, NVIDIA, Tesla y +5.000 acciones del mercado
+          estadounidense — directo, sin pasar por CEDEARs.
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.usScrollContent}
+      >
+        {US_STOCKS.map((stock) => (
+          <UsStockCard
+            key={stock.ticker}
+            stock={stock}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/detail",
+                params: { ticker: stock.ticker },
+              })
+            }
+          />
+        ))}
+      </ScrollView>
+
+      <UsMarketInfoModal
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
+    </View>
+  );
+}
+
+function UsStockCard({
+  stock,
+  onPress,
+}: {
+  stock: UsStock;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const up = stock.change >= 0;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.usCard,
+        { backgroundColor: c.surfaceHover, borderColor: c.border },
+      ]}
+    >
+      <View style={s.usCardTop}>
+        <View style={[s.usCardIcon, { backgroundColor: c.ink }]}>
+          <Text style={[s.usCardIconText, { color: c.bg }]}>
+            {stock.ticker.slice(0, 2)}
+          </Text>
+        </View>
+        <FlagIcon code="US" size={18} />
+      </View>
+
+      <View>
+        <Text style={[s.usCardTicker, { color: c.text }]}>{stock.ticker}</Text>
+        <Text
+          style={[s.usCardName, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {stock.name}
+        </Text>
+      </View>
+
+      <View style={s.usCardChart}>
+        <MiniSparkline
+          series={seriesFromSeed(stock.ticker, 28, up ? "up" : "down")}
+          color={up ? c.greenDark : c.red}
+        />
+      </View>
+
+      <View>
+        <Text style={[s.usCardPrice, { color: c.text }]}>
+          US${" "}
+          {stock.priceUsd.toLocaleString("es-AR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </Text>
+        <Text
+          style={[s.usCardChange, { color: up ? c.greenDark : c.red }]}
+        >
+          {up ? "+" : ""}
+          {stock.change.toFixed(2)}%
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function UsMarketInfoModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { c } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={[s.modalCard, { backgroundColor: c.surface }]}
+        >
+          <View style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}>
+            <FlagIcon code="US" size={42} />
+          </View>
+          <Text style={[s.modalTitle, { color: c.text }]}>
+            Acciones del mercado USA
+          </Text>
+          <Text style={[s.modalBody, { color: c.textSecondary }]}>
+            Acceso directo al NYSE y NASDAQ. Comprás la acción real en
+            dólares, sin pasar por CEDEARs ni tipo de cambio implícito.
+            Disponible para usuarios con cuenta en USD habilitada en
+            Alamos. Liquidez T+1 y comisiones más bajas que la operación
+            local.
+          </Text>
+          <Tap
+            onPress={onClose}
+            haptic="light"
+            style={[s.modalCTA, { backgroundColor: c.ink }]}
+          >
+            <Text style={[s.modalCTAText, { color: c.bg }]}>Entendido</Text>
+          </Tap>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function AssetRow({
   asset,
   first,
@@ -1682,6 +1878,68 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 15,
     letterSpacing: -0.25,
+  },
+  /* Acciones de USA: subtítulo + horizontal scroll de cards. */
+  usSubtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.1,
+    marginBottom: 14,
+  },
+  usScrollContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+    paddingBottom: 4,
+  },
+  usCard: {
+    width: 150,
+    padding: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 10,
+  },
+  usCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  usCardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  usCardIconText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.2,
+  },
+  usCardTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.25,
+  },
+  usCardName: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+  usCardChart: {
+    height: 26,
+  },
+  usCardPrice: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
+  },
+  usCardChange: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 2,
   },
   /* Earnings accounts block (estilo ARQ) */
   earningsBlock: {
