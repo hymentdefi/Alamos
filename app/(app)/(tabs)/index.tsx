@@ -444,7 +444,7 @@ function BaseHome() {
             </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
-              size={38}
+              size={42}
               weight={700}
               prefix={currency === "ARS" ? "$" : "US$"}
             />
@@ -508,8 +508,6 @@ function BaseHome() {
             )}
           </View>
 
-          <HeroActions />
-
           <View style={[s.chartWrap, { marginTop: 18 }]}>
             <Sparkline
               series={series}
@@ -548,6 +546,8 @@ function BaseHome() {
               );
             })}
           </View>
+
+          <HeroActions />
         </View>
 
         {/* Divider sutil entre el bloque del chart y las tabs */}
@@ -578,14 +578,19 @@ function BaseHome() {
   );
 }
 
-/* ─── Botones Ingresar / Enviar inline en el hero ─── */
+/* ─── Botones de acción del hero: Ingresar / Enviar / Invertir ─── */
+/**
+ * Estilo Cash App / Wise: ícono en círculo arriba + label debajo, los
+ * tres con el mismo peso visual. Va abajo del rango pills, antes del
+ * divider de tabs.
+ */
 function HeroActions() {
   const router = useRouter();
-  const { c } = useTheme();
   return (
     <View style={s.heroActionsRow}>
-      <Tap
-        style={[s.heroActionPrimary, { backgroundColor: c.ink }]}
+      <HeroActionButton
+        icon="arrow-down-left"
+        label="Ingresar"
         haptic="medium"
         onPress={() =>
           router.push({
@@ -593,15 +598,10 @@ function HeroActions() {
             params: { mode: "deposit" },
           })
         }
-      >
-        <Feather name="arrow-down-left" size={15} color={c.bg} />
-        <Text style={[s.heroActionText, { color: c.bg }]}>Ingresar</Text>
-      </Tap>
-      <Tap
-        style={[
-          s.heroActionSecondary,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
+      />
+      <HeroActionButton
+        icon="arrow-up-right"
+        label="Enviar"
         haptic="light"
         onPress={() =>
           router.push({
@@ -609,11 +609,36 @@ function HeroActions() {
             params: { mode: "send" },
           })
         }
-      >
-        <Feather name="arrow-up-right" size={15} color={c.text} />
-        <Text style={[s.heroActionText, { color: c.text }]}>Enviar</Text>
-      </Tap>
+      />
+      <HeroActionButton
+        icon="trending-up"
+        label="Invertir"
+        haptic="medium"
+        onPress={() => router.navigate("/(app)/explore" as never)}
+      />
     </View>
+  );
+}
+
+function HeroActionButton({
+  icon,
+  label,
+  onPress,
+  haptic,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  label: string;
+  onPress: () => void;
+  haptic: "medium" | "light";
+}) {
+  const { c } = useTheme();
+  return (
+    <Tap style={s.heroActionItem} onPress={onPress} haptic={haptic}>
+      <View style={[s.heroActionCircle, { backgroundColor: c.surfaceHover }]}>
+        <Feather name={icon} size={20} color={c.text} />
+      </View>
+      <Text style={[s.heroActionLabel, { color: c.text }]}>{label}</Text>
+    </Tap>
   );
 }
 
@@ -1746,35 +1771,32 @@ const s = StyleSheet.create({
     letterSpacing: 1.4,
   },
 
-  /* Botones Ingresar / Enviar inline en el hero, abajo del saldo. */
+  /* Botones de acción del hero (Ingresar / Enviar / Invertir): ícono
+     circular + label debajo, los tres equidistribuidos. Estilo Cash App. */
   heroActionsRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 18,
+    justifyContent: "space-around",
+    paddingHorizontal: 8,
+    marginTop: 22,
+    marginBottom: 4,
   },
-  heroActionPrimary: {
-    flex: 1,
-    flexDirection: "row",
+  heroActionItem: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  heroActionCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: radius.pill,
   },
-  heroActionSecondary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  heroActionText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
+  heroActionLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
 
   /* Earnings accounts block (estilo ARQ) */
@@ -2173,9 +2195,9 @@ const s = StyleSheet.create({
   },
   portfolioTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 38,
-    lineHeight: 42,
-    letterSpacing: -1.6,
+    fontSize: 42,
+    lineHeight: 46,
+    letterSpacing: -1.8,
     marginBottom: 4,
   },
   amountRow: {
