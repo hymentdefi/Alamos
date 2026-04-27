@@ -17,7 +17,13 @@ import { Tap } from "../../lib/components/Tap";
 import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import { AccountAvatar } from "../../lib/components/AccountAvatar";
+import { CryptoIcon } from "../../lib/components/CryptoIcon";
 import { accounts, type AccountId } from "../../lib/data/accounts";
+
+/** Las cuentas fiat disponibles para depositar (excluye crypto — ese
+ *  flow vive en /(app)/crypto-deposit con su propio picker de
+ *  asset+red). */
+type FiatKindId = Exclude<AccountId, "usdt-crypto">;
 
 /** Balances disponibles por moneda — mockeados. */
 const BALANCES = {
@@ -54,57 +60,6 @@ const RECEIVE_WIRE_US = {
   account: "9876543210",
   swift: "CHASUS33XXX",
   memo: "ALAMOS-USR-12345",
-};
-
-/** Redes soportadas para depósitos USDT. */
-interface CryptoNetwork {
-  id: string;
-  label: string;
-  /** Etiqueta corta del protocolo (TRC20, ERC20, etc.) — para warning. */
-  protocol: string;
-  /** Dirección de depósito en esa red. Mock — en prod viene del backend. */
-  address: string;
-  /** Tiempo aproximado para confirmar. */
-  eta: string;
-  /** Comisión típica de la red (display only). */
-  fee: string;
-}
-
-const RECEIVE_CRYPTO: { networks: CryptoNetwork[] } = {
-  networks: [
-    {
-      id: "trc20",
-      label: "Tron",
-      protocol: "TRC20",
-      address: "TXp9N8mE3kP6sZQq7rV2WfJ5HdYn4Lc1aB",
-      eta: "~1 min",
-      fee: "≈ 1 USDT",
-    },
-    {
-      id: "erc20",
-      label: "Ethereum",
-      protocol: "ERC20",
-      address: "0x4f5A2cBd7e91FdA38b3C0a9e21Db88E45fC7aB12",
-      eta: "~3 min",
-      fee: "≈ 3 USDT",
-    },
-    {
-      id: "polygon",
-      label: "Polygon",
-      protocol: "MATIC",
-      address: "0x7c2E9aB4F3D8b51eA0c92Df45a78Bd1cE3F09a98",
-      eta: "~30 seg",
-      fee: "< 0,1 USDT",
-    },
-    {
-      id: "solana",
-      label: "Solana",
-      protocol: "SPL",
-      address: "5qHe8kP3nL9XwT2YzQrV4Bf7mAcRdGpJuN6sWvHt2Wn",
-      eta: "~10 seg",
-      fee: "< 0,01 USDT",
-    },
-  ],
 };
 
 /** Cuentas externas vinculadas del usuario. Por ahora un mock; la idea
@@ -151,13 +106,19 @@ export default function TransferScreen() {
   return <DepositInfo />;
 }
 
-/* ─── Deposit info: picker de cuenta + instrucciones por tipo ─── */
+/* ─── Deposit info: picker fiat + entrada Crypto ─── */
 
 function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [kindId, setKindId] = useState<AccountId>("ars-ar");
+  const fiatAccounts = useMemo(
+    () => accounts.filter((a): a is typeof a & { id: FiatKindId } =>
+      a.currency !== "USDT",
+    ),
+    [],
+  );
+  const [kindId, setKindId] = useState<FiatKindId>("ars-ar");
   // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
   const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
 
@@ -189,12 +150,15 @@ function DepositInfo() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.depositTitle, { color: c.text }]}>
-          ¿A qué cuenta querés ingresar?
+          ¿De dónde viene el dinero?
         </Text>
 
-        {/* Picker 2x2 — cada cuenta es un card. */}
-        <View style={s.kindGrid}>
-          {accounts.map((a) => {
+        {/* Picker fiat — vertical stack, cambia el contenido inline. */}
+        <Text style={[s.depositEyebrow, { color: c.textMuted }]}>
+          PESOS Y DÓLARES
+        </Text>
+        <View style={s.fiatStack}>
+          {fiatAccounts.map((a) => {
             const active = a.id === kindId;
             return (
               <Pressable
@@ -204,40 +168,74 @@ function DepositInfo() {
                   setKindId(a.id);
                 }}
                 style={[
-                  s.kindCard,
+                  s.fiatRow,
                   {
                     backgroundColor: active ? c.surface : c.surfaceHover,
                     borderColor: active ? c.ink : c.border,
                   },
                 ]}
               >
-                <AccountAvatar account={a} size={32} />
+                <AccountAvatar account={a} size={36} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.kindCardTitle, { color: c.text }]}>
+                  <Text style={[s.fiatRowTitle, { color: c.text }]}>
                     {a.currency}
                   </Text>
                   <Text
-                    style={[s.kindCardSub, { color: c.textMuted }]}
+                    style={[s.fiatRowSub, { color: c.textMuted }]}
                     numberOfLines={1}
                   >
                     {a.location}
                   </Text>
                 </View>
+                {active ? (
+                  <Feather name="check" size={18} color={c.text} />
+                ) : null}
               </Pressable>
             );
           })}
         </View>
 
-        {kindId === "usdt" ? (
-          <CryptoDepositCard />
-        ) : kindId === "usd-us" ? (
+        {kindId === "usd-us" ? (
           <WireDepositCard />
         ) : (
           <BankDepositCard
-            kind={kindId}
+            kind={kindId as "ars-ar" | "usd-ar"}
             onPickLinked={setDepositFrom}
           />
         )}
+
+        {/* Entrada Crypto — distinta semántica: navega a su propio screen
+            con asset list + network picker porque la matriz de tokens ×
+            redes no entra en un picker estático. */}
+        <Text
+          style={[
+            s.depositEyebrow,
+            { color: c.textMuted, marginTop: 32 },
+          ]}
+        >
+          CRYPTO
+        </Text>
+        <Pressable
+          onPress={() => router.push("/(app)/crypto-deposit")}
+          style={[
+            s.cryptoEntry,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <CryptoIcon ticker="BTC" iconText="₿" bg="#F7931A" fg="#FFFFFF" size={40} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.cryptoEntryTitle, { color: c.text }]}>
+              Depositar crypto
+            </Text>
+            <Text
+              style={[s.cryptoEntrySub, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              Bitcoin, Ethereum, USDT, USDC y más
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={c.textFaint} />
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -424,121 +422,6 @@ function WireDepositCard() {
 }
 
 /* ─── Card de depósito crypto (USDT, multi-red) ─── */
-function CryptoDepositCard() {
-  const { c } = useTheme();
-  const [networkId, setNetworkId] = useState(RECEIVE_CRYPTO.networks[0].id);
-  const network =
-    RECEIVE_CRYPTO.networks.find((n) => n.id === networkId) ??
-    RECEIVE_CRYPTO.networks[0];
-
-  return (
-    <>
-      <Text style={[s.depositEyebrow, { color: c.text }]}>Elegí la red</Text>
-      <View style={s.networkRow}>
-        {RECEIVE_CRYPTO.networks.map((n) => {
-          const active = n.id === networkId;
-          return (
-            <Pressable
-              key={n.id}
-              onPress={() => {
-                if (n.id !== networkId)
-                  Haptics.selectionAsync().catch(() => {});
-                setNetworkId(n.id);
-              }}
-              style={[
-                s.networkPill,
-                {
-                  backgroundColor: active ? c.ink : c.surfaceHover,
-                  borderColor: active ? c.ink : c.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  s.networkLabel,
-                  { color: active ? c.bg : c.text },
-                ]}
-              >
-                {n.label}
-              </Text>
-              <Text
-                style={[
-                  s.networkProto,
-                  { color: active ? c.bg : c.textMuted },
-                ]}
-              >
-                {n.protocol}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={[s.depositEyebrow, { color: c.text, marginTop: 22 }]}>
-        Tu dirección de depósito
-      </Text>
-      <View
-        style={[
-          s.depositCard,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-      >
-        <CopyRow label={`Dirección USDT · ${network.protocol}`} value={network.address} mono />
-        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
-        <View style={s.cryptoMetaRow}>
-          <View>
-            <Text style={[s.copyLabel, { color: c.textMuted }]}>Tiempo</Text>
-            <Text style={[s.cryptoMetaValue, { color: c.text }]}>
-              {network.eta}
-            </Text>
-          </View>
-          <View>
-            <Text style={[s.copyLabel, { color: c.textMuted }]}>
-              Comisión de red
-            </Text>
-            <Text style={[s.cryptoMetaValue, { color: c.text }]}>
-              {network.fee}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <Tap
-        style={[
-          s.shareAliasBtn,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-        haptic="light"
-        onPress={() => {
-          Share.share({ message: network.address }).catch(() => {});
-        }}
-      >
-        <Feather name="share" size={16} color={c.greenDark} />
-        <Text style={[s.shareAliasText, { color: c.greenDark }]}>
-          Compartir dirección
-        </Text>
-      </Tap>
-
-      <View
-        style={[
-          s.noteCard,
-          {
-            backgroundColor: "rgba(200, 59, 59, 0.08)",
-            borderColor: "rgba(200, 59, 59, 0.25)",
-            marginTop: 20,
-          },
-        ]}
-      >
-        <Feather name="alert-triangle" size={14} color={c.red} />
-        <Text style={[s.noteText, { color: c.red }]}>
-          Enviá únicamente USDT por la red {network.protocol}. Si usás otra
-          red o mandás otro token, los fondos se pierden.
-        </Text>
-      </View>
-    </>
-  );
-}
-
 function CurPill({
   label,
   flag,
@@ -1330,73 +1213,51 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  /* Picker 2x2 de cuentas para depositar. */
-  kindGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  /* Picker fiat — vertical stack de 3 rows seleccionables. */
+  fiatStack: {
     paddingHorizontal: 20,
-    gap: 10,
-    marginTop: 16,
+    gap: 8,
     marginBottom: 24,
   },
-  kindCard: {
-    flexBasis: "47%",
-    flexGrow: 1,
+  fiatRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 12,
+    gap: 12,
+    padding: 14,
     borderRadius: radius.md,
     borderWidth: 1,
   },
-  kindCardTitle: {
+  fiatRowTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 14,
+    fontSize: 15,
     letterSpacing: -0.2,
   },
-  kindCardSub: {
+  fiatRowSub: {
     fontFamily: fontFamily[500],
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
   },
-  /* Selector de red para depósito crypto. */
-  networkRow: {
+  /* Entrada Crypto — single tappable row que navega a su propio screen. */
+  cryptoEntry: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 8,
-  },
-  networkPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
     alignItems: "center",
+    gap: 14,
+    marginHorizontal: 20,
+    padding: 14,
+    borderRadius: radius.lg,
+    borderWidth: 1,
   },
-  networkLabel: {
+  cryptoEntryTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.15,
+    fontSize: 16,
+    letterSpacing: -0.25,
   },
-  networkProto: {
+  cryptoEntrySub: {
     fontFamily: fontFamily[500],
-    fontSize: 10,
-    letterSpacing: 0.4,
-    marginTop: 1,
-  },
-  cryptoMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    gap: 16,
-  },
-  cryptoMetaValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 12,
     marginTop: 2,
+    letterSpacing: -0.05,
   },
   curPillsWrap: {
     paddingHorizontal: 20,
