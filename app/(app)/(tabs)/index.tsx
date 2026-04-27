@@ -25,6 +25,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Polygon } from "react-native-svg";
 import {
   useTheme,
   fontFamily,
@@ -51,6 +52,7 @@ import {
   Sparkline,
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
+import { CryptoIcon } from "../../../lib/components/CryptoIcon";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
@@ -552,6 +554,8 @@ function BaseHome() {
         <Funds />
 
         <UsMarket />
+
+        <CryptoMarket />
 
       </ScrollView>
     </View>
@@ -1410,6 +1414,29 @@ function fciFlag(asset: Asset): "AR" | "US" {
   return asset.subLabel.toLowerCase().includes("dólar") ? "US" : "AR";
 }
 
+/** Mini isotipo Alamos — 2 triángulos como los del logo, en un solo
+ *  color. Se usa como indicador de riesgo en lugar de los flames. */
+function AlamoMark({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Polygon
+        points="38,26 16,86 60,86"
+        stroke={color}
+        strokeWidth={11}
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Polygon
+        points="56,12 29,86 83,86"
+        stroke={color}
+        strokeWidth={11}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
 function FundCard({
   asset,
   onPress,
@@ -1429,31 +1456,34 @@ function FundCard({
         { backgroundColor: c.surfaceHover, borderColor: c.border },
       ]}
     >
-      <View style={s.fundCardTop}>
-        <FlagIcon code={flag} size={24} />
+      {/* Yield protagonista en su propia row para que no desborde. */}
+      <View style={s.fundYieldRow}>
+        <Text
+          style={[s.fundYield, { color: c.greenDark }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {asset.annualYield != null
+            ? `+${asset.annualYield.toLocaleString("es-AR", {
+                maximumFractionDigits: 2,
+              })}%`
+            : "—"}
+        </Text>
+        <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>ANUAL</Text>
+      </View>
+
+      {/* Bandera + 3 alamitos como termómetro de riesgo. */}
+      <View style={s.fundRiskRow}>
+        <FlagIcon code={flag} size={20} />
         <View style={[s.flameSep, { backgroundColor: c.borderStrong }]} />
         <View style={s.flames}>
           {[1, 2, 3].map((i) => (
-            <Ionicons
+            <AlamoMark
               key={i}
-              name="flame"
-              size={13}
+              size={14}
               color={i <= risk ? BRAND_GREEN : c.textFaint}
             />
           ))}
-        </View>
-        <View style={{ flex: 1 }} />
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={[s.fundYield, { color: c.greenDark }]}>
-            {asset.annualYield != null
-              ? `+${asset.annualYield.toLocaleString("es-AR", {
-                  maximumFractionDigits: 2,
-                })}%`
-              : "—"}
-          </Text>
-          <Text style={[s.fundYieldLabel, { color: c.textMuted }]}>
-            ANUAL
-          </Text>
         </View>
       </View>
 
@@ -1505,7 +1535,7 @@ function UsMarket() {
       <View style={[s.sectionBlock, { marginTop: 0 }]}>
         <View style={s.earningsHead}>
           <Text style={[s.earningsTitle, { color: c.text }]}>
-            Acciones de USA
+            Invertí en el mercado extranjero
           </Text>
           <Pressable
             hitSlop={10}
@@ -1516,8 +1546,11 @@ function UsMarket() {
           </Pressable>
         </View>
         <Text style={[s.usSubtitle, { color: c.textMuted }]}>
-          Comprá Apple, NVIDIA, Tesla y +5.000 acciones del mercado
-          estadounidense — directo, sin pasar por CEDEARs.
+          Operá en NYSE y NASDAQ directo desde Alamos, sin intervención
+          local ni CEDEARs.{" "}
+          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+            El mercado más grande del mundo, en tu bolsillo.
+          </Text>
         </Text>
       </View>
 
@@ -1644,6 +1677,251 @@ function UsMarketInfoModal({
             Disponible para usuarios con cuenta en USD habilitada en
             Alamos. Liquidez T+1 y comisiones más bajas que la operación
             local.
+          </Text>
+          <Tap
+            onPress={onClose}
+            haptic="light"
+            style={[s.modalCTA, { backgroundColor: c.ink }]}
+          >
+            <Text style={[s.modalCTAText, { color: c.bg }]}>Entendido</Text>
+          </Tap>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+/* ─── Invertí en crypto: CTA con horizontal scroll de cryptos ─── */
+/**
+ * Tercer call-to-action en el home — promo de operar crypto. Comparte
+ * el mismo layout que UsMarket (horizontal scroll de cards) pero los
+ * íconos usan los brand colors de cada moneda para diferenciarlo.
+ */
+
+interface FeaturedCrypto {
+  ticker: string;
+  /** Ticker que el detail screen entiende (con par /USDT). */
+  detailTicker: string;
+  name: string;
+  priceUsd: number;
+  change: number;
+  bg: string;
+  fg: string;
+  iconText?: string;
+}
+
+const FEATURED_CRYPTOS: FeaturedCrypto[] = [
+  {
+    ticker: "BTC",
+    detailTicker: "BTC/USDT",
+    name: "Bitcoin",
+    priceUsd: 67432.5,
+    change: 1.24,
+    bg: "#F7931A",
+    fg: "#FFFFFF",
+    iconText: "₿",
+  },
+  {
+    ticker: "ETH",
+    detailTicker: "ETH/USDT",
+    name: "Ethereum",
+    priceUsd: 3284.15,
+    change: -0.91,
+    bg: "#627EEA",
+    fg: "#FFFFFF",
+  },
+  {
+    ticker: "SOL",
+    detailTicker: "SOL/USDT",
+    name: "Solana",
+    priceUsd: 142.82,
+    change: 3.22,
+    bg: "#14F195",
+    fg: "#0E0F0C",
+  },
+  {
+    ticker: "USDT",
+    detailTicker: "BTC/USDT",
+    name: "Tether",
+    priceUsd: 1.0,
+    change: 0.01,
+    bg: "#26A17B",
+    fg: "#FFFFFF",
+    iconText: "₮",
+  },
+  {
+    ticker: "BNB",
+    detailTicker: "BNB/USDT",
+    name: "BNB",
+    priceUsd: 584.3,
+    change: 0.74,
+    bg: "#F0B90B",
+    fg: "#0E0F0C",
+  },
+  {
+    ticker: "ADA",
+    detailTicker: "ADA/USDT",
+    name: "Cardano",
+    priceUsd: 0.45,
+    change: 1.87,
+    bg: "#0033AD",
+    fg: "#FFFFFF",
+  },
+];
+
+function CryptoMarket() {
+  const { c } = useTheme();
+  const router = useRouter();
+  const [infoOpen, setInfoOpen] = useState(false);
+
+  return (
+    <View style={{ marginTop: 28 }}>
+      <View style={[s.sectionBlock, { marginTop: 0 }]}>
+        <View style={s.earningsHead}>
+          <Text style={[s.earningsTitle, { color: c.text }]}>
+            Invertí en crypto
+          </Text>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setInfoOpen(true)}
+            style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
+          >
+            <Feather name="info" size={12} color={c.textSecondary} />
+          </Pressable>
+        </View>
+        <Text style={[s.usSubtitle, { color: c.textMuted }]}>
+          Bitcoin, Ethereum, Solana y +200 cryptos. Operá 24/7, sin
+          horarios de mercado.{" "}
+          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+            El mercado que nunca duerme.
+          </Text>
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.usScrollContent}
+      >
+        {FEATURED_CRYPTOS.map((crypto) => (
+          <CryptoFeatureCard
+            key={crypto.ticker}
+            crypto={crypto}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/detail",
+                params: { ticker: crypto.detailTicker },
+              })
+            }
+          />
+        ))}
+      </ScrollView>
+
+      <CryptoMarketInfoModal
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
+    </View>
+  );
+}
+
+function CryptoFeatureCard({
+  crypto,
+  onPress,
+}: {
+  crypto: FeaturedCrypto;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const up = crypto.change >= 0;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        s.usCard,
+        { backgroundColor: c.surfaceHover, borderColor: c.border },
+      ]}
+    >
+      <View style={s.usCardTop}>
+        <CryptoIcon
+          ticker={crypto.ticker}
+          bg={crypto.bg}
+          fg={crypto.fg}
+          iconText={crypto.iconText}
+          size={32}
+        />
+        <Feather name="zap" size={12} color={c.textMuted} />
+      </View>
+
+      <View>
+        <Text style={[s.usCardTicker, { color: c.text }]}>
+          {crypto.ticker}
+        </Text>
+        <Text
+          style={[s.usCardName, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {crypto.name}
+        </Text>
+      </View>
+
+      <View style={s.usCardChart}>
+        <MiniSparkline
+          series={seriesFromSeed(crypto.ticker, 28, up ? "up" : "down")}
+          color={up ? c.greenDark : c.red}
+        />
+      </View>
+
+      <View>
+        <Text style={[s.usCardPrice, { color: c.text }]}>
+          US${" "}
+          {crypto.priceUsd.toLocaleString("es-AR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </Text>
+        <Text style={[s.usCardChange, { color: up ? c.greenDark : c.red }]}>
+          {up ? "+" : ""}
+          {crypto.change.toFixed(2)}%
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function CryptoMarketInfoModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { c } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={[s.modalCard, { backgroundColor: c.surface }]}
+        >
+          <View style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}>
+            <CryptoIcon ticker="₿" iconText="₿" bg="#F7931A" fg="#FFFFFF" size={42} />
+          </View>
+          <Text style={[s.modalTitle, { color: c.text }]}>
+            Crypto en Alamos
+          </Text>
+          <Text style={[s.modalBody, { color: c.textSecondary }]}>
+            Operá Bitcoin, Ethereum, Solana, USDT, USDC y +200 monedas
+            digitales. Mercado abierto 24/7, sin horarios de cierre.
+            Liquidez instantánea, custodia institucional y rendimientos
+            nativos en stablecoins. Cripto sin complicaciones.
           </Text>
           <Tap
             onPress={onClose}
@@ -1847,7 +2125,24 @@ const s = StyleSheet.create({
     borderWidth: 1,
     gap: 14,
   },
-  fundCardTop: {
+  fundYieldRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  fundYield: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    lineHeight: 24,
+    letterSpacing: -0.8,
+    flexShrink: 1,
+  },
+  fundYieldLabel: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  fundRiskRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -1860,19 +2155,7 @@ const s = StyleSheet.create({
   flames: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 1,
-  },
-  fundYield: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    lineHeight: 24,
-    letterSpacing: -0.8,
-  },
-  fundYieldLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 10,
-    letterSpacing: -0.05,
-    marginTop: 1,
+    gap: 2,
   },
   fundName: {
     fontFamily: fontFamily[600],
