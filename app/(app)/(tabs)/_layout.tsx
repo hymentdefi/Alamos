@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Tabs, useRouter, useSegments } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import {
   Animated,
+  Dimensions,
   Easing,
   Platform,
   Pressable,
@@ -16,6 +17,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { DrawingIcon, tabPaths } from "../../../lib/components/DrawingIcon";
+
+// Importamos cada tab como componente directo. Esto bypassa el
+// `<Tabs>` de expo-router (que sólo monta una a la vez sin slide
+// horizontal) y nos permite renderizar las 4 simultáneas en un
+// horizontal Animated.View para hacer el slide smooth full-screen.
+// Trade-off: `useIsFocused` y el evento `tabPress` ya no funcionan
+// en los screens (las 4 están "focuseadas" siempre). Las animaciones
+// internas siguen corriendo en las 4 — perf cost menor en devices
+// modernos.
+import IndexScreen from "./index";
+import ExploreScreen from "./explore";
+import NewsScreen from "./news";
+import AlamoScreen from "./alamo";
+
+const { width: SCREEN_W } = Dimensions.get("window");
 
 const ISLAND_HEIGHT = 68;
 const ISLAND_SIDE_GAP = 16;
@@ -34,14 +50,69 @@ type TabRoute = {
   href: string;
   title: string;
   path: (typeof tabPaths)[keyof typeof tabPaths];
+  Component: React.ComponentType;
 };
 
 const TAB_ROUTES: TabRoute[] = [
-  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home },
-  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets },
-  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news },
-  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Alamo",path: tabPaths.alamo },
+  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home,    Component: IndexScreen },
+  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets, Component: ExploreScreen },
+  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news,    Component: NewsScreen },
+  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Alamo",path: tabPaths.alamo,   Component: AlamoScreen },
 ];
+
+/**
+ * Pager horizontal que monta las 4 tabs y desliza entre ellas.
+ *
+ * `activeIndex` se deriva de `useSegments()` — cualquier navegación
+ * (tap en pill, deep link, router.navigate desde un botón) actualiza
+ * la URL primero y el pager reacciona animando el translateX.
+ *
+ * Duración 320ms con ease-out cubic — se siente smooth y rápido sin
+ * ser brusco.
+ */
+function TabPager() {
+  const segments = useSegments();
+  const tabSegment = (segments[2] as string | undefined) ?? "index";
+  const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
+  const activeIndex = segIdx >= 0 ? segIdx : 0;
+
+  const translateX = useRef(
+    new Animated.Value(-activeIndex * SCREEN_W),
+  ).current;
+  const lastIndexRef = useRef(activeIndex);
+
+  useEffect(() => {
+    if (lastIndexRef.current === activeIndex) return;
+    lastIndexRef.current = activeIndex;
+    Animated.timing(translateX, {
+      toValue: -activeIndex * SCREEN_W,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeIndex, translateX]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.pager,
+        {
+          width: SCREEN_W * TAB_ROUTES.length,
+          transform: [{ translateX }],
+        },
+      ]}
+    >
+      {TAB_ROUTES.map((r) => {
+        const Comp = r.Component;
+        return (
+          <View key={r.name} style={styles.page}>
+            <Comp />
+          </View>
+        );
+      })}
+    </Animated.View>
+  );
+}
 
 /**
  * Nav bar flotante glassmorphism con backdrop blur extendido.
@@ -225,23 +296,7 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
 export default function TabsLayout() {
   return (
     <View style={styles.root}>
-      <Tabs
-        backBehavior="none"
-        screenOptions={{
-          headerShown: false,
-          // Slide horizontal entre tabs según la dirección (i.e. de Inicio
-          // a Mercado entra de derecha a izquierda; volver entra de
-          // izquierda a derecha). Implementado nativamente por
-          // react-navigation/bottom-tabs v7.
-          animation: "shift",
-        }}
-        tabBar={() => null}
-      >
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="explore" />
-        <Tabs.Screen name="news" />
-        <Tabs.Screen name="alamo" />
-      </Tabs>
+      <TabPager />
       <FloatingTabBar />
     </View>
   );
@@ -249,6 +304,14 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  pager: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  page: {
+    width: SCREEN_W,
+    flex: 1,
+  },
   container: {
     position: "absolute",
     left: 0,
