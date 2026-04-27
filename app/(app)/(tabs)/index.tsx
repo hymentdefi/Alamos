@@ -108,10 +108,13 @@ function BaseHome() {
     setTabState(next);
     SecureStore.setItemAsync("home:active_tab", next).catch(() => {});
   }, []);
-  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const [currency, setCurrency] = useState<"ARS" | "USD" | "USDT">("ARS");
+  // Cycla forward: ARS → USD → USDT → ARS.
   const toggleCurrency = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
-    setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
+    setCurrency((p) =>
+      p === "ARS" ? "USD" : p === "USD" ? "USDT" : "ARS",
+    );
   }, []);
 
   // Coachmark: la primera vez que el user entra al Inicio, mostramos
@@ -162,7 +165,13 @@ function BaseHome() {
       onPanResponderRelease: (_, g) => {
         if (Math.abs(g.dx) > 40) {
           Haptics.selectionAsync().catch(() => {});
-          setCurrency((p) => (g.dx < 0 ? "USD" : "ARS"));
+          setCurrency((p) => {
+            // Swipe izquierda → next, swipe derecha → previous.
+            if (g.dx < 0) {
+              return p === "ARS" ? "USD" : p === "USD" ? "USDT" : "ARS";
+            }
+            return p === "ARS" ? "USDT" : p === "USDT" ? "USD" : "ARS";
+          });
         }
       },
     }),
@@ -229,9 +238,18 @@ function BaseHome() {
         }, 0),
     [held],
   );
+  // USDT total: balance de la wallet crypto + crypto held convertido a
+  // USDT (~1:1 con USD para el mock).
+  const usdtTotal = useMemo(() => {
+    const usdtAccount = accounts.find((a) => a.id === "usdt-crypto");
+    const cryptoInUsd = held
+      .filter((a) => a.category === "crypto")
+      .reduce((sum, a) => sum + (a.price * (a.qty ?? 1)) / USD_RATE, 0);
+    return (usdtAccount?.balance ?? 0) + cryptoInUsd;
+  }, [held]);
   // `total` sigue siendo el valor combinado en ARS — se usa para el
   // chart del período (la serie de puntos se genera en base a este).
-  const total = arsTotal + usdTotal * USD_RATE;
+  const total = arsTotal + usdTotal * USD_RATE + usdtTotal * USD_RATE;
 
   // Tick para el modo Live: cada ~3s rotamos el seed y forzamos
   // re-render para que el chart "respire" y el último punto se mueva.
@@ -324,10 +342,12 @@ function BaseHome() {
   const scrubRatio = total > 0 ? current / total : 1;
   const arsCurrent = arsTotal * scrubRatio;
   const usdCurrent = usdTotal * scrubRatio;
+  const usdtCurrent = usdtTotal * scrubRatio;
   // Delta del período expresado en cada moneda.
   const deltaRatio = total > 0 ? displayDelta / total : 0;
   const arsDelta = arsTotal * deltaRatio;
   const usdDelta = usdTotal * deltaRatio;
+  const usdtDelta = usdtTotal * deltaRatio;
 
   const timeLabel =
     scrubIndex != null
@@ -429,7 +449,14 @@ function BaseHome() {
             {...currencyPan.panHandlers}
           >
             <View style={s.flagWrap} pointerEvents="none">
-              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
+              {currency === "USDT" ? (
+                <MoneyIcon variant="usdt" size={26} />
+              ) : (
+                <FlagIcon
+                  code={currency === "ARS" ? "AR" : "US"}
+                  size={26}
+                />
+              )}
               {/* Indicador persistente — chip chiquito con icono de
                   swap en el borde. Le avisa al ojo que la bandera es
                   interactiva. */}
@@ -443,10 +470,22 @@ function BaseHome() {
               </View>
             </View>
             <AmountDisplay
-              value={currency === "ARS" ? arsCurrent : usdCurrent}
+              value={
+                currency === "ARS"
+                  ? arsCurrent
+                  : currency === "USD"
+                  ? usdCurrent
+                  : usdtCurrent
+              }
               size={42}
               weight={700}
-              prefix={currency === "ARS" ? "$" : "US$"}
+              prefix={
+                currency === "ARS"
+                  ? "$"
+                  : currency === "USD"
+                  ? "US$"
+                  : "USDT"
+              }
             />
             {/* Coachmark: sólo la primera vez, pill debajo de la
                 bandera con una flecha para arriba indicando que sea
@@ -466,7 +505,7 @@ function BaseHome() {
                   style={[s.currencyHintPill, { backgroundColor: c.ink }]}
                 >
                   <Text style={[s.currencyHintText, { color: c.bg }]}>
-                    Tocá para ver en {currency === "ARS" ? "USD" : "ARS"}
+                    Tocá para cambiar de moneda
                   </Text>
                 </View>
               </Animated.View>
@@ -480,7 +519,11 @@ function BaseHome() {
             <Text style={[s.deltaText, { color: trendColor }]}>
               {currency === "ARS"
                 ? formatARS(Math.abs(arsDelta))
-                : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
+                : currency === "USD"
+                ? `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
+                    maximumFractionDigits: 2,
+                  })}`
+                : `USDT ${Math.abs(usdtDelta).toLocaleString("es-AR", {
                     maximumFractionDigits: 2,
                   })}`}
             </Text>
