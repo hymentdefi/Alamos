@@ -1,15 +1,21 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSegments } from "expo-router";
 import {
-  Animated,
+  Animated as RNAnimated,
   Dimensions,
-  Easing,
+  Easing as RNEasing,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import MaskedView from "@react-native-masked-view/masked-view";
@@ -67,8 +73,13 @@ const TAB_ROUTES: TabRoute[] = [
  * (tap en pill, deep link, router.navigate desde un botón) actualiza
  * la URL primero y el pager reacciona animando el translateX.
  *
- * Duración 320ms con ease-out cubic — se siente smooth y rápido sin
- * ser brusco.
+ * Usa Reanimated (UI thread) para que la animación NO se vea afectada
+ * por el JS thread (las 4 pantallas tienen animaciones propias —
+ * sparkline tick, gift pulse, news refresh — y con el Animated API de
+ * RN cualquier delay del JS se traducía en un slide a tirones).
+ *
+ * Duración 460ms con ease-in-out cubic — entrada y salida suaves para
+ * que se sienta como "deslizándose tranqui" en vez de un cut con tween.
  */
 function TabPager() {
   const segments = useSegments();
@@ -76,30 +87,25 @@ function TabPager() {
   const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
   const activeIndex = segIdx >= 0 ? segIdx : 0;
 
-  const translateX = useRef(
-    new Animated.Value(-activeIndex * SCREEN_W),
-  ).current;
-  const lastIndexRef = useRef(activeIndex);
+  const translateX = useSharedValue(-activeIndex * SCREEN_W);
 
   useEffect(() => {
-    if (lastIndexRef.current === activeIndex) return;
-    lastIndexRef.current = activeIndex;
-    Animated.timing(translateX, {
-      toValue: -activeIndex * SCREEN_W,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    translateX.value = withTiming(-activeIndex * SCREEN_W, {
+      duration: 460,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+    });
   }, [activeIndex, translateX]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   return (
     <Animated.View
       style={[
         styles.pager,
-        {
-          width: SCREEN_W * TAB_ROUTES.length,
-          transform: [{ translateX }],
-        },
+        { width: SCREEN_W * TAB_ROUTES.length },
+        animStyle,
       ]}
     >
       {TAB_ROUTES.map((r) => {
@@ -247,14 +253,14 @@ interface TabItemProps {
 
 function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProps) {
   const pillOpacity = useRef(
-    new Animated.Value(focused ? 1 : 0),
+    new RNAnimated.Value(focused ? 1 : 0),
   ).current;
 
   useEffect(() => {
-    Animated.timing(pillOpacity, {
+    RNAnimated.timing(pillOpacity, {
       toValue: focused ? 1 : 0,
       duration: focused ? 260 : 180,
-      easing: Easing.out(Easing.quad),
+      easing: RNEasing.out(RNEasing.quad),
       useNativeDriver: true,
     }).start();
   }, [focused, pillOpacity]);
@@ -270,7 +276,7 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
       style={styles.tabItem}
       hitSlop={6}
     >
-      <Animated.View
+      <RNAnimated.View
         pointerEvents="none"
         style={[
           styles.activePill,
