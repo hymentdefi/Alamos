@@ -61,10 +61,11 @@ export function MoneyIcon({ variant, size = 40 }: Props) {
     );
   }
 
-  // USDT (Tether) — teal con la T blanca tipo logo
+  // USDT (Tether) — círculo teal con la T blanca tipo logo. Mismo
+  // diámetro que las banderas (FlagIcon) para que coincidan visualmente.
   return (
     <Svg width={size} height={size} viewBox="0 0 40 40">
-      <Rect x="0" y="0" width="40" height="40" rx={r} ry={r} fill="#26A17B" />
+      <Circle cx="20" cy="20" r="20" fill="#26A17B" />
       {/* Barra horizontal arriba de la T */}
       <Rect x="11" y="13" width="18" height="3.6" rx="1" fill="#FFFFFF" />
       {/* Pilar vertical de la T */}

@@ -795,12 +795,7 @@ function Dinero(_: {
         </View>
 
         {accounts.map((a, i) => (
-          <AccountRow
-            key={a.id}
-            account={a}
-            withTopDivider={i > 0}
-            onPress={() => openConvertFrom(a.id)}
-          />
+          <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
         ))}
       </View>
 
@@ -866,11 +861,9 @@ function AccountAvatar({
 function AccountRow({
   account,
   withTopDivider,
-  onPress,
 }: {
   account: Account;
   withTopDivider?: boolean;
-  onPress: () => void;
 }) {
   const { c } = useTheme();
   // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
@@ -880,8 +873,7 @@ function AccountRow({
       : `≈ ${formatARS(convertAmount(account.balance, account.currency, "ARS"))}`;
 
   return (
-    <Pressable
-      onPress={onPress}
+    <View
       style={[
         s.earningsRow,
         withTopDivider && {
@@ -919,7 +911,7 @@ function AccountRow({
           </Text>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
