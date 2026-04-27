@@ -53,6 +53,7 @@ import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
+import { AccountAvatar } from "../../../lib/components/AccountAvatar";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
@@ -808,52 +809,6 @@ function Dinero(_: {
         onClose={() => setConvertOpen(false)}
         initialFromId={convertFromId}
       />
-    </View>
-  );
-}
-
-/**
- * Avatar de la cuenta: bandera/Tether de la moneda como ícono principal,
- * con un pin chiquito abajo a la derecha que indica el país donde reside
- * la cuenta. Wallets crypto no tienen país → no se renderiza el pin.
- */
-function AccountAvatar({
-  account,
-  size = 40,
-}: {
-  account: Account;
-  size?: number;
-}) {
-  const main =
-    account.currency === "ARS" ? (
-      <FlagIcon code="AR" size={size} />
-    ) : account.currency === "USD" ? (
-      <FlagIcon code="US" size={size} />
-    ) : (
-      <MoneyIcon variant="usdt" size={size} />
-    );
-
-  // Pin: ~40% del avatar, con anillo blanco para separar visualmente.
-  const pinOuter = Math.round(size * 0.42);
-  const pinInner = pinOuter - 3;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      {main}
-      {account.country ? (
-        <View
-          style={[
-            s.accountPin,
-            {
-              width: pinOuter,
-              height: pinOuter,
-              borderRadius: pinOuter / 2,
-            },
-          ]}
-        >
-          <FlagIcon code={account.country} size={pinInner} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1622,17 +1577,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.15,
   },
-  /* Pin de país abajo a la derecha del avatar de cuenta. Anillo blanco
-     para separarlo visualmente del ícono principal. */
-  accountPin: {
-    position: "absolute",
-    bottom: -2,
-    right: -2,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   /* Earnings accounts block (estilo ARQ) */
   earningsBlock: {
     gap: 2,

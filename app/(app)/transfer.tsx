@@ -13,10 +13,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
-import { useAuth } from "../../lib/auth/context";
 import { Tap } from "../../lib/components/Tap";
 import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
+import { AccountAvatar } from "../../lib/components/AccountAvatar";
+import { accounts, type AccountId } from "../../lib/data/accounts";
 
 /** Balances disponibles por moneda — mockeados. */
 const BALANCES = {
@@ -24,19 +25,86 @@ const BALANCES = {
   usd: 1250,
 };
 
-/** Datos propios para recibir transferencias — mockeados por ahora. */
-const RECEIVE = {
-  ars: {
+/** Datos para recibir transferencias bancarias en cuentas argentinas
+ *  (ARS y USD MEP/normal). */
+const RECEIVE_BANK_AR: Record<"ars-ar" | "usd-ar", {
+  alias: string;
+  cbu: string;
+  legend: string | null;
+}> = {
+  "ars-ar": {
     alias: "chris.alamos.ars",
-    cvu: "0000003100083868047594",
-    legend: null as string | null,
+    cbu: "0000003100083868047594",
+    legend: null,
   },
-  usd: {
+  "usd-ar": {
     alias: "aceite.ronco.inca",
-    cvu: "3220001888042412530014",
+    cbu: "3220001888042412530014",
     legend:
-      "Al ingresar o transferir dólares, se verá como destino al Banco Industrial (BIND).",
+      "Al ingresar dólares en tu cuenta argentina, se verá como destino al Banco Industrial (BIND).",
   },
+};
+
+/** Datos para wire transfer internacional — cuenta USD en USA. */
+const RECEIVE_WIRE_US = {
+  beneficiary: "Christian Gramajo",
+  bankName: "Mercury Business",
+  bankAddress: "650 California St, San Francisco, CA 94108",
+  routing: "084009519",
+  account: "9876543210",
+  swift: "CHASUS33XXX",
+  memo: "ALAMOS-USR-12345",
+};
+
+/** Redes soportadas para depósitos USDT. */
+interface CryptoNetwork {
+  id: string;
+  label: string;
+  /** Etiqueta corta del protocolo (TRC20, ERC20, etc.) — para warning. */
+  protocol: string;
+  /** Dirección de depósito en esa red. Mock — en prod viene del backend. */
+  address: string;
+  /** Tiempo aproximado para confirmar. */
+  eta: string;
+  /** Comisión típica de la red (display only). */
+  fee: string;
+}
+
+const RECEIVE_CRYPTO: { networks: CryptoNetwork[] } = {
+  networks: [
+    {
+      id: "trc20",
+      label: "Tron",
+      protocol: "TRC20",
+      address: "TXp9N8mE3kP6sZQq7rV2WfJ5HdYn4Lc1aB",
+      eta: "~1 min",
+      fee: "≈ 1 USDT",
+    },
+    {
+      id: "erc20",
+      label: "Ethereum",
+      protocol: "ERC20",
+      address: "0x4f5A2cBd7e91FdA38b3C0a9e21Db88E45fC7aB12",
+      eta: "~3 min",
+      fee: "≈ 3 USDT",
+    },
+    {
+      id: "polygon",
+      label: "Polygon",
+      protocol: "MATIC",
+      address: "0x7c2E9aB4F3D8b51eA0c92Df45a78Bd1cE3F09a98",
+      eta: "~30 seg",
+      fee: "< 0,1 USDT",
+    },
+    {
+      id: "solana",
+      label: "Solana",
+      protocol: "SPL",
+      address: "5qHe8kP3nL9XwT2YzQrV4Bf7mAcRdGpJuN6sWvHt2Wn",
+      eta: "~10 seg",
+      fee: "< 0,01 USDT",
+    },
+  ],
 };
 
 /** Cuentas externas vinculadas del usuario. Por ahora un mock; la idea
@@ -83,17 +151,14 @@ export default function TransferScreen() {
   return <DepositInfo />;
 }
 
-/* ─── Deposit info: alias + CVU para recibir ARS/USD ─── */
+/* ─── Deposit info: picker de cuenta + instrucciones por tipo ─── */
 
 function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const [cur, setCur] = useState<DepositCurrency>("ars");
-  // Si el usuario toca una cuenta vinculada, nos movemos al sub-flow
-  // de ingresar desde esa cuenta (amount + success). Volver desde ahí
-  // nos devuelve a la info screen sin perder la moneda elegida.
+  const [kindId, setKindId] = useState<AccountId>("ars-ar");
+  // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
   const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
 
   if (depositFrom) {
@@ -104,9 +169,6 @@ function DepositInfo() {
       />
     );
   }
-
-  const data = RECEIVE[cur];
-  const linkedForCur = LINKED_ACCOUNTS.filter((a) => a.currency === cur);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -127,154 +189,353 @@ function DepositInfo() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.depositTitle, { color: c.text }]}>
-          Ingresá dinero con tus datos
+          ¿A qué cuenta querés ingresar?
         </Text>
 
-        {/* Pill switch Pesos / Dólares con banderas AR/US. */}
-        <View style={s.curPillsWrap}>
-          <View style={[s.curPills, { backgroundColor: c.surfaceHover }]}>
-            <CurPill
-              label="Pesos"
-              flag="AR"
-              active={cur === "ars"}
-              onPress={() => {
-                if (cur !== "ars") Haptics.selectionAsync().catch(() => {});
-                setCur("ars");
-              }}
-            />
-            <CurPill
-              label="Dólares"
-              flag="US"
-              active={cur === "usd"}
-              onPress={() => {
-                if (cur !== "usd") Haptics.selectionAsync().catch(() => {});
-                setCur("usd");
-              }}
-            />
-          </View>
+        {/* Picker 2x2 — cada cuenta es un card. */}
+        <View style={s.kindGrid}>
+          {accounts.map((a) => {
+            const active = a.id === kindId;
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => {
+                  if (a.id !== kindId) Haptics.selectionAsync().catch(() => {});
+                  setKindId(a.id);
+                }}
+                style={[
+                  s.kindCard,
+                  {
+                    backgroundColor: active ? c.surface : c.surfaceHover,
+                    borderColor: active ? c.ink : c.border,
+                  },
+                ]}
+              >
+                <AccountAvatar account={a} size={32} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.kindCardTitle, { color: c.text }]}>
+                    {a.currency}
+                  </Text>
+                  <Text
+                    style={[s.kindCardSub, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {a.location}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* ── Card 1: tus datos de recepción ── */}
-        <Text style={[s.depositEyebrow, { color: c.text }]}>
-          Desde un banco o billetera
+        {kindId === "usdt" ? (
+          <CryptoDepositCard />
+        ) : kindId === "usd-us" ? (
+          <WireDepositCard />
+        ) : (
+          <BankDepositCard
+            kind={kindId}
+            onPickLinked={setDepositFrom}
+          />
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ─── Card de depósito bancario en cuenta argentina (ARS / USD) ─── */
+function BankDepositCard({
+  kind,
+  onPickLinked,
+}: {
+  kind: "ars-ar" | "usd-ar";
+  onPickLinked: (a: LinkedAccount) => void;
+}) {
+  const { c } = useTheme();
+  const data = RECEIVE_BANK_AR[kind];
+  const linkedCurrency = kind === "ars-ar" ? "ars" : "usd";
+  const linked = LINKED_ACCOUNTS.filter((a) => a.currency === linkedCurrency);
+
+  return (
+    <>
+      <Text style={[s.depositEyebrow, { color: c.text }]}>
+        Desde un banco o billetera
+      </Text>
+      <View
+        style={[
+          s.depositCard,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
+        <CopyRow label="Alias" value={data.alias} />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="CBU" value={data.cbu} mono />
+        {data.legend ? (
+          <>
+            <View
+              style={[s.depositRowDivider, { backgroundColor: c.border }]}
+            />
+            <Text style={[s.depositLegend, { color: c.textMuted }]}>
+              {data.legend}
+            </Text>
+          </>
+        ) : null}
+      </View>
+
+      <Tap
+        style={[
+          s.shareAliasBtn,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+        haptic="light"
+        onPress={() => {
+          Share.share({ message: data.alias }).catch(() => {});
+        }}
+      >
+        <Feather name="share" size={16} color={c.greenDark} />
+        <Text style={[s.shareAliasText, { color: c.greenDark }]}>
+          Compartir alias
         </Text>
+      </Tap>
+
+      <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
+        Desde cuentas vinculadas
+      </Text>
+      {linked.length > 0 ? (
         <View
           style={[
             s.depositCard,
             { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <CopyRow label="Alias" value={data.alias} />
-          <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
-          <CopyRow
-            label={cur === "ars" ? "CVU" : "CBU"}
-            value={data.cvu}
-            mono
-          />
-          {data.legend ? (
-            <>
-              <View
-                style={[s.depositRowDivider, { backgroundColor: c.border }]}
-              />
-              <Text style={[s.depositLegend, { color: c.textMuted }]}>
-                {data.legend}
-              </Text>
-            </>
-          ) : null}
-        </View>
-
-        {/* Compartir alias — abre la sheet nativa (WhatsApp, mail,
-            Telegram, etc.) con el alias como mensaje, nada más. */}
-        <Tap
-          style={[
-            s.shareAliasBtn,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-          haptic="light"
-          onPress={() => {
-            Share.share({ message: data.alias }).catch(() => {});
-          }}
-        >
-          <Feather name="share" size={16} color={c.greenDark} />
-          <Text style={[s.shareAliasText, { color: c.greenDark }]}>
-            Compartir alias
-          </Text>
-        </Tap>
-
-        {/* ── Card 2: cuentas vinculadas (externas) del usuario ── */}
-        <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
-          Desde cuentas vinculadas
-        </Text>
-        {linkedForCur.length > 0 ? (
-          <View
-            style={[
-              s.depositCard,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-          >
-            {linkedForCur.map((acc, i) => (
-              <View key={acc.id}>
-                {i > 0 ? (
-                  <View
-                    style={[
-                      s.depositRowDivider,
-                      { backgroundColor: c.border },
-                    ]}
-                  />
-                ) : null}
-                <LinkedAccountRow
-                  acc={acc}
-                  onPress={() => setDepositFrom(acc)}
+          {linked.map((acc, i) => (
+            <View key={acc.id}>
+              {i > 0 ? (
+                <View
+                  style={[
+                    s.depositRowDivider,
+                    { backgroundColor: c.border },
+                  ]}
                 />
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View
-            style={[
-              s.depositCard,
-              s.emptyLinkedCard,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-          >
-            <Text style={[s.emptyLinkedText, { color: c.textMuted }]}>
-              Todavía no tenés cuentas{" "}
-              {cur === "ars" ? "en pesos" : "en dólares"} vinculadas.
-            </Text>
-          </View>
-        )}
-
-        <Tap
-          style={s.addAccountBtn}
-          haptic="light"
-          onPress={() => {
-            /* Flow de agregar cuenta — TODO: wizard. */
-          }}
-        >
-          <Feather name="plus" size={16} color={c.text} />
-          <Text style={[s.addAccountText, { color: c.text }]}>
-            Agregar otra cuenta
-          </Text>
-        </Tap>
-
+              ) : null}
+              <LinkedAccountRow acc={acc} onPress={() => onPickLinked(acc)} />
+            </View>
+          ))}
+        </View>
+      ) : (
         <View
           style={[
-            s.noteCard,
-            {
-              backgroundColor: c.surfaceHover,
-              borderColor: c.border,
-              marginTop: 20,
-            },
+            s.depositCard,
+            s.emptyLinkedCard,
+            { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <Feather name="clock" size={14} color={c.textSecondary} />
-          <Text style={[s.noteText, { color: c.textSecondary }]}>
-            Los ingresos acreditan de inmediato cuando el banco confirme la
-            transferencia.
+          <Text style={[s.emptyLinkedText, { color: c.textMuted }]}>
+            Todavía no tenés cuentas{" "}
+            {kind === "ars-ar" ? "en pesos" : "en dólares"} vinculadas.
           </Text>
         </View>
-      </ScrollView>
-    </View>
+      )}
+
+      <Tap
+        style={s.addAccountBtn}
+        haptic="light"
+        onPress={() => {
+          /* TODO: wizard de agregar cuenta */
+        }}
+      >
+        <Feather name="plus" size={16} color={c.text} />
+        <Text style={[s.addAccountText, { color: c.text }]}>
+          Agregar otra cuenta
+        </Text>
+      </Tap>
+
+      <View
+        style={[
+          s.noteCard,
+          {
+            backgroundColor: c.surfaceHover,
+            borderColor: c.border,
+            marginTop: 20,
+          },
+        ]}
+      >
+        <Feather name="clock" size={14} color={c.textSecondary} />
+        <Text style={[s.noteText, { color: c.textSecondary }]}>
+          Los ingresos acreditan de inmediato cuando el banco confirme la
+          transferencia.
+        </Text>
+      </View>
+    </>
+  );
+}
+
+/* ─── Card de wire transfer internacional (USD cuenta USA) ─── */
+function WireDepositCard() {
+  const { c } = useTheme();
+  const w = RECEIVE_WIRE_US;
+  return (
+    <>
+      <Text style={[s.depositEyebrow, { color: c.text }]}>
+        Wire transfer (USD)
+      </Text>
+      <View
+        style={[
+          s.depositCard,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
+        <CopyRow label="Beneficiario" value={w.beneficiary} />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="Banco" value={w.bankName} />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="Routing (ABA)" value={w.routing} mono />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="Cuenta" value={w.account} mono />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="SWIFT / BIC" value={w.swift} mono />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <CopyRow label="Memo / Reference" value={w.memo} mono />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <Text style={[s.depositLegend, { color: c.textMuted }]}>
+          Dirección del banco: {w.bankAddress}
+        </Text>
+      </View>
+
+      <View
+        style={[
+          s.noteCard,
+          {
+            backgroundColor: c.surfaceHover,
+            borderColor: c.border,
+            marginTop: 20,
+          },
+        ]}
+      >
+        <Feather name="clock" size={14} color={c.textSecondary} />
+        <Text style={[s.noteText, { color: c.textSecondary }]}>
+          Los wire transfers internacionales acreditan en 1-3 días hábiles.
+          Asegurate de incluir el memo para que podamos identificar tu
+          depósito.
+        </Text>
+      </View>
+    </>
+  );
+}
+
+/* ─── Card de depósito crypto (USDT, multi-red) ─── */
+function CryptoDepositCard() {
+  const { c } = useTheme();
+  const [networkId, setNetworkId] = useState(RECEIVE_CRYPTO.networks[0].id);
+  const network =
+    RECEIVE_CRYPTO.networks.find((n) => n.id === networkId) ??
+    RECEIVE_CRYPTO.networks[0];
+
+  return (
+    <>
+      <Text style={[s.depositEyebrow, { color: c.text }]}>Elegí la red</Text>
+      <View style={s.networkRow}>
+        {RECEIVE_CRYPTO.networks.map((n) => {
+          const active = n.id === networkId;
+          return (
+            <Pressable
+              key={n.id}
+              onPress={() => {
+                if (n.id !== networkId)
+                  Haptics.selectionAsync().catch(() => {});
+                setNetworkId(n.id);
+              }}
+              style={[
+                s.networkPill,
+                {
+                  backgroundColor: active ? c.ink : c.surfaceHover,
+                  borderColor: active ? c.ink : c.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.networkLabel,
+                  { color: active ? c.bg : c.text },
+                ]}
+              >
+                {n.label}
+              </Text>
+              <Text
+                style={[
+                  s.networkProto,
+                  { color: active ? c.bg : c.textMuted },
+                ]}
+              >
+                {n.protocol}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[s.depositEyebrow, { color: c.text, marginTop: 22 }]}>
+        Tu dirección de depósito
+      </Text>
+      <View
+        style={[
+          s.depositCard,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
+        <CopyRow label={`Dirección USDT · ${network.protocol}`} value={network.address} mono />
+        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+        <View style={s.cryptoMetaRow}>
+          <View>
+            <Text style={[s.copyLabel, { color: c.textMuted }]}>Tiempo</Text>
+            <Text style={[s.cryptoMetaValue, { color: c.text }]}>
+              {network.eta}
+            </Text>
+          </View>
+          <View>
+            <Text style={[s.copyLabel, { color: c.textMuted }]}>
+              Comisión de red
+            </Text>
+            <Text style={[s.cryptoMetaValue, { color: c.text }]}>
+              {network.fee}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <Tap
+        style={[
+          s.shareAliasBtn,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+        haptic="light"
+        onPress={() => {
+          Share.share({ message: network.address }).catch(() => {});
+        }}
+      >
+        <Feather name="share" size={16} color={c.greenDark} />
+        <Text style={[s.shareAliasText, { color: c.greenDark }]}>
+          Compartir dirección
+        </Text>
+      </Tap>
+
+      <View
+        style={[
+          s.noteCard,
+          {
+            backgroundColor: "rgba(200, 59, 59, 0.08)",
+            borderColor: "rgba(200, 59, 59, 0.25)",
+            marginTop: 20,
+          },
+        ]}
+      >
+        <Feather name="alert-triangle" size={14} color={c.red} />
+        <Text style={[s.noteText, { color: c.red }]}>
+          Enviá únicamente USDT por la red {network.protocol}. Si usás otra
+          red o mandás otro token, los fondos se pierden.
+        </Text>
+      </View>
+    </>
   );
 }
 
@@ -693,7 +954,7 @@ function DestinationStep({
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const accounts = LINKED_ACCOUNTS.filter((a) => a.currency === cur);
+  const linked = LINKED_ACCOUNTS.filter((a) => a.currency === cur);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -722,14 +983,14 @@ function DestinationStep({
           Tus cuentas vinculadas
         </Text>
 
-        {accounts.length > 0 ? (
+        {linked.length > 0 ? (
           <View
             style={[
               s.depositCard,
               { backgroundColor: c.surface, borderColor: c.border },
             ]}
           >
-            {accounts.map((acc, i) => (
+            {linked.map((acc, i) => (
               <View key={acc.id}>
                 {i > 0 ? (
                   <View
@@ -1068,6 +1329,74 @@ const s = StyleSheet.create({
     letterSpacing: -0.7,
     paddingHorizontal: 20,
     paddingTop: 8,
+  },
+  /* Picker 2x2 de cuentas para depositar. */
+  kindGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  kindCard: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  kindCardTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  kindCardSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    marginTop: 2,
+    letterSpacing: -0.05,
+  },
+  /* Selector de red para depósito crypto. */
+  networkRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 8,
+  },
+  networkPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  networkLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  networkProto: {
+    fontFamily: fontFamily[500],
+    fontSize: 10,
+    letterSpacing: 0.4,
+    marginTop: 1,
+  },
+  cryptoMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    gap: 16,
+  },
+  cryptoMetaValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.15,
+    marginTop: 2,
   },
   curPillsWrap: {
     paddingHorizontal: 20,
