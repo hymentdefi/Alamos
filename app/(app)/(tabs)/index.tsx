@@ -1667,9 +1667,10 @@ const s = StyleSheet.create({
     gap: 1,
   },
   fundYield: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    lineHeight: 24,
+    letterSpacing: -0.8,
   },
   fundYieldLabel: {
     fontFamily: fontFamily[500],
