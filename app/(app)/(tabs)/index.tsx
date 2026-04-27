@@ -46,7 +46,11 @@ import {
   type Account,
   type AccountId,
 } from "../../../lib/data/accounts";
-import { Sparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
+import {
+  MiniSparkline,
+  Sparkline,
+  seriesFromSeed,
+} from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
@@ -866,6 +870,14 @@ function AccountRow({
           {account.location}
         </Text>
       </View>
+      {account.currency === "USDT" ? (
+        <View style={s.rowChart}>
+          <MiniSparkline
+            series={seriesFromSeed(account.id, 28, "up")}
+            color={c.greenDark}
+          />
+        </View>
+      ) : null}
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.earningsPrimary, { color: c.text }]}>
           {formatAccountBalance(account)}
@@ -1361,6 +1373,18 @@ function AssetRow({
             : `${asset.qty} ${asset.qty === 1 ? "unidad" : "unidades"} · ${formatARS(asset.price)}`}
         </Text>
       </View>
+      {!isCash ? (
+        <View style={s.rowChart}>
+          <MiniSparkline
+            series={seriesFromSeed(
+              asset.ticker,
+              28,
+              asset.change >= 0 ? "up" : "down",
+            )}
+            color={asset.change >= 0 ? c.greenDark : c.red}
+          />
+        </View>
+      ) : null}
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.rowPrice, { color: c.text }]}>{primaryValue}</Text>
         {secondaryValue ? (
@@ -1889,6 +1913,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     gap: 12,
+  },
+  rowChart: {
+    width: 56,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rowIcon: {
     width: 40,
