@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { fontFamily, useTheme } from "../theme";
 import { useAuth } from "../auth/context";
@@ -20,6 +21,7 @@ interface Props {
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -32,39 +34,46 @@ function timeGreeting(): string {
 const RING_VIEWBOX = 100;
 const RING_RADIUS = 44;
 const CIRC = 2 * Math.PI * RING_RADIUS;
-const RING_SIZE = 156;
+const RING_SIZE = 168;
 const RING_STROKE = 2.2;
-const LOGO_SIZE = 92;
+const LOGO_SIZE = 96;
 
 /**
- * Splash post-native — secuencia "activación de cuenta", inspirada en
- * el SwipeToSubmit del confirm screen. La idea: cuando abrís la app
- * sentís el mismo gesto de "se ejecuta tu acción", pero acá la acción
- * es entrar a Alamos.
+ * Splash post-native — la apertura premium estilo "activación de
+ * cuenta", referenciando el SwipeToSubmit del confirm screen.
  *
- * Coreografía (≈3.4s):
+ * Coreografía (~3.6s):
  *
- *   1. Cover verde brand SUBE desde abajo cubriendo la pantalla
- *      (280ms, cubic). Mismo gesto que el green cover del swipe
- *      to submit.
+ *   1. Backdrop blanco + LOGO MIX aparece en el centro (mismo del
+ *      splash nativo: triángulo trasero verde + delantero negro
+ *      outline). Spring sutil + fadeIn.
  *
- *   2. Sobre el verde: logo BLANCO mono emerge desde abajo con
- *      spring (tension 55, friction 12 — mismo que el confirm). Ring
- *      SVG empieza a dibujarse alrededor (strokeDashoffset, 700ms,
- *      bezier 0.22 1 0.36 1 — mismo easing del spinner del confirm).
+ *   2. HOLD del logo mix — 240ms. Le da tiempo al ojo para registrar
+ *      el splash "normal" antes de la transición.
  *
- *   3. HOLD del logo encendido sobre verde — 300ms quieto. Selection
- *      haptic muy sutil al cerrar el ring.
+ *   3. Cover verde brand SUBE desde abajo CON AURA — un gradient en
+ *      el top edge (transparent → verde brand) que crea un halo de
+ *      ~120px arriba del cover sólido, dándole el feel de "ola con
+ *      luz" en vez de un edge duro. Subida tranquila (820ms,
+ *      bezier 0.32 0.72 0 1 = slow-out contemplativo). Mientras
+ *      sube, el logo se mantiene quieto en el centro y el cover
+ *      pasa por detrás del logo.
  *
- *   4. Cover BAJA. Mientras baja, el logo crossfade de BLANCO mono a
- *      VERDE brand — efecto "el cover dejó su color en el logo".
- *      El ring también desvanece.
+ *   4. Cover llega al top → LOGO crossfade MIX → BLANCO mono. El
+ *      logo cambia de color cuando el cover terminó de cubrir todo,
+ *      sintiéndose como "el cover dejó al logo en blanco" sobre el
+ *      verde.
  *
- *   5. Logo verde se desvanece quieto y emerge "Buen día, / Christian"
- *      en su propio lugar (alineado izquierda, tipografía editorial
- *      Alamos).
+ *   5. Ring SVG se dibuja alrededor del logo blanco (strokeDashoffset
+ *      CIRC→0, 720ms, mismo bezier que el spinner del confirm).
+ *      Selection haptic + pulse al cerrar el ring.
  *
- *   6. Hold del saludo + exit global.
+ *   6. Ring cerrado → emerge "Buen día, / Christian" en blanco
+ *      sobre el verde brand, alineado a la izquierda. El logo y el
+ *      ring desvanecen quietos (NO viajan al texto), el saludo
+ *      aparece en su propia posición con fade + ty mínimo.
+ *
+ *   7. Hold del saludo + exit global.
  *
  * Tappeable para skip rápido.
  */
@@ -75,31 +84,30 @@ export function GreetingOverlay({ onEnd }: Props) {
   const firstName = user?.fullName?.split(" ")[0] ?? "Christian";
   const greeting = timeGreeting();
 
-  /* ─── Cover verde (entry up + exit down) ─── */
-  // Empieza fuera de pantalla abajo. Sube → 0 → baja a windowH.
+  /* ─── Cover verde (sube en stage 3) ─── */
+  // Empieza fuera de pantalla. Sube → 0. Halo extra arriba del cover
+  // de ~120px; lo posicionamos ABAJO del top del cover sólido.
+  const HALO_HEIGHT = 140;
   const coverY = useRef(new Animated.Value(windowH)).current;
 
-  /* ─── Logo entrance (mismo lenguaje que confirm.tsx) ─── */
-  const entranceTravel = Math.round(windowH * 0.18);
-  const logoTranslateY = useRef(
-    new Animated.Value(entranceTravel),
-  ).current;
-  const logoRotate = useRef(new Animated.Value(-12)).current;
+  /* ─── Logo entrance ─── */
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  // Pulse al cerrar el ring (1 → 1.05 → 1).
+  const logoScale = useRef(new Animated.Value(0.94)).current;
+  // Pulse al cerrar el ring.
   const logoPulse = useRef(new Animated.Value(1)).current;
-  // Exit: scale-up sutil + opacity al saludo.
-  const logoExitScale = useRef(new Animated.Value(1)).current;
+  // Exit final.
   const logoExitOpacity = useRef(new Animated.Value(1)).current;
+  const logoExitScale = useRef(new Animated.Value(1)).current;
 
-  /* ─── Logo color crossfade (white sobre cover, green tras cover) ─── */
-  const whiteLogoOpacity = useRef(new Animated.Value(1)).current;
-  const greenLogoOpacity = useRef(new Animated.Value(0)).current;
+  /* ─── Logo color crossfade (mix → white) ─── */
+  // Mix (verde + negro outline) visible al inicio; cuando el cover
+  // termina de subir, fadea y emerge el blanco mono.
+  const mixLogoOpacity = useRef(new Animated.Value(1)).current;
+  const whiteLogoOpacity = useRef(new Animated.Value(0)).current;
 
-  /* ─── Ring (alrededor del logo) ─── */
-  // strokeDashoffset: empieza en CIRC (invisible) y termina en 0 (cerrado).
+  /* ─── Ring ─── */
   const ringOffset = useRef(new Animated.Value(CIRC)).current;
-  const ringOpacity = useRef(new Animated.Value(1)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
 
   /* ─── Greeting in ─── */
   const greetTy = useRef(new Animated.Value(12)).current;
@@ -111,46 +119,73 @@ export function GreetingOverlay({ onEnd }: Props) {
   const endedRef = useRef(false);
 
   useEffect(() => {
-    /* ─── 1. Cover sube (0–280ms) ─── */
-    Animated.timing(coverY, {
-      toValue: 0,
-      duration: 280,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
-      useNativeDriver: true,
-    }).start();
+    /* ─── 1. Logo mix entry (0–360ms) ─── */
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 80,
+        friction: 12,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-    /* ─── 2. Logo emerge + Ring se dibuja (a partir de 220ms) ─── */
+    /* ─── 2. HOLD del logo mix (360–600ms) ─── */
+    /* ─── 3. Cover sube CON AURA (a partir de 600ms) ─── */
     setTimeout(() => {
-      // Logo: spring desde abajo + rotación leve a 0 (mismo confirm).
+      // Haptic Light muy sutil al inicio del cover — "comienza el gesto".
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      Animated.timing(coverY, {
+        toValue: 0,
+        duration: 820,
+        // slow-out contemplativo — el cover empieza rápido y se
+        // asienta al final, dándole feel premium.
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+        useNativeDriver: true,
+      }).start();
+    }, 600);
+
+    /* ─── 4. Cover terminó → crossfade logo mix → blanco
+     *      (a partir de 1420ms) ─── */
+    setTimeout(() => {
       Animated.parallel([
-        Animated.spring(logoTranslateY, {
+        Animated.timing(mixLogoOpacity, {
           toValue: 0,
-          tension: 55,
-          friction: 12,
+          duration: 320,
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.spring(logoRotate, {
-          toValue: 0,
-          tension: 55,
-          friction: 12,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
+        Animated.timing(whiteLogoOpacity, {
           toValue: 1,
-          duration: 400,
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        // Ring fade-in para que esté visible cuando empiece a dibujarse.
+        Animated.timing(ringOpacity, {
+          toValue: 1,
+          duration: 200,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start();
+    }, 1420);
 
-      // Ring: dibuja alrededor (mismo easing que el spinner del confirm).
+    /* ─── 5. Ring se dibuja (a partir de 1660ms) ─── */
+    setTimeout(() => {
       Animated.timing(ringOffset, {
         toValue: 0,
         duration: 720,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: false, // strokeDashoffset no soporta native
       }).start(() => {
-        // Selection haptic al cerrar el ring.
+        // Selection haptic al cerrar — confirma sin gritar.
         Haptics.selectionAsync().catch(() => {});
         // Pulse sutil al cerrar (1 → 1.05 → 1).
         Animated.sequence([
@@ -168,52 +203,13 @@ export function GreetingOverlay({ onEnd }: Props) {
           }),
         ]).start();
       });
-    }, 220);
+    }, 1660);
 
-    /* ─── 3. HOLD + 4. Cover baja (a partir de 1240ms) ─── */
+    /* ─── 6. Ring cerrado → logo + ring desvanecen +
+     *      saludo emerge (a partir de 2580ms) ─── */
     setTimeout(() => {
       Animated.parallel([
-        // Cover desciende.
-        Animated.timing(coverY, {
-          toValue: windowH,
-          duration: 520,
-          easing: Easing.bezier(0.4, 0, 0.6, 1),
-          useNativeDriver: true,
-        }),
-        // Logo: crossfade WHITE → GREEN durante el descenso del cover.
-        // El descenso del cover "destiñe" el logo blanco que va
-        // quedando expuesto sobre fondo blanco — mientras tanto el
-        // logo verde toma su lugar.
-        Animated.sequence([
-          Animated.delay(80),
-          Animated.parallel([
-            Animated.timing(whiteLogoOpacity, {
-              toValue: 0,
-              duration: 380,
-              easing: Easing.inOut(Easing.cubic),
-              useNativeDriver: true,
-            }),
-            Animated.timing(greenLogoOpacity, {
-              toValue: 1,
-              duration: 400,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
-        // Ring desvanece junto con el cover.
-        Animated.timing(ringOpacity, {
-          toValue: 0,
-          duration: 360,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 1240);
-
-    /* ─── 5. Logo sale + Greeting entra (a partir de 1900ms) ─── */
-    setTimeout(() => {
-      Animated.parallel([
+        // Logo + ring fade-out quietos.
         Animated.timing(logoExitOpacity, {
           toValue: 0,
           duration: 380,
@@ -226,13 +222,19 @@ export function GreetingOverlay({ onEnd }: Props) {
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
+        Animated.timing(ringOpacity, {
+          toValue: 0,
+          duration: 320,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
         // Greeting entra.
         Animated.sequence([
-          Animated.delay(140),
+          Animated.delay(180),
           Animated.parallel([
             Animated.timing(greetOpacity, {
               toValue: 1,
-              duration: 360,
+              duration: 380,
               easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
@@ -244,12 +246,13 @@ export function GreetingOverlay({ onEnd }: Props) {
             }),
           ]),
         ]),
+        // Name stagger 90ms.
         Animated.sequence([
-          Animated.delay(220),
+          Animated.delay(270),
           Animated.parallel([
             Animated.timing(nameOpacity, {
               toValue: 1,
-              duration: 440,
+              duration: 460,
               easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
@@ -262,10 +265,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           ]),
         ]),
       ]).start();
-    }, 1900);
+    }, 2580);
 
-    /* ─── 6. EXIT (a los 2900ms) ─── */
-    const exitTimer = setTimeout(() => exit(), 2900);
+    /* ─── 7. EXIT (a los 3500ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 3500);
 
     return () => clearTimeout(exitTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,12 +291,6 @@ export function GreetingOverlay({ onEnd }: Props) {
     ]).start(() => onEnd());
   };
 
-  /* ─── Estilos animados ─── */
-  const logoRotateStr = logoRotate.interpolate({
-    inputRange: [-360, 360],
-    outputRange: ["-360deg", "360deg"],
-  });
-
   return (
     <Modal
       visible
@@ -304,14 +301,42 @@ export function GreetingOverlay({ onEnd }: Props) {
     >
       <View style={[s.root, { backgroundColor: c.bg }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={exit}>
-          {/* Greeting alineado a la izquierda — vive en la base, debajo
-              de todo. Aparece cuando el cover se va. */}
+          {/* Cover verde brand — sube desde abajo full-screen.
+              Tiene un halo arriba (gradient transparent→verde) que
+              precede al cover sólido, dándole el feel "ola con
+              aura" en vez de edge plano. Va detrás del logo y del
+              saludo. */}
+          <Animated.View
+            style={[
+              s.coverContainer,
+              { transform: [{ translateY: coverY }] },
+            ]}
+            pointerEvents="none"
+          >
+            {/* Halo encima del cover — extiende el verde hacia arriba
+                con gradiente transparent → verde, simulando luz que
+                sale del top del cover. */}
+            <LinearGradient
+              colors={["transparent", c.brand]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={[
+                s.coverHalo,
+                { height: HALO_HEIGHT, top: -HALO_HEIGHT },
+              ]}
+            />
+            {/* Cover sólido — verde brand. */}
+            <View style={[s.coverSolid, { backgroundColor: c.brand }]} />
+          </Animated.View>
+
+          {/* Greeting alineado a la izquierda — vive en blanco/foreground;
+              aparece sobre el verde después de que el ring cierra.
+              Color blanco para máximo contraste con el cover verde. */}
           <View style={s.greetingWrap} pointerEvents="none">
             <Animated.Text
               style={[
                 s.greeting,
                 {
-                  color: c.textMuted,
                   opacity: greetOpacity,
                   transform: [{ translateY: greetTy }],
                 },
@@ -323,7 +348,6 @@ export function GreetingOverlay({ onEnd }: Props) {
               style={[
                 s.name,
                 {
-                  color: c.text,
                   opacity: nameOpacity,
                   transform: [{ translateY: nameTy }],
                 },
@@ -333,87 +357,62 @@ export function GreetingOverlay({ onEnd }: Props) {
             </Animated.Text>
           </View>
 
-          {/* Cover verde brand — sube full-screen y baja al final.
-              Sobre el cover se renderea el logo en blanco; cuando
-              baja, el logo crossfade a verde sobre fondo blanco. */}
+          {/* Hero centrado: ring + logo. SIEMPRE en el mismo lugar —
+              el cover pasa por DETRÁS del logo, no lo desplaza. */}
           <Animated.View
             style={[
-              s.cover,
+              s.hero,
               {
-                backgroundColor: c.brand,
-                transform: [{ translateY: coverY }],
+                opacity: Animated.multiply(logoOpacity, logoExitOpacity),
+                transform: [
+                  {
+                    scale: Animated.multiply(
+                      Animated.multiply(logoScale, logoPulse),
+                      logoExitScale,
+                    ),
+                  },
+                ],
               },
             ]}
             pointerEvents="none"
           >
-            {/* Hero: logo + ring centrados. Comparten el wrapper para
-                que la rotación de entrance (rotate del logo) NO afecte
-                al ring — el ring vive arriba en su propio Animated.View
-                quieto. Por eso renderizo dos capas separadas. */}
+            {/* Ring (SVG) — quieto, dibujado con dashoffset. */}
             <Animated.View
-              style={[
-                s.hero,
-                {
-                  opacity: logoExitOpacity,
-                  transform: [
-                    { scale: Animated.multiply(logoPulse, logoExitScale) },
-                  ],
-                },
-              ]}
+              style={[s.ringWrap, { opacity: ringOpacity }]}
             >
-              {/* Ring (SVG) — quieto, sin rotación, dibuja alrededor
-                  del logo con strokeDashoffset. */}
-              <Animated.View
-                style={[s.ringWrap, { opacity: ringOpacity }]}
-                pointerEvents="none"
+              <Svg
+                width={RING_SIZE}
+                height={RING_SIZE}
+                viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}
               >
-                <Svg
-                  width={RING_SIZE}
-                  height={RING_SIZE}
-                  viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}
-                >
-                  <AnimatedCircle
-                    cx={RING_VIEWBOX / 2}
-                    cy={RING_VIEWBOX / 2}
-                    r={RING_RADIUS}
-                    stroke="#FFFFFF"
-                    strokeWidth={RING_STROKE}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={`${CIRC} ${CIRC}`}
-                    strokeDashoffset={ringOffset}
-                    rotation="-90"
-                    originX={RING_VIEWBOX / 2}
-                    originY={RING_VIEWBOX / 2}
-                  />
-                </Svg>
-              </Animated.View>
+                <AnimatedCircle
+                  cx={RING_VIEWBOX / 2}
+                  cy={RING_VIEWBOX / 2}
+                  r={RING_RADIUS}
+                  stroke="#FFFFFF"
+                  strokeWidth={RING_STROKE}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${CIRC} ${CIRC}`}
+                  strokeDashoffset={ringOffset}
+                  rotation="-90"
+                  originX={RING_VIEWBOX / 2}
+                  originY={RING_VIEWBOX / 2}
+                />
+              </Svg>
+            </Animated.View>
 
-              {/* Logo wrapper — entrance translate/rotate/opacity. Dos
-                  copias del logo (white + green) en crossfade. */}
-              <Animated.View
-                style={[
-                  s.logoWrap,
-                  {
-                    opacity: logoOpacity,
-                    transform: [
-                      { translateY: logoTranslateY },
-                      { rotate: logoRotateStr },
-                    ],
-                  },
-                ]}
-              >
-                <Animated.View
-                  style={[s.logoLayer, { opacity: whiteLogoOpacity }]}
-                >
-                  <AlamosLogo variant="mark" tone="white" size={LOGO_SIZE} />
-                </Animated.View>
-                <Animated.View
-                  style={[s.logoLayer, { opacity: greenLogoOpacity }]}
-                >
-                  <AlamosLogo variant="mark" tone="green" size={LOGO_SIZE} />
-                </Animated.View>
-              </Animated.View>
+            {/* Dos copias del logo en crossfade: mix (start) y blanco
+                (después de que el cover termina de cubrir). */}
+            <Animated.View
+              style={[s.logoLayer, { opacity: mixLogoOpacity }]}
+            >
+              <AlamosLogo variant="mark" tone="light" size={LOGO_SIZE} />
+            </Animated.View>
+            <Animated.View
+              style={[s.logoLayer, { opacity: whiteLogoOpacity }]}
+            >
+              <AlamosLogo variant="mark" tone="white" size={LOGO_SIZE} />
             </Animated.View>
           </Animated.View>
         </Pressable>
@@ -426,6 +425,44 @@ const s = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
   },
+  coverContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  coverHalo: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
+  coverSolid: {
+    flex: 1,
+  },
+  hero: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ringWrap: {
+    position: "absolute",
+    width: RING_SIZE,
+    height: RING_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoLayer: {
+    position: "absolute",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   greetingWrap: {
     position: "absolute",
     left: 28,
@@ -435,44 +472,20 @@ const s = StyleSheet.create({
     justifyContent: "center",
     alignItems: "flex-start",
   },
-  cover: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hero: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ringWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoWrap: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  /* Tipografía editorial Alamos — escala display sin shouting. */
+  /* Tipografía editorial Alamos en BLANCO sobre el cover verde
+   * — máximo contraste, feel "panel premium". */
   greeting: {
     fontFamily: fontFamily[500],
     fontSize: 17,
     letterSpacing: -0.2,
     marginBottom: 6,
+    color: "rgba(255,255,255,0.78)",
   },
   name: {
     fontFamily: fontFamily[700],
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -1.4,
+    color: "#FFFFFF",
   },
 });
