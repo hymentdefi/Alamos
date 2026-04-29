@@ -153,11 +153,12 @@ function BaseExplore() {
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
 
         {/* Segmented tabs de mercado — el "switch" entre AR / EE.UU /
-            Cripto. Reemplaza a las pills de categoría que había antes. */}
+            Cripto. Estilo iOS-like: track crema, pill activa blanca
+            elevada con sombra sutil. */}
         <View
           style={[
             s.marketSeg,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
+            { backgroundColor: c.surfaceHover },
           ]}
         >
           {MARKET_TABS.map((m, i) => {
@@ -171,14 +172,20 @@ function BaseExplore() {
                 rippleContained
                 style={[
                   s.marketSegBtn,
-                  active && { backgroundColor: c.text },
+                  active && [
+                    s.marketSegBtnActive,
+                    { backgroundColor: c.surface },
+                  ],
                 ]}
               >
                 <MarketGlyph market={m.id} active={active} />
                 <Text
                   style={[
                     s.marketSegLabel,
-                    { color: active ? c.bg : c.textSecondary },
+                    {
+                      color: active ? c.text : c.textMuted,
+                      fontFamily: active ? fontFamily[700] : fontFamily[600],
+                    },
                   ]}
                   numberOfLines={1}
                 >
@@ -248,10 +255,12 @@ function BaseExplore() {
 
 function MarketGlyph({
   market,
-  active,
 }: {
   market: AssetMarket;
-  active: boolean;
+  /** Reservado por compatibilidad — el glyph mantiene los mismos
+   *  colores en estado activo e inactivo desde que el segmented pasó
+   *  a estilo iOS (track crema + pill blanca). */
+  active?: boolean;
 }) {
   const { c } = useTheme();
   if (market === "AR") return <FlagIcon code="AR" size={18} />;
@@ -260,19 +269,9 @@ function MarketGlyph({
   // glyph que mantenga el peso visual de las dos primeras opciones.
   return (
     <View
-      style={[
-        gs.cryptoBadge,
-        { backgroundColor: active ? c.bg : c.greenDark },
-      ]}
+      style={[gs.cryptoBadge, { backgroundColor: c.greenDark }]}
     >
-      <Text
-        style={[
-          gs.cryptoBadgeText,
-          { color: active ? c.text : c.bg },
-        ]}
-      >
-        ₿
-      </Text>
+      <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
     </View>
   );
 }
@@ -711,8 +710,7 @@ const s = StyleSheet.create({
   marketSeg: {
     flexDirection: "row",
     borderRadius: radius.pill,
-    borderWidth: 1,
-    padding: 3,
+    padding: 4,
     gap: 2,
     marginBottom: 14,
   },
@@ -725,8 +723,17 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radius.pill,
   },
+  marketSegBtnActive: {
+    // Sombra sutil para que la pill activa "flote" sobre el track crema —
+    // mismo feel que el toggle Dinero/Portfolio del home y los segmented
+    // controls de iOS.
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   marketSegLabel: {
-    fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.1,
   },
