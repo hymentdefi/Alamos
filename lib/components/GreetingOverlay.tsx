@@ -80,8 +80,33 @@ export function GreetingOverlay({ onEnd }: Props) {
   const firstName = user?.fullName?.split(" ")[0] ?? "Christian";
   const greeting = timeGreeting();
 
-  /* ─── Cover verde ─── */
-  const coverY = useRef(new Animated.Value(windowH)).current;
+  /* ─── Progress unificado del cover + wipe (0→1) ───
+   * Un único Animated.Value controla TANTO el translateY del cover
+   * como la altura de la máscara del wipe via `interpolate`. Así el
+   * wipe está sincronizado al pixel exacto con el avance del cover:
+   * cuando el top del cover toca el bottom del logo, el wipe arranca;
+   * cuando el top del cover pasa el top del logo, el wipe terminó. */
+  const coverProgress = useRef(new Animated.Value(0)).current;
+
+  // Cover translateY: lerp simple de windowH (todo abajo) a 0 (full-cover).
+  const coverTranslateY = coverProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [windowH, 0],
+  });
+
+  // Puntos del progreso donde el TOP del cover toca el bottom y el
+  // top del logo (logo centrado en la pantalla). Calculados a partir
+  // de la geometría real, no aproximados.
+  //   coverTopY = windowH * (1 - progress)
+  //   bottom del logo = windowH/2 + LOGO_SIZE/2
+  //   top del logo    = windowH/2 - LOGO_SIZE/2
+  // Resolviendo: progress = 1 - coverTopY/windowH.
+  const wipeStart = 1 - (windowH / 2 + LOGO_SIZE / 2) / windowH;
+  const wipeEnd = 1 - (windowH / 2 - LOGO_SIZE / 2) / windowH;
+  const wipeHeight = coverProgress.interpolate({
+    inputRange: [0, wipeStart, wipeEnd, 1],
+    outputRange: [0, 0, LOGO_SIZE, LOGO_SIZE],
+  });
 
   /* ─── Logo entrance ─── */
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -89,13 +114,6 @@ export function GreetingOverlay({ onEnd }: Props) {
   const logoPulse = useRef(new Animated.Value(1)).current;
   const logoExitOpacity = useRef(new Animated.Value(1)).current;
   const logoExitScale = useRef(new Animated.Value(1)).current;
-
-  /* ─── Wipe del logo MIX → BLANCO ─── */
-  // Altura del rectángulo de máscara: 0 = ninguna parte revelada,
-  // LOGO_SIZE = todo el blanco visible. Anclado al bottom para que
-  // crezca de abajo hacia arriba (en sincro con el cover subiendo).
-  // useNativeDriver:false porque animamos `height` (layout, no transform).
-  const wipeHeight = useRef(new Animated.Value(0)).current;
 
   /* ─── Ring ─── */
   const ringOffset = useRef(new Animated.Value(CIRC)).current;
@@ -128,52 +146,38 @@ export function GreetingOverlay({ onEnd }: Props) {
     ]).start();
 
     /* ─── 2. HOLD del logo mix (340–560ms) ─── */
-    /* ─── 3. Cover sube + WIPE coordinado (a partir de 560ms) ─── */
+    /* ─── 3. Cover sube + WIPE coordinado (a partir de 560ms) ───
+     *
+     * Una única animación de `coverProgress` (0→1) que mediante
+     * `interpolate` mueve simultáneamente:
+     *   - el translateY del cover (de windowH → 0)
+     *   - la altura de la máscara del wipe (0 en el rango pre-logo,
+     *     creciendo de 0 → LOGO_SIZE entre wipeStart y wipeEnd, y
+     *     luego LOGO_SIZE en el rango post-logo)
+     *
+     * Resultado: el cambio a blanco está atado pixel-por-pixel al
+     * avance del cover. Apenas el verde toca el bottom del logo,
+     * el wipe arranca; cuando el verde supera el top del logo, el
+     * logo ya está 100% blanco. No hay desfase. */
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-      // Cover y wipe son DOS animaciones paralelas con el mismo
-      // duración + easing — así el wipe avanza visualmente en
-      // sincronía con el cover que sube. La máscara crece sólo
-      // durante la fracción del recorrido en que el cover está
-      // pasando por la zona del logo.
-      const COVER_DURATION = 1100;
-      // Posición del cover (translateY) cuando llega al bottom del
-      // logo y cuando pasa el top, expresado como progreso 0–1.
-      // En vez de calcularlo exacto (depende de windowH), arrancamos
-      // el wipe a un 40% del avance y lo terminamos al 75% — eso
-      // distribuye 35% del recorrido al wipe, es visualmente lento
-      // sin ser dramático.
-      const WIPE_DELAY = COVER_DURATION * 0.4;
-      const WIPE_DURATION = COVER_DURATION * 0.35;
-
       Animated.parallel([
-        // Cover: in-out cubic, suave constante. Sin halo, edge limpio.
-        Animated.timing(coverY, {
-          toValue: 0,
-          duration: COVER_DURATION,
+        Animated.timing(coverProgress, {
+          toValue: 1,
+          duration: 1300,
           easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
+          // false porque el wipeHeight (interpolate de coverProgress)
+          // se aplica a `height` (layout), no a transform.
+          useNativeDriver: false,
         }),
-        // Wipe: la máscara crece de 0 a LOGO_SIZE durante la zona
-        // central del recorrido del cover. Mismo easing para que
-        // visualmente "siga" el avance del cover píxel por píxel.
+        // Ring fade-in al final del cover — listo para dibujarse
+        // apenas el cover llega al top.
         Animated.sequence([
-          Animated.delay(WIPE_DELAY),
-          Animated.timing(wipeHeight, {
-            toValue: LOGO_SIZE,
-            duration: WIPE_DURATION,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: false, // height no soporta native
-          }),
-        ]),
-        // Ring fade-in mientras el cover está terminando — para que
-        // esté listo a dibujarse apenas el cover llega al top.
-        Animated.sequence([
-          Animated.delay(900),
+          Animated.delay(1080),
           Animated.timing(ringOpacity, {
             toValue: 1,
-            duration: 240,
+            duration: 220,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
@@ -181,9 +185,9 @@ export function GreetingOverlay({ onEnd }: Props) {
       ]).start();
     }, 560);
 
-    /* ─── 5. Cover terminó (1660ms). Pausa breve. ─── */
-    /* ─── 6. Ring se DIBUJA (a partir de 1760ms — el ring
-     *      "nace" desde un punto y se cierra) ─── */
+    /* ─── 5. Cover terminó (a los 1860ms). Pausa breve. ─── */
+    /* ─── 6. Ring se DIBUJA (a partir de 1960ms — nace desde
+     *      un punto y se cierra de punta a punta) ─── */
     setTimeout(() => {
       Animated.timing(ringOffset, {
         toValue: 0,
@@ -207,10 +211,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           }),
         ]).start();
       });
-    }, 1760);
+    }, 1960);
 
     /* ─── 7. Ring cerrado → logo + ring desvanecen +
-     *      saludo emerge (a partir de 2700ms) ─── */
+     *      saludo emerge (a partir de 2900ms) ─── */
     setTimeout(() => {
       Animated.parallel([
         Animated.timing(logoExitOpacity, {
@@ -266,10 +270,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           ]),
         ]),
       ]).start();
-    }, 2700);
+    }, 2900);
 
-    /* ─── 8. EXIT (a los 3700ms) ─── */
-    const exitTimer = setTimeout(() => exit(), 3700);
+    /* ─── 8. EXIT (a los 3900ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 3900);
 
     return () => clearTimeout(exitTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,7 +313,7 @@ export function GreetingOverlay({ onEnd }: Props) {
               s.cover,
               {
                 backgroundColor: c.brand,
-                transform: [{ translateY: coverY }],
+                transform: [{ translateY: coverTranslateY }],
               },
             ]}
             pointerEvents="none"
