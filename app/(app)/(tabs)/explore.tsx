@@ -15,34 +15,60 @@ import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 import { AutoMarquee } from "../../../lib/components/AutoMarquee";
+import { FlagIcon } from "../../../lib/components/FlagIcon";
+import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 
 const FAVS_FILTER_KEY = "explore:only_favs";
+const MARKET_TAB_KEY = "explore:market_tab";
 import {
   assets,
   assetIconCode,
-  formatARS,
+  assetMarket,
+  assetCurrency,
+  formatMoney,
   formatPct,
   type Asset,
-  type AssetCategory,
+  type AssetMarket,
+  type AssetCurrency,
 } from "../../../lib/data/assets";
+import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
 import { useProMode } from "../../../lib/pro/context";
 import { Tap } from "../../../lib/components/Tap";
 
-type Filter = "todo" | AssetCategory;
+interface MarketTab {
+  id: AssetMarket;
+  label: string;
+  short: string;
+  currency: AssetCurrency;
+  /** Etiqueta de la cuenta en el footer del card de fondos. */
+  walletLabel: string;
+}
 
-const filters: { id: Filter; label: string }[] = [
-  { id: "todo", label: "Todo" },
-  { id: "cedears", label: "CEDEARs" },
-  { id: "fci", label: "Fondos" },
-  { id: "crypto", label: "Crypto" },
-  { id: "bonos", label: "Bonos" },
-  { id: "acciones", label: "Acciones" },
-  { id: "obligaciones", label: "ONs" },
-  { id: "letras", label: "Letras" },
-  { id: "caucion", label: "Caución" },
+const MARKET_TABS: MarketTab[] = [
+  {
+    id: "AR",
+    label: "Argentina",
+    short: "AR",
+    currency: "ARS",
+    walletLabel: "Cuenta argentina",
+  },
+  {
+    id: "US",
+    label: "Estados Unidos",
+    short: "EE.UU",
+    currency: "USD",
+    walletLabel: "Cuentas en dólares",
+  },
+  {
+    id: "CRYPTO",
+    label: "Cripto",
+    short: "Cripto",
+    currency: "USDT",
+    walletLabel: "Wallet cripto",
+  },
 ];
 
 export default function ExploreScreen() {
@@ -60,31 +86,27 @@ function BaseExplore() {
   const isFocused = useIsFocused();
 
   const [query, setQuery] = useState("");
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeMarketIdx, setActiveMarketIdx] = useState(0);
   const [onlyFavs, setOnlyFavs] = useState(false);
-  const filterScrollRef = useRef<ScrollView>(null);
   const listRef = useRef<ScrollView | null>(null);
 
-  // Cargamos la preferencia del filtro 'solo favoritos' al montar.
-  // Así sobrevive entre sesiones.
+  // Cargamos preferencia de "solo favoritos" + última market tab
+  // seleccionada al montar para que sobrevivan entre sesiones.
   useEffect(() => {
     SecureStore.getItemAsync(FAVS_FILTER_KEY)
       .then((v) => {
         if (v === "1") setOnlyFavs(true);
       })
       .catch(() => {});
+    SecureStore.getItemAsync(MARKET_TAB_KEY)
+      .then((v) => {
+        const idx = MARKET_TABS.findIndex((m) => m.id === v);
+        if (idx >= 0) setActiveMarketIdx(idx);
+      })
+      .catch(() => {});
   }, []);
 
-  const filter = filters[activeIdx];
-
-  const topMovers = useMemo(
-    () =>
-      [...assets]
-        .filter((a) => a.category !== "efectivo")
-        .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-        .slice(0, 8),
-    [],
-  );
+  const market = MARKET_TABS[activeMarketIdx];
 
   const openDetail = useCallback(
     (asset: Asset) => {
@@ -107,17 +129,12 @@ function BaseExplore() {
     Haptics.selectionAsync().catch(() => {});
   };
 
-  // Scroll de los pills para centrar la categoría activa
-  useEffect(() => {
-    filterScrollRef.current?.scrollTo({
-      x: Math.max(0, activeIdx * 92 - 60),
-      animated: true,
-    });
-  }, [activeIdx]);
-
-  const openFilter = useCallback((idx: number) => {
+  const switchMarket = useCallback((idx: number) => {
     Haptics.selectionAsync().catch(() => {});
-    setActiveIdx(idx);
+    setActiveMarketIdx(idx);
+    SecureStore.setItemAsync(MARKET_TAB_KEY, MARKET_TABS[idx].id).catch(
+      () => {},
+    );
     listRef.current?.scrollTo({ y: 0, animated: false });
   }, []);
 
@@ -135,6 +152,43 @@ function BaseExplore() {
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
 
+        {/* Segmented tabs de mercado — el "switch" entre AR / EE.UU /
+            Cripto. Reemplaza a las pills de categoría que había antes. */}
+        <View
+          style={[
+            s.marketSeg,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+        >
+          {MARKET_TABS.map((m, i) => {
+            const active = i === activeMarketIdx;
+            return (
+              <Tap
+                key={m.id}
+                onPress={() => switchMarket(i)}
+                haptic="selection"
+                pressScale={0.96}
+                rippleContained
+                style={[
+                  s.marketSegBtn,
+                  active && { backgroundColor: c.text },
+                ]}
+              >
+                <MarketGlyph market={m.id} active={active} />
+                <Text
+                  style={[
+                    s.marketSegLabel,
+                    { color: active ? c.bg : c.textSecondary },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {m.short}
+                </Text>
+              </Tap>
+            );
+          })}
+        </View>
+
         <View style={s.searchRow}>
           <View
             style={[
@@ -145,7 +199,7 @@ function BaseExplore() {
             <Feather name="search" size={16} color={c.textMuted} />
             <TextInput
               style={[s.searchInput, { color: c.text }]}
-              placeholder="Buscar por ticker o nombre"
+              placeholder={`Buscar en ${market.label}`}
               placeholderTextColor={c.textMuted}
               value={query}
               onChangeText={setQuery}
@@ -174,50 +228,12 @@ function BaseExplore() {
             />
           </Tap>
         </View>
-
-        <ScrollView
-          ref={filterScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.filterRow}
-          contentContainerStyle={s.filterContent}
-        >
-          {filters.map((f, i) => {
-            const active = i === activeIdx;
-            return (
-              <Tap
-                key={f.id}
-                onPress={() => openFilter(i)}
-                haptic="selection"
-                pressScale={0.93}
-                style={[
-                  s.filterPill,
-                  {
-                    backgroundColor: active ? c.ink : c.surfaceHover,
-                    borderColor: active ? c.ink : c.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    s.filterLabel,
-                    { color: active ? c.bg : c.textSecondary },
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </Tap>
-            );
-          })}
-        </ScrollView>
       </View>
 
-      <MarketPage
-        filter={filter.id}
-        label={filter.label}
+      <MarketBody
+        market={market}
         query={query}
         onlyFavs={onlyFavs}
-        topMovers={topMovers}
         onOpen={openDetail}
         isFavorite={isFavorite}
         listRef={(r) => {
@@ -228,52 +244,269 @@ function BaseExplore() {
   );
 }
 
-/* ─── Página de lista filtrada por categoría ─── */
+/* ─── Glyph del mercado para los segmented tabs ─── */
 
-function MarketPage({
-  filter,
-  label,
+function MarketGlyph({
+  market,
+  active,
+}: {
+  market: AssetMarket;
+  active: boolean;
+}) {
+  const { c } = useTheme();
+  if (market === "AR") return <FlagIcon code="AR" size={18} />;
+  if (market === "US") return <FlagIcon code="US" size={18} />;
+  // Cripto: pill verde con ₿ — no hay bandera, así que armamos un
+  // glyph que mantenga el peso visual de las dos primeras opciones.
+  return (
+    <View
+      style={[
+        gs.cryptoBadge,
+        { backgroundColor: active ? c.bg : c.greenDark },
+      ]}
+    >
+      <Text
+        style={[
+          gs.cryptoBadgeText,
+          { color: active ? c.text : c.bg },
+        ]}
+      >
+        ₿
+      </Text>
+    </View>
+  );
+}
+
+const gs = StyleSheet.create({
+  cryptoBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cryptoBadgeText: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    lineHeight: 13,
+  },
+});
+
+/* ─── Card de fondos disponibles para operar ─── */
+
+function AvailableFundsCard({ market }: { market: MarketTab }) {
+  const { c } = useTheme();
+  const router = useRouter();
+
+  // Sumamos todas las cuentas en la moneda del mercado activo. Para
+  // USD esto agrupa la cuenta argentina y la cuenta US.
+  const matchingAccounts = useMemo(
+    () => accounts.filter((a) => a.currency === market.currency),
+    [market.currency],
+  );
+  const balance = useMemo(
+    () => matchingAccounts.reduce((s, a) => s + a.balance, 0),
+    [matchingAccounts],
+  );
+
+  const prefix =
+    market.currency === "USD"
+      ? "US$"
+      : market.currency === "USDT"
+      ? "USDT"
+      : "$";
+
+  // Footer: nombres de las cuentas que componen el balance, separadas
+  // por punto medio. Si hay una sola, mostramos su location;
+  // si hay varias (caso USD), las concatenamos.
+  const footerParts =
+    matchingAccounts.length > 0
+      ? matchingAccounts.map((a) => a.location)
+      : [market.walletLabel];
+
+  return (
+    <View
+      style={[
+        fs.card,
+        { backgroundColor: c.surface, borderColor: c.border },
+      ]}
+    >
+      <View style={fs.headRow}>
+        <Text style={[fs.eyebrow, { color: c.textMuted }]}>
+          DISPONIBLE PARA OPERAR
+        </Text>
+        <View style={[fs.marketPill, { backgroundColor: c.surfaceHover }]}>
+          <View style={fs.marketPillIcon}>
+            <MarketGlyph market={market.id} active={false} />
+          </View>
+          <Text style={[fs.marketPillText, { color: c.textSecondary }]}>
+            {market.short}
+          </Text>
+        </View>
+      </View>
+
+      <View style={fs.amountRow}>
+        <AmountDisplay
+          value={balance}
+          size={42}
+          weight={800}
+          prefix={prefix}
+        />
+      </View>
+
+      <View style={fs.footerRow}>
+        <Text
+          style={[fs.footerText, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {footerParts.join(" · ")}
+        </Text>
+        <Tap
+          onPress={() => router.push("/(app)/transfer")}
+          haptic="selection"
+          pressScale={0.95}
+          style={[fs.cta, { backgroundColor: c.greenDim }]}
+        >
+          <Feather name="plus" size={13} color={c.greenDark} />
+          <Text style={[fs.ctaText, { color: c.greenDark }]}>Ingresar</Text>
+        </Tap>
+      </View>
+    </View>
+  );
+}
+
+const fs = StyleSheet.create({
+  card: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  headRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  eyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  marketPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingLeft: 4,
+    paddingRight: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  marketPillIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketPillText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  amountRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(0,0,0,0.08)",
+    gap: 12,
+  },
+  footerText: {
+    flex: 1,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+  },
+  cta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+  },
+  ctaText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.05,
+  },
+});
+
+/* ─── Body: card de fondos + movers + lista de instrumentos ─── */
+
+function MarketBody({
+  market,
   query,
   onlyFavs,
-  topMovers,
   onOpen,
   isFavorite,
   listRef,
 }: {
-  filter: Filter;
-  label: string;
+  market: MarketTab;
   query: string;
   onlyFavs: boolean;
-  topMovers: Asset[];
   onOpen: (a: Asset) => void;
   isFavorite: (t: string) => boolean;
   listRef: (ref: ScrollView | null) => void;
 }) {
   const { c } = useTheme();
 
+  const inMarket = useMemo(
+    () =>
+      assets.filter(
+        (a) =>
+          a.category !== "efectivo" && assetMarket(a) === market.id,
+      ),
+    [market.id],
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return assets.filter((a) => {
-      if (a.category === "efectivo") return false;
+    return inMarket.filter((a) => {
       if (onlyFavs && !isFavorite(a.ticker)) return false;
-      if (filter !== "todo" && a.category !== filter) return false;
       if (!q) return true;
       return (
         a.ticker.toLowerCase().includes(q) ||
         a.name.toLowerCase().includes(q)
       );
     });
-  }, [query, filter, onlyFavs, isFavorite]);
+  }, [query, onlyFavs, isFavorite, inMarket]);
+
+  const topMovers = useMemo(
+    () =>
+      [...inMarket]
+        .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+        .slice(0, 8),
+    [inMarket],
+  );
 
   const eyebrowLabel = query
     ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
     : onlyFavs
-    ? filter === "todo"
-      ? "Tus favoritos"
-      : `Favoritos · ${label}`
-    : label;
+    ? `Tus favoritos en ${market.short}`
+    : `Instrumentos · ${market.label}`;
 
-  const showMovers = !query && !onlyFavs && filter === "todo";
+  const showMovers = !query && !onlyFavs;
 
   return (
     <ScrollView
@@ -281,7 +514,9 @@ function MarketPage({
       contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
     >
-      {showMovers ? (
+      <AvailableFundsCard market={market} />
+
+      {showMovers && topMovers.length > 0 ? (
         <View style={s.moversBlock}>
           <View style={s.sectionHead}>
             <Text style={[s.eyebrow, { color: c.textMuted }]}>
@@ -302,17 +537,24 @@ function MarketPage({
         {visible.length === 0 ? (
           <View style={s.empty}>
             <Text style={[s.emptyTitle, { color: c.text }]}>
-              {onlyFavs ? "Aún no tenés favoritos" : "Sin resultados"}
+              {onlyFavs
+                ? "Aún no tenés favoritos"
+                : query
+                ? "Sin resultados"
+                : `Todavía no hay instrumentos en ${market.label}`}
             </Text>
             <Text style={[s.emptySub, { color: c.textMuted }]}>
               {onlyFavs
                 ? "Entrá a un activo y tocá la estrella arriba a la derecha para guardarlo."
-                : "Probá con otro ticker o categoría."}
+                : query
+                ? "Probá con otro ticker o nombre."
+                : "Pronto vamos a sumar más opciones."}
             </Text>
           </View>
         ) : (
           visible.map((asset, i) => {
             const fav = isFavorite(asset.ticker);
+            const currency = assetCurrency(asset);
             return (
               <Pressable
                 key={asset.ticker}
@@ -368,7 +610,7 @@ function MarketPage({
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
                   <Text style={[s.rowPrice, { color: c.text }]}>
-                    {formatARS(asset.price)}
+                    {formatMoney(asset.price, currency)}
                   </Text>
                   {asset.annualYield != null ? (
                     /* FCI: mostramos TNA (o rendimiento 12M para RV)
@@ -415,6 +657,7 @@ function MoversMarquee({
       <AutoMarquee speed={32} contentStyle={s.marqueeTrack}>
         {movers.map((asset) => {
           const up = asset.change >= 0;
+          const currency = assetCurrency(asset);
           return (
             <Pressable
               key={asset.ticker}
@@ -434,7 +677,7 @@ function MoversMarquee({
                 {asset.name}
               </Text>
               <Text style={[s.moverPrice, { color: c.text }]}>
-                {formatARS(asset.price)}
+                {formatMoney(asset.price, currency)}
               </Text>
               <Text
                 style={[
@@ -456,7 +699,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   title: {
     fontFamily: fontFamily[700],
@@ -464,6 +707,28 @@ const s = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -1.2,
     marginBottom: 14,
+  },
+  marketSeg: {
+    flexDirection: "row",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
+    marginBottom: 14,
+  },
+  marketSegBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  marketSegLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
   searchRow: {
     flexDirection: "row",
@@ -495,27 +760,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  filterRow: {
-    marginTop: 14,
-    marginHorizontal: -20,
-  },
-  filterContent: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  filterLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
   moversBlock: {
-    paddingTop: 20,
+    paddingTop: 24,
   },
   sectionHead: {
     paddingHorizontal: 20,
@@ -633,6 +879,7 @@ const s = StyleSheet.create({
     fontSize: 18,
     letterSpacing: -0.4,
     marginBottom: 6,
+    textAlign: "center",
   },
   emptySub: {
     fontFamily: fontFamily[500],
