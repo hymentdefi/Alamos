@@ -28,48 +28,42 @@ function timeGreeting(): string {
 
 /* ─── Geometría del isotipo (brand-kit) ───────────────────────────── */
 
-// Triángulo trasero — `M 38,26 L 16,86 L 60,86 Z`
 const TRI_BACK_PATH = "M 38,26 L 16,86 L 60,86 Z";
-// Triángulo delantero — `M 56,12 L 29,86 L 83,86 Z`
 const TRI_FRONT_PATH = "M 56,12 L 29,86 L 83,86 Z";
 
-// Perímetros calculados — necesarios para el stroke-dashoffset reveal.
 // Lados back:    sqrt(22²+60²)=64, 44, sqrt(22²+60²)=64 → 172
-// Lados front:   sqrt(27²+74²)≈78.8, 54, sqrt(27²+74²)≈78.8 → 211.6
+// Lados front:   sqrt(27²+74²)≈79, 54, sqrt(27²+74²)≈79 → 212
 const TRI_BACK_PERIMETER = 172;
 const TRI_FRONT_PERIMETER = 212;
 
 const STROKE_W = 5.5;
-const LOGO_SIZE = 132;
+const LOGO_SIZE = 124;
 
 /**
- * Animación de entrada coordinada — todo conectado, ningún corte:
+ * Animación de entrada — secuencia continua, ningún corte:
  *
- *   A. Boot (0–360ms)   — fondo + logo aparecen como en el splash
- *      nativo (back verde + front outline negro). Scale spring + fadeIn.
+ *   A. Boot (0–340ms)        — backdrop + logo entry (scale 0.94→1).
+ *   B. Charge / TRACE        — el verde brand se dibuja sobre el
+ *      (340–940ms)             front-negro animando strokeDashoffset.
+ *                              El negro fadea desde el 40% del trace
+ *                              para overlap suave. Selection haptic
+ *                              al cerrar.
+ *   C. Hold del logo verde   — 250ms quieto. El "beat" premium —
+ *      (940–1190ms)            le da al logo un momento de respiro
+ *                              antes de la transición.
+ *   D. Logo out + Text in    — el logo se desvanece quieto con un
+ *      (1190–1700ms)           scale-up muy sutil (1→1.04). El texto
+ *                              entra en su propia posición (left
+ *                              padding, ~42% altura) con fadeIn +
+ *                              translateY de 10px. Greeting antes,
+ *                              name con stagger 80ms. NO viajan
+ *                              hacia ningún lado: cada elemento se
+ *                              mueve mínimo, lo que coordina es el
+ *                              TIMING, no la trayectoria.
+ *   E. Hold (1700–2200ms)    — el saludo respira.
+ *   F. Exit (2200–2500ms)    — fade global, onEnd.
  *
- *   B. Charge (360–960ms) — el verde brand se TRAZA encima del front
- *      como si lo dibujaran (strokeDashoffset 0→full). Mientras el
- *      trace avanza, el negro original se va apagando proporcional.
- *      Al final el logo está "todo verde". Pulse + haptic Light al
- *      cerrar el trazo.
- *
- *   C. Morph to text (960–1700ms) — los triángulos se DESLIZAN hacia
- *      la izquierda mientras se achican y giran levemente. Cada uno
- *      "se convierte" visualmente en una línea del saludo:
- *         · back  → "Buen día,"  (se va arriba-izq)
- *         · front → "Christian"  (se va abajo-izq, más amplitud)
- *      Mientras los triángulos viajan, su opacity baja en sincronía
- *      con la opacity de cada línea de texto que emerge desde la
- *      misma trayectoria. Al cierre: triángulos en 0, textos en 1,
- *      sin pop.
- *
- *   D. Hold (1700–2050ms)
- *
- *   E. Exit (2050–2350ms) — fade global, onEnd.
- *
- * Tappeable para skip rápido. Total ~2.3s — suficiente para que cada
- * beat se lea pero corto para no aburrir.
+ * Tappeable para skip rápido.
  */
 export function GreetingOverlay({ onEnd }: Props) {
   const { c } = useTheme();
@@ -82,54 +76,34 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   /* ─── A. Logo entry ─── */
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.82)).current;
+  const logoScale = useRef(new Animated.Value(0.94)).current;
 
-  /* ─── B. Charge / morph ─── */
-  // Trazo verde sobre el front. Empieza con dashoffset = perímetro
-  // (invisible) y termina en 0 (cerrado). Lo mismo para el back para
-  // que ambos se "redibujen" sincronizados.
+  /* ─── B. Charge / trace ─── */
   const backTraceOffset = useRef(
     new Animated.Value(TRI_BACK_PERIMETER),
   ).current;
   const frontTraceOffset = useRef(
     new Animated.Value(TRI_FRONT_PERIMETER),
   ).current;
-  // Front-negro original que se desvanece a medida que el verde lo cubre.
   const frontBlackOpacity = useRef(new Animated.Value(1)).current;
-  // Pulse al final del charge — confirma "encendido".
-  const chargePulse = useRef(new Animated.Value(1)).current;
 
-  /* ─── C. Morph to text — viajes individuales ─── */
-  // Each triangle has its own translate (X,Y), scale, rotate, opacity.
-  // El back va a la posición de "Buen día," y el front a "Christian".
-  const backTx = useRef(new Animated.Value(0)).current;
-  const backTy = useRef(new Animated.Value(0)).current;
-  const backScale = useRef(new Animated.Value(1)).current;
-  const backRot = useRef(new Animated.Value(0)).current;
-  const backOpacity = useRef(new Animated.Value(1)).current;
-
-  const frontTx = useRef(new Animated.Value(0)).current;
-  const frontTy = useRef(new Animated.Value(0)).current;
-  const frontScale = useRef(new Animated.Value(1)).current;
-  const frontRot = useRef(new Animated.Value(0)).current;
-  const frontOpacity = useRef(new Animated.Value(1)).current;
+  /* ─── D. Logo exit ─── */
+  // Scale-up muy sutil (1 → 1.04) mientras opacity 1 → 0. NO se mueve.
+  const logoExitScale = useRef(new Animated.Value(1)).current;
+  const logoExitOpacity = useRef(new Animated.Value(1)).current;
 
   /* ─── D. Greeting in ─── */
-  // Cada línea entra desde la posición desde donde llega su triángulo
-  // — eso da la sensación de "el triángulo se convirtió en este texto".
-  const greetTx = useRef(new Animated.Value(40)).current;
+  const greetTy = useRef(new Animated.Value(10)).current;
   const greetOpacity = useRef(new Animated.Value(0)).current;
-  const greetScale = useRef(new Animated.Value(0.85)).current;
 
-  const nameTx = useRef(new Animated.Value(60)).current;
+  const nameTy = useRef(new Animated.Value(14)).current;
   const nameOpacity = useRef(new Animated.Value(0)).current;
-  const nameScale = useRef(new Animated.Value(0.78)).current;
 
   // Re-entry guard.
   const endedRef = useRef(false);
 
   useEffect(() => {
-    /* ─── A. BOOT (0–360ms) ─── */
+    /* ─── A. BOOT ─── */
     Animated.timing(bgOpacity, {
       toValue: 1,
       duration: 220,
@@ -146,141 +120,69 @@ export function GreetingOverlay({ onEnd }: Props) {
       }),
       Animated.spring(logoScale, {
         toValue: 1,
-        tension: 80,
-        friction: 10,
+        tension: 95,
+        friction: 13,
         useNativeDriver: true,
       }),
     ]).start();
 
-    /* ─── B. CHARGE / TRACE (360→960ms) ─── */
-    const chargeTimer = setTimeout(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    /* ─── B. TRACE (340→940ms) ─── */
+    const traceTimer = setTimeout(() => {
       Animated.parallel([
-        // Trace de los dos triángulos en simultáneo — back y front se
-        // "redibujan" al mismo tiempo. La duración es igual aunque
-        // tengan perímetros distintos para que el feel sea unificado;
-        // el ojo no nota la diferencia de velocidad.
+        // Trace de los dos triángulos en simultáneo. easeInOut suave
+        // — más contemplativo que un easeOut punchy.
         Animated.timing(backTraceOffset, {
           toValue: 0,
           duration: 600,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(frontTraceOffset, {
           toValue: 0,
           duration: 600,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        // El negro original se va apagando — empezamos a 30% del trace
-        // para que el verde "monte" antes de que desaparezca el negro.
+        // El negro fadea desde el 40% del trace.
         Animated.sequence([
-          Animated.delay(180),
+          Animated.delay(240),
           Animated.timing(frontBlackOpacity, {
             toValue: 0,
-            duration: 360,
+            duration: 320,
             easing: Easing.inOut(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
-        // Pulse al cerrar — 1 → 1.06 → 1.
-        Animated.sequence([
-          Animated.delay(540),
-          Animated.timing(chargePulse, {
-            toValue: 1.06,
-            duration: 140,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(chargePulse, {
-            toValue: 1,
-            duration: 200,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
-    }, 360);
+      ]).start(() => {
+        // Selection haptic muy sutil al cerrar el trazo — confirma
+        // sin gritar.
+        Haptics.selectionAsync().catch(() => {});
+      });
+    }, 340);
 
-    /* ─── C. MORPH TO TEXT (960→1700ms) ─── */
-    // Direcciones aproximadas — el back va arriba-izquierda (donde
-    // "Buen día,") y el front abajo-izquierda con más amplitud
-    // (donde "Christian"). Y/X negativos = arriba/izquierda.
-    const morphTimer = setTimeout(() => {
+    /* ─── D. LOGO OUT + TEXT IN (a partir de 1190ms) ─── */
+    // El logo holdea 250ms quieto antes de empezar el exit. Ese hold
+    // es lo que se siente premium — el ojo necesita el beat para
+    // registrar el logo completo en verde.
+    const transitionTimer = setTimeout(() => {
       Animated.parallel([
-        /* Back → "Buen día," */
-        Animated.timing(backTx, {
-          toValue: -110,
-          duration: 720,
-          easing: Easing.bezier(0.65, 0, 0.35, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(backTy, {
-          toValue: -38,
-          duration: 720,
-          easing: Easing.bezier(0.65, 0, 0.35, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(backScale, {
-          toValue: 0.18,
-          duration: 720,
-          easing: Easing.bezier(0.5, 0, 0.5, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(backRot, {
-          toValue: -18,
-          duration: 720,
+        // Logo se desvanece quieto + scale-up muy sutil.
+        Animated.timing(logoExitOpacity, {
+          toValue: 0,
+          duration: 460,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.sequence([
-          Animated.delay(420),
-          Animated.timing(backOpacity, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
+        Animated.timing(logoExitScale, {
+          toValue: 1.04,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
 
-        /* Front → "Christian" — más amplitud y baja más */
-        Animated.timing(frontTx, {
-          toValue: -120,
-          duration: 740,
-          easing: Easing.bezier(0.65, 0, 0.35, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(frontTy, {
-          toValue: 28,
-          duration: 740,
-          easing: Easing.bezier(0.65, 0, 0.35, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(frontScale, {
-          toValue: 0.22,
-          duration: 740,
-          easing: Easing.bezier(0.5, 0, 0.5, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(frontRot, {
-          toValue: 14,
-          duration: 740,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
+        // Greeting line — entra con fade + translateY mínimo.
         Animated.sequence([
-          Animated.delay(440),
-          Animated.timing(frontOpacity, {
-            toValue: 0,
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-
-        /* Greeting line — entra cuando el back triangle llega a destino */
-        Animated.sequence([
-          Animated.delay(280),
+          Animated.delay(160),
           Animated.parallel([
             Animated.timing(greetOpacity, {
               toValue: 1,
@@ -288,24 +190,18 @@ export function GreetingOverlay({ onEnd }: Props) {
               easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.spring(greetTx, {
+            Animated.spring(greetTy, {
               toValue: 0,
-              tension: 75,
-              friction: 11,
-              useNativeDriver: true,
-            }),
-            Animated.spring(greetScale, {
-              toValue: 1,
-              tension: 70,
-              friction: 9,
+              tension: 78,
+              friction: 13,
               useNativeDriver: true,
             }),
           ]),
         ]),
 
-        /* Name — stagger 120ms después */
+        // Name — stagger 80ms.
         Animated.sequence([
-          Animated.delay(400),
+          Animated.delay(240),
           Animated.parallel([
             Animated.timing(nameOpacity, {
               toValue: 1,
@@ -313,29 +209,23 @@ export function GreetingOverlay({ onEnd }: Props) {
               easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.spring(nameTx, {
+            Animated.spring(nameTy, {
               toValue: 0,
-              tension: 65,
-              friction: 9,
-              useNativeDriver: true,
-            }),
-            Animated.spring(nameScale, {
-              toValue: 1,
-              tension: 60,
-              friction: 8,
+              tension: 70,
+              friction: 12,
               useNativeDriver: true,
             }),
           ]),
         ]),
       ]).start();
-    }, 960);
+    }, 1190);
 
-    /* ─── E. EXIT (a los 2050ms) ─── */
-    const exitTimer = setTimeout(() => exit(), 2050);
+    /* ─── F. EXIT (a los 2200ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 2200);
 
     return () => {
-      clearTimeout(chargeTimer);
-      clearTimeout(morphTimer);
+      clearTimeout(traceTimer);
+      clearTimeout(transitionTimer);
       clearTimeout(exitTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -358,27 +248,11 @@ export function GreetingOverlay({ onEnd }: Props) {
       }),
       Animated.timing(nameOpacity, {
         toValue: 0,
-        duration: 260,
-        useNativeDriver: true,
-      }),
-      Animated.timing(nameScale, {
-        toValue: 1.04,
-        duration: 320,
-        easing: Easing.out(Easing.quad),
+        duration: 280,
         useNativeDriver: true,
       }),
     ]).start(() => onEnd());
   };
-
-  /* ─── Estilos animados de cada triángulo (transforms compuestos) ─── */
-  const backRotStr = backRot.interpolate({
-    inputRange: [-360, 360],
-    outputRange: ["-360deg", "360deg"],
-  });
-  const frontRotStr = frontRot.interpolate({
-    inputRange: [-360, 360],
-    outputRange: ["-360deg", "360deg"],
-  });
 
   return (
     <Modal
@@ -392,121 +266,62 @@ export function GreetingOverlay({ onEnd }: Props) {
         style={[s.backdrop, { backgroundColor: c.bg, opacity: bgOpacity }]}
       >
         <Pressable style={s.content} onPress={exit}>
-          {/* Logo wrapper — escala global de entrada + pulse del charge.
-              Centrado absoluto en la pantalla. */}
+          {/* Logo wrapper — centrado absoluto. Scale spring de entrada
+              + scale-up sutil del exit + opacity del exit (todo
+              compuesto). El logo no se mueve nunca, sólo se ilumina
+              y desvanece quieto. */}
           <Animated.View
             style={[
               s.logoWrap,
               {
-                opacity: logoOpacity,
+                opacity: Animated.multiply(logoOpacity, logoExitOpacity),
                 transform: [
-                  { scale: Animated.multiply(logoScale, chargePulse) },
+                  { scale: Animated.multiply(logoScale, logoExitScale) },
                 ],
               },
             ]}
             pointerEvents="none"
           >
-            {/* Triángulo BACK — un container animado individual para
-                que su trayectoria al texto sea independiente. */}
-            <Animated.View
-              style={[
-                s.triLayer,
-                {
-                  opacity: backOpacity,
-                  transform: [
-                    { translateX: backTx },
-                    { translateY: backTy },
-                    { rotate: backRotStr },
-                    { scale: backScale },
-                  ],
-                },
-              ]}
-            >
-              <Svg
-                width={LOGO_SIZE}
-                height={LOGO_SIZE}
-                viewBox="0 0 100 100"
-              >
-                <AnimatedPath
-                  d={TRI_BACK_PATH}
-                  stroke={c.brand}
-                  strokeWidth={STROKE_W}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  fill="none"
-                  strokeDasharray={`${TRI_BACK_PERIMETER} ${TRI_BACK_PERIMETER}`}
-                  strokeDashoffset={backTraceOffset}
-                />
-              </Svg>
-            </Animated.View>
-
-            {/* Triángulo FRONT — capa NEGRA original (start state) */}
-            <Animated.View
-              style={[
-                s.triLayer,
-                {
-                  opacity: Animated.multiply(frontOpacity, frontBlackOpacity),
-                  transform: [
-                    { translateX: frontTx },
-                    { translateY: frontTy },
-                    { rotate: frontRotStr },
-                    { scale: frontScale },
-                  ],
-                },
-              ]}
-            >
-              <Svg
-                width={LOGO_SIZE}
-                height={LOGO_SIZE}
-                viewBox="0 0 100 100"
-              >
-                <Path
-                  d={TRI_FRONT_PATH}
-                  stroke={c.text}
-                  strokeWidth={STROKE_W}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              </Svg>
-            </Animated.View>
-
-            {/* Triángulo FRONT — capa VERDE que se traza encima */}
-            <Animated.View
-              style={[
-                s.triLayer,
-                {
-                  opacity: frontOpacity,
-                  transform: [
-                    { translateX: frontTx },
-                    { translateY: frontTy },
-                    { rotate: frontRotStr },
-                    { scale: frontScale },
-                  ],
-                },
-              ]}
-            >
-              <Svg
-                width={LOGO_SIZE}
-                height={LOGO_SIZE}
-                viewBox="0 0 100 100"
-              >
-                <AnimatedPath
-                  d={TRI_FRONT_PATH}
-                  stroke={c.brand}
-                  strokeWidth={STROKE_W}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  fill="none"
-                  strokeDasharray={`${TRI_FRONT_PERIMETER} ${TRI_FRONT_PERIMETER}`}
-                  strokeDashoffset={frontTraceOffset}
-                />
-              </Svg>
-            </Animated.View>
+            <Svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox="0 0 100 100">
+              {/* Triángulo BACK — verde brand, se traza con dashoffset. */}
+              <AnimatedPath
+                d={TRI_BACK_PATH}
+                stroke={c.brand}
+                strokeWidth={STROKE_W}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={`${TRI_BACK_PERIMETER} ${TRI_BACK_PERIMETER}`}
+                strokeDashoffset={backTraceOffset}
+              />
+              {/* Triángulo FRONT capa NEGRA — start state, fadea
+                  durante el trace. */}
+              <AnimatedPath
+                d={TRI_FRONT_PATH}
+                stroke={c.text}
+                strokeWidth={STROKE_W}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                fill="none"
+                opacity={frontBlackOpacity}
+              />
+              {/* Triángulo FRONT capa VERDE — se traza encima. */}
+              <AnimatedPath
+                d={TRI_FRONT_PATH}
+                stroke={c.brand}
+                strokeWidth={STROKE_W}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={`${TRI_FRONT_PERIMETER} ${TRI_FRONT_PERIMETER}`}
+                strokeDashoffset={frontTraceOffset}
+              />
+            </Svg>
           </Animated.View>
 
-          {/* Greeting alineado a la izquierda — emerge de la trayectoria
-              de los triángulos. */}
+          {/* Greeting — alineado a la izquierda, posición propia.
+              No emerge del logo: aparece en su propio lugar con un
+              fade + translateY mínimo. La unidad la da el TIMING. */}
           <View style={s.greetingWrap} pointerEvents="none">
             <Animated.Text
               style={[
@@ -514,10 +329,7 @@ export function GreetingOverlay({ onEnd }: Props) {
                 {
                   color: c.textMuted,
                   opacity: greetOpacity,
-                  transform: [
-                    { translateX: greetTx },
-                    { scale: greetScale },
-                  ],
+                  transform: [{ translateY: greetTy }],
                 },
               ]}
             >
@@ -529,10 +341,7 @@ export function GreetingOverlay({ onEnd }: Props) {
                 {
                   color: c.text,
                   opacity: nameOpacity,
-                  transform: [
-                    { translateX: nameTx },
-                    { scale: nameScale },
-                  ],
+                  transform: [{ translateY: nameTy }],
                 },
               ]}
             >
@@ -552,6 +361,8 @@ const s = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 28,
+    // El saludo va a 42% de altura — un poquito arriba del centro
+    // para que respire arriba del fold y no quede bajo.
     justifyContent: "center",
   },
   logoWrap: {
@@ -563,25 +374,23 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  triLayer: {
-    position: "absolute",
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-  },
   greetingWrap: {
     alignItems: "flex-start",
   },
+  /* ─── Tipografía editorial — escala Alamos (no shouting). El
+   *     "Buen día," small/muted, el nombre con la jerarquía del
+   *     `type.h1` del theme (32, weight 700, letter-spacing -1.1)
+   *     pero un toque más bold (-1.4). */
   greeting: {
     fontFamily: fontFamily[500],
-    fontSize: 26,
-    letterSpacing: -0.4,
-    marginBottom: 4,
-    transformOrigin: "left",
+    fontSize: 17,
+    letterSpacing: -0.2,
+    marginBottom: 6,
   },
   name: {
     fontFamily: fontFamily[700],
-    fontSize: 56,
-    letterSpacing: -2.4,
-    transformOrigin: "left",
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -1.4,
   },
 });
