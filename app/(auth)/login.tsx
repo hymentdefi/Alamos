@@ -58,7 +58,7 @@ export default function LoginScreen() {
         >
           <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
-        <AlamosLogo variant="mark" tone="light" size={26} />
+        <AlamosLogo variant="mark" tone="green" size={26} />
         <View style={{ width: 36 }} />
       </View>
 

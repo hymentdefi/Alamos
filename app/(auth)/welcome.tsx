@@ -14,7 +14,7 @@ export default function WelcomeScreen() {
   return (
     <View style={[s.container, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        <AlamosLogo variant="lockup" tone="light" size={26} />
+        <AlamosLogo variant="lockup" tone="green" size={26} />
         <Pressable
           style={[s.loginPill, { borderColor: c.border }]}
           onPress={() => router.push("/(auth)/login")}

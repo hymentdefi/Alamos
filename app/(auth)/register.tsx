@@ -164,7 +164,7 @@ export default function RegisterScreen() {
             color={c.text}
           />
         </Pressable>
-        <AlamosLogo variant="mark" tone="light" size={26} />
+        <AlamosLogo variant="mark" tone="green" size={26} />
         <View style={{ width: 36 }} />
       </View>
 

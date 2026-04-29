@@ -76,7 +76,7 @@ export default function OnboardingScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <AlamosLogo variant="mark" tone="light" size={26} />
+        <AlamosLogo variant="mark" tone="green" size={26} />
         <Pressable onPress={() => router.replace("/(auth)/register")}>
           <Text style={[s.skip, { color: c.textMuted }]}>Saltar</Text>
         </Pressable>

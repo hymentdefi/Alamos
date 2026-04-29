@@ -66,6 +66,11 @@ import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { AccountAvatar } from "../../../lib/components/AccountAvatar";
 import { AlamosLogo } from "../../../lib/components/Logo";
+import {
+  AlamosIcon,
+  type AlamosIconName,
+} from "../../../lib/components/AlamosIcon";
+import { TrianglesWatermark } from "../../../lib/components/TrianglesWatermark";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -469,6 +474,13 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
+          {/* Watermark de los triángulos brand atrás del hero — vestido
+              de marca sutil sin dominar la jerarquía. */}
+          <TrianglesWatermark
+            size={220}
+            opacity={0.06}
+            style={{ bottom: -40, right: -30 }}
+          />
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
@@ -652,7 +664,7 @@ function ActionButton({
   haptic,
   variant,
 }: {
-  icon: React.ComponentProps<typeof Feather>["name"];
+  icon: AlamosIconName;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
@@ -667,7 +679,7 @@ function ActionButton({
       onPress={onPress}
       haptic={haptic}
     >
-      <Feather name={icon} size={14} color={fg} />
+      <AlamosIcon name={icon} size={16} color={fg} />
       <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
@@ -809,7 +821,7 @@ function Dinero(_: {
       {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
       <View style={s.actionsRow}>
         <ActionButton
-          icon="arrow-down-left"
+          icon="download"
           label="Ingresar"
           variant="primary"
           haptic="medium"
@@ -821,7 +833,7 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="arrow-up-right"
+          icon="upload"
           label="Enviar"
           variant="secondary"
           haptic="light"
@@ -833,7 +845,7 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="repeat"
+          icon="refresh"
           label="Convertir"
           variant="secondary"
           haptic="medium"
@@ -1306,7 +1318,7 @@ function EarningsInfoModal({
           <View
             style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}
           >
-            <AlamosLogo variant="mark" tone="light" size={36} />
+            <AlamosLogo variant="mark" tone="green" size={36} />
           </View>
           <Text style={[s.modalTitle, { color: c.text }]}>
             Tu saldo genera rendimientos
@@ -1475,7 +1487,7 @@ function FundsInfoModal({
           style={[s.modalCard, { backgroundColor: c.surface }]}
         >
           <View style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}>
-            <AlamosLogo variant="mark" tone="light" size={36} />
+            <AlamosLogo variant="mark" tone="green" size={36} />
           </View>
           <Text style={[s.modalTitle, { color: c.text }]}>
             Sobre el rendimiento estimado

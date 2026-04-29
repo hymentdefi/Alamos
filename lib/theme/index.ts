@@ -14,6 +14,9 @@ export const brand = {
 const light = {
   bg: "#FFFFFF",
   bgWarm: "#FAFAFA",
+  /** Beige cálido oficial del brand-kit — para superficies con
+   *  identidad de marca (heroes, banners, success screens). */
+  beige: "#F0EEE9",
   surface: "#FFFFFF",
   surfaceRaised: "#FFFFFF",
   surfaceHover: "#F5F5F5",
@@ -36,6 +39,9 @@ const light = {
 const dark = {
   bg: "#000000",
   bgWarm: "#0A0A0A",
+  /** En dark, "beige" es un gris tirando a marrón — mismo rol pero
+   *  adaptado para que no destruya el contraste del modo OLED. */
+  beige: "#1A1815",
   surface: "#0D0D0D",
   surfaceRaised: "#141414",
   surfaceHover: "#1A1A1A",
@@ -58,6 +64,7 @@ const dark = {
 export interface ThemeColors {
   bg: string;
   bgWarm: string;
+  beige: string;
   surface: string;
   surfaceRaised: string;
   surfaceHover: string;

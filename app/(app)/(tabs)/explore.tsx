@@ -18,6 +18,7 @@ import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { CryptoIcon } from "../../../lib/components/CryptoIcon";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+import { AlamosIcon } from "../../../lib/components/AlamosIcon";
 
 /** Mismo verde brand que usa el ActionButton del home — ver
  *  app/(app)/(tabs)/index.tsx (BRAND_GREEN). */
@@ -432,7 +433,7 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
         pressScale={0.95}
         style={[fs.ingresarBtn, { backgroundColor: BRAND_GREEN }]}
       >
-        <Feather name="arrow-down-left" size={13} color="#FFFFFF" />
+        <AlamosIcon name="download" size={14} color="#FFFFFF" />
         <Text style={fs.ingresarBtnText}>Ingresar</Text>
       </Tap>
     </View>

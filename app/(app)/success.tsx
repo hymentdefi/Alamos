@@ -1,9 +1,10 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
+import { AlamosIcon } from "../../lib/components/AlamosIcon";
+import { AlamosLogo } from "../../lib/components/Logo";
 
 export default function SuccessScreen() {
   const { ticker, amount, qty, mode } = useLocalSearchParams<{
@@ -45,7 +46,7 @@ export default function SuccessScreen() {
         <View
           style={[s.checkCircle, { backgroundColor: c.green }]}
         >
-          <Feather name="check" size={36} color={c.ink} strokeWidth={3} />
+          <AlamosIcon name="check" size={44} color={c.ink} strokeWidth={2.4} />
         </View>
         <Text style={[s.title, { color: c.text }]}>
           Orden ejecutada
@@ -91,6 +92,12 @@ export default function SuccessScreen() {
         >
           <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
         </Pressable>
+        {/* Sello de marca al pie — lockup verde Alamos.
+            Confirmación de que la operación se ejecutó dentro del
+            ecosistema Alamos. */}
+        <View style={s.brandStamp}>
+          <AlamosLogo variant="lockup" tone="green" size={14} />
+        </View>
       </View>
     </View>
   );
@@ -149,7 +156,13 @@ const s = StyleSheet.create({
   },
   bottom: {
     paddingHorizontal: 20,
-    gap: 4,
+    gap: 14,
+  },
+  brandStamp: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 4,
+    opacity: 0.85,
   },
   cta: {
     height: 52,

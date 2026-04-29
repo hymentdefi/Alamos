@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import {
   assets,
   assetCurrency,
@@ -123,7 +124,7 @@ export default function CompromisedScreen() {
         {/* Hero: ícono + título + explicación. */}
         <View style={s.hero}>
           <View style={[s.heroIcon, { backgroundColor: c.surfaceSunken }]}>
-            <Feather name="alert-triangle" size={26} color={c.text} />
+            <AlamosIcon name="alert" size={28} color={c.text} />
           </View>
           <Text style={[s.heroTitle, { color: c.text }]}>
             Tu conversión quedó en pausa
