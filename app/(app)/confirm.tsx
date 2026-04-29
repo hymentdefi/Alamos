@@ -698,7 +698,7 @@ export default function ConfirmScreen() {
             label: "Origen",
             value:
               bridge.from.currency === "USDT"
-                ? "Cripto · USDT"
+                ? "Crypto · USDT"
                 : `${bridge.from.location} · ${bridge.from.currency}`,
           },
           {
@@ -782,7 +782,7 @@ export default function ConfirmScreen() {
             />
             <Text style={[s.available, { color: c.textMuted }]}>
               {bridge && bridge.from
-                ? `Pagás con ${bridge.from.currency === "USDT" ? "tu wallet cripto" : bridge.from.location.toLowerCase()}`
+                ? `Pagás con ${bridge.from.currency === "USDT" ? "tu wallet crypto" : bridge.from.location.toLowerCase()}`
                 : `${formatMoney(nativeBalanceFor(nativeCurrency), nativeCurrency)} disponibles para operar`}
             </Text>
           </View>

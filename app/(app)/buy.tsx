@@ -86,7 +86,7 @@ export default function BuyScreen() {
   const [bridgeOpen, setBridgeOpen] = useState(false);
 
   // Moneda nativa del activo. Si el activo es US, todo se opera en USD;
-  // si es cripto, en USDT. Para AR, en ARS.
+  // si es crypto, en USDT. Para AR, en ARS.
   const nativeCurrency = useMemo<AssetCurrency>(
     () => (asset ? assetCurrency(asset) : "ARS"),
     [asset],

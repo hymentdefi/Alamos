@@ -252,7 +252,7 @@ function BaseHome() {
   // cada uno se exhibe en la moneda en la que cotiza.
   //   ARS: efectivo en pesos + CEDEARs / bonos / FCIs / acciones AR.
   //   USD: efectivo en dólares + acciones US (NYSE/NASDAQ).
-  //   USDT: balance de la wallet crypto + cripto/futuros held.
+  //   USDT: balance de la wallet crypto + crypto/futuros held.
   const arsTotal = useMemo(
     () =>
       held
@@ -273,7 +273,7 @@ function BaseHome() {
         }, 0),
     [held],
   );
-  // USDT total: balance de la wallet crypto + cripto held (price en USDT).
+  // USDT total: balance de la wallet crypto + crypto held (price en USDT).
   const usdtTotal = useMemo(() => {
     const usdtAccount = accounts.find((a) => a.id === "usdt-crypto");
     const cryptoInUsdt = held
@@ -789,7 +789,7 @@ function Dinero(_: {
   const cryptoStory = useGateStory(CRYPTO_STORY);
 
   /** Wrapper para el ⇅ de cada cuenta: si es USDT y todavía no vio
-   *  la story de cripto, la mostramos primero y después abrimos
+   *  la story de crypto, la mostramos primero y después abrimos
    *  el ConvertSheet. */
   const handleSwap = useCallback(
     (id: AccountId) => {
@@ -2029,7 +2029,7 @@ function CryptoMarketInfoModal({
             Operá Bitcoin, Ethereum, Solana, USDT, USDC y +200 monedas
             digitales. Mercado abierto 24/7, sin horarios de cierre.
             Liquidez instantánea, custodia institucional y rendimientos
-            nativos en stablecoins. Cripto sin complicaciones.
+            nativos en stablecoins. Crypto sin complicaciones.
           </Text>
           <Tap
             onPress={onClose}

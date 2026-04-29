@@ -484,7 +484,7 @@ function aboutText(cat: AssetCategory): string {
     case "caucion":
       return "Préstamo de corto plazo entre inversores con garantía en títulos públicos. Rinde pesos a tasa de mercado.";
     case "crypto":
-      return "Criptomoneda spot. Operable 24/7 en el mercado internacional con liquidación inmediata.";
+      return "Crypto spot. Operable 24/7 en el mercado internacional con liquidación inmediata.";
     case "futuros":
       return "Contrato de futuro perpetuo con apalancamiento. Alto riesgo, solo para traders experimentados.";
     case "opciones":

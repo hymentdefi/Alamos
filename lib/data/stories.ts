@@ -2,7 +2,7 @@ import type { StoryConfig } from "../components/StoryOverlay";
 
 /**
  * Catálogo de stories educativas — se muestran la primera vez que el
- * usuario activa un nuevo segmento (cripto, mercado USA, etc.). Persisten
+ * usuario activa un nuevo segmento (crypto, mercado USA, etc.). Persisten
  * en SecureStore con la key `story:<id>:seen` y no se vuelven a mostrar.
  */
 
@@ -15,7 +15,7 @@ export const CRYPTO_STORY: StoryConfig = {
     {
       emoji: "⚡",
       title: "El mercado que nunca duerme",
-      body: "Operás cripto 24 horas, los 7 días de la semana. Sin horarios de cierre, sin esperar a la apertura.",
+      body: "Operás crypto 24 horas, los 7 días de la semana. Sin horarios de cierre, sin esperar a la apertura.",
     },
     {
       emoji: "₮",

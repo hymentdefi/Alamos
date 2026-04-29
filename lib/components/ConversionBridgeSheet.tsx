@@ -143,7 +143,7 @@ function BridgeOptionRow({
   // Etiqueta principal de la cuenta — moneda + ubicación.
   const label =
     opt.from.currency === "USDT"
-      ? "Cripto · USDT"
+      ? "Crypto · USDT"
       : `${opt.from.location} · ${opt.from.currency}`;
 
   return (

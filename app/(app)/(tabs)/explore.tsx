@@ -16,7 +16,12 @@ import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
+import { CryptoIcon } from "../../../lib/components/CryptoIcon";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+
+/** Mismo verde brand que usa el ActionButton del home — ver
+ *  app/(app)/(tabs)/index.tsx (BRAND_GREEN). */
+const BRAND_GREEN = "#5ac43e";
 
 const FAVS_FILTER_KEY = "explore:only_favs";
 const MARKET_TAB_KEY = "explore:market_tab";
@@ -64,10 +69,10 @@ const MARKET_TABS: MarketTab[] = [
   },
   {
     id: "CRYPTO",
-    label: "Cripto",
-    short: "Cripto",
+    label: "Crypto",
+    short: "Crypto",
     currency: "USDT",
-    walletLabel: "Wallet cripto",
+    walletLabel: "Wallet crypto",
   },
 ];
 
@@ -153,7 +158,7 @@ function BaseExplore() {
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
 
         {/* Segmented tabs de mercado — el "switch" entre AR / EE.UU /
-            Cripto. Estilo iOS-like: track crema, pill activa blanca
+            Crypto. Estilo iOS-like: track crema, pill activa blanca
             elevada con sombra sutil. */}
         <View
           style={[
@@ -265,7 +270,7 @@ function MarketGlyph({
   const { c } = useTheme();
   if (market === "AR") return <FlagIcon code="AR" size={18} />;
   if (market === "US") return <FlagIcon code="US" size={18} />;
-  // Cripto: pill verde con ₿ — no hay bandera, así que armamos un
+  // Crypto: pill verde con ₿ — no hay bandera, así que armamos un
   // glyph que mantenga el peso visual de las dos primeras opciones.
   return (
     <View
@@ -330,25 +335,18 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
         { backgroundColor: c.surface, borderColor: c.border },
       ]}
     >
-      <View style={fs.headRow}>
-        <Text style={[fs.eyebrow, { color: c.textMuted }]}>
-          DISPONIBLE PARA OPERAR
-        </Text>
-        <View style={[fs.marketPill, { backgroundColor: c.surfaceHover }]}>
-          <View style={fs.marketPillIcon}>
-            <MarketGlyph market={market.id} active={false} />
-          </View>
-          <Text style={[fs.marketPillText, { color: c.textSecondary }]}>
-            {market.short}
-          </Text>
-        </View>
-      </View>
+      <Text style={[fs.eyebrow, { color: c.textMuted }]}>
+        DISPONIBLE PARA OPERAR
+      </Text>
 
+      {/* Saldo con bandera/logo adelante — mismo patrón que el hero
+          de Inicio (Pesos AR, Dólares US, Tether USDT). */}
       <View style={fs.amountRow}>
+        <CurrencyMark currency={market.currency} />
         <AmountDisplay
           value={balance}
-          size={42}
-          weight={800}
+          size={26}
+          weight={700}
           prefix={prefix}
         />
       </View>
@@ -361,93 +359,87 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
           {footerParts.join(" · ")}
         </Text>
         <Tap
-          onPress={() => router.push("/(app)/transfer")}
-          haptic="selection"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/transfer",
+              params: { mode: "deposit" },
+            })
+          }
+          haptic="medium"
           pressScale={0.95}
-          style={[fs.cta, { backgroundColor: c.greenDim }]}
+          style={[fs.ingresarBtn, { backgroundColor: BRAND_GREEN }]}
         >
-          <Feather name="plus" size={13} color={c.greenDark} />
-          <Text style={[fs.ctaText, { color: c.greenDark }]}>Ingresar</Text>
+          <Feather name="arrow-down-left" size={14} color="#FFFFFF" />
+          <Text style={fs.ingresarBtnText}>Ingresar</Text>
         </Tap>
       </View>
     </View>
   );
 }
 
+/** Logo del país (AR/US) o de Tether (USDT) que va adelante del saldo.
+ *  Mismo tamaño y patrón que usa el hero del home. */
+function CurrencyMark({ currency }: { currency: AssetCurrency }) {
+  if (currency === "ARS") return <FlagIcon code="AR" size={26} />;
+  if (currency === "USD") return <FlagIcon code="US" size={26} />;
+  return (
+    <CryptoIcon
+      ticker="USDT"
+      iconText="₮"
+      bg="#26A17B"
+      fg="#FFFFFF"
+      size={26}
+    />
+  );
+}
+
 const fs = StyleSheet.create({
   card: {
     marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: radius.xl,
+    marginTop: 12,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 14,
-  },
-  headRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   eyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-  },
-  marketPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingLeft: 4,
-    paddingRight: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  marketPillIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  marketPillText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    marginBottom: 4,
   },
   amountRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: 8,
   },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(0,0,0,0.08)",
+    marginTop: 8,
     gap: 12,
   },
   footerText: {
     flex: 1,
     fontFamily: fontFamily[500],
-    fontSize: 12,
+    fontSize: 11,
     letterSpacing: -0.05,
   },
-  cta: {
+  ingresarBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
+    gap: 6,
+    paddingHorizontal: 14,
+    height: 32,
+    borderRadius: radius.md,
   },
-  ctaText: {
+  ingresarBtnText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.05,
+    fontSize: 13,
+    letterSpacing: -0.15,
+    color: "#FFFFFF",
   },
 });
 

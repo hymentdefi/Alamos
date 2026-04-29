@@ -34,7 +34,7 @@ export interface Asset {
   category: AssetCategory;
   /**
    * Mercado del activo. Si no se setea, se infiere de la categoría
-   * (cripto/futuros → CRYPTO, resto → AR).
+   * (crypto/futuros → CRYPTO, resto → AR).
    */
   market?: AssetMarket;
   /**
@@ -706,19 +706,19 @@ export const categoryLabels: Record<AssetCategory, string> = {
 export const marketLabels: Record<AssetMarket, string> = {
   AR: "AR",
   US: "US",
-  CRYPTO: "Cripto",
+  CRYPTO: "Crypto",
 };
 
 /** Etiqueta larga para headers de sección. */
 export const marketLabelsFull: Record<AssetMarket, string> = {
   AR: "Argentina",
   US: "Estados Unidos",
-  CRYPTO: "Cripto",
+  CRYPTO: "Crypto",
 };
 
 /**
  * Mercado efectivo del asset — cae al default si no fue declarado.
- * Cripto/futuros → CRYPTO, todo lo demás → AR.
+ * Crypto/futuros → CRYPTO, todo lo demás → AR.
  */
 export function assetMarket(a: Pick<Asset, "market" | "category">): AssetMarket {
   if (a.market) return a.market;
@@ -727,7 +727,7 @@ export function assetMarket(a: Pick<Asset, "market" | "category">): AssetMarket 
 }
 
 /**
- * Moneda nativa del asset — la categoría US es siempre USD; cripto y
+ * Moneda nativa del asset — la categoría US es siempre USD; crypto y
  * futuros cotizan en USDT; el resto en pesos. Para acciones AR el
  * `price` ya viene en ARS.
  */
@@ -775,7 +775,7 @@ export function formatUSD(n: number): string {
   );
 }
 
-/** "USDT 1.234,56" — para cripto. */
+/** "USDT 1.234,56" — para crypto. */
 export function formatUSDT(n: number): string {
   return (
     "USDT " +
@@ -800,7 +800,7 @@ export function formatMoney(n: number, currency: AssetCurrency): string {
 }
 
 /**
- * Formatea una cantidad (acciones, cuotapartes, cripto) con separador
+ * Formatea una cantidad (acciones, cuotapartes, crypto) con separador
  * decimal ',' y de miles '.' al estilo argentino, sin ceros finales
  * innecesarios. Hasta `maxDecimals` decimales.
  */

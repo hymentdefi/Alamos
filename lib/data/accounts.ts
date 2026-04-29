@@ -94,7 +94,7 @@ export function convertAmount(
 }
 
 /** Liquidación que aplica al cambio de moneda. T+1 sólo cuando hay
- *  ruta MEP (ARS ↔ USD). Cripto y same-currency liquidan al toque. */
+ *  ruta MEP (ARS ↔ USD). Crypto y same-currency liquidan al toque. */
 export type Settlement = "T+0" | "T+1";
 
 export function settlementFor(
@@ -117,7 +117,7 @@ export function feePctFor(
   // MEP (ARS ↔ USD): spread típico de la operatoria.
   if ((from === "ARS" && to === "USD") || (from === "USD" && to === "ARS"))
     return 0.005;
-  // Cripto on-ramp / off-ramp: spread más alto que MEP.
+  // Crypto on-ramp / off-ramp: spread más alto que MEP.
   if (
     (from === "ARS" && to === "USDT") ||
     (from === "USDT" && to === "ARS")
