@@ -7,7 +7,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import Svg, { Polygon } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { fontFamily, useTheme } from "../theme";
 import { useAuth } from "../auth/context";
@@ -17,7 +17,7 @@ interface Props {
   onEnd: () => void;
 }
 
-const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -26,23 +26,50 @@ function timeGreeting(): string {
   return "Buenas noches,";
 }
 
+/* ─── Geometría del isotipo (brand-kit) ───────────────────────────── */
+
+// Triángulo trasero — `M 38,26 L 16,86 L 60,86 Z`
+const TRI_BACK_PATH = "M 38,26 L 16,86 L 60,86 Z";
+// Triángulo delantero — `M 56,12 L 29,86 L 83,86 Z`
+const TRI_FRONT_PATH = "M 56,12 L 29,86 L 83,86 Z";
+
+// Perímetros calculados — necesarios para el stroke-dashoffset reveal.
+// Lados back:    sqrt(22²+60²)=64, 44, sqrt(22²+60²)=64 → 172
+// Lados front:   sqrt(27²+74²)≈78.8, 54, sqrt(27²+74²)≈78.8 → 211.6
+const TRI_BACK_PERIMETER = 172;
+const TRI_FRONT_PERIMETER = 212;
+
+const STROKE_W = 5.5;
+const LOGO_SIZE = 132;
+
 /**
- * Overlay full-screen post-splash con la animación de marca:
+ * Animación de entrada coordinada — todo conectado, ningún corte:
  *
- *   1. Logo aparece como el "empresa" mix — triángulo trasero verde
- *      brand + delantero outline negro (mismo que el splash nativo,
- *      sin pop de color). Pequeño scale-up + fade-in.
- *   2. MORPH: el triángulo delantero crossfade de negro a verde brand
- *      (~250ms). Pulse sutil del scale como confirmación + haptic Light.
- *      Resultado: logo "todo verde" — la identidad oficial.
- *   3. DISARM: los dos triángulos se separan (translateX opuesto) y
- *      hacen fade-out. Mientras tanto, "Buen día, / Christian" entra
- *      desde la izquierda con stagger.
- *   4. HOLD breve para que el saludo se lea.
- *   5. Fade-out global.
+ *   A. Boot (0–360ms)   — fondo + logo aparecen como en el splash
+ *      nativo (back verde + front outline negro). Scale spring + fadeIn.
  *
- * Total ~1.7s. Tappeable para skip rápido (algunos usuarios prefieren
- * ir directo al home, no los frenamos).
+ *   B. Charge (360–960ms) — el verde brand se TRAZA encima del front
+ *      como si lo dibujaran (strokeDashoffset 0→full). Mientras el
+ *      trace avanza, el negro original se va apagando proporcional.
+ *      Al final el logo está "todo verde". Pulse + haptic Light al
+ *      cerrar el trazo.
+ *
+ *   C. Morph to text (960–1700ms) — los triángulos se DESLIZAN hacia
+ *      la izquierda mientras se achican y giran levemente. Cada uno
+ *      "se convierte" visualmente en una línea del saludo:
+ *         · back  → "Buen día,"  (se va arriba-izq)
+ *         · front → "Christian"  (se va abajo-izq, más amplitud)
+ *      Mientras los triángulos viajan, su opacity baja en sincronía
+ *      con la opacity de cada línea de texto que emerge desde la
+ *      misma trayectoria. Al cierre: triángulos en 0, textos en 1,
+ *      sin pop.
+ *
+ *   D. Hold (1700–2050ms)
+ *
+ *   E. Exit (2050–2350ms) — fade global, onEnd.
+ *
+ * Tappeable para skip rápido. Total ~2.3s — suficiente para que cada
+ * beat se lea pero corto para no aburrir.
  */
 export function GreetingOverlay({ onEnd }: Props) {
   const { c } = useTheme();
@@ -53,35 +80,59 @@ export function GreetingOverlay({ onEnd }: Props) {
   /* ─── Backdrop ─── */
   const bgOpacity = useRef(new Animated.Value(0)).current;
 
-  /* ─── Logo (entry + morph + disarm) ─── */
-  const logoScale = useRef(new Animated.Value(0.85)).current;
+  /* ─── A. Logo entry ─── */
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  // Morph: el front-negro fadea out mientras el front-verde fadea in.
+  const logoScale = useRef(new Animated.Value(0.82)).current;
+
+  /* ─── B. Charge / morph ─── */
+  // Trazo verde sobre el front. Empieza con dashoffset = perímetro
+  // (invisible) y termina en 0 (cerrado). Lo mismo para el back para
+  // que ambos se "redibujen" sincronizados.
+  const backTraceOffset = useRef(
+    new Animated.Value(TRI_BACK_PERIMETER),
+  ).current;
+  const frontTraceOffset = useRef(
+    new Animated.Value(TRI_FRONT_PERIMETER),
+  ).current;
+  // Front-negro original que se desvanece a medida que el verde lo cubre.
   const frontBlackOpacity = useRef(new Animated.Value(1)).current;
-  const frontGreenOpacity = useRef(new Animated.Value(0)).current;
-  // Pulse sutil al confirmar el morph.
-  const morphPulse = useRef(new Animated.Value(1)).current;
-  // Disarm: cada triángulo se mueve en direcciones opuestas + fadeOut.
-  const backTriX = useRef(new Animated.Value(0)).current;
-  const frontTriX = useRef(new Animated.Value(0)).current;
-  const trianglesOpacity = useRef(new Animated.Value(1)).current;
+  // Pulse al final del charge — confirma "encendido".
+  const chargePulse = useRef(new Animated.Value(1)).current;
 
-  /* ─── Greeting (entry + exit) ─── */
-  const greetTx = useRef(new Animated.Value(-24)).current;
+  /* ─── C. Morph to text — viajes individuales ─── */
+  // Each triangle has its own translate (X,Y), scale, rotate, opacity.
+  // El back va a la posición de "Buen día," y el front a "Christian".
+  const backTx = useRef(new Animated.Value(0)).current;
+  const backTy = useRef(new Animated.Value(0)).current;
+  const backScale = useRef(new Animated.Value(1)).current;
+  const backRot = useRef(new Animated.Value(0)).current;
+  const backOpacity = useRef(new Animated.Value(1)).current;
+
+  const frontTx = useRef(new Animated.Value(0)).current;
+  const frontTy = useRef(new Animated.Value(0)).current;
+  const frontScale = useRef(new Animated.Value(1)).current;
+  const frontRot = useRef(new Animated.Value(0)).current;
+  const frontOpacity = useRef(new Animated.Value(1)).current;
+
+  /* ─── D. Greeting in ─── */
+  // Cada línea entra desde la posición desde donde llega su triángulo
+  // — eso da la sensación de "el triángulo se convirtió en este texto".
+  const greetTx = useRef(new Animated.Value(40)).current;
   const greetOpacity = useRef(new Animated.Value(0)).current;
-  const nameTx = useRef(new Animated.Value(-32)).current;
-  const nameOpacity = useRef(new Animated.Value(0)).current;
-  const nameScale = useRef(new Animated.Value(0.94)).current;
+  const greetScale = useRef(new Animated.Value(0.85)).current;
 
-  // Guardamos el ended state en un ref para que skip y auto-exit no
-  // disparen onEnd dos veces.
+  const nameTx = useRef(new Animated.Value(60)).current;
+  const nameOpacity = useRef(new Animated.Value(0)).current;
+  const nameScale = useRef(new Animated.Value(0.78)).current;
+
+  // Re-entry guard.
   const endedRef = useRef(false);
 
   useEffect(() => {
-    /* ─── 1. Backdrop + entry del logo (0–280ms) ─── */
+    /* ─── A. BOOT (0–360ms) ─── */
     Animated.timing(bgOpacity, {
       toValue: 1,
-      duration: 200,
+      duration: 220,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
@@ -89,126 +140,202 @@ export function GreetingOverlay({ onEnd }: Props) {
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 240,
+        duration: 280,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.spring(logoScale, {
         toValue: 1,
-        tension: 90,
-        friction: 11,
+        tension: 80,
+        friction: 10,
         useNativeDriver: true,
       }),
     ]).start();
 
-    /* ─── 2. MORPH (a partir de 380ms, dura ~280ms) ─── */
-    const morphTimer = setTimeout(() => {
+    /* ─── B. CHARGE / TRACE (360→960ms) ─── */
+    const chargeTimer = setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       Animated.parallel([
-        // Cross-fade: negro out, verde in (con leve overlap).
-        Animated.timing(frontBlackOpacity, {
+        // Trace de los dos triángulos en simultáneo — back y front se
+        // "redibujan" al mismo tiempo. La duración es igual aunque
+        // tengan perímetros distintos para que el feel sea unificado;
+        // el ojo no nota la diferencia de velocidad.
+        Animated.timing(backTraceOffset, {
           toValue: 0,
-          duration: 240,
-          easing: Easing.inOut(Easing.cubic),
+          duration: 600,
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
           useNativeDriver: true,
         }),
-        Animated.timing(frontGreenOpacity, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
+        Animated.timing(frontTraceOffset, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
           useNativeDriver: true,
         }),
-        // Pulse: 1 → 1.06 → 1 sobre todo el SVG, "energía" al cambiar.
+        // El negro original se va apagando — empezamos a 30% del trace
+        // para que el verde "monte" antes de que desaparezca el negro.
         Animated.sequence([
-          Animated.timing(morphPulse, {
+          Animated.delay(180),
+          Animated.timing(frontBlackOpacity, {
+            toValue: 0,
+            duration: 360,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+        // Pulse al cerrar — 1 → 1.06 → 1.
+        Animated.sequence([
+          Animated.delay(540),
+          Animated.timing(chargePulse, {
             toValue: 1.06,
             duration: 140,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
-          Animated.timing(morphPulse, {
+          Animated.timing(chargePulse, {
             toValue: 1,
-            duration: 180,
+            duration: 200,
             easing: Easing.inOut(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
       ]).start();
-    }, 380);
+    }, 360);
 
-    /* ─── 3. DISARM + entrada del greeting (a partir de 760ms) ─── */
-    const disarmTimer = setTimeout(() => {
+    /* ─── C. MORPH TO TEXT (960→1700ms) ─── */
+    // Direcciones aproximadas — el back va arriba-izquierda (donde
+    // "Buen día,") y el front abajo-izquierda con más amplitud
+    // (donde "Christian"). Y/X negativos = arriba/izquierda.
+    const morphTimer = setTimeout(() => {
       Animated.parallel([
-        // Triángulos se separan + fade-out.
-        Animated.timing(backTriX, {
-          toValue: -36,
-          duration: 360,
-          easing: Easing.in(Easing.cubic),
+        /* Back → "Buen día," */
+        Animated.timing(backTx, {
+          toValue: -110,
+          duration: 720,
+          easing: Easing.bezier(0.65, 0, 0.35, 1),
           useNativeDriver: true,
         }),
-        Animated.timing(frontTriX, {
-          toValue: 36,
-          duration: 360,
-          easing: Easing.in(Easing.cubic),
+        Animated.timing(backTy, {
+          toValue: -38,
+          duration: 720,
+          easing: Easing.bezier(0.65, 0, 0.35, 1),
           useNativeDriver: true,
         }),
-        Animated.timing(trianglesOpacity, {
-          toValue: 0,
-          duration: 320,
-          easing: Easing.in(Easing.cubic),
+        Animated.timing(backScale, {
+          toValue: 0.18,
+          duration: 720,
+          easing: Easing.bezier(0.5, 0, 0.5, 1),
           useNativeDriver: true,
         }),
-        // Greeting entra desde la izquierda — stagger entre línea
-        // chica y nombre grande.
+        Animated.timing(backRot, {
+          toValue: -18,
+          duration: 720,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
         Animated.sequence([
-          Animated.delay(120),
+          Animated.delay(420),
+          Animated.timing(backOpacity, {
+            toValue: 0,
+            duration: 280,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+
+        /* Front → "Christian" — más amplitud y baja más */
+        Animated.timing(frontTx, {
+          toValue: -120,
+          duration: 740,
+          easing: Easing.bezier(0.65, 0, 0.35, 1),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontTy, {
+          toValue: 28,
+          duration: 740,
+          easing: Easing.bezier(0.65, 0, 0.35, 1),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontScale, {
+          toValue: 0.22,
+          duration: 740,
+          easing: Easing.bezier(0.5, 0, 0.5, 1),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontRot, {
+          toValue: 14,
+          duration: 740,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(440),
+          Animated.timing(frontOpacity, {
+            toValue: 0,
+            duration: 300,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+
+        /* Greeting line — entra cuando el back triangle llega a destino */
+        Animated.sequence([
+          Animated.delay(280),
           Animated.parallel([
             Animated.timing(greetOpacity, {
-              toValue: 1,
-              duration: 320,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: true,
-            }),
-            Animated.spring(greetTx, {
-              toValue: 0,
-              tension: 80,
-              friction: 11,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
-        Animated.sequence([
-          Animated.delay(220),
-          Animated.parallel([
-            Animated.timing(nameOpacity, {
               toValue: 1,
               duration: 380,
               easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
+            Animated.spring(greetTx, {
+              toValue: 0,
+              tension: 75,
+              friction: 11,
+              useNativeDriver: true,
+            }),
+            Animated.spring(greetScale, {
+              toValue: 1,
+              tension: 70,
+              friction: 9,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+
+        /* Name — stagger 120ms después */
+        Animated.sequence([
+          Animated.delay(400),
+          Animated.parallel([
+            Animated.timing(nameOpacity, {
+              toValue: 1,
+              duration: 460,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
             Animated.spring(nameTx, {
               toValue: 0,
-              tension: 70,
+              tension: 65,
               friction: 9,
               useNativeDriver: true,
             }),
             Animated.spring(nameScale, {
               toValue: 1,
-              tension: 65,
+              tension: 60,
               friction: 8,
               useNativeDriver: true,
             }),
           ]),
         ]),
       ]).start();
-    }, 760);
+    }, 960);
 
-    /* ─── 4. EXIT (1700ms — total ~2s) ─── */
-    const exitTimer = setTimeout(() => exit(), 1700);
+    /* ─── E. EXIT (a los 2050ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 2050);
 
     return () => {
+      clearTimeout(chargeTimer);
       clearTimeout(morphTimer);
-      clearTimeout(disarmTimer);
       clearTimeout(exitTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,11 +370,15 @@ export function GreetingOverlay({ onEnd }: Props) {
     ]).start(() => onEnd());
   };
 
-  /* ─── Triángulos del isotipo — geometría oficial brand-kit
-   *     (viewBox 100, mismos `points` que el logo empresa). */
-  const TRI_BACK_POINTS = "38,26 16,86 60,86";
-  const TRI_FRONT_POINTS = "56,12 29,86 83,86";
-  const STROKE_W = 5.5;
+  /* ─── Estilos animados de cada triángulo (transforms compuestos) ─── */
+  const backRotStr = backRot.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ["-360deg", "360deg"],
+  });
+  const frontRotStr = frontRot.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ["-360deg", "360deg"],
+  });
 
   return (
     <Modal
@@ -261,56 +392,121 @@ export function GreetingOverlay({ onEnd }: Props) {
         style={[s.backdrop, { backgroundColor: c.bg, opacity: bgOpacity }]}
       >
         <Pressable style={s.content} onPress={exit}>
-          {/* Logo: aparece centrado, hace morph negro→verde, después
-              se desarma. Position absoluta para que pueda compartir
-              el centro óptico con el greeting (que también va al
-              centro vertical). */}
+          {/* Logo wrapper — escala global de entrada + pulse del charge.
+              Centrado absoluto en la pantalla. */}
           <Animated.View
             style={[
               s.logoWrap,
               {
-                opacity: Animated.multiply(logoOpacity, trianglesOpacity),
+                opacity: logoOpacity,
                 transform: [
-                  { scale: Animated.multiply(logoScale, morphPulse) },
+                  { scale: Animated.multiply(logoScale, chargePulse) },
                 ],
               },
             ]}
             pointerEvents="none"
           >
-            <Svg width={120} height={120} viewBox="0 0 100 100">
-              {/* Triángulo trasero — verde brand desde el inicio. */}
-              <AnimatedPolygon
-                points={TRI_BACK_POINTS}
-                stroke={c.brand}
-                strokeWidth={STROKE_W}
-                strokeLinejoin="round"
-                fill="none"
-                translateX={backTriX}
-              />
-              {/* Triángulo delantero — capa negra (start). */}
-              <AnimatedPolygon
-                points={TRI_FRONT_POINTS}
-                stroke={c.text}
-                strokeWidth={STROKE_W}
-                strokeLinejoin="round"
-                fill="none"
-                opacity={frontBlackOpacity}
-                translateX={frontTriX}
-              />
-              {/* Triángulo delantero — capa verde (end del morph). */}
-              <AnimatedPolygon
-                points={TRI_FRONT_POINTS}
-                stroke={c.brand}
-                strokeWidth={STROKE_W}
-                strokeLinejoin="round"
-                fill="none"
-                opacity={frontGreenOpacity}
-                translateX={frontTriX}
-              />
-            </Svg>
+            {/* Triángulo BACK — un container animado individual para
+                que su trayectoria al texto sea independiente. */}
+            <Animated.View
+              style={[
+                s.triLayer,
+                {
+                  opacity: backOpacity,
+                  transform: [
+                    { translateX: backTx },
+                    { translateY: backTy },
+                    { rotate: backRotStr },
+                    { scale: backScale },
+                  ],
+                },
+              ]}
+            >
+              <Svg
+                width={LOGO_SIZE}
+                height={LOGO_SIZE}
+                viewBox="0 0 100 100"
+              >
+                <AnimatedPath
+                  d={TRI_BACK_PATH}
+                  stroke={c.brand}
+                  strokeWidth={STROKE_W}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={`${TRI_BACK_PERIMETER} ${TRI_BACK_PERIMETER}`}
+                  strokeDashoffset={backTraceOffset}
+                />
+              </Svg>
+            </Animated.View>
+
+            {/* Triángulo FRONT — capa NEGRA original (start state) */}
+            <Animated.View
+              style={[
+                s.triLayer,
+                {
+                  opacity: Animated.multiply(frontOpacity, frontBlackOpacity),
+                  transform: [
+                    { translateX: frontTx },
+                    { translateY: frontTy },
+                    { rotate: frontRotStr },
+                    { scale: frontScale },
+                  ],
+                },
+              ]}
+            >
+              <Svg
+                width={LOGO_SIZE}
+                height={LOGO_SIZE}
+                viewBox="0 0 100 100"
+              >
+                <Path
+                  d={TRI_FRONT_PATH}
+                  stroke={c.text}
+                  strokeWidth={STROKE_W}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </Svg>
+            </Animated.View>
+
+            {/* Triángulo FRONT — capa VERDE que se traza encima */}
+            <Animated.View
+              style={[
+                s.triLayer,
+                {
+                  opacity: frontOpacity,
+                  transform: [
+                    { translateX: frontTx },
+                    { translateY: frontTy },
+                    { rotate: frontRotStr },
+                    { scale: frontScale },
+                  ],
+                },
+              ]}
+            >
+              <Svg
+                width={LOGO_SIZE}
+                height={LOGO_SIZE}
+                viewBox="0 0 100 100"
+              >
+                <AnimatedPath
+                  d={TRI_FRONT_PATH}
+                  stroke={c.brand}
+                  strokeWidth={STROKE_W}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={`${TRI_FRONT_PERIMETER} ${TRI_FRONT_PERIMETER}`}
+                  strokeDashoffset={frontTraceOffset}
+                />
+              </Svg>
+            </Animated.View>
           </Animated.View>
 
-          {/* Greeting alineado a la izquierda — entra desde fuera. */}
+          {/* Greeting alineado a la izquierda — emerge de la trayectoria
+              de los triángulos. */}
           <View style={s.greetingWrap} pointerEvents="none">
             <Animated.Text
               style={[
@@ -318,7 +514,10 @@ export function GreetingOverlay({ onEnd }: Props) {
                 {
                   color: c.textMuted,
                   opacity: greetOpacity,
-                  transform: [{ translateX: greetTx }],
+                  transform: [
+                    { translateX: greetTx },
+                    { scale: greetScale },
+                  ],
                 },
               ]}
             >
@@ -356,8 +555,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   logoWrap: {
-    // Centrado absoluto para que se solape con el greeting (mismo
-    // centro óptico vertical, ambos en el medio de la pantalla).
     position: "absolute",
     left: 0,
     right: 0,
@@ -366,9 +563,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  triLayer: {
+    position: "absolute",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+  },
   greetingWrap: {
-    // Alineado a la izquierda — el saludo "vive" donde estaba el
-    // logo pero alineado al edge para sentirse personal.
     alignItems: "flex-start",
   },
   greeting: {
@@ -376,6 +576,7 @@ const s = StyleSheet.create({
     fontSize: 26,
     letterSpacing: -0.4,
     marginBottom: 4,
+    transformOrigin: "left",
   },
   name: {
     fontFamily: fontFamily[700],
