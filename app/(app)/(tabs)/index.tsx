@@ -79,7 +79,10 @@ type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
 
-/** Mismo verde que la pill activa del nav bar — ver app/(app)/(tabs)/_layout.tsx. */
+/**
+ * @deprecated Usar `c.action` (CTA primario) o `c.brand` (identidad).
+ * Lo mantenemos por compatibilidad mientras migramos los call-sites
+ * — apunta al mismo hex que `c.action` del theme. */
 const BRAND_GREEN = "#5ac43e";
 
 const ranges: Range[] = ["live", "1H", "1D", "1S", "1M", "3M", "YTD"];
@@ -368,8 +371,9 @@ function BaseHome() {
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
   // Color del trazo del chart: verde Alamos específico para charts
-  // (#5ac43e), separado del trendColor que usamos para textos y pills.
-  const chartColor = isUp ? "#5ac43e" : c.red;
+  // El chart usa el verde-positive (delta del periodo) — separado del
+  // trendColor de textos/pills aunque comparta hue, distinto rol.
+  const chartColor = isUp ? c.positive : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -427,13 +431,13 @@ function BaseHome() {
             style={[
               s.giftBtnWrap,
               {
-                shadowColor: BRAND_GREEN,
+                shadowColor: c.action,
                 transform: [{ scale: giftPulse }],
               },
             ]}
           >
             <Tap
-              style={[s.giftBtn, { backgroundColor: BRAND_GREEN }]}
+              style={[s.giftBtn, { backgroundColor: c.action }]}
               onPress={() =>
                 Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success,
@@ -628,7 +632,7 @@ function BaseHome() {
         />
         <View style={[s.sectionBlock, { marginTop: 24 }]}>
           <View style={s.discoverRow}>
-            <AlamoMark size={20} color={BRAND_GREEN} />
+            <AlamoMark size={20} color={c.brand} />
             <Text style={[s.discoverTitle, { color: c.text }]}>
               Descubrí{" "}
               <Text
@@ -672,7 +676,7 @@ function ActionButton({
   variant: "primary" | "secondary";
 }) {
   const { c } = useTheme();
-  const bg = variant === "primary" ? BRAND_GREEN : c.surfaceHover;
+  const bg = variant === "primary" ? c.action : c.surfaceHover;
   const fg = variant === "primary" ? "#FFFFFF" : c.text;
   return (
     <Tap
@@ -1112,7 +1116,7 @@ function ConvertSheet({
                       <Feather
                         name="check"
                         size={18}
-                        color={BRAND_GREEN}
+                        color={c.positive}
                         style={{ marginLeft: 8 }}
                       />
                     ) : null}
@@ -1566,7 +1570,7 @@ function FundCard({
             <AlamoMark
               key={i}
               size={14}
-              color={i <= risk ? BRAND_GREEN : c.textFaint}
+              color={i <= risk ? c.brand : c.textFaint}
             />
           ))}
         </View>

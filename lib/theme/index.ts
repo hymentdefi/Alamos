@@ -10,7 +10,26 @@ export const brand = {
 
 /* ─── Color palettes — trading-hardcore aesthetic (Binance-style).
  *     Light: blanco puro + grises neutros fríos.
- *     Dark:  negro puro + grises muy oscuros. */
+ *     Dark:  negro puro + grises muy oscuros.
+ *
+ * El verde tiene 3 ROLES distintos en escalas distintas (mismo hue,
+ * diferente luminosidad) — el diagnóstico de claude-design exige
+ * separar marca / acción / positivo para que un mismo color no
+ * signifique todo:
+ *
+ *   - `brand` (#00E676 light, #0ECB81 dark) — logo, watermark, sello
+ *     de identidad. Verde más saturado, alto recall.
+ *   - `action` (#5ac43e light, #4FB833 dark) — CTAs primarios
+ *     (Ingresar / Convertir y comprar / etc.). Más empujado a tierra,
+ *     mejor contraste con texto blanco.
+ *   - `positive` (#00A304 light, #02A05C dark) — deltas, retornos
+ *     positivos, "subió". Más oscuro y técnico, NO se confunde con
+ *     un botón.
+ *
+ * Cada uno tiene su `Dim` (rgba al 14%) para badges/pills sin
+ * dominar. Los tokens viejos `green/greenDark/greenDim` se mantienen
+ * como aliases — `green = action`, `greenDark = positive` — para no
+ * romper código que aún no migró. */
 const light = {
   bg: "#FFFFFF",
   bgWarm: "#FAFAFA",
@@ -27,9 +46,21 @@ const light = {
   textSecondary: "#2A2A2A",
   textMuted: "#737373",
   textFaint: "#A3A3A3",
-  green: brand.green,
-  greenDark: brand.greenDark,
-  greenDim: "rgba(0,200,5,0.14)",
+
+  /* Roles de verde — semánticos. */
+  brand: "#00E676",
+  brandDim: "rgba(0,230,118,0.14)",
+  action: "#5ac43e",
+  actionDim: "rgba(90,196,62,0.14)",
+  positive: "#00A304",
+  positiveDim: "rgba(0,163,4,0.14)",
+
+  /* Aliases legacy: mantienen el código viejo funcionando y mapean
+   * a la semántica que históricamente usaron. */
+  green: "#5ac43e",
+  greenDark: "#00A304",
+  greenDim: "rgba(0,163,4,0.14)",
+
   red: "#C83B3B",
   redDim: "rgba(200,59,59,0.10)",
   ink: brand.ink,
@@ -52,9 +83,18 @@ const dark = {
   textSecondary: "#B7BDC6",
   textMuted: "#848E9C",
   textFaint: "#5E6673",
-  green: "#0ECB81",
+
+  brand: "#0ECB81",
+  brandDim: "rgba(14,203,129,0.18)",
+  action: "#4FB833",
+  actionDim: "rgba(79,184,51,0.16)",
+  positive: "#02A05C",
+  positiveDim: "rgba(2,160,92,0.16)",
+
+  green: "#4FB833",
   greenDark: "#02A05C",
-  greenDim: "rgba(14,203,129,0.16)",
+  greenDim: "rgba(2,160,92,0.16)",
+
   red: "#F6465D",
   redDim: "rgba(246,70,93,0.14)",
   ink: "#000000",
@@ -75,6 +115,14 @@ export interface ThemeColors {
   textSecondary: string;
   textMuted: string;
   textFaint: string;
+  /* Verdes semánticos. */
+  brand: string;
+  brandDim: string;
+  action: string;
+  actionDim: string;
+  positive: string;
+  positiveDim: string;
+  /* Aliases legacy — apuntan a `action` y `positive`. */
   green: string;
   greenDark: string;
   greenDim: string;

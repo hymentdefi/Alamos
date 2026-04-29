@@ -20,9 +20,9 @@ import { CryptoIcon } from "../../../lib/components/CryptoIcon";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { AlamosIcon } from "../../../lib/components/AlamosIcon";
 
-/** Mismo verde brand que usa el ActionButton del home — ver
- *  app/(app)/(tabs)/index.tsx (BRAND_GREEN). */
-const BRAND_GREEN = "#5ac43e";
+// Verde de acción primaria — usar `c.action` del theme. Esta constante
+// quedó como literal sólo para que no rompa style.create() — donde sí
+// resolvemos vía `c.action` es en los componentes que lo usan.
 
 const FAVS_FILTER_KEY = "explore:only_favs";
 const MARKET_TAB_KEY = "explore:market_tab";
@@ -431,7 +431,7 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
         }
         haptic="medium"
         pressScale={0.95}
-        style={[fs.ingresarBtn, { backgroundColor: BRAND_GREEN }]}
+        style={[fs.ingresarBtn, { backgroundColor: c.action }]}
       >
         <AlamosIcon name="download" size={14} color="#FFFFFF" />
         <Text style={fs.ingresarBtnText}>Ingresar</Text>
@@ -677,10 +677,11 @@ function MarketBody({
                     <Text
                       style={[
                         s.rowChange,
-                        { color: asset.change >= 0 ? c.greenDark : c.red },
+                        { color: asset.change >= 0 ? c.positive : c.red },
                       ]}
                     >
-                      {formatPct(asset.change)}
+                      {asset.change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(asset.change, false)}
                     </Text>
                   )}
                 </View>
@@ -736,10 +737,11 @@ function MoversMarquee({
               <Text
                 style={[
                   s.moverChange,
-                  { color: up ? c.greenDark : c.red },
+                  { color: up ? c.positive : c.red },
                 ]}
               >
-                {formatPct(asset.change)}
+                {up ? "▲ " : "▼ "}
+                {formatPct(asset.change, false)}
               </Text>
             </Pressable>
           );

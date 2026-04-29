@@ -66,7 +66,7 @@ export default function SuccessScreen() {
     >
       <View style={s.heroBlock}>
         <View
-          style={[s.checkCircle, { backgroundColor: c.green }]}
+          style={[s.checkCircle, { backgroundColor: c.positive }]}
         >
           <AlamosIcon name="check" size={44} color="#FFFFFF" strokeWidth={2.4} />
         </View>
@@ -112,8 +112,10 @@ export default function SuccessScreen() {
           style={[
             s.shareCta,
             {
-              backgroundColor: c.greenDim,
-              borderColor: c.green,
+              // Identidad de marca, no acción primaria — esto comparte
+              // ecosystem Alamos. Verde-brand en escala dim + border.
+              backgroundColor: c.brandDim,
+              borderColor: c.brand,
             },
           ]}
           onPress={() =>
@@ -131,14 +133,14 @@ export default function SuccessScreen() {
         >
           <AlamosLogo variant="mark" tone="green" size={20} />
           <View style={s.shareCtaTextWrap}>
-            <Text style={[s.shareCtaTitle, { color: c.greenDark }]}>
+            <Text style={[s.shareCtaTitle, { color: c.positive }]}>
               Compartir comprobante
             </Text>
-            <Text style={[s.shareCtaRef, { color: c.greenDark }]}>
+            <Text style={[s.shareCtaRef, { color: c.positive }]}>
               {receiptId}
             </Text>
           </View>
-          <AlamosIcon name="arrow" size={16} color={c.greenDark} />
+          <AlamosIcon name="arrow" size={16} color={c.positive} />
         </Pressable>
 
         <Pressable

@@ -1,15 +1,16 @@
 import { StyleSheet, View, type ViewStyle, type StyleProp } from "react-native";
 import Svg, { Polygon } from "react-native-svg";
+import { useTheme } from "../theme";
 
 interface Props {
   /** Tamaño del watermark — ancho del SVG. Default 240. */
   size?: number;
-  /** Color del triángulo trasero. Default brand green. */
+  /** Color del triángulo trasero. Default `c.brand` del theme. */
   greenColor?: string;
-  /** Color del triángulo delantero. Default brand green también — el
+  /** Color del triángulo delantero. Default `c.brand` también — el
    *  watermark "todo verde" es la identidad principal. Si querés el
    *  outline mixto (verde + dark) del logo empresa, pasalo
-   *  explícitamente con `darkColor="#0E0F0C"`. */
+   *  explícitamente con `darkColor={c.text}`. */
   darkColor?: string;
   /** Opacidad del watermark. Default 0.08 (sutil). */
   opacity?: number;
@@ -34,13 +35,16 @@ interface Props {
  */
 export function TrianglesWatermark({
   size = 240,
-  greenColor = "#00E676",
-  darkColor = "#00E676",
+  greenColor,
+  darkColor,
   opacity = 0.08,
   strokeWidth,
   absolute = true,
   style,
 }: Props) {
+  const { c } = useTheme();
+  const green = greenColor ?? c.brand;
+  const dark = darkColor ?? c.brand;
   const sw = strokeWidth ?? size * 0.022;
   const containerStyle = absolute ? s.absolute : undefined;
 
@@ -57,15 +61,15 @@ export function TrianglesWatermark({
         {/* Triángulo trasero — verde, centrado en x=38, ancho 44, alto 60. */}
         <Polygon
           points="38,26 16,86 60,86"
-          stroke={greenColor}
+          stroke={green}
           strokeWidth={sw}
           strokeLinejoin="round"
           fill="none"
         />
-        {/* Triángulo delantero — oscuro, centrado en x=56, ancho 54, alto 74. */}
+        {/* Triángulo delantero — overlap, centrado en x=56, ancho 54, alto 74. */}
         <Polygon
           points="56,12 29,86 83,86"
-          stroke={darkColor}
+          stroke={dark}
           strokeWidth={sw}
           strokeLinejoin="round"
           fill="none"

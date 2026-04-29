@@ -171,8 +171,8 @@ function BridgeOptionRow({
           </Text>
         </View>
         {sameCurrency ? (
-          <View style={[s.directBadge, { backgroundColor: c.greenDim }]}>
-            <Text style={[s.directBadgeText, { color: c.greenDark }]}>
+          <View style={[s.directBadge, { backgroundColor: c.positiveDim }]}>
+            <Text style={[s.directBadgeText, { color: c.positive }]}>
               Sin conversión
             </Text>
           </View>

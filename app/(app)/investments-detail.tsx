@@ -643,8 +643,9 @@ function AssetDetailRow({
         <Text style={[s.balance, { color: c.text }]}>
           {formatMoney(total, cur)}
         </Text>
-        <Text style={[s.balanceSub, { color: up ? c.greenDark : c.red }]}>
-          {formatPct(asset.change)}
+        <Text style={[s.balanceSub, { color: up ? c.positive : c.red }]}>
+          {up ? "▲ " : "▼ "}
+          {formatPct(asset.change, false)}
         </Text>
       </View>
     </Pressable>
