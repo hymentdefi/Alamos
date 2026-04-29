@@ -110,6 +110,12 @@ function BaseExplore() {
 
   const [query, setQuery] = useState("");
   const [activeMarketIdx, setActiveMarketIdx] = useState(0);
+  // Sub-categoría activa dentro del mercado (pills debajo de los tabs).
+  // Se vive en BaseExplore — no en MarketBody — porque las pills se
+  // renderizan en el header, integradas con el segmented de mercado.
+  const [activeCategory, setActiveCategory] = useState<
+    AssetCategory | "todo"
+  >("todo");
   const [onlyFavs, setOnlyFavs] = useState(false);
   const listRef = useRef<ScrollView | null>(null);
 
@@ -155,6 +161,9 @@ function BaseExplore() {
   const switchMarket = useCallback((idx: number) => {
     Haptics.selectionAsync().catch(() => {});
     setActiveMarketIdx(idx);
+    // Reseteamos la categoría al cambiar de mercado para que no quede
+    // pegada una que no aplica (ej: pasar de AR/CEDEARs a EE.UU).
+    setActiveCategory("todo");
     SecureStore.setItemAsync(MARKET_TAB_KEY, MARKET_TABS[idx].id).catch(
       () => {},
     );
@@ -175,48 +184,107 @@ function BaseExplore() {
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
 
-        {/* Segmented tabs de mercado — el "switch" entre AR / EE.UU /
-            Crypto. Estilo iOS-like: track crema, pill activa blanca
-            elevada con sombra sutil. */}
+        {/* Control jerárquico: tabs de mercado arriba, categorías
+            del mercado activo debajo. Mismo container crema (track
+            iOS-like) — la categoría sale visualmente del segmented
+            de mercado en lugar de flotar como un grupo aparte.
+            Pill activa blanca con sombra en ambos niveles. */}
         <View
           style={[
-            s.marketSeg,
+            s.marketControl,
             { backgroundColor: c.surfaceHover },
           ]}
         >
-          {MARKET_TABS.map((m, i) => {
-            const active = i === activeMarketIdx;
-            return (
-              <Tap
-                key={m.id}
-                onPress={() => switchMarket(i)}
-                haptic="selection"
-                pressScale={0.96}
-                rippleContained
-                style={[
-                  s.marketSegBtn,
-                  active && [
-                    s.marketSegBtnActive,
-                    { backgroundColor: c.surface },
-                  ],
-                ]}
-              >
-                <MarketGlyph market={m.id} active={active} />
-                <Text
+          <View style={s.marketSeg}>
+            {MARKET_TABS.map((m, i) => {
+              const active = i === activeMarketIdx;
+              return (
+                <Tap
+                  key={m.id}
+                  onPress={() => switchMarket(i)}
+                  haptic="selection"
+                  pressScale={0.96}
+                  rippleContained
                   style={[
-                    s.marketSegLabel,
-                    {
-                      color: active ? c.text : c.textMuted,
-                      fontFamily: active ? fontFamily[700] : fontFamily[600],
-                    },
+                    s.marketSegBtn,
+                    active && [
+                      s.marketSegBtnActive,
+                      { backgroundColor: c.surface },
+                    ],
                   ]}
-                  numberOfLines={1}
                 >
-                  {m.short}
-                </Text>
-              </Tap>
-            );
-          })}
+                  <MarketGlyph market={m.id} active={active} />
+                  <Text
+                    style={[
+                      s.marketSegLabel,
+                      {
+                        color: active ? c.text : c.textMuted,
+                        fontFamily: active
+                          ? fontFamily[700]
+                          : fontFamily[600],
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {m.short}
+                  </Text>
+                </Tap>
+              );
+            })}
+          </View>
+
+          {/* Divider sutil entre tabs y categorías — un hairline a
+              media opacidad sobre el track crema; suficiente para
+              estructurar sin agregar peso visual. */}
+          <View
+            style={[
+              s.marketControlDivider,
+              { backgroundColor: c.border },
+            ]}
+          />
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.categoryContent}
+          >
+            {market.categories.map((cat) => {
+              const active = cat.id === activeCategory;
+              return (
+                <Tap
+                  key={cat.id}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setActiveCategory(cat.id);
+                  }}
+                  haptic="selection"
+                  pressScale={0.94}
+                  rippleContained
+                  style={[
+                    s.categoryPill,
+                    active && [
+                      s.categoryPillActive,
+                      { backgroundColor: c.surface },
+                    ],
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.categoryLabel,
+                      {
+                        color: active ? c.text : c.textMuted,
+                        fontFamily: active
+                          ? fontFamily[700]
+                          : fontFamily[600],
+                      },
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </Tap>
+              );
+            })}
+          </ScrollView>
         </View>
 
         <View style={s.searchRow}>
@@ -262,6 +330,7 @@ function BaseExplore() {
 
       <MarketBody
         market={market}
+        activeCategory={activeCategory}
         query={query}
         onlyFavs={onlyFavs}
         onOpen={openDetail}
@@ -422,6 +491,7 @@ const fs = StyleSheet.create({
 
 function MarketBody({
   market,
+  activeCategory,
   query,
   onlyFavs,
   onOpen,
@@ -429,6 +499,7 @@ function MarketBody({
   listRef,
 }: {
   market: MarketTab;
+  activeCategory: AssetCategory | "todo";
   query: string;
   onlyFavs: boolean;
   onOpen: (a: Asset) => void;
@@ -436,17 +507,6 @@ function MarketBody({
   listRef: (ref: ScrollView | null) => void;
 }) {
   const { c } = useTheme();
-
-  // Categoría activa dentro del mercado. "todo" = sin sub-filtro.
-  // Se resetea cuando cambia el mercado para que no quede pegada una
-  // categoría que no aplica (ej: pasar de AR/CEDEARs a US, donde no
-  // hay CEDEARs).
-  const [activeCategory, setActiveCategory] = useState<
-    AssetCategory | "todo"
-  >("todo");
-  useEffect(() => {
-    setActiveCategory("todo");
-  }, [market.id]);
 
   const inMarket = useMemo(
     () =>
@@ -508,47 +568,6 @@ function MarketBody({
       showsVerticalScrollIndicator={false}
     >
       <AvailableFundsCard market={market} />
-
-      {/* Categorías dentro del mercado activo. Pills horizontales
-          scrolleables — la primera ("Todo") está al ras del padding
-          izquierdo para que no haya un hueco vacío al arrancar. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={s.categoryRow}
-        contentContainerStyle={s.categoryContent}
-      >
-        {market.categories.map((cat) => {
-          const active = cat.id === activeCategory;
-          return (
-            <Tap
-              key={cat.id}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setActiveCategory(cat.id);
-              }}
-              haptic="selection"
-              pressScale={0.94}
-              style={[
-                s.categoryPill,
-                {
-                  backgroundColor: active ? c.text : c.surfaceHover,
-                  borderColor: active ? c.text : c.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  s.categoryLabel,
-                  { color: active ? c.bg : c.textSecondary },
-                ]}
-              >
-                {cat.label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </ScrollView>
 
       {showMovers && topMovers.length > 0 ? (
         <View style={s.moversBlock}>
@@ -742,12 +761,21 @@ const s = StyleSheet.create({
     letterSpacing: -1.2,
     marginBottom: 14,
   },
+  marketControl: {
+    borderRadius: radius.lg,
+    paddingTop: 4,
+    paddingBottom: 4,
+    marginBottom: 14,
+  },
+  marketControlDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    opacity: 0.6,
+  },
   marketSeg: {
     flexDirection: "row",
-    borderRadius: radius.pill,
-    padding: 4,
     gap: 2,
-    marginBottom: 14,
   },
   marketSegBtn: {
     flex: 1,
@@ -802,21 +830,26 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  categoryRow: {
-    marginTop: 14,
-  },
   categoryContent: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: 4,
+    gap: 4,
   },
   categoryPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radius.pill,
-    borderWidth: 1,
+  },
+  categoryPillActive: {
+    // Mismo lenguaje visual que el pill activo del segmented de
+    // mercado — blanco brillante con sombra sutil para que ambos
+    // niveles del control se "lean" igual.
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
   },
   categoryLabel: {
-    fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.05,
   },
