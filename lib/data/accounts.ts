@@ -93,6 +93,107 @@ export function convertAmount(
   return amount * rateBetween(from, to);
 }
 
+/** Liquidación que aplica al cambio de moneda. T+1 sólo cuando hay
+ *  ruta MEP (ARS ↔ USD). Cripto y same-currency liquidan al toque. */
+export type Settlement = "T+0" | "T+1";
+
+export function settlementFor(
+  from: AccountCurrency,
+  to: AccountCurrency,
+): Settlement {
+  if (from === to) return "T+0";
+  if ((from === "ARS" && to === "USD") || (from === "USD" && to === "ARS"))
+    return "T+1";
+  return "T+0";
+}
+
+/** % de spread / fee implícito por par de monedas. Mock — la API real
+ *  va a devolverlo embebido en el rate de cada quote. */
+export function feePctFor(
+  from: AccountCurrency,
+  to: AccountCurrency,
+): number {
+  if (from === to) return 0;
+  // MEP (ARS ↔ USD): spread típico de la operatoria.
+  if ((from === "ARS" && to === "USD") || (from === "USD" && to === "ARS"))
+    return 0.005;
+  // Cripto on-ramp / off-ramp: spread más alto que MEP.
+  if (
+    (from === "ARS" && to === "USDT") ||
+    (from === "USDT" && to === "ARS")
+  )
+    return 0.007;
+  // USD ↔ USDT: spread chico, casi paridad.
+  return 0.002;
+}
+
+export interface BridgeOption {
+  /** Cuenta de origen — desde donde se debitan los fondos. */
+  from: Account;
+  /** Cantidad que necesitamos debitar en la cuenta origen (incluye spread). */
+  debitSource: number;
+  /** Cuánto del débito se va en spread/fee. */
+  feeAmountSource: number;
+  /** % de fee aplicado (informativo). */
+  feePct: number;
+  /** Tipo de cambio efectivo (post-fee) que recibe el usuario. */
+  rateNet: number;
+  /** Equivalente del débito en ARS — siempre, para que el usuario tenga
+   *  una sola unidad de comparación entre fuentes. */
+  arsEquivalent: number;
+  /** ¿Alcanza el saldo de la cuenta para cubrir la operación? */
+  enough: boolean;
+  /** Liquidación — T+1 si hay ruta MEP. */
+  settles: Settlement;
+}
+
+/**
+ * Calcula desde qué cuentas se puede tomar `targetAmount` en
+ * `targetCurrency`. Ordena: primero las que ya están en la moneda
+ * destino (no requieren conversión), después por mejor rate efectivo,
+ * y al final las que no alcanzan.
+ */
+export function bridgeOptionsFor(
+  targetAmount: number,
+  targetCurrency: AccountCurrency,
+  available: Account[] = accounts,
+): BridgeOption[] {
+  const opts: BridgeOption[] = available.map((acc) => {
+    const fee = feePctFor(acc.currency, targetCurrency);
+    const grossRate = rateBetween(acc.currency, targetCurrency);
+    // Rate neto que recibe el user — gross × (1 − fee).
+    const rateNet = grossRate * (1 - fee);
+    // Cuánto necesitamos debitar en source para obtener target en destino.
+    const debitSource = rateNet > 0 ? targetAmount / rateNet : 0;
+    const feeAmountSource = debitSource * fee;
+    const arsEquivalent =
+      acc.currency === "ARS"
+        ? debitSource
+        : convertAmount(debitSource, acc.currency, "ARS");
+    return {
+      from: acc,
+      debitSource,
+      feeAmountSource,
+      feePct: fee,
+      rateNet,
+      arsEquivalent,
+      enough: acc.balance >= debitSource,
+      settles: settlementFor(acc.currency, targetCurrency),
+    };
+  });
+
+  return opts.sort((a, b) => {
+    // Same-currency siempre primero.
+    const aSame = a.from.currency === targetCurrency ? 0 : 1;
+    const bSame = b.from.currency === targetCurrency ? 0 : 1;
+    if (aSame !== bSame) return aSame - bSame;
+    // Las que alcanzan, antes que las que no.
+    if (a.enough !== b.enough) return a.enough ? -1 : 1;
+    // Después por mejor rate (menos ARS-equivalente para mismo target).
+    return a.arsEquivalent - b.arsEquivalent;
+  });
+}
+
 /** Formato del saldo en la moneda nativa de la cuenta. */
 export function formatAccountBalance(a: Account): string {
   if (a.currency === "ARS") {

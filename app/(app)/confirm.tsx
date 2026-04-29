@@ -27,7 +27,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing, brand } from "../../lib/theme";
-import { assets, formatARS } from "../../lib/data/assets";
+import {
+  assets,
+  assetCurrency,
+  formatARS,
+  formatMoney,
+  type AssetCurrency,
+} from "../../lib/data/assets";
+import { accounts } from "../../lib/data/accounts";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
 
@@ -225,10 +232,28 @@ const AVAILABLE_ARS = 1272850;
 type Phase = "idle" | "sending" | "received" | "done" | "error";
 
 export default function ConfirmScreen() {
-  const { ticker, amount, mode } = useLocalSearchParams<{
+  const {
+    ticker,
+    amount,
+    mode,
+    currency,
+    bridgeFrom,
+    bridgeRate,
+    bridgeFeePct,
+    bridgeDebit,
+    bridgeArs,
+    bridgeSettles,
+  } = useLocalSearchParams<{
     ticker: string;
     amount?: string;
     mode?: string;
+    currency?: string;
+    bridgeFrom?: string;
+    bridgeRate?: string;
+    bridgeFeePct?: string;
+    bridgeDebit?: string;
+    bridgeArs?: string;
+    bridgeSettles?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -238,10 +263,32 @@ export default function ConfirmScreen() {
   const asset = assets.find((a) => a.ticker === ticker);
   const isSell = mode === "sell";
 
+  // Moneda nativa del activo. Si llega `currency` desde buy, lo
+  // tomamos; si no (orden vieja sin migrar), inferimos del asset.
+  const nativeCurrency: AssetCurrency =
+    (currency as AssetCurrency | undefined) ??
+    (asset ? assetCurrency(asset) : "ARS");
+
   const numAmount = Number(amount) || asset?.price || 0;
   const estQty = asset ? numAmount / asset.price : 0;
-  const fee = Math.round(numAmount * 0.005);
+  // Comisión de la operación de compra/venta (separada del spread del
+  // puente — el spread ya está absorbido en bridgeDebit).
+  const fee = numAmount * 0.005;
   const net = isSell ? numAmount - fee : numAmount + fee;
+
+  // Datos del puente — sólo si la orden vino con bridge. Ej: comprar
+  // un US stock pagando con la cuenta ars-ar requiere conversión MEP
+  // → bridge.from = ars-ar, settles = T+1.
+  const bridge = bridgeFrom
+    ? {
+        from: accounts.find((a) => a.id === bridgeFrom),
+        rate: Number(bridgeRate) || 0,
+        feePct: Number(bridgeFeePct) || 0,
+        debitSource: Number(bridgeDebit) || 0,
+        arsEquivalent: Number(bridgeArs) || 0,
+        settles: (bridgeSettles as "T+0" | "T+1" | undefined) ?? "T+0",
+      }
+    : null;
 
   // Ring sizing (spec A, updated): 28% del ancho, clamped 100-140 px.
   // Chico, elegante, discreto. NO domina la pantalla — como Robinhood.
@@ -618,15 +665,62 @@ export default function ConfirmScreen() {
   if (!asset) return null;
 
   const rows: { label: string; value: string; strong?: boolean }[] = [
-    { label: "Precio estimado", value: formatARS(asset.price) },
+    {
+      label: "Precio estimado",
+      value: formatMoney(asset.price, nativeCurrency),
+    },
     { label: "Cantidad", value: `${estQty.toFixed(4)} unidades` },
-    { label: "Comisión (0,5%)", value: formatARS(fee) },
+    {
+      label: "Comisión (0,5%)",
+      value: formatMoney(fee, nativeCurrency),
+    },
     {
       label: isSell ? "Total a recibir" : "Total a pagar",
-      value: formatARS(net),
+      value: formatMoney(net, nativeCurrency),
       strong: true,
     },
   ];
+
+  /** Rows del desglose del puente — sólo se muestran cuando hay bridge.
+   *  Backend ejecuta esto como dos eventos (conversión + compra) pero
+   *  para el usuario es una sola aprobación. */
+  const bridgeRows: { label: string; value: string; strong?: boolean }[] =
+    bridge && bridge.from
+      ? [
+          {
+            label: "Origen",
+            value:
+              bridge.from.currency === "USDT"
+                ? "Cripto · USDT"
+                : `${bridge.from.location} · ${bridge.from.currency}`,
+          },
+          {
+            label: "Tipo de cambio",
+            value: `1 ${bridge.from.currency} = ${formatMoney(
+              bridge.rate,
+              nativeCurrency,
+            )}`,
+          },
+          {
+            label: `Spread (${(bridge.feePct * 100)
+              .toFixed(2)
+              .replace(".", ",")}%)`,
+            value: "incluido",
+          },
+          {
+            label: "A debitar",
+            value: formatMoney(
+              bridge.debitSource,
+              bridge.from.currency as AssetCurrency,
+            ),
+            strong: true,
+          },
+          {
+            label: "Equivalente ARS",
+            value: formatARS(bridge.arsEquivalent),
+          },
+        ]
+      : [];
 
   const statusBarStyle = phase === "idle" ? "dark" : "light";
 
@@ -668,9 +762,21 @@ export default function ConfirmScreen() {
             <Text style={[s.amountLabel, { color: c.textMuted }]}>
               {isSell ? "Vendés" : "Comprás"}
             </Text>
-            <AmountDisplay value={numAmount} size={36} />
+            <AmountDisplay
+              value={numAmount}
+              size={36}
+              prefix={
+                nativeCurrency === "USD"
+                  ? "US$"
+                  : nativeCurrency === "USDT"
+                  ? "USDT"
+                  : "$"
+              }
+            />
             <Text style={[s.available, { color: c.textMuted }]}>
-              {formatARS(AVAILABLE_ARS)} disponibles para operar
+              {bridge && bridge.from
+                ? `Pagás con ${bridge.from.currency === "USDT" ? "tu wallet cripto" : bridge.from.location.toLowerCase()}`
+                : `${formatARS(AVAILABLE_ARS)} disponibles para operar`}
             </Text>
           </View>
 
@@ -702,15 +808,63 @@ export default function ConfirmScreen() {
             ))}
           </View>
 
+          {bridge && bridge.from ? (
+            <View style={[s.bridgeBlock, { borderColor: c.border }]}>
+              <View style={s.bridgeHead}>
+                <Feather
+                  name="repeat"
+                  size={14}
+                  color={c.textSecondary}
+                />
+                <Text style={[s.bridgeTitle, { color: c.text }]}>
+                  Conversión incluida
+                </Text>
+                {bridge.settles === "T+1" ? (
+                  <View
+                    style={[s.t1Pill, { backgroundColor: c.surfaceHover }]}
+                  >
+                    <Text style={[s.t1PillText, { color: c.textSecondary }]}>
+                      Liquida T+1
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              {bridgeRows.map((row, i) => (
+                <View
+                  key={row.label}
+                  style={[
+                    s.row,
+                    i < bridgeRows.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                >
+                  <Text style={[s.rowLabel, { color: c.textMuted }]}>
+                    {row.label}
+                  </Text>
+                  <Text
+                    style={[
+                      s.rowValue,
+                      row.strong && s.rowValueStrong,
+                      { color: c.text },
+                    ]}
+                  >
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={s.orderSummary}>
             <Text style={[s.summaryTitle, { color: c.text }]}>
               Resumen de orden
             </Text>
             <Text style={[s.summaryBody, { color: c.textMuted }]}>
-              Estás enviando una orden a mercado para{" "}
-              {isSell ? "vender" : "comprar"} {formatARS(numAmount)} de{" "}
-              {asset.ticker}. La ejecución se realiza al mejor precio
-              disponible.
+              {bridge
+                ? `Convertimos los fondos y compramos ${formatMoney(numAmount, nativeCurrency)} de ${asset.ticker} en una sola operación. ${bridge.settles === "T+1" ? "La acreditación final puede demorar hasta 24 hs hábiles por el ciclo MEP." : "Liquidación al instante."}`
+                : `Estás enviando una orden a mercado para ${isSell ? "vender" : "comprar"} ${formatMoney(numAmount, nativeCurrency)} de ${asset.ticker}. La ejecución se realiza al mejor precio disponible.`}
             </Text>
           </View>
         </View>
@@ -868,13 +1022,19 @@ export default function ConfirmScreen() {
             </Animated.View>
           </View>
 
-          {/* Error subtitle (always mounted, opacity controlled). */}
+          {/* Error subtitle (always mounted, opacity controlled). Si hubo
+              bridge, el rechazo más probable es bancario: la conversión
+              quedó "comprometida" (los fondos están reservados pero no
+              acreditados). Le explicamos al usuario y le ofrecemos
+              reenviar a otro CBU. */}
           <Animated.View
             style={[s.subtitleWrap, errSubStyle]}
             pointerEvents="none"
           >
             <Text style={s.errorSubtitle}>
-              Revisa el estado en tu portafolio
+              {bridge
+                ? "Tu conversión quedó comprometida. Podés reintentar o reenviar a otro CBU desde tu portafolio."
+                : "Revisa el estado en tu portafolio"}
             </Text>
           </Animated.View>
 
@@ -980,6 +1140,36 @@ const s = StyleSheet.create({
   rowValueStrong: {
     fontFamily: fontFamily[700],
     fontSize: 16,
+  },
+  bridgeBlock: {
+    marginTop: 18,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+  },
+  bridgeHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  bridgeTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    flex: 1,
+  },
+  t1Pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  t1PillText: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 0.3,
   },
   orderSummary: {
     marginTop: 24,
