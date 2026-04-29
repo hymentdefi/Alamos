@@ -16,7 +16,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -72,19 +71,19 @@ export function GreetingOverlay({ onEnd }: Props) {
   // Progreso del cover + wipe (0 → 1). Único valor para los dos.
   const coverProgress = useSharedValue(0);
 
-  // Logo entry.
-  const logoOpacity = useSharedValue(0);
-  const logoScale = useSharedValue(0.94);
+  // Logo: NO hay entry animada — el splash nativo de Expo ya mostró
+  // el logo MIX estático. Arrancamos visible directamente para que
+  // la transición native→JS sea invisible. Sólo el pulse del ring y
+  // el fade-out final usan estos valores.
   const logoPulse = useSharedValue(1);
-  const logoExitOpacity = useSharedValue(1);
-  const logoExitScale = useSharedValue(1);
 
   // Ring.
   const ringProgress = useSharedValue(0); // 0 = invisible, 1 = cerrado
   const ringOpacity = useSharedValue(0);
 
-  // Exit del cover — al final, baja revelando el home.
-  const coverExitY = useSharedValue(0);
+  // Exit global — todo el overlay (cover + logo + ring) hace fade-out
+  // smooth cuando el ring cierra, dejando el home detrás.
+  const exitOpacity = useSharedValue(1);
 
   /* ─── Geometría exacta del wipe ─── */
   // Puntos del coverProgress donde empieza/termina el wipe en el logo:
@@ -99,17 +98,11 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   /* ─── Animated styles ─── */
 
-  // Cover: translateY entry (windowH→0) + exit (0→-windowH).
-  // El exit baja al final revelando el home detrás (gesto inverso al
-  // swipe up del confirm). En realidad sale "hacia arriba" porque
-  // coverExitY va negativo: coverY = entryY - exitY. Cuando entryY=0
-  // y exitY crece, el cover se va volando hacia arriba.
+  // Cover: translateY de windowH (todo abajo) a 0 (full-cover).
   const coverStyle = useAnimatedStyle(() => ({
     transform: [
       {
-        translateY:
-          interpolate(coverProgress.value, [0, 1], [windowH, 0]) +
-          coverExitY.value,
+        translateY: interpolate(coverProgress.value, [0, 1], [windowH, 0]),
       },
     ],
   }));
@@ -124,12 +117,16 @@ export function GreetingOverlay({ onEnd }: Props) {
     ),
   }));
 
-  // Hero (logo + ring): opacity entry × exit, scale entry × pulse × exit.
+  // Hero (logo + ring): siempre visible al 100%; sólo el pulse del
+  // ring escala. El fade-out final lo maneja `exitOpacity` aplicado
+  // al overlay entero.
   const heroStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value * logoExitOpacity.value,
-    transform: [
-      { scale: logoScale.value * logoPulse.value * logoExitScale.value },
-    ],
+    transform: [{ scale: logoPulse.value }],
+  }));
+
+  // Exit global del overlay — cover + logo + ring fadean juntos.
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: exitOpacity.value,
   }));
 
   // Ring: animatedProps con strokeDashoffset interpolado.
@@ -147,19 +144,11 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   /* ─── Coreografía ─── */
   useEffect(() => {
-    /* 1. Logo MIX entry (0–340ms) */
-    logoOpacity.value = withTiming(1, {
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
-    });
-    logoScale.value = withSpring(1, {
-      mass: 1,
-      stiffness: 80,
-      damping: 12,
-    });
+    /* 1. Hold breve sobre el logo mix (0–220ms) — el splash nativo
+     *    ya lo mostró estático, sólo necesitamos un beat para que
+     *    el ojo registre la continuidad antes del cover. */
 
-    /* 2. Hold del logo mix (340–620ms) */
-    /* 3. Cover sube + WIPE en sincro (a partir de 620ms) */
+    /* 2. Cover sube + WIPE en sincro (a partir de 220ms) */
     const coverTimer = setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       coverProgress.value = withTiming(1, {
@@ -171,9 +160,9 @@ export function GreetingOverlay({ onEnd }: Props) {
         1180,
         withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
       );
-    }, 620);
+    }, 220);
 
-    /* 4. Cover terminó (≈2020ms). Ring se TRAZA. */
+    /* 3. Cover terminó (≈1620ms). Ring se TRAZA. */
     const ringTimer = setTimeout(() => {
       ringProgress.value = withTiming(
         1,
@@ -199,40 +188,25 @@ export function GreetingOverlay({ onEnd }: Props) {
           );
         },
       );
-    }, 2120);
+    }, 1720);
 
-    /* 5. EXIT — logo + ring fade quietos + cover slide hacia arriba
-     *      (a los 3140ms, después del pulse). El cover sube como
-     *      "telón" revelando el home detrás. */
+    /* 4. EXIT smooth — todo el overlay (cover + logo + ring) hace
+     *    fade-out conjunto cuando el ring cerró + el pulse terminó.
+     *    Sin gestos, sin slide, sin ruido — desaparece y aparece
+     *    el home. */
     const exitTimer = setTimeout(() => {
-      logoExitOpacity.value = withTiming(0, {
-        duration: 280,
-        easing: Easing.in(Easing.cubic),
-      });
-      logoExitScale.value = withTiming(1.04, {
-        duration: 320,
-        easing: Easing.out(Easing.cubic),
-      });
-      ringOpacity.value = withTiming(0, {
-        duration: 240,
-        easing: Easing.in(Easing.cubic),
-      });
-      // Cover sube hacia afuera — gesto inverso al swipe del confirm.
-      coverExitY.value = withDelay(
-        140,
-        withTiming(
-          -windowH,
-          {
-            duration: 520,
-            easing: Easing.bezier(0.5, 0, 0.2, 1),
-          },
-          (finished) => {
-            "worklet";
-            if (finished) runOnJS(onEnd)();
-          },
-        ),
+      exitOpacity.value = withTiming(
+        0,
+        {
+          duration: 420,
+          easing: Easing.inOut(Easing.cubic),
+        },
+        (finished) => {
+          "worklet";
+          if (finished) runOnJS(onEnd)();
+        },
       );
-    }, 3140);
+    }, 2780);
 
     return () => {
       clearTimeout(coverTimer);
@@ -240,16 +214,16 @@ export function GreetingOverlay({ onEnd }: Props) {
       clearTimeout(exitTimer);
       cancelAnimation(coverProgress);
       cancelAnimation(ringProgress);
-      cancelAnimation(coverExitY);
+      cancelAnimation(exitOpacity);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Skip rápido al tap.
+  // Skip rápido al tap — fade-out del overlay entero.
   const skip = () => {
-    coverExitY.value = withTiming(
-      -windowH,
-      { duration: 280, easing: Easing.in(Easing.cubic) },
+    exitOpacity.value = withTiming(
+      0,
+      { duration: 220, easing: Easing.in(Easing.cubic) },
       (finished) => {
         "worklet";
         if (finished) runOnJS(onEnd)();
@@ -265,7 +239,9 @@ export function GreetingOverlay({ onEnd }: Props) {
       statusBarTranslucent
       onRequestClose={() => {}}
     >
-      <View style={[s.root, { backgroundColor: c.bg }]}>
+      <Animated.View
+        style={[s.root, { backgroundColor: c.bg }, overlayStyle]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={skip}>
           {/* Cover verde brand sólido. Sin halo, sin gradient. */}
           <Animated.View
@@ -329,7 +305,7 @@ export function GreetingOverlay({ onEnd }: Props) {
             </View>
           </Animated.View>
         </Pressable>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
