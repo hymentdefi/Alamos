@@ -33,6 +33,7 @@ import {
   formatMoney,
   formatPct,
   type Asset,
+  type AssetCategory,
   type AssetMarket,
   type AssetCurrency,
 } from "../../../lib/data/assets";
@@ -48,12 +49,49 @@ interface MarketTab {
   label: string;
   short: string;
   currency: AssetCurrency;
+  /** Categorías disponibles dentro del mercado, en orden de relevancia.
+   *  La primera ("todo") siempre es el catch-all. */
+  categories: { id: AssetCategory | "todo"; label: string }[];
 }
 
 const MARKET_TABS: MarketTab[] = [
-  { id: "AR", label: "Argentina", short: "AR", currency: "ARS" },
-  { id: "US", label: "Estados Unidos", short: "EE.UU", currency: "USD" },
-  { id: "CRYPTO", label: "Crypto", short: "Crypto", currency: "USDT" },
+  {
+    id: "AR",
+    label: "Argentina",
+    short: "AR",
+    currency: "ARS",
+    categories: [
+      { id: "todo", label: "Todo" },
+      { id: "cedears", label: "CEDEARs" },
+      { id: "acciones", label: "Acciones" },
+      { id: "bonos", label: "Bonos" },
+      { id: "fci", label: "Fondos" },
+      { id: "obligaciones", label: "ONs" },
+      { id: "letras", label: "Letras" },
+      { id: "caucion", label: "Caución" },
+    ],
+  },
+  {
+    id: "US",
+    label: "Estados Unidos",
+    short: "EE.UU",
+    currency: "USD",
+    categories: [
+      { id: "todo", label: "Todo" },
+      { id: "acciones", label: "Acciones" },
+    ],
+  },
+  {
+    id: "CRYPTO",
+    label: "Crypto",
+    short: "Crypto",
+    currency: "USDT",
+    categories: [
+      { id: "todo", label: "Todo" },
+      { id: "crypto", label: "Spot" },
+      { id: "futuros", label: "Futuros" },
+    ],
+  },
 ];
 
 export default function ExploreScreen() {
@@ -399,6 +437,17 @@ function MarketBody({
 }) {
   const { c } = useTheme();
 
+  // Categoría activa dentro del mercado. "todo" = sin sub-filtro.
+  // Se resetea cuando cambia el mercado para que no quede pegada una
+  // categoría que no aplica (ej: pasar de AR/CEDEARs a US, donde no
+  // hay CEDEARs).
+  const [activeCategory, setActiveCategory] = useState<
+    AssetCategory | "todo"
+  >("todo");
+  useEffect(() => {
+    setActiveCategory("todo");
+  }, [market.id]);
+
   const inMarket = useMemo(
     () =>
       assets.filter(
@@ -408,9 +457,19 @@ function MarketBody({
     [market.id],
   );
 
+  // Filtramos primero por categoría dentro del mercado, después por
+  // search/onlyFavs. Los movers también respetan la categoría activa.
+  const inCategory = useMemo(
+    () =>
+      activeCategory === "todo"
+        ? inMarket
+        : inMarket.filter((a) => a.category === activeCategory),
+    [inMarket, activeCategory],
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return inMarket.filter((a) => {
+    return inCategory.filter((a) => {
       if (onlyFavs && !isFavorite(a.ticker)) return false;
       if (!q) return true;
       return (
@@ -418,23 +477,29 @@ function MarketBody({
         a.name.toLowerCase().includes(q)
       );
     });
-  }, [query, onlyFavs, isFavorite, inMarket]);
+  }, [query, onlyFavs, isFavorite, inCategory]);
 
   const topMovers = useMemo(
     () =>
-      [...inMarket]
+      [...inCategory]
         .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
         .slice(0, 8),
-    [inMarket],
+    [inCategory],
   );
+
+  const activeCategoryLabel =
+    market.categories.find((cat) => cat.id === activeCategory)?.label ??
+    "Todo";
 
   const eyebrowLabel = query
     ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
     : onlyFavs
     ? `Tus favoritos en ${market.short}`
-    : `Instrumentos · ${market.label}`;
+    : activeCategory === "todo"
+    ? `Instrumentos · ${market.label}`
+    : `${activeCategoryLabel} · ${market.short}`;
 
-  const showMovers = !query && !onlyFavs;
+  const showMovers = !query && !onlyFavs && activeCategory === "todo";
 
   return (
     <ScrollView
@@ -443,6 +508,47 @@ function MarketBody({
       showsVerticalScrollIndicator={false}
     >
       <AvailableFundsCard market={market} />
+
+      {/* Categorías dentro del mercado activo. Pills horizontales
+          scrolleables — la primera ("Todo") está al ras del padding
+          izquierdo para que no haya un hueco vacío al arrancar. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.categoryRow}
+        contentContainerStyle={s.categoryContent}
+      >
+        {market.categories.map((cat) => {
+          const active = cat.id === activeCategory;
+          return (
+            <Tap
+              key={cat.id}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setActiveCategory(cat.id);
+              }}
+              haptic="selection"
+              pressScale={0.94}
+              style={[
+                s.categoryPill,
+                {
+                  backgroundColor: active ? c.text : c.surfaceHover,
+                  borderColor: active ? c.text : c.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.categoryLabel,
+                  { color: active ? c.bg : c.textSecondary },
+                ]}
+              >
+                {cat.label}
+              </Text>
+            </Tap>
+          );
+        })}
+      </ScrollView>
 
       {showMovers && topMovers.length > 0 ? (
         <View style={s.moversBlock}>
@@ -695,6 +801,24 @@ const s = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  categoryRow: {
+    marginTop: 14,
+  },
+  categoryContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  categoryPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  categoryLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.05,
   },
   moversBlock: {
     paddingTop: 24,
