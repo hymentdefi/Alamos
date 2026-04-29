@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import { LinearGradient } from "expo-linear-gradient";
+import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
 import { fontFamily, useTheme } from "../theme";
 import { useAuth } from "../auth/context";
@@ -21,7 +21,6 @@ interface Props {
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -39,43 +38,40 @@ const RING_STROKE = 2.6;
 const LOGO_SIZE = 140;
 
 /**
- * Splash post-native — la apertura premium estilo "activación de
- * cuenta", referenciando el SwipeToSubmit del confirm screen.
+ * Splash post-native — apertura premium.
  *
- * Coreografía (~3.6s):
+ *   1. Backdrop BLANCO + logo MIX (verde + negro outline) entra spring
+ *      en el centro. Sin halos, sin degradés. Pantalla totalmente
+ *      blanca, logo limpio.
  *
- *   1. Backdrop blanco + LOGO MIX aparece en el centro (mismo del
- *      splash nativo: triángulo trasero verde + delantero negro
- *      outline). Spring sutil + fadeIn.
+ *   2. Hold del logo mix 220ms — el ojo lo registra como el "splash
+ *      normal" antes de que arranque el cambio.
  *
- *   2. HOLD del logo mix — 240ms. Le da tiempo al ojo para registrar
- *      el splash "normal" antes de la transición.
+ *   3. Cover verde brand SUBE desde abajo SÓLIDO, sin halo (edge
+ *      limpio). Sube con easing in-out cubic, duración 1100ms,
+ *      contemplativo. Light haptic al iniciar.
  *
- *   3. Cover verde brand SUBE desde abajo CON AURA — un gradient en
- *      el top edge (transparent → verde brand) que crea un halo de
- *      ~120px arriba del cover sólido, dándole el feel de "ola con
- *      luz" en vez de un edge duro. Subida tranquila (820ms,
- *      bezier 0.32 0.72 0 1 = slow-out contemplativo). Mientras
- *      sube, el logo se mantiene quieto en el centro y el cover
- *      pasa por detrás del logo.
+ *   4. WIPE coordinado: a medida que el cover pasa por la zona del
+ *      logo, una máscara revela la versión BLANCO mono del logo
+ *      desde abajo hacia arriba — exacto píxel del logo donde está
+ *      el cover, queda en blanco. Donde todavía no llegó el cover,
+ *      queda mix. La transición es 1:1 con el avance del cover.
+ *      MaskedView con un rectángulo opaco que crece de bottom→top.
  *
- *   4. Cover llega al top → LOGO crossfade MIX → BLANCO mono. El
- *      logo cambia de color cuando el cover terminó de cubrir todo,
- *      sintiéndose como "el cover dejó al logo en blanco" sobre el
- *      verde.
+ *   5. Cover terminó arriba → logo blanco completo sobre el verde.
+ *      Pausa breve.
  *
- *   5. Ring SVG se dibuja alrededor del logo blanco (strokeDashoffset
- *      CIRC→0, 720ms, mismo bezier que el spinner del confirm).
- *      Selection haptic + pulse al cerrar el ring.
+ *   6. Ring SVG se DIBUJA — strokeDashoffset CIRC→0, easing del
+ *      spinner del confirm. "Lo vemos nacer y cerrarse". Selection
+ *      haptic + pulse al cerrar.
  *
- *   6. Ring cerrado → emerge "Buen día, / Christian" en blanco
- *      sobre el verde brand, alineado a la izquierda. El logo y el
- *      ring desvanecen quietos (NO viajan al texto), el saludo
- *      aparece en su propia posición con fade + ty mínimo.
+ *   7. Ring cerrado → emerge "Buen día, / Christian" en blanco
+ *      sobre verde, alineado a la izquierda con tipografía editorial
+ *      Alamos. Logo y ring desvanecen quietos.
  *
- *   7. Hold del saludo + exit global.
+ *   8. Hold + exit.
  *
- * Tappeable para skip rápido.
+ * Tappeable para skip. Total ~3.5s.
  */
 export function GreetingOverlay({ onEnd }: Props) {
   const { c } = useTheme();
@@ -84,26 +80,22 @@ export function GreetingOverlay({ onEnd }: Props) {
   const firstName = user?.fullName?.split(" ")[0] ?? "Christian";
   const greeting = timeGreeting();
 
-  /* ─── Cover verde (sube en stage 3) ─── */
-  // Empieza fuera de pantalla. Sube → 0. Halo extra arriba del cover
-  // de ~120px; lo posicionamos ABAJO del top del cover sólido.
-  const HALO_HEIGHT = 140;
+  /* ─── Cover verde ─── */
   const coverY = useRef(new Animated.Value(windowH)).current;
 
   /* ─── Logo entrance ─── */
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.94)).current;
-  // Pulse al cerrar el ring.
   const logoPulse = useRef(new Animated.Value(1)).current;
-  // Exit final.
   const logoExitOpacity = useRef(new Animated.Value(1)).current;
   const logoExitScale = useRef(new Animated.Value(1)).current;
 
-  /* ─── Logo color crossfade (mix → white) ─── */
-  // Mix (verde + negro outline) visible al inicio; cuando el cover
-  // termina de subir, fadea y emerge el blanco mono.
-  const mixLogoOpacity = useRef(new Animated.Value(1)).current;
-  const whiteLogoOpacity = useRef(new Animated.Value(0)).current;
+  /* ─── Wipe del logo MIX → BLANCO ─── */
+  // Altura del rectángulo de máscara: 0 = ninguna parte revelada,
+  // LOGO_SIZE = todo el blanco visible. Anclado al bottom para que
+  // crezca de abajo hacia arriba (en sincro con el cover subiendo).
+  // useNativeDriver:false porque animamos `height` (layout, no transform).
+  const wipeHeight = useRef(new Animated.Value(0)).current;
 
   /* ─── Ring ─── */
   const ringOffset = useRef(new Animated.Value(CIRC)).current;
@@ -119,7 +111,7 @@ export function GreetingOverlay({ onEnd }: Props) {
   const endedRef = useRef(false);
 
   useEffect(() => {
-    /* ─── 1. Logo mix entry (0–360ms) ─── */
+    /* ─── 1. Logo mix entry (0–340ms) ─── */
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -135,63 +127,71 @@ export function GreetingOverlay({ onEnd }: Props) {
       }),
     ]).start();
 
-    /* ─── 2. HOLD breve del logo mix (360–500ms) ─── */
-    /* ─── 3. Cover sube CON AURA (a partir de 500ms) ─── */
+    /* ─── 2. HOLD del logo mix (340–560ms) ─── */
+    /* ─── 3. Cover sube + WIPE coordinado (a partir de 560ms) ─── */
     setTimeout(() => {
-      // Haptic Light muy sutil al inicio del cover — "comienza el gesto".
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-      Animated.timing(coverY, {
-        toValue: 0,
-        duration: 760,
-        // slow-out contemplativo — el cover empieza rápido y se
-        // asienta al final, dándole feel premium.
-        easing: Easing.bezier(0.32, 0.72, 0, 1),
-        useNativeDriver: true,
-      }).start();
-    }, 500);
+      // Cover y wipe son DOS animaciones paralelas con el mismo
+      // duración + easing — así el wipe avanza visualmente en
+      // sincronía con el cover que sube. La máscara crece sólo
+      // durante la fracción del recorrido en que el cover está
+      // pasando por la zona del logo.
+      const COVER_DURATION = 1100;
+      // Posición del cover (translateY) cuando llega al bottom del
+      // logo y cuando pasa el top, expresado como progreso 0–1.
+      // En vez de calcularlo exacto (depende de windowH), arrancamos
+      // el wipe a un 40% del avance y lo terminamos al 75% — eso
+      // distribuye 35% del recorrido al wipe, es visualmente lento
+      // sin ser dramático.
+      const WIPE_DELAY = COVER_DURATION * 0.4;
+      const WIPE_DURATION = COVER_DURATION * 0.35;
 
-    /* ─── 4. Crossfade logo mix → BLANCO mientras el cover todavía
-     *      sube — empezamos cuando el cover está al ~60% subido,
-     *      así para cuando el cover llega al top el logo ya es
-     *      blanco (sin el momento feo donde solo se ve el outline
-     *      negro mimetizando con el verde). (a partir de 950ms) ─── */
-    setTimeout(() => {
       Animated.parallel([
-        Animated.timing(mixLogoOpacity, {
+        // Cover: in-out cubic, suave constante. Sin halo, edge limpio.
+        Animated.timing(coverY, {
           toValue: 0,
-          duration: 380,
+          duration: COVER_DURATION,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.timing(whiteLogoOpacity, {
-          toValue: 1,
-          duration: 420,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        // Ring fade-in para que esté listo cuando empiece a dibujarse.
-        Animated.timing(ringOpacity, {
-          toValue: 1,
-          duration: 240,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
+        // Wipe: la máscara crece de 0 a LOGO_SIZE durante la zona
+        // central del recorrido del cover. Mismo easing para que
+        // visualmente "siga" el avance del cover píxel por píxel.
+        Animated.sequence([
+          Animated.delay(WIPE_DELAY),
+          Animated.timing(wipeHeight, {
+            toValue: LOGO_SIZE,
+            duration: WIPE_DURATION,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: false, // height no soporta native
+          }),
+        ]),
+        // Ring fade-in mientras el cover está terminando — para que
+        // esté listo a dibujarse apenas el cover llega al top.
+        Animated.sequence([
+          Animated.delay(900),
+          Animated.timing(ringOpacity, {
+            toValue: 1,
+            duration: 240,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start();
-    }, 950);
+    }, 560);
 
-    /* ─── 5. Ring se dibuja (a partir de 1380ms — empieza apenas
-     *      el cover terminó de subir y el logo ya es blanco) ─── */
+    /* ─── 5. Cover terminó (1660ms). Pausa breve. ─── */
+    /* ─── 6. Ring se DIBUJA (a partir de 1760ms — el ring
+     *      "nace" desde un punto y se cierra) ─── */
     setTimeout(() => {
       Animated.timing(ringOffset, {
         toValue: 0,
-        duration: 720,
+        duration: 760,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
-        useNativeDriver: false, // strokeDashoffset no soporta native
+        useNativeDriver: false,
       }).start(() => {
-        // Selection haptic al cerrar — confirma sin gritar.
         Haptics.selectionAsync().catch(() => {});
-        // Pulse sutil al cerrar (1 → 1.05 → 1).
         Animated.sequence([
           Animated.timing(logoPulse, {
             toValue: 1.05,
@@ -207,22 +207,21 @@ export function GreetingOverlay({ onEnd }: Props) {
           }),
         ]).start();
       });
-    }, 1380);
+    }, 1760);
 
-    /* ─── 6. Ring cerrado → logo + ring desvanecen +
-     *      saludo emerge (a partir de 2300ms) ─── */
+    /* ─── 7. Ring cerrado → logo + ring desvanecen +
+     *      saludo emerge (a partir de 2700ms) ─── */
     setTimeout(() => {
       Animated.parallel([
-        // Logo + ring fade-out quietos.
         Animated.timing(logoExitOpacity, {
           toValue: 0,
-          duration: 380,
+          duration: 400,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(logoExitScale, {
-          toValue: 1.04,
-          duration: 420,
+          toValue: 1.05,
+          duration: 440,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
@@ -232,7 +231,6 @@ export function GreetingOverlay({ onEnd }: Props) {
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }),
-        // Greeting entra.
         Animated.sequence([
           Animated.delay(180),
           Animated.parallel([
@@ -250,9 +248,8 @@ export function GreetingOverlay({ onEnd }: Props) {
             }),
           ]),
         ]),
-        // Name stagger 90ms.
         Animated.sequence([
-          Animated.delay(270),
+          Animated.delay(280),
           Animated.parallel([
             Animated.timing(nameOpacity, {
               toValue: 1,
@@ -269,10 +266,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           ]),
         ]),
       ]).start();
-    }, 2300);
+    }, 2700);
 
-    /* ─── 7. EXIT (a los 3300ms) ─── */
-    const exitTimer = setTimeout(() => exit(), 3300);
+    /* ─── 8. EXIT (a los 3700ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 3700);
 
     return () => clearTimeout(exitTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,37 +302,21 @@ export function GreetingOverlay({ onEnd }: Props) {
     >
       <View style={[s.root, { backgroundColor: c.bg }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={exit}>
-          {/* Cover verde brand — sube desde abajo full-screen.
-              Tiene un halo arriba (gradient transparent→verde) que
-              precede al cover sólido, dándole el feel "ola con
-              aura" en vez de edge plano. Va detrás del logo y del
-              saludo. */}
+          {/* Cover verde brand SÓLIDO — sin halo, sin gradient, edge
+              limpio. Sube desde abajo cubriendo full-screen. */}
           <Animated.View
             style={[
-              s.coverContainer,
-              { transform: [{ translateY: coverY }] },
+              s.cover,
+              {
+                backgroundColor: c.brand,
+                transform: [{ translateY: coverY }],
+              },
             ]}
             pointerEvents="none"
-          >
-            {/* Halo encima del cover — extiende el verde hacia arriba
-                con gradiente transparent → verde, simulando luz que
-                sale del top del cover. */}
-            <LinearGradient
-              colors={["transparent", c.brand]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={[
-                s.coverHalo,
-                { height: HALO_HEIGHT, top: -HALO_HEIGHT },
-              ]}
-            />
-            {/* Cover sólido — verde brand. */}
-            <View style={[s.coverSolid, { backgroundColor: c.brand }]} />
-          </Animated.View>
+          />
 
-          {/* Greeting alineado a la izquierda — vive en blanco/foreground;
-              aparece sobre el verde después de que el ring cierra.
-              Color blanco para máximo contraste con el cover verde. */}
+          {/* Saludo — alineado a la izquierda, vive en el blanco/cover.
+              Aparece después del ring. */}
           <View style={s.greetingWrap} pointerEvents="none">
             <Animated.Text
               style={[
@@ -361,8 +342,9 @@ export function GreetingOverlay({ onEnd }: Props) {
             </Animated.Text>
           </View>
 
-          {/* Hero centrado: ring + logo. SIEMPRE en el mismo lugar —
-              el cover pasa por DETRÁS del logo, no lo desplaza. */}
+          {/* Hero centrado: ring + logo. El logo MIX está siempre
+              renderizado, y encima un MaskedView revela la versión
+              BLANCO en sincronía con el avance del cover. */}
           <Animated.View
             style={[
               s.hero,
@@ -406,18 +388,45 @@ export function GreetingOverlay({ onEnd }: Props) {
               </Svg>
             </Animated.View>
 
-            {/* Dos copias del logo en crossfade: mix (start) y blanco
-                (después de que el cover termina de cubrir). */}
-            <Animated.View
-              style={[s.logoLayer, { opacity: mixLogoOpacity }]}
-            >
-              <AlamosLogo variant="mark" tone="light" size={LOGO_SIZE} />
-            </Animated.View>
-            <Animated.View
-              style={[s.logoLayer, { opacity: whiteLogoOpacity }]}
-            >
-              <AlamosLogo variant="mark" tone="white" size={LOGO_SIZE} />
-            </Animated.View>
+            {/* Stack de logos: MIX abajo (siempre visible), BLANCO
+                arriba con MaskedView que se revela en sincronía con
+                el cover subiendo. */}
+            <View style={s.logoStack}>
+              {/* Capa MIX — splash normal, siempre visible. */}
+              <View style={s.logoLayer}>
+                <AlamosLogo variant="mark" tone="light" size={LOGO_SIZE} />
+              </View>
+
+              {/* Capa BLANCA con MaskedView. La máscara es un rect
+                  anclado al bottom cuya altura crece de 0 a LOGO_SIZE
+                  en sincro con el cover. Donde la máscara es opaca,
+                  el blanco se ve; donde es transparente, sigue
+                  visible el mix de abajo. */}
+              <View style={s.logoLayer}>
+                <MaskedView
+                  style={{ width: LOGO_SIZE, height: LOGO_SIZE }}
+                  maskElement={
+                    <View
+                      style={{
+                        width: LOGO_SIZE,
+                        height: LOGO_SIZE,
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <Animated.View
+                        style={{
+                          width: LOGO_SIZE,
+                          height: wipeHeight,
+                          backgroundColor: "#000", // opaco = visible
+                        }}
+                      />
+                    </View>
+                  }
+                >
+                  <AlamosLogo variant="mark" tone="white" size={LOGO_SIZE} />
+                </MaskedView>
+              </View>
+            </View>
           </Animated.View>
         </Pressable>
       </View>
@@ -429,20 +438,8 @@ const s = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
   },
-  coverContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  coverHalo: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-  },
-  coverSolid: {
-    flex: 1,
+  cover: {
+    ...StyleSheet.absoluteFillObject,
   },
   hero: {
     position: "absolute",
@@ -460,6 +457,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  logoStack: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoLayer: {
     position: "absolute",
     width: LOGO_SIZE,
@@ -473,16 +476,10 @@ const s = StyleSheet.create({
     right: 28,
     top: 0,
     bottom: 0,
-    // Lo posicionamos un toque arriba del centro óptico (paddingBottom
-    // empuja el contenido arriba). Más editorial que dead-center.
     justifyContent: "center",
     alignItems: "flex-start",
     paddingBottom: 80,
   },
-  /* Tipografía editorial Alamos en BLANCO sobre el cover verde —
-   * máximo contraste, feel "panel premium". El nombre es protagónico
-   * (peso 800, escala display) y el greeting acompaña en alpha alto
-   * para que se lea sin competir. */
   greeting: {
     fontFamily: fontFamily[500],
     fontSize: 19,
