@@ -73,9 +73,7 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   // Logo: NO hay entry animada — el splash nativo de Expo ya mostró
   // el logo MIX estático. Arrancamos visible directamente para que
-  // la transición native→JS sea invisible. Sólo el pulse del ring y
-  // el fade-out final usan estos valores.
-  const logoPulse = useSharedValue(1);
+  // la transición native→JS sea invisible.
 
   // Ring.
   const ringProgress = useSharedValue(0); // 0 = invisible, 1 = cerrado
@@ -115,13 +113,6 @@ export function GreetingOverlay({ onEnd }: Props) {
       [0, wipeStart, wipeEnd, 1],
       [0, 0, LOGO_SIZE, LOGO_SIZE],
     ),
-  }));
-
-  // Hero (logo + ring): siempre visible al 100%; sólo el pulse del
-  // ring escala. El fade-out final lo maneja `exitOpacity` aplicado
-  // al overlay entero.
-  const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: logoPulse.value }],
   }));
 
   // Exit global del overlay — cover + logo + ring fadean juntos.
@@ -173,27 +164,18 @@ export function GreetingOverlay({ onEnd }: Props) {
         (finished) => {
           "worklet";
           if (!finished) return;
-          // Selection haptic + pulse al cerrar.
+          // Selection haptic sutil al cerrar — sin pulse de scale,
+          // que se sentía como un "jump" antes del fade.
           runOnJS(triggerSelectionHaptic)();
-          logoPulse.value = withTiming(
-            1.05,
-            { duration: 140, easing: Easing.out(Easing.quad) },
-            () => {
-              "worklet";
-              logoPulse.value = withTiming(1, {
-                duration: 200,
-                easing: Easing.inOut(Easing.cubic),
-              });
-            },
-          );
         },
       );
     }, 1720);
 
     /* 4. EXIT smooth — todo el overlay (cover + logo + ring) hace
-     *    fade-out conjunto cuando el ring cerró + el pulse terminó.
-     *    Sin gestos, sin slide, sin ruido — desaparece y aparece
-     *    el home. */
+     *    fade-out conjunto al cerrar el ring. Sin gestos, sin
+     *    pulse: del último frame del trazo pasamos directo al fade,
+     *    con un breathing breve (140ms) para registrar el cierre.
+     *    Aparece el home detrás. */
     const exitTimer = setTimeout(() => {
       exitOpacity.value = withTiming(
         0,
@@ -206,7 +188,7 @@ export function GreetingOverlay({ onEnd }: Props) {
           if (finished) runOnJS(onEnd)();
         },
       );
-    }, 2780);
+    }, 2680);
 
     return () => {
       clearTimeout(coverTimer);
@@ -250,7 +232,7 @@ export function GreetingOverlay({ onEnd }: Props) {
           />
 
           {/* Hero centrado: ring + logo. */}
-          <Animated.View style={[s.hero, heroStyle]} pointerEvents="none">
+          <View style={s.hero} pointerEvents="none">
             {/* Ring (SVG) — TRAZADO con strokeDashoffset animado.
                 Usamos useAnimatedProps porque Animated nativo no anima
                 bien props SVG, daba ese feel "aparece y ya". */}
@@ -303,7 +285,7 @@ export function GreetingOverlay({ onEnd }: Props) {
                 </Animated.View>
               </View>
             </View>
-          </Animated.View>
+          </View>
         </Pressable>
       </Animated.View>
     </Modal>
