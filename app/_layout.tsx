@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import {
   View,
   StyleSheet,
-  Animated,
   Text,
   Appearance,
   type ColorSchemeName,
@@ -39,73 +38,37 @@ import {
   fontFamily,
 } from "../lib/theme";
 
-function SplashScreen({ onFinish }: { onFinish: () => void }) {
-  const scale = useState(new Animated.Value(0.85))[0];
-  const opacity = useState(new Animated.Value(0))[0];
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          tension: 60,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.delay(900),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => onFinish());
-  }, []);
-
-  return (
-    <View style={splash.container}>
-      <Animated.Image
-        source={require("../assets/brand-assets/empresa/png/brand-isotipo-1024.png")}
-        style={[splash.logo, { opacity, transform: [{ scale }] }]}
-        resizeMode="contain"
-      />
-    </View>
-  );
-}
-
 function AuthGate() {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const [showSplash, setShowSplash] = useState(true);
-  // Saludo personalizado: se muestra una vez por cold start después del
-  // splash, sólo si el usuario está autenticado. Persiste en un ref para
-  // que no se vuelva a mostrar al volver del background o al re-render.
+  // Greeting overlay: se muestra una vez por cold start después del
+  // splash nativo, sólo si el usuario está autenticado. Persiste en un
+  // ref para que no se vuelva a mostrar al volver del background.
   const [showGreeting, setShowGreeting] = useState(false);
   const greetingShownRef = useRef(false);
 
   useEffect(() => {
-    if (isLoading || showSplash) return;
+    if (isLoading) return;
     const inAuthGroup = segments[0] === "(auth)";
     if (!isAuthenticated && !inAuthGroup) router.replace("/(auth)/welcome");
     else if (isAuthenticated && inAuthGroup) router.replace("/(app)");
-  }, [isAuthenticated, isLoading, segments, showSplash]);
+  }, [isAuthenticated, isLoading, segments]);
 
   useEffect(() => {
-    if (showSplash || isLoading) return;
+    if (isLoading) return;
     if (!isAuthenticated) return;
     if (greetingShownRef.current) return;
     greetingShownRef.current = true;
     setShowGreeting(true);
-  }, [showSplash, isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated]);
 
-  if (showSplash || isLoading) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  // Mientras la auth carga, mostramos un View vacío con bg blanco —
+  // visualmente continuo con el splash nativo de Expo, sin segundo
+  // splash JS que pisaba el logo mix por 1.7s extra. Apenas el JS
+  // está listo y el user autenticado, arranca el GreetingOverlay.
+  if (isLoading) {
+    return <View style={splash.container} />;
   }
 
   return (
@@ -207,11 +170,5 @@ const splash = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: brand.bg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logo: {
-    width: 96,
-    height: 96,
   },
 });
