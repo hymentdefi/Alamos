@@ -11,6 +11,17 @@ export type AssetCategory =
   | "futuros"
   | "opciones";
 
+/**
+ * Jurisdicción / mercado donde vive el activo. Define el header de
+ * agrupación en "Tus inversiones": AR para todo lo que se opera en
+ * BYMA / MAE, US para acciones y ETFs en NYSE/NASDAQ y bonos del
+ * Treasury, CRYPTO para spot y futuros perpetuos.
+ */
+export type AssetMarket = "AR" | "US" | "CRYPTO";
+
+/** Moneda nativa en la que está cotizado el activo. */
+export type AssetCurrency = "ARS" | "USD" | "USDT";
+
 export interface Asset {
   ticker: string;
   name: string;
@@ -21,7 +32,17 @@ export interface Asset {
   /** Variante visual del ícono en listas. */
   iconTone?: "dark" | "neutral" | "accent";
   category: AssetCategory;
-  /** Precio actual en ARS. Para efectivo = 1. */
+  /**
+   * Mercado del activo. Si no se setea, se infiere de la categoría
+   * (cripto/futuros → CRYPTO, resto → AR).
+   */
+  market?: AssetMarket;
+  /**
+   * Moneda nativa de cotización. Si no se setea, se infiere del
+   * mercado (AR → ARS, US → USD, CRYPTO → USDT).
+   */
+  currency?: AssetCurrency;
+  /** Precio actual en la moneda nativa del activo. Para efectivo = 1. */
   price: number;
   /** Variación del día en %. Para efectivo = 0. */
   change: number;
@@ -408,6 +429,64 @@ export const assets: Asset[] = [
     held: false,
   },
 
+  // ─── Acciones USA (NYSE / NASDAQ — operadas directo, no CEDEAR) ───
+  {
+    ticker: "AAPL.US",
+    name: "Apple",
+    subLabel: "Apple · NASDAQ",
+    iconCode: "AA",
+    iconTone: "dark",
+    category: "acciones",
+    market: "US",
+    currency: "USD",
+    price: 201.0,
+    change: 2.4,
+    held: true,
+    qty: 4,
+    favorite: true,
+  },
+  {
+    ticker: "NVDA.US",
+    name: "NVIDIA",
+    subLabel: "NVIDIA · NASDAQ",
+    iconCode: "NV",
+    iconTone: "dark",
+    category: "acciones",
+    market: "US",
+    currency: "USD",
+    price: 142.83,
+    change: 3.42,
+    held: true,
+    qty: 3,
+  },
+  {
+    ticker: "TSLA.US",
+    name: "Tesla",
+    subLabel: "Tesla · NASDAQ",
+    iconCode: "TS",
+    iconTone: "dark",
+    category: "acciones",
+    market: "US",
+    currency: "USD",
+    price: 240.5,
+    change: -2.17,
+    held: true,
+    qty: 2,
+  },
+  {
+    ticker: "MSFT.US",
+    name: "Microsoft",
+    subLabel: "Microsoft · NASDAQ",
+    iconCode: "MS",
+    iconTone: "dark",
+    category: "acciones",
+    market: "US",
+    currency: "USD",
+    price: 415.3,
+    change: 0.43,
+    held: false,
+  },
+
   // ─── Crypto Spot (solo visible en Alamos Pro) ───
   {
     ticker: "BTC/USDT",
@@ -418,7 +497,8 @@ export const assets: Asset[] = [
     category: "crypto",
     price: 67432.5,
     change: 1.24,
-    held: false,
+    held: true,
+    qty: 0.0058,
     volume24h: 42_500_000_000,
   },
   {
@@ -430,7 +510,8 @@ export const assets: Asset[] = [
     category: "crypto",
     price: 3284.15,
     change: -0.91,
-    held: false,
+    held: true,
+    qty: 0.42,
     volume24h: 12_300_000_000,
   },
   {
@@ -442,7 +523,8 @@ export const assets: Asset[] = [
     category: "crypto",
     price: 142.82,
     change: 3.22,
-    held: false,
+    held: true,
+    qty: 5,
     volume24h: 2_800_000_000,
   },
   {
@@ -620,6 +702,56 @@ export const categoryLabels: Record<AssetCategory, string> = {
   opciones: "Opciones",
 };
 
+/** Etiqueta corta de mercado para chips / badges. */
+export const marketLabels: Record<AssetMarket, string> = {
+  AR: "AR",
+  US: "US",
+  CRYPTO: "Cripto",
+};
+
+/** Etiqueta larga para headers de sección. */
+export const marketLabelsFull: Record<AssetMarket, string> = {
+  AR: "Argentina",
+  US: "Estados Unidos",
+  CRYPTO: "Cripto",
+};
+
+/**
+ * Mercado efectivo del asset — cae al default si no fue declarado.
+ * Cripto/futuros → CRYPTO, todo lo demás → AR.
+ */
+export function assetMarket(a: Pick<Asset, "market" | "category">): AssetMarket {
+  if (a.market) return a.market;
+  if (a.category === "crypto" || a.category === "futuros") return "CRYPTO";
+  return "AR";
+}
+
+/**
+ * Moneda nativa del asset — la categoría US es siempre USD; cripto y
+ * futuros cotizan en USDT; el resto en pesos. Para acciones AR el
+ * `price` ya viene en ARS.
+ */
+export function assetCurrency(
+  a: Pick<Asset, "currency" | "market" | "category">,
+): AssetCurrency {
+  if (a.currency) return a.currency;
+  const m = assetMarket(a);
+  if (m === "US") return "USD";
+  if (m === "CRYPTO") return "USDT";
+  return "ARS";
+}
+
+/**
+ * Etiqueta de subcategoría dentro del acordeón de mercado. La misma
+ * categoría puede tener label distinto según mercado (ej: "acciones"
+ * → "Acciones AR" en AR, "Acciones" en US).
+ */
+export function subgroupLabel(a: Asset): string {
+  const m = assetMarket(a);
+  if (m === "US" && a.category === "acciones") return "Acciones";
+  return categoryLabels[a.category];
+}
+
 /** Formatea un volumen grande como "42.5B", "128.3M", etc. */
 export function formatVolume(n: number): string {
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
@@ -630,6 +762,41 @@ export function formatVolume(n: number): string {
 
 export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");
+}
+
+/** "US$ 1.234,56" — siempre con dos decimales. */
+export function formatUSD(n: number): string {
+  return (
+    "US$ " +
+    Math.abs(n).toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
+/** "USDT 1.234,56" — para cripto. */
+export function formatUSDT(n: number): string {
+  return (
+    "USDT " +
+    Math.abs(n).toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
+/** Formatea un monto en la moneda especificada con su símbolo. */
+export function formatMoney(n: number, currency: AssetCurrency): string {
+  switch (currency) {
+    case "USD":
+      return formatUSD(n);
+    case "USDT":
+      return formatUSDT(n);
+    case "ARS":
+    default:
+      return formatARS(n);
+  }
 }
 
 /**

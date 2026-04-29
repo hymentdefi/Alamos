@@ -34,7 +34,9 @@ import {
 import {
   assets,
   assetIconCode,
+  assetCurrency,
   formatARS,
+  formatMoney,
   formatPct,
   type Asset,
   type AssetCategory,
@@ -246,37 +248,38 @@ function BaseHome() {
   }, [navigation, isFocused, refreshing, onRefresh]);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
-  // Portfolios separados: los activos denominados en pesos van por un
-  // lado y los denominados en dólares por otro. No convertimos — sólo
-  // sumamos los que ya cotizan en cada moneda.
+  // Portfolios separados por moneda nativa del activo. No convertimos —
+  // cada uno se exhibe en la moneda en la que cotiza.
+  //   ARS: efectivo en pesos + CEDEARs / bonos / FCIs / acciones AR.
+  //   USD: efectivo en dólares + acciones US (NYSE/NASDAQ).
+  //   USDT: balance de la wallet crypto + cripto/futuros held.
   const arsTotal = useMemo(
     () =>
       held
-        .filter((a) => a.category !== "crypto" && a.ticker !== "USD")
+        .filter((a) => assetCurrency(a) === "ARS")
         .reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0),
     [held],
   );
   const usdTotal = useMemo(
     () =>
       held
-        .filter((a) => a.category === "crypto" || a.ticker === "USD")
+        .filter((a) => assetCurrency(a) === "USD")
         .reduce((sum, a) => {
-          // Los USD ya están en USD (qty directo). Crypto acá está
-          // priceada en ARS mock, así que sacamos su equivalente USD
-          // para exhibir la tenencia en su moneda nativa.
+          // El "USD" cash row tiene qty=saldo en USD y price=tipo de
+          // cambio, así que para tenencia usamos qty directo. Para
+          // acciones USA, price * qty ya está en USD.
           if (a.ticker === "USD") return sum + (a.qty ?? 0);
-          return sum + (a.price * (a.qty ?? 1)) / USD_RATE;
+          return sum + a.price * (a.qty ?? 1);
         }, 0),
     [held],
   );
-  // USDT total: balance de la wallet crypto + crypto held convertido a
-  // USDT (~1:1 con USD para el mock).
+  // USDT total: balance de la wallet crypto + cripto held (price en USDT).
   const usdtTotal = useMemo(() => {
     const usdtAccount = accounts.find((a) => a.id === "usdt-crypto");
-    const cryptoInUsd = held
-      .filter((a) => a.category === "crypto")
-      .reduce((sum, a) => sum + (a.price * (a.qty ?? 1)) / USD_RATE, 0);
-    return (usdtAccount?.balance ?? 0) + cryptoInUsd;
+    const cryptoInUsdt = held
+      .filter((a) => assetCurrency(a) === "USDT")
+      .reduce((sum, a) => sum + a.price * (a.qty ?? 1), 0);
+    return (usdtAccount?.balance ?? 0) + cryptoInUsdt;
   }, [held]);
   // `total` sigue siendo el valor combinado en ARS — se usa para el
   // chart del período (la serie de puntos se genera en base a este).
@@ -2055,11 +2058,12 @@ function AssetRow({
   const isUSD = asset.ticker === "USD";
   const qty = asset.qty ?? 0;
 
+  const cur = assetCurrency(asset);
   const primaryValue = isCash
     ? isUSD
       ? `US$ ${qty.toLocaleString("es-AR")}`
       : formatARS(qty)
-    : formatARS(asset.price * (asset.qty ?? 1));
+    : formatMoney(asset.price * (asset.qty ?? 1), cur);
   const secondaryValue = isCash && isUSD ? formatARS(asset.price * qty) : null;
 
   const up = asset.change >= 0;
@@ -2107,7 +2111,7 @@ function AssetRow({
         <Text style={[s.rowSub, { color: c.textMuted }]}>
           {isCash
             ? asset.subLabel
-            : `${asset.qty} ${asset.qty === 1 ? "unidad" : "unidades"} · ${formatARS(asset.price)}`}
+            : `${asset.qty} ${asset.qty === 1 ? "unidad" : "unidades"} · ${formatMoney(asset.price, cur)}`}
         </Text>
       </View>
       {!isCash ? (
