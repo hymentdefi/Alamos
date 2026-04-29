@@ -20,8 +20,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { fontFamily, useTheme } from "../theme";
-import { useAuth } from "../auth/context";
+import { useTheme } from "../theme";
 import { AlamosLogo } from "./Logo";
 
 interface Props {
@@ -30,13 +29,6 @@ interface Props {
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-function timeGreeting(): string {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return "Buen día,";
-  if (h >= 12 && h < 20) return "Buenas tardes,";
-  return "Buenas noches,";
-}
 
 /* ─── Geometría del ring (igual que confirm.tsx) ───────────────────── */
 const RING_VIEWBOX = 100;
@@ -47,39 +39,33 @@ const RING_STROKE = 2.6;
 const LOGO_SIZE = 140;
 
 /**
- * Splash post-native — apertura premium con tres beats:
+ * Splash post-native — apertura premium:
  *
- *   1. PANTALLA BLANCA + LOGO MIX (verde + negro) entrance.
+ *   1. PANTALLA BLANCA + LOGO MIX (verde + negro) entrance (spring +
+ *      fadeIn).
  *
  *   2. COVER VERDE BRAND sube desde abajo MIENTRAS el logo se va
- *      tornando BLANCO en la zona que el cover ya cubrió. Es un
- *      wipe genuino atado pixel-a-pixel al avance del cover.
+ *      tornando BLANCO en la zona que el cover ya cubrió. Wipe
+ *      genuino atado pixel-a-pixel al avance del cover.
  *
- *      Implementación: el cover y el wipe comparten el mismo
- *      `coverProgress` shared value. La altura del wipe se
- *      interpola con `wipeStart`/`wipeEnd` calculados con la
- *      geometría real (windowH y LOGO_SIZE), no aproximaciones.
+ *      Cover y wipe comparten el mismo `coverProgress` shared value.
+ *      La altura del wipe se interpola con `wipeStart`/`wipeEnd`
+ *      calculados con la geometría real (windowH y LOGO_SIZE).
+ *      El wipe usa un wrapper con `overflow: hidden` + altura
+ *      animada (sin MaskedView, más predecible).
  *
- *      El wipe NO usa MaskedView — usa un wrapper con overflow:
- *      hidden + altura animada. El logo blanco vive dentro del
- *      wrapper, anclado al bottom; cuando el wrapper crece desde 0
- *      hasta LOGO_SIZE, va exponiendo el logo blanco desde abajo
- *      hacia arriba en sincro con el verde subiendo.
+ *   3. RING SVG se TRAZA con `useAnimatedProps` — strokeDashoffset
+ *      CIRC→0. Lo vemos nacer y cerrarse, no aparece de golpe.
+ *      Selection haptic + pulse al cerrar.
  *
- *   3. RING SVG se TRAZA — strokeDashoffset CIRC→0 con
- *      `useAnimatedProps` (no Animated nativo, que no anima bien
- *      props SVG). "Lo vemos nacer y cerrarse".
+ *   4. EXIT — logo + ring fade quietos, cover sale slide hacia
+ *      arriba revelando el home detrás (gesto "telón").
  *
- *   4. Saludo en blanco sobre verde.
- *
- * Tappeable para skip. Total ~3.9s.
+ * Tappeable para skip. Total ~3.7s.
  */
 export function GreetingOverlay({ onEnd }: Props) {
   const { c } = useTheme();
-  const { user } = useAuth();
   const { height: windowH } = useWindowDimensions();
-  const firstName = user?.fullName?.split(" ")[0] ?? "Christian";
-  const greeting = timeGreeting();
 
   /* ─── Shared values (Reanimated 3) ─── */
 
@@ -97,11 +83,8 @@ export function GreetingOverlay({ onEnd }: Props) {
   const ringProgress = useSharedValue(0); // 0 = invisible, 1 = cerrado
   const ringOpacity = useSharedValue(0);
 
-  // Greeting.
-  const greetTy = useSharedValue(12);
-  const greetOpacity = useSharedValue(0);
-  const nameTy = useSharedValue(16);
-  const nameOpacity = useSharedValue(0);
+  // Exit del cover — al final, baja revelando el home.
+  const coverExitY = useSharedValue(0);
 
   /* ─── Geometría exacta del wipe ─── */
   // Puntos del coverProgress donde empieza/termina el wipe en el logo:
@@ -116,15 +99,17 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   /* ─── Animated styles ─── */
 
-  // Cover: translateY de windowH a 0.
+  // Cover: translateY entry (windowH→0) + exit (0→-windowH).
+  // El exit baja al final revelando el home detrás (gesto inverso al
+  // swipe up del confirm). En realidad sale "hacia arriba" porque
+  // coverExitY va negativo: coverY = entryY - exitY. Cuando entryY=0
+  // y exitY crece, el cover se va volando hacia arriba.
   const coverStyle = useAnimatedStyle(() => ({
     transform: [
       {
-        translateY: interpolate(
-          coverProgress.value,
-          [0, 1],
-          [windowH, 0],
-        ),
+        translateY:
+          interpolate(coverProgress.value, [0, 1], [windowH, 0]) +
+          coverExitY.value,
       },
     ],
   }));
@@ -158,16 +143,6 @@ export function GreetingOverlay({ onEnd }: Props) {
 
   const ringWrapStyle = useAnimatedStyle(() => ({
     opacity: ringOpacity.value,
-  }));
-
-  // Greeting + nombre.
-  const greetStyle = useAnimatedStyle(() => ({
-    opacity: greetOpacity.value,
-    transform: [{ translateY: greetTy.value }],
-  }));
-  const nameStyle = useAnimatedStyle(() => ({
-    opacity: nameOpacity.value,
-    transform: [{ translateY: nameTy.value }],
   }));
 
   /* ─── Coreografía ─── */
@@ -226,63 +201,60 @@ export function GreetingOverlay({ onEnd }: Props) {
       );
     }, 2120);
 
-    /* 5. Saludo emerge cuando el ring cerró (a los 3060ms) */
-    const greetingTimer = setTimeout(() => {
+    /* 5. EXIT — logo + ring fade quietos + cover slide hacia arriba
+     *      (a los 3140ms, después del pulse). El cover sube como
+     *      "telón" revelando el home detrás. */
+    const exitTimer = setTimeout(() => {
       logoExitOpacity.value = withTiming(0, {
-        duration: 400,
-        easing: Easing.inOut(Easing.cubic),
+        duration: 280,
+        easing: Easing.in(Easing.cubic),
       });
-      logoExitScale.value = withTiming(1.05, {
-        duration: 440,
+      logoExitScale.value = withTiming(1.04, {
+        duration: 320,
         easing: Easing.out(Easing.cubic),
       });
       ringOpacity.value = withTiming(0, {
-        duration: 320,
+        duration: 240,
         easing: Easing.in(Easing.cubic),
       });
-
-      greetOpacity.value = withDelay(
-        180,
-        withTiming(1, { duration: 380, easing: Easing.out(Easing.cubic) }),
+      // Cover sube hacia afuera — gesto inverso al swipe del confirm.
+      coverExitY.value = withDelay(
+        140,
+        withTiming(
+          -windowH,
+          {
+            duration: 520,
+            easing: Easing.bezier(0.5, 0, 0.2, 1),
+          },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onEnd)();
+          },
+        ),
       );
-      greetTy.value = withDelay(
-        180,
-        withSpring(0, { mass: 1, stiffness: 78, damping: 13 }),
-      );
-      nameOpacity.value = withDelay(
-        280,
-        withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) }),
-      );
-      nameTy.value = withDelay(
-        280,
-        withSpring(0, { mass: 1, stiffness: 70, damping: 12 }),
-      );
-    }, 3060);
-
-    /* 6. EXIT (a los 4100ms) */
-    const exitTimer = setTimeout(() => {
-      greetOpacity.value = withTiming(0, { duration: 240 });
-      nameOpacity.value = withTiming(0, { duration: 280 });
-      // Llamar onEnd después del fade.
-      setTimeout(() => onEnd(), 320);
-    }, 4100);
+    }, 3140);
 
     return () => {
       clearTimeout(coverTimer);
       clearTimeout(ringTimer);
-      clearTimeout(greetingTimer);
       clearTimeout(exitTimer);
       cancelAnimation(coverProgress);
       cancelAnimation(ringProgress);
+      cancelAnimation(coverExitY);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Skip rápido al tap.
   const skip = () => {
-    greetOpacity.value = withTiming(0, { duration: 180 });
-    nameOpacity.value = withTiming(0, { duration: 220 });
-    setTimeout(() => onEnd(), 220);
+    coverExitY.value = withTiming(
+      -windowH,
+      { duration: 280, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onEnd)();
+      },
+    );
   };
 
   return (
@@ -300,17 +272,6 @@ export function GreetingOverlay({ onEnd }: Props) {
             style={[s.cover, { backgroundColor: c.brand }, coverStyle]}
             pointerEvents="none"
           />
-
-          {/* Saludo — alineado a la izquierda, vive sobre el cover.
-              Aparece después del ring. */}
-          <View style={s.greetingWrap} pointerEvents="none">
-            <Animated.Text style={[s.greeting, greetStyle]}>
-              {greeting}
-            </Animated.Text>
-            <Animated.Text style={[s.name, nameStyle]}>
-              {firstName}
-            </Animated.Text>
-          </View>
 
           {/* Hero centrado: ring + logo. */}
           <Animated.View style={[s.hero, heroStyle]} pointerEvents="none">
@@ -434,29 +395,5 @@ const s = StyleSheet.create({
     left: 0,
     width: LOGO_SIZE,
     height: LOGO_SIZE,
-  },
-  greetingWrap: {
-    position: "absolute",
-    left: 28,
-    right: 28,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "flex-start",
-    paddingBottom: 80,
-  },
-  greeting: {
-    fontFamily: fontFamily[500],
-    fontSize: 19,
-    letterSpacing: -0.2,
-    marginBottom: 6,
-    color: "rgba(255,255,255,0.88)",
-  },
-  name: {
-    fontFamily: fontFamily[800],
-    fontSize: 44,
-    lineHeight: 48,
-    letterSpacing: -1.7,
-    color: "#FFFFFF",
   },
 });
