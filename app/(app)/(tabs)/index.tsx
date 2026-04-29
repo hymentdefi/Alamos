@@ -731,17 +731,6 @@ function Dinero(_: {
     setConvertOpen(true);
   }, []);
 
-  // Separamos fiat (ARS / USD) de crypto (USDT) — cada uno se renderiza
-  // como su propia sección con título distinto.
-  const fiatAccounts = useMemo(
-    () => accounts.filter((a) => a.currency !== "USDT"),
-    [],
-  );
-  const cryptoAccounts = useMemo(
-    () => accounts.filter((a) => a.currency === "USDT"),
-    [],
-  );
-
   return (
     <View style={s.sectionBlock}>
       {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
@@ -798,27 +787,15 @@ function Dinero(_: {
           </Pressable>
         </View>
 
-        {fiatAccounts.map((a, i) => (
-          <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
+        {accounts.map((a, i) => (
+          <AccountRow
+            key={a.id}
+            account={a}
+            withTopDivider={i > 0}
+            onSwap={() => openConvertFrom(a.id)}
+          />
         ))}
       </View>
-
-      {cryptoAccounts.length > 0 ? (
-        <View style={[s.earningsBlock, { marginTop: 28 }]}>
-          <Pressable
-            style={s.earningsHead}
-            onPress={() => router.push("/(app)/crypto-detail")}
-            hitSlop={8}
-          >
-            <Text style={[s.earningsTitle, { color: c.text }]}>Crypto</Text>
-            <Feather name="chevron-right" size={16} color={c.textFaint} />
-          </Pressable>
-
-          {cryptoAccounts.map((a, i) => (
-            <AccountRow key={a.id} account={a} withTopDivider={i > 0} />
-          ))}
-        </View>
-      ) : null}
 
       <EarningsInfoModal
         visible={infoOpen}
@@ -836,9 +813,13 @@ function Dinero(_: {
 function AccountRow({
   account,
   withTopDivider,
+  onSwap,
 }: {
   account: Account;
   withTopDivider?: boolean;
+  /** Tap en el botón ⇅ — abre el ConvertSheet con esta cuenta como
+   *  origen preseleccionada. */
+  onSwap?: () => void;
 }) {
   const { c } = useTheme();
   // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
@@ -876,14 +857,6 @@ function AccountRow({
           {account.location}
         </Text>
       </View>
-      {account.currency === "USDT" ? (
-        <View style={s.rowChart}>
-          <MiniSparkline
-            series={seriesFromSeed(account.id, 28, "up")}
-            color={c.greenDark}
-          />
-        </View>
-      ) : null}
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.earningsPrimary, { color: c.text }]}>
           {formatAccountBalance(account)}
@@ -894,6 +867,28 @@ function AccountRow({
           </Text>
         ) : null}
       </View>
+      {onSwap ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            onSwap();
+          }}
+          hitSlop={6}
+          style={({ pressed }) => [
+            s.swapBtn,
+            {
+              backgroundColor: pressed ? c.surfaceHover : "transparent",
+              borderColor: c.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="swap-vertical"
+            size={16}
+            color={c.textSecondary}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -2335,6 +2330,17 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
+  },
+  /* Per-card ⇅ button — shortcut a Convertir con esa moneda como
+     origen preseleccionada. Sutil: 32x32 circular, gris medio. */
+  swapBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginLeft: 12,
   },
 
   /* ConvertSheet */
