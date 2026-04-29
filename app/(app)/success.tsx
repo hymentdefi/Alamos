@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -5,6 +6,19 @@ import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { AlamosLogo } from "../../lib/components/Logo";
+
+/**
+ * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
+ * mismo que usamos en la papelería de marca (ver brand-kit/06-letterhead).
+ * En prod va a ser el `orderId` que devuelva la API de Manteca.
+ */
+function buildReceiptId(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const yr = new Date().getFullYear();
+  const num = (Math.abs(h) % 999999).toString().padStart(6, "0");
+  return `AC-${yr}-${num}`;
+}
 
 export default function SuccessScreen() {
   const { ticker, amount, qty, mode } = useLocalSearchParams<{
@@ -21,6 +35,14 @@ export default function SuccessScreen() {
   const asset = assets.find((a) => a.ticker === ticker);
   const numAmount = Number(amount) || 0;
   const numQty = Number(qty) || 0;
+
+  // El comprobante necesita un ID estable durante toda la sesión. Lo
+  // derivamos de los params para que abrir/cerrar el receipt o
+  // compartirlo más de una vez reutilice el mismo número.
+  const receiptId = useMemo(
+    () => buildReceiptId(`${ticker ?? ""}-${amount ?? ""}-${qty ?? ""}-${mode ?? ""}`),
+    [ticker, amount, qty, mode],
+  );
 
   const rows = [
     { label: "Activo", value: asset?.name ?? "—" },
@@ -46,7 +68,7 @@ export default function SuccessScreen() {
         <View
           style={[s.checkCircle, { backgroundColor: c.green }]}
         >
-          <AlamosIcon name="check" size={44} color={c.ink} strokeWidth={2.4} />
+          <AlamosIcon name="check" size={44} color="#FFFFFF" strokeWidth={2.4} />
         </View>
         <Text style={[s.title, { color: c.text }]}>
           Orden ejecutada
@@ -87,6 +109,30 @@ export default function SuccessScreen() {
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <Pressable
+          style={[
+            s.shareCta,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/receipt",
+              params: {
+                ticker: ticker ?? "",
+                amount: String(numAmount),
+                qty: String(numQty),
+                mode: isSell ? "sell" : "buy",
+                receiptId,
+              },
+            })
+          }
+        >
+          <AlamosIcon name="upload" size={16} color={c.text} />
+          <Text style={[s.shareCtaText, { color: c.text }]}>
+            Compartir comprobante
+          </Text>
+        </Pressable>
+
+        <Pressable
           style={[s.cta, { backgroundColor: c.ink }]}
           onPress={() => router.replace("/(app)")}
         >
@@ -96,7 +142,7 @@ export default function SuccessScreen() {
             Confirmación de que la operación se ejecutó dentro del
             ecosistema Alamos. */}
         <View style={s.brandStamp}>
-          <AlamosLogo variant="lockup" tone="green" size={14} />
+          <AlamosLogo variant="lockup" tone="green" size={22} />
         </View>
       </View>
     </View>
@@ -174,6 +220,20 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.2,
+  },
+  shareCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 48,
+    borderRadius: radius.btn,
+    borderWidth: 1,
+  },
+  shareCtaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   secondary: {
     alignItems: "center",

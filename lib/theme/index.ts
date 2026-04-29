@@ -86,7 +86,8 @@ export type ThemeMode = "light" | "dark";
 
 export const themes: Record<ThemeMode, ThemeColors> = { light, dark };
 
-/* ─── Tipografía: Plus Jakarta Sans ─── */
+/* ─── Tipografía: Plus Jakarta Sans (display/body) + JetBrains Mono
+ *     (data/labels técnicas). Los dos vienen del brand-kit oficial. */
 export type FontWeight = 400 | 500 | 600 | 700 | 800;
 
 export const fontFamily: Record<FontWeight, string> = {
@@ -96,6 +97,20 @@ export const fontFamily: Record<FontWeight, string> = {
   700: "PlusJakartaSans_700Bold",
   800: "PlusJakartaSans_800ExtraBold",
 };
+
+/**
+ * JetBrains Mono — la fuente monoespaciada del brand-kit. Pensada
+ * para eyebrows técnicos (`DISPONIBLE PARA OPERAR`, `MÉTRICAS`),
+ * microcopy data (`T+1`, `0,02%`, `MEP`), IDs/CBUs (`AC-2026-···4421`)
+ * y cualquier valor que se beneficie del feel "panel de control" y
+ * de la alineación columna en grids.
+ *
+ * Sólo cargamos los pesos 500 y 700 — el set core lo cubre en mono.
+ */
+export const fontMono = {
+  500: "JetBrainsMono_500Medium",
+  700: "JetBrainsMono_700Bold",
+} as const;
 
 /** Tamaños tipográficos alineados con el landing. */
 export const type = {

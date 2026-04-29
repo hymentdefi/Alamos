@@ -261,7 +261,7 @@ export function SideMenu({ visible, onClose }: Props) {
               },
             ]}
           >
-            <AlamosLogo variant="lockupShort" tone="light" size={44} />
+            <AlamosLogo variant="lockupShort" tone="green" size={44} />
             {!isPro ? (
               <Text style={[s.proPillAccent, { color: c.greenDark }]}>
                 Pro

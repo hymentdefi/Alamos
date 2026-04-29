@@ -21,6 +21,10 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from "@expo-google-fonts/plus-jakarta-sans";
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_700Bold,
+} from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
 import { ProProvider } from "../lib/pro/context";
@@ -121,6 +125,10 @@ export default function RootLayout() {
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
+    // JetBrains Mono — fuente monoespaciada del brand-kit. Para
+    // eyebrows técnicos, IDs/CBUs, microcopy data tipo "T+1", "0,02%".
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
   });
 
   const [pref, setPrefState] = useState<ThemeModePref>("light");

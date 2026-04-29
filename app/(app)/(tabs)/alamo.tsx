@@ -115,7 +115,7 @@ export default function AlamoScreen() {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <AlamosLogo variant="lockupShort" tone="light" size={38} />
+          <AlamosLogo variant="lockupShort" tone="green" size={38} />
           {!isPro ? (
             <Text style={[s.proBtnAccent, { color: c.greenDark }]}>Pro</Text>
           ) : null}

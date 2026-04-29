@@ -36,7 +36,7 @@ export default function AboutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.hero}>
-          <AlamosLogo variant="mark" tone="light" size={64} />
+          <AlamosLogo variant="mark" tone="green" size={64} />
           <Text style={[s.heroTitle, { color: c.text }]}>Alamos Capital</Text>
           <Text style={[s.heroSub, { color: c.textMuted }]}>
             Inversiones simples y transparentes para el mercado argentino.
@@ -97,7 +97,7 @@ export default function AboutScreen() {
           </Text>
           <AlamosLogo
             variant="lockup"
-            tone="light"
+            tone="green"
             size={22}
             style={{ marginTop: 20 }}
           />

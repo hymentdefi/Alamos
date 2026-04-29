@@ -818,7 +818,9 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
+      {/* 2 acciones primarias: Ingresar + Enviar. Convertir vive en
+          el ⇅ de cada cuenta de "Tu dinero"; invertir tiene su propio
+          tab "Mercado" en la nav inferior. */}
       <View style={s.actionsRow}>
         <ActionButton
           icon="download"
@@ -843,20 +845,6 @@ function Dinero(_: {
               params: { mode: "send" },
             })
           }
-        />
-        <ActionButton
-          icon="refresh"
-          label="Convertir"
-          variant="secondary"
-          haptic="medium"
-          onPress={() => openConvertFrom(undefined)}
-        />
-        <ActionButton
-          icon="trending-up"
-          label="Invertir"
-          variant="secondary"
-          haptic="medium"
-          onPress={() => router.navigate("/(app)/explore" as never)}
         />
       </View>
 
