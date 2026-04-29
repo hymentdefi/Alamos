@@ -54,6 +54,11 @@ import {
 } from "../../../lib/components/Sparkline";
 import { CryptoIcon } from "../../../lib/components/CryptoIcon";
 import { AutoMarquee } from "../../../lib/components/AutoMarquee";
+import {
+  StoryOverlay,
+  type StoryConfig,
+} from "../../../lib/components/StoryOverlay";
+import { CRYPTO_STORY, US_MARKET_STORY } from "../../../lib/data/stories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
@@ -87,6 +92,53 @@ export default function HomeScreen() {
   const { isPro } = useProMode();
   if (isPro) return <ProHome />;
   return <BaseHome />;
+}
+
+/**
+ * Hook para gatear una acción detrás de una Story educativa que solo
+ * se muestra la primera vez. Persiste en SecureStore con la key
+ * `story:<id>:seen`. Si la story ya se vio, ejecuta la acción al
+ * toque; si no, guarda la acción como pendiente y abre la story —
+ * cuando se cierra (último slide o X), marca como vista y ejecuta.
+ */
+function useGateStory(story: StoryConfig) {
+  const storeKey = `story:${story.id}:seen`;
+  // null mientras carga, true/false una vez resuelto.
+  const seenRef = useRef<boolean | null>(null);
+  const [open, setOpen] = useState(false);
+  const pendingRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    SecureStore.getItemAsync(storeKey)
+      .then((v) => {
+        seenRef.current = !!v;
+      })
+      .catch(() => {
+        seenRef.current = false;
+      });
+  }, [storeKey]);
+
+  const gate = useCallback((action: () => void) => {
+    // Si seenRef es null (aún cargando) o true, ejecutamos directo —
+    // evita mostrar la story por error si el SecureStore tarda.
+    if (seenRef.current === false) {
+      pendingRef.current = action;
+      setOpen(true);
+    } else {
+      action();
+    }
+  }, []);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    seenRef.current = true;
+    SecureStore.setItemAsync(storeKey, "1").catch(() => {});
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    pending?.();
+  }, [storeKey]);
+
+  return { open, gate, close };
 }
 
 function BaseHome() {
@@ -731,6 +783,24 @@ function Dinero(_: {
     setConvertOpen(true);
   }, []);
 
+  const cryptoStory = useGateStory(CRYPTO_STORY);
+
+  /** Wrapper para el ⇅ de cada cuenta: si es USDT y todavía no vio
+   *  la story de cripto, la mostramos primero y después abrimos
+   *  el ConvertSheet. */
+  const handleSwap = useCallback(
+    (id: AccountId) => {
+      const isCrypto =
+        accounts.find((a) => a.id === id)?.currency === "USDT";
+      if (isCrypto) {
+        cryptoStory.gate(() => openConvertFrom(id));
+      } else {
+        openConvertFrom(id);
+      }
+    },
+    [cryptoStory, openConvertFrom],
+  );
+
   return (
     <View style={s.sectionBlock}>
       {/* 4 acciones arriba: Ingresar (primario) + Enviar / Convertir / Invertir. */}
@@ -792,7 +862,7 @@ function Dinero(_: {
             key={a.id}
             account={a}
             withTopDivider={i > 0}
-            onSwap={() => openConvertFrom(a.id)}
+            onSwap={() => handleSwap(a.id)}
           />
         ))}
       </View>
@@ -805,6 +875,11 @@ function Dinero(_: {
         visible={convertOpen}
         onClose={() => setConvertOpen(false)}
         initialFromId={convertFromId}
+      />
+      <StoryOverlay
+        visible={cryptoStory.open}
+        story={CRYPTO_STORY}
+        onClose={cryptoStory.close}
       />
     </View>
   );
@@ -1551,6 +1626,7 @@ function UsMarket() {
   const { c } = useTheme();
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
+  const usStory = useGateStory(US_MARKET_STORY);
 
   return (
     <View style={{ marginTop: 28 }}>
@@ -1586,10 +1662,12 @@ function UsMarket() {
             key={stock.ticker}
             stock={stock}
             onPress={() =>
-              router.push({
-                pathname: "/(app)/detail",
-                params: { ticker: stock.ticker },
-              })
+              usStory.gate(() =>
+                router.push({
+                  pathname: "/(app)/detail",
+                  params: { ticker: stock.ticker },
+                }),
+              )
             }
           />
         ))}
@@ -1598,6 +1676,11 @@ function UsMarket() {
       <UsMarketInfoModal
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
+      />
+      <StoryOverlay
+        visible={usStory.open}
+        story={US_MARKET_STORY}
+        onClose={usStory.close}
       />
     </View>
   );
