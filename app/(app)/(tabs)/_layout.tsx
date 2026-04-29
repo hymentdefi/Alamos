@@ -227,7 +227,12 @@ export default function TabsLayout() {
     <View style={styles.root}>
       <Tabs
         backBehavior="none"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          // Slide direccional en X axis nativo de bottom-tabs v7. No es
+          // un slide full-page como Stack, pero al menos hay movimiento.
+          animation: "shift",
+        }}
         tabBar={() => null}
       >
         <Tabs.Screen name="index" />
