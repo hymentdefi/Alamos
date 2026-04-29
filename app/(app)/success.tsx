@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import { useTheme, fontFamily, fontMono, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { AlamosLogo } from "../../lib/components/Logo";
@@ -111,7 +111,10 @@ export default function SuccessScreen() {
         <Pressable
           style={[
             s.shareCta,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
+            {
+              backgroundColor: c.greenDim,
+              borderColor: c.green,
+            },
           ]}
           onPress={() =>
             router.push({
@@ -126,10 +129,16 @@ export default function SuccessScreen() {
             })
           }
         >
-          <AlamosIcon name="upload" size={16} color={c.text} />
-          <Text style={[s.shareCtaText, { color: c.text }]}>
-            Compartir comprobante
-          </Text>
+          <AlamosLogo variant="mark" tone="green" size={20} />
+          <View style={s.shareCtaTextWrap}>
+            <Text style={[s.shareCtaTitle, { color: c.greenDark }]}>
+              Compartir comprobante
+            </Text>
+            <Text style={[s.shareCtaRef, { color: c.greenDark }]}>
+              {receiptId}
+            </Text>
+          </View>
+          <AlamosIcon name="arrow" size={16} color={c.greenDark} />
         </Pressable>
 
         <Pressable
@@ -142,7 +151,7 @@ export default function SuccessScreen() {
             Confirmación de que la operación se ejecutó dentro del
             ecosistema Alamos. */}
         <View style={s.brandStamp}>
-          <AlamosLogo variant="lockup" tone="green" size={22} />
+          <AlamosLogo variant="lockup" tone="green" size={32} />
         </View>
       </View>
     </View>
@@ -224,16 +233,26 @@ const s = StyleSheet.create({
   shareCta: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 48,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: radius.btn,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
-  shareCtaText: {
-    fontFamily: fontFamily[600],
+  shareCtaTextWrap: {
+    flex: 1,
+  },
+  shareCtaTitle: {
+    fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.15,
+  },
+  shareCtaRef: {
+    fontFamily: fontMono[500],
+    fontSize: 11,
+    letterSpacing: 0,
+    marginTop: 2,
+    opacity: 0.8,
   },
   secondary: {
     alignItems: "center",

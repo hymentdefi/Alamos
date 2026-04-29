@@ -474,11 +474,12 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
-          {/* Watermark de los triángulos brand atrás del hero — vestido
-              de marca sutil sin dominar la jerarquía. */}
+          {/* Watermark de los triángulos brand atrás del hero — todo
+              verde (default) para acompañar la identidad "logo verde
+              everywhere". */}
           <TrianglesWatermark
             size={220}
-            opacity={0.06}
+            opacity={0.09}
             style={{ bottom: -40, right: -30 }}
           />
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>

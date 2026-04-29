@@ -4,9 +4,12 @@ import Svg, { Polygon } from "react-native-svg";
 interface Props {
   /** Tamaño del watermark — ancho del SVG. Default 240. */
   size?: number;
-  /** Color del triángulo verde (atrás). Default brand green. */
+  /** Color del triángulo trasero. Default brand green. */
   greenColor?: string;
-  /** Color del triángulo oscuro (adelante). Default ink. */
+  /** Color del triángulo delantero. Default brand green también — el
+   *  watermark "todo verde" es la identidad principal. Si querés el
+   *  outline mixto (verde + dark) del logo empresa, pasalo
+   *  explícitamente con `darkColor="#0E0F0C"`. */
   darkColor?: string;
   /** Opacidad del watermark. Default 0.08 (sutil). */
   opacity?: number;
@@ -32,7 +35,7 @@ interface Props {
 export function TrianglesWatermark({
   size = 240,
   greenColor = "#00E676",
-  darkColor = "#0E0F0C",
+  darkColor = "#00E676",
   opacity = 0.08,
   strokeWidth,
   absolute = true,
