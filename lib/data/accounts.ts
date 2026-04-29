@@ -194,6 +194,50 @@ export function bridgeOptionsFor(
   });
 }
 
+/* ─── CBUs vinculados ────────────────────────────────────────── */
+
+/**
+ * Cuenta bancaria vinculada al usuario. La app permite tener varios
+ * CBUs declarados (cuenta sueldo, caja de ahorro, etc.) y reenviar a
+ * cualquiera cuando un débito queda "comprometido" en otro.
+ */
+export interface LinkedBank {
+  id: string;
+  /** Nombre del banco (Galicia, Santander, Brubank, etc.). */
+  bank: string;
+  /** Tipo de cuenta para mostrar como subtítulo. */
+  alias: string;
+  /** Últimos 4 dígitos del CBU — el resto se enmascara en UI. */
+  last4: string;
+  /** Estado: "active" disponible, "pending" en validación,
+   *  "compromised" con un débito comprometido en curso. */
+  status: "active" | "pending" | "compromised";
+}
+
+export const linkedBanks: LinkedBank[] = [
+  {
+    id: "bank-galicia",
+    bank: "Galicia",
+    alias: "Cuenta sueldo · CA $",
+    last4: "4421",
+    status: "active",
+  },
+  {
+    id: "bank-santander",
+    bank: "Santander",
+    alias: "Caja de ahorro · CA $",
+    last4: "9087",
+    status: "active",
+  },
+  {
+    id: "bank-brubank",
+    bank: "Brubank",
+    alias: "Cuenta única · CA $",
+    last4: "1502",
+    status: "active",
+  },
+];
+
 /** Formato del saldo en la moneda nativa de la cuenta. */
 export function formatAccountBalance(a: Account): string {
   if (a.currency === "ARS") {

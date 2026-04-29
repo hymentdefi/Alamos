@@ -227,7 +227,14 @@ const START_SCALE = 0.82;
 const outEasing = Easing.out(Easing.cubic);
 const inEasing = Easing.bezier(0.16, 1, 0.3, 1);
 
-const AVAILABLE_ARS = 1272850;
+/** Saldo total del usuario en la moneda nativa del activo, sumando
+ *  todas las cuentas en esa moneda. Reemplaza al `AVAILABLE_ARS`
+ *  hardcodeado anterior — ahora respeta la moneda del activo. */
+function nativeBalanceFor(currency: AssetCurrency): number {
+  return accounts
+    .filter((a) => a.currency === currency)
+    .reduce((s, a) => s + a.balance, 0);
+}
 
 type Phase = "idle" | "sending" | "received" | "done" | "error";
 
@@ -776,7 +783,7 @@ export default function ConfirmScreen() {
             <Text style={[s.available, { color: c.textMuted }]}>
               {bridge && bridge.from
                 ? `Pagás con ${bridge.from.currency === "USDT" ? "tu wallet cripto" : bridge.from.location.toLowerCase()}`
-                : `${formatARS(AVAILABLE_ARS)} disponibles para operar`}
+                : `${formatMoney(nativeBalanceFor(nativeCurrency), nativeCurrency)} disponibles para operar`}
             </Text>
           </View>
 
@@ -1041,7 +1048,10 @@ export default function ConfirmScreen() {
           {/* Spec layout: flex 1.3 spacer bottom asimétrico (óptica center). */}
           <View style={{ flex: 1.3 }} />
 
-          {/* "Volver" button — only pressable in error state. */}
+          {/* CTA del error state — only pressable cuando phase === "error".
+              Si la operación involucraba un puente de conversión, llevamos
+              al usuario a la pantalla de "comprometida" para que reenvíe
+              a otro CBU. Si fue una compra simple, "Volver" alcanza. */}
           <Animated.View
             pointerEvents={phase === "error" ? "box-none" : "none"}
             style={[
@@ -1051,11 +1061,29 @@ export default function ConfirmScreen() {
             ]}
           >
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => {
+                if (bridge) {
+                  router.replace({
+                    pathname: "/(app)/compromised",
+                    params: {
+                      ticker: asset.ticker,
+                      amount: String(numAmount),
+                      currency: nativeCurrency,
+                      bridgeFrom: bridgeFrom ?? "",
+                      bridgeDebit: bridgeDebit ?? "",
+                      bridgeArs: bridgeArs ?? "",
+                    },
+                  });
+                } else {
+                  router.back();
+                }
+              }}
               style={s.errorBtn}
               hitSlop={12}
             >
-              <Text style={s.errorBtnText}>Volver</Text>
+              <Text style={s.errorBtnText}>
+                {bridge ? "Reenviar a otro CBU" : "Volver"}
+              </Text>
             </Pressable>
           </Animated.View>
         </View>
