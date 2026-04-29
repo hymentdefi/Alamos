@@ -48,32 +48,12 @@ interface MarketTab {
   label: string;
   short: string;
   currency: AssetCurrency;
-  /** Etiqueta de la cuenta en el footer del card de fondos. */
-  walletLabel: string;
 }
 
 const MARKET_TABS: MarketTab[] = [
-  {
-    id: "AR",
-    label: "Argentina",
-    short: "AR",
-    currency: "ARS",
-    walletLabel: "Cuenta argentina",
-  },
-  {
-    id: "US",
-    label: "Estados Unidos",
-    short: "EE.UU",
-    currency: "USD",
-    walletLabel: "Cuentas en dólares",
-  },
-  {
-    id: "CRYPTO",
-    label: "Crypto",
-    short: "Crypto",
-    currency: "USDT",
-    walletLabel: "Wallet crypto",
-  },
+  { id: "AR", label: "Argentina", short: "AR", currency: "ARS" },
+  { id: "US", label: "Estados Unidos", short: "EE.UU", currency: "USD" },
+  { id: "CRYPTO", label: "Crypto", short: "Crypto", currency: "USDT" },
 ];
 
 export default function ExploreScreen() {
@@ -304,13 +284,12 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
 
   // Sumamos todas las cuentas en la moneda del mercado activo. Para
   // USD esto agrupa la cuenta argentina y la cuenta US.
-  const matchingAccounts = useMemo(
-    () => accounts.filter((a) => a.currency === market.currency),
-    [market.currency],
-  );
   const balance = useMemo(
-    () => matchingAccounts.reduce((s, a) => s + a.balance, 0),
-    [matchingAccounts],
+    () =>
+      accounts
+        .filter((a) => a.currency === market.currency)
+        .reduce((s, a) => s + a.balance, 0),
+    [market.currency],
   );
 
   const prefix =
@@ -320,14 +299,6 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
       ? "USDT"
       : "$";
 
-  // Footer: nombres de las cuentas que componen el balance, separadas
-  // por punto medio. Si hay una sola, mostramos su location;
-  // si hay varias (caso USD), las concatenamos.
-  const footerParts =
-    matchingAccounts.length > 0
-      ? matchingAccounts.map((a) => a.location)
-      : [market.walletLabel];
-
   return (
     <View
       style={[
@@ -335,44 +306,28 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
         { backgroundColor: c.surface, borderColor: c.border },
       ]}
     >
-      <Text style={[fs.eyebrow, { color: c.textMuted }]}>
-        DISPONIBLE PARA OPERAR
-      </Text>
-
-      {/* Saldo con bandera/logo adelante — mismo patrón que el hero
-          de Inicio (Pesos AR, Dólares US, Tether USDT). */}
-      <View style={fs.amountRow}>
-        <CurrencyMark currency={market.currency} />
-        <AmountDisplay
-          value={balance}
-          size={26}
-          weight={700}
-          prefix={prefix}
-        />
-      </View>
-
-      <View style={fs.footerRow}>
-        <Text
-          style={[fs.footerText, { color: c.textMuted }]}
-          numberOfLines={1}
-        >
-          {footerParts.join(" · ")}
-        </Text>
-        <Tap
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "deposit" },
-            })
-          }
-          haptic="medium"
-          pressScale={0.95}
-          style={[fs.ingresarBtn, { backgroundColor: BRAND_GREEN }]}
-        >
-          <Feather name="arrow-down-left" size={14} color="#FFFFFF" />
-          <Text style={fs.ingresarBtnText}>Ingresar</Text>
-        </Tap>
-      </View>
+      <CurrencyMark currency={market.currency} />
+      <AmountDisplay
+        value={balance}
+        size={20}
+        weight={700}
+        prefix={prefix}
+        style={fs.amount}
+      />
+      <Tap
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/transfer",
+            params: { mode: "deposit" },
+          })
+        }
+        haptic="medium"
+        pressScale={0.95}
+        style={[fs.ingresarBtn, { backgroundColor: BRAND_GREEN }]}
+      >
+        <Feather name="arrow-down-left" size={13} color="#FFFFFF" />
+        <Text style={fs.ingresarBtnText}>Ingresar</Text>
+      </Tap>
     </View>
   );
 }
@@ -380,52 +335,34 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
 /** Logo del país (AR/US) o de Tether (USDT) que va adelante del saldo.
  *  Mismo tamaño y patrón que usa el hero del home. */
 function CurrencyMark({ currency }: { currency: AssetCurrency }) {
-  if (currency === "ARS") return <FlagIcon code="AR" size={26} />;
-  if (currency === "USD") return <FlagIcon code="US" size={26} />;
+  if (currency === "ARS") return <FlagIcon code="AR" size={24} />;
+  if (currency === "USD") return <FlagIcon code="US" size={24} />;
   return (
     <CryptoIcon
       ticker="USDT"
       iconText="₮"
       bg="#26A17B"
       fg="#FFFFFF"
-      size={26}
+      size={24}
     />
   );
 }
 
 const fs = StyleSheet.create({
   card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginHorizontal: 20,
     marginTop: 12,
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingLeft: 8,
+    paddingRight: 6,
+    paddingVertical: 6,
   },
-  eyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 1.1,
-    marginBottom: 4,
-  },
-  amountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-    gap: 12,
-  },
-  footerText: {
+  amount: {
     flex: 1,
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: -0.05,
   },
   ingresarBtn: {
     flexDirection: "row",
