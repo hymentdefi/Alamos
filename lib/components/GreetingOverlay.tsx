@@ -34,9 +34,9 @@ function timeGreeting(): string {
 const RING_VIEWBOX = 100;
 const RING_RADIUS = 44;
 const CIRC = 2 * Math.PI * RING_RADIUS;
-const RING_SIZE = 168;
-const RING_STROKE = 2.2;
-const LOGO_SIZE = 96;
+const RING_SIZE = 220;
+const RING_STROKE = 2.6;
+const LOGO_SIZE = 140;
 
 /**
  * Splash post-native — la apertura premium estilo "activación de
@@ -135,49 +135,53 @@ export function GreetingOverlay({ onEnd }: Props) {
       }),
     ]).start();
 
-    /* ─── 2. HOLD del logo mix (360–600ms) ─── */
-    /* ─── 3. Cover sube CON AURA (a partir de 600ms) ─── */
+    /* ─── 2. HOLD breve del logo mix (360–500ms) ─── */
+    /* ─── 3. Cover sube CON AURA (a partir de 500ms) ─── */
     setTimeout(() => {
       // Haptic Light muy sutil al inicio del cover — "comienza el gesto".
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
       Animated.timing(coverY, {
         toValue: 0,
-        duration: 820,
+        duration: 760,
         // slow-out contemplativo — el cover empieza rápido y se
         // asienta al final, dándole feel premium.
         easing: Easing.bezier(0.32, 0.72, 0, 1),
         useNativeDriver: true,
       }).start();
-    }, 600);
+    }, 500);
 
-    /* ─── 4. Cover terminó → crossfade logo mix → blanco
-     *      (a partir de 1420ms) ─── */
+    /* ─── 4. Crossfade logo mix → BLANCO mientras el cover todavía
+     *      sube — empezamos cuando el cover está al ~60% subido,
+     *      así para cuando el cover llega al top el logo ya es
+     *      blanco (sin el momento feo donde solo se ve el outline
+     *      negro mimetizando con el verde). (a partir de 950ms) ─── */
     setTimeout(() => {
       Animated.parallel([
         Animated.timing(mixLogoOpacity, {
           toValue: 0,
-          duration: 320,
+          duration: 380,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(whiteLogoOpacity, {
           toValue: 1,
-          duration: 360,
+          duration: 420,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
-        // Ring fade-in para que esté visible cuando empiece a dibujarse.
+        // Ring fade-in para que esté listo cuando empiece a dibujarse.
         Animated.timing(ringOpacity, {
           toValue: 1,
-          duration: 200,
+          duration: 240,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start();
-    }, 1420);
+    }, 950);
 
-    /* ─── 5. Ring se dibuja (a partir de 1660ms) ─── */
+    /* ─── 5. Ring se dibuja (a partir de 1380ms — empieza apenas
+     *      el cover terminó de subir y el logo ya es blanco) ─── */
     setTimeout(() => {
       Animated.timing(ringOffset, {
         toValue: 0,
@@ -203,10 +207,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           }),
         ]).start();
       });
-    }, 1660);
+    }, 1380);
 
     /* ─── 6. Ring cerrado → logo + ring desvanecen +
-     *      saludo emerge (a partir de 2580ms) ─── */
+     *      saludo emerge (a partir de 2300ms) ─── */
     setTimeout(() => {
       Animated.parallel([
         // Logo + ring fade-out quietos.
@@ -265,10 +269,10 @@ export function GreetingOverlay({ onEnd }: Props) {
           ]),
         ]),
       ]).start();
-    }, 2580);
+    }, 2300);
 
-    /* ─── 7. EXIT (a los 3500ms) ─── */
-    const exitTimer = setTimeout(() => exit(), 3500);
+    /* ─── 7. EXIT (a los 3300ms) ─── */
+    const exitTimer = setTimeout(() => exit(), 3300);
 
     return () => clearTimeout(exitTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -469,23 +473,28 @@ const s = StyleSheet.create({
     right: 28,
     top: 0,
     bottom: 0,
+    // Lo posicionamos un toque arriba del centro óptico (paddingBottom
+    // empuja el contenido arriba). Más editorial que dead-center.
     justifyContent: "center",
     alignItems: "flex-start",
+    paddingBottom: 80,
   },
-  /* Tipografía editorial Alamos en BLANCO sobre el cover verde
-   * — máximo contraste, feel "panel premium". */
+  /* Tipografía editorial Alamos en BLANCO sobre el cover verde —
+   * máximo contraste, feel "panel premium". El nombre es protagónico
+   * (peso 800, escala display) y el greeting acompaña en alpha alto
+   * para que se lea sin competir. */
   greeting: {
     fontFamily: fontFamily[500],
-    fontSize: 17,
+    fontSize: 19,
     letterSpacing: -0.2,
     marginBottom: 6,
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.88)",
   },
   name: {
-    fontFamily: fontFamily[700],
-    fontSize: 36,
-    lineHeight: 40,
-    letterSpacing: -1.4,
+    fontFamily: fontFamily[800],
+    fontSize: 44,
+    lineHeight: 48,
+    letterSpacing: -1.7,
     color: "#FFFFFF",
   },
 });
