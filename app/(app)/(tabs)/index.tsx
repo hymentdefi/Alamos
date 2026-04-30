@@ -777,13 +777,18 @@ function BaseHome() {
 /* ─── Action button: pill estilo Binance con ícono + texto al lado ─── */
 function ActionButton({
   icon,
+  customIcon,
   label,
   onPress,
   haptic,
   variant,
   accentColor,
 }: {
-  icon: AlamosIconName;
+  icon?: AlamosIconName;
+  /** Render custom del ícono — si se pasa, override el AlamosIcon
+   *  default. Útil para casos puntuales (ej: Convertir usa el mismo
+   *  swap-vertical que el ⇅ de cada cuenta de "Tu dinero"). */
+  customIcon?: React.ReactNode;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
@@ -795,9 +800,6 @@ function ActionButton({
 }) {
   const { c } = useTheme();
   const isPrimary = variant === "primary";
-  // Secondary: c.surfaceHover (gris muy sutil) — se distingue del bg
-  // blanco del home sin necesidad de border, y mantiene el feel
-  // editorial. Antes c.surface puro lo perdía contra el fondo.
   const bg = isPrimary ? accentColor ?? c.action : c.surfaceHover;
   const fg = isPrimary ? "#FFFFFF" : c.text;
   return (
@@ -806,7 +808,9 @@ function ActionButton({
       onPress={onPress}
       haptic={haptic}
     >
-      <AlamosIcon name={icon} size={17} color={fg} />
+      {customIcon ?? (
+        icon ? <AlamosIcon name={icon} size={17} color={fg} /> : null
+      )}
       <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
@@ -974,7 +978,9 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="refresh"
+          customIcon={
+            <Ionicons name="swap-vertical" size={18} color={c.text} />
+          }
           label="Convertir"
           variant="secondary"
           haptic="medium"
