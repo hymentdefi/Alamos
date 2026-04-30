@@ -54,6 +54,11 @@ const VB_W = 260;
 const VB_H = 90;
 const TOP_PAD = 10;
 const BOT_PAD = 10;
+// Padding derecho dentro del viewBox — reserva espacio para que el
+// dot del live (y su halo) quede visible en el end del trazo sin
+// salirse del SVG. 8 unidades del VB ≈ 3% del ancho, casi imperceptible
+// pero suficiente para alojar el halo de hasta 16px de radio.
+const RIGHT_PAD = 8;
 
 /** Ancho del rectángulo de sheen en coords del viewBox. */
 const SHEEN_W = 80;
@@ -296,48 +301,31 @@ function SparklineImpl({
         />
       </Svg>
 
-      {/* Live dot — sobre el último punto del chart, NO se distorsiona
-          con preserveAspectRatio='none' porque renderea en un SVG
-          separado con coords 1:1 en px. Halo pulsa, dot sólido fijo.
-          Se oculta durante el scrub para no competir con el cursor.
-
-          Inset desde el borde derecho: el último punto del chart está
-          en `x = VB_W` (borde exacto), pero el halo de hasta 16px se
-          clippea al SVG. Con un offset de 14px hacia adentro queda
-          alineado con el cap redondeado del path y el halo entero
-          se ve. El dot sigue visualmente "al final" del trazo. */}
+      {/* Live dot — sobre el último punto del chart, en su coord
+          exacta. computePath ya reserva RIGHT_PAD para que el último
+          punto no quede en el borde absoluto y el halo (hasta 16px
+          de r) tenga espacio para verse entero. Se oculta durante
+          el scrub para no competir con el cursor. */}
       {live && points.length > 0 && layoutWidth > 0 && !activePoint ? (
         <Svg
           width={layoutWidth}
           height={height}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
-          // overflow visible para que el halo no se clippee si el
-          // SVG queda al ras del View (algún renderer en RN-svg sí
-          // recorta los hijos al bbox del SVG si no se le indica).
-          // @ts-expect-error react-native-svg acepta overflow string
-          overflow="visible"
         >
-          {(() => {
-            const last = points[points.length - 1];
-            const cx = Math.max(
-              14,
-              Math.min((last.x / VB_W) * layoutWidth - 6, layoutWidth - 14),
-            );
-            const cy = (last.y / VB_H) * height;
-            return (
-              <>
-                <AnimatedCircle
-                  cx={cx}
-                  cy={cy}
-                  r={haloR}
-                  fill={color}
-                  opacity={haloOpacity}
-                />
-                <Circle cx={cx} cy={cy} r={3.5} fill={color} />
-              </>
-            );
-          })()}
+          <AnimatedCircle
+            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
+            cy={(points[points.length - 1].y / VB_H) * height}
+            r={haloR}
+            fill={color}
+            opacity={haloOpacity}
+          />
+          <Circle
+            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
+            cy={(points[points.length - 1].y / VB_H) * height}
+            r={3.5}
+            fill={color}
+          />
         </Svg>
       ) : null}
 
@@ -396,9 +384,10 @@ function computePath(
   const max = Math.max(...series);
   const range = max - min || 1;
   const innerH = VB_H - TOP_PAD - BOT_PAD;
+  const innerW = VB_W - RIGHT_PAD;
 
   const points = series.map((v, i) => {
-    const x = (i / Math.max(1, series.length - 1)) * VB_W;
+    const x = (i / Math.max(1, series.length - 1)) * innerW;
     const y = TOP_PAD + innerH - ((v - min) / range) * innerH;
     return { x, y };
   });

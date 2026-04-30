@@ -371,7 +371,16 @@ function BaseHome() {
     return () => loop.stop();
   }, [isFocused, giftPulse]);
 
-  const rangePct = rangeChanges[range];
+  // En modo live, el % no es constante — oscila por liveTick para
+  // simular movimiento real de mercado (a veces sube, a veces baja).
+  // El chartColor y el botón Ingresar siguen este pct, así que en
+  // ticks "rojos" todo el ecosistema visual se vuelve rojo.
+  const livePct = useMemo(() => {
+    // Pseudo random walk determinístico: combina dos sinusoides de
+    // frecuencias distintas para no ser predecible. Rango ~ ±0.6%.
+    return Math.sin(liveTick * 1.7) * 0.45 + Math.sin(liveTick * 0.4) * 0.18;
+  }, [liveTick]);
+  const rangePct = range === "live" ? livePct : rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
   // Color del trazo del chart + timeline: usa el verde-action (mismo
