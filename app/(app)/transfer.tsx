@@ -6,6 +6,7 @@ import {
   Pressable,
   Share,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,13 +18,7 @@ import { Tap } from "../../lib/components/Tap";
 import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import { AccountAvatar } from "../../lib/components/AccountAvatar";
-import { CryptoIcon } from "../../lib/components/CryptoIcon";
 import { accounts, type AccountId } from "../../lib/data/accounts";
-
-/** Las cuentas fiat disponibles para depositar (excluye crypto — ese
- *  flow vive en /(app)/crypto-deposit con su propio picker de
- *  asset+red). */
-type FiatKindId = Exclude<AccountId, "usdt-crypto">;
 
 /** Balances disponibles por moneda — mockeados. */
 const BALANCES = {
@@ -112,13 +107,8 @@ function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const fiatAccounts = useMemo(
-    () => accounts.filter((a): a is typeof a & { id: FiatKindId } =>
-      a.currency !== "USDT",
-    ),
-    [],
-  );
-  const [kindId, setKindId] = useState<FiatKindId>("ars-ar");
+  // null = hub picker (4 cards). AccountId = detalle de esa moneda.
+  const [kindId, setKindId] = useState<AccountId | null>(null);
   // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
   const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
 
@@ -131,6 +121,43 @@ function DepositInfo() {
     );
   }
 
+  // Detalle de una moneda elegida — back vuelve al hub.
+  if (kindId) {
+    return (
+      <View style={[s.root, { backgroundColor: c.bg }]}>
+        <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+          <Pressable
+            style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+            onPress={() => setKindId(null)}
+            hitSlop={12}
+          >
+            <Feather name="arrow-left" size={18} color={c.text} />
+          </Pressable>
+          <Text style={[s.headerTitle, { color: c.text }]}>
+            Ingresar {kindId === "usdt-crypto" ? "USDT" : currencyLabelOf(kindId)}
+          </Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {kindId === "usd-us" ? (
+            <WireDepositCard />
+          ) : kindId === "usdt-crypto" ? (
+            <CryptoDepositRedirect />
+          ) : (
+            <BankDepositCard
+              kind={kindId as "ars-ar" | "usd-ar"}
+              onPickLinked={setDepositFrom}
+            />
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // Hub picker — 4 floating cards 2×2.
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
@@ -150,94 +177,188 @@ function DepositInfo() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.depositTitle, { color: c.text }]}>
-          ¿De dónde viene el dinero?
+          ¿En qué moneda querés{"\n"}ingresar?
+        </Text>
+        <Text style={[s.hubSub, { color: c.textMuted }]}>
+          Elegí la cuenta donde vas a recibir.
         </Text>
 
-        {/* Picker fiat — vertical stack, cambia el contenido inline. */}
-        <Text style={[s.depositEyebrow, { color: c.textMuted }]}>
-          PESOS Y DÓLARES
-        </Text>
-        <View style={s.fiatStack}>
-          {fiatAccounts.map((a) => {
-            const active = a.id === kindId;
-            return (
-              <Pressable
-                key={a.id}
-                onPress={() => {
-                  if (a.id !== kindId) Haptics.selectionAsync().catch(() => {});
-                  setKindId(a.id);
-                }}
-                style={[
-                  s.fiatRow,
-                  {
-                    backgroundColor: active ? c.surface : c.surfaceHover,
-                    borderColor: active ? c.ink : c.border,
-                  },
-                ]}
-              >
-                <AccountAvatar account={a} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.fiatRowTitle, { color: c.text }]}>
-                    {a.currency}
-                  </Text>
-                  <Text
-                    style={[s.fiatRowSub, { color: c.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {a.location}
-                  </Text>
-                </View>
-                {active ? (
-                  <Feather name="check" size={18} color={c.text} />
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {kindId === "usd-us" ? (
-          <WireDepositCard />
-        ) : (
-          <BankDepositCard
-            kind={kindId as "ars-ar" | "usd-ar"}
-            onPickLinked={setDepositFrom}
-          />
-        )}
-
-        {/* Entrada Crypto — distinta semántica: navega a su propio screen
-            con asset list + network picker porque la matriz de tokens ×
-            redes no entra en un picker estático. */}
-        <Text
-          style={[
-            s.depositEyebrow,
-            { color: c.textMuted, marginTop: 32 },
-          ]}
-        >
-          CRYPTO
-        </Text>
-        <Pressable
-          onPress={() => router.push("/(app)/crypto-deposit")}
-          style={[
-            s.cryptoEntry,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <CryptoIcon ticker="BTC" iconText="₿" bg="#F7931A" fg="#FFFFFF" size={40} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.cryptoEntryTitle, { color: c.text }]}>
-              Depositar crypto
-            </Text>
-            <Text
-              style={[s.cryptoEntrySub, { color: c.textMuted }]}
-              numberOfLines={1}
-            >
-              Bitcoin, Ethereum, USDT, USDC y más
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={c.textFaint} />
-        </Pressable>
+        <CurrencyHubCards
+          mode="deposit"
+          onPick={(id) => {
+            Haptics.selectionAsync().catch(() => {});
+            setKindId(id);
+          }}
+        />
       </ScrollView>
     </View>
+  );
+}
+
+/** Mini-component: en lugar del crypto-deposit inline acá, redirige
+ *  al screen dedicado (que tiene asset list + network picker). */
+function CryptoDepositRedirect() {
+  const { c } = useTheme();
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/(app)/crypto-deposit");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <View style={{ padding: 20 }}>
+      <Text style={{ color: c.textMuted, fontFamily: fontFamily[500] }}>
+        Abriendo crypto deposit…
+      </Text>
+    </View>
+  );
+}
+
+function currencyLabelOf(id: AccountId): string {
+  const a = accounts.find((x) => x.id === id);
+  return a?.currency ?? "";
+}
+
+/* ─── Hub picker: 4 floating cards en grid 2×2, estilo premium Álamos ─── */
+
+interface HubProps {
+  mode: "deposit" | "send";
+  /** Si mode=send, sólo se muestran cards con balance > 0; el resto
+   *  quedan disabled o se ocultan según `hideEmpty`. */
+  hideEmpty?: boolean;
+  onPick: (id: AccountId) => void;
+}
+
+function CurrencyHubCards({
+  mode,
+  hideEmpty = false,
+  onPick,
+}: HubProps) {
+  const { c } = useTheme();
+
+  const router = useRouter();
+
+  // Para deposit mostramos las 4; para send filtramos según balance.
+  const visible = useMemo(() => {
+    if (mode === "deposit") return accounts;
+    return hideEmpty ? accounts.filter((a) => a.balance > 0) : accounts;
+  }, [mode, hideEmpty]);
+
+  // Empty state para send sin saldo.
+  if (mode === "send" && visible.every((a) => a.balance <= 0)) {
+    return (
+      <View style={s.emptyWrap}>
+        <View style={[s.emptyIconBubble, { backgroundColor: c.brandDim }]}>
+          <Feather name="inbox" size={28} color={c.action} />
+        </View>
+        <Text style={[s.emptyTitle, { color: c.text }]}>
+          No tenés saldo para enviar
+        </Text>
+        <Text style={[s.emptyDesc, { color: c.textMuted }]}>
+          Cuando ingreses dinero a tu cuenta, vas a poder enviarlo desde acá.
+        </Text>
+        <Pressable
+          onPress={() => router.replace("/(app)/transfer?mode=deposit")}
+          style={[s.emptyCta, { backgroundColor: c.action }]}
+        >
+          <Feather name="arrow-down-left" size={14} color="#FFFFFF" />
+          <Text style={s.emptyCtaText}>Ingresar dinero</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.hubGrid}>
+      {visible.map((a) => {
+        const disabled = mode === "send" && a.balance <= 0;
+        return (
+          <HubCard
+            key={a.id}
+            accountId={a.id}
+            currency={a.currency}
+            location={a.location}
+            balance={a.balance}
+            mode={mode}
+            disabled={disabled}
+            onPress={() => onPick(a.id)}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function HubCard({
+  accountId,
+  currency,
+  location,
+  balance,
+  mode,
+  disabled,
+  onPress,
+}: {
+  accountId: AccountId;
+  currency: "ARS" | "USD" | "USDT";
+  location: string;
+  balance: number;
+  mode: "deposit" | "send";
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const account = accounts.find((a) => a.id === accountId)!;
+
+  const balanceLabel =
+    currency === "ARS"
+      ? "$ " + Math.round(balance).toLocaleString("es-AR")
+      : currency === "USD"
+      ? "US$ " +
+        balance.toLocaleString("es-AR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "USDT " +
+        balance.toLocaleString("es-AR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [
+        s.hubCard,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: disabled ? 0.45 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.97 : 1 }],
+        },
+      ]}
+    >
+      <View style={s.hubCardTop}>
+        <AccountAvatar account={account} size={44} />
+      </View>
+      <Text style={[s.hubCardCurrency, { color: c.text }]}>
+        {currency === "USDT" ? "Cripto" : currency}
+      </Text>
+      <Text
+        style={[s.hubCardLocation, { color: c.textMuted }]}
+        numberOfLines={1}
+      >
+        {location}
+      </Text>
+      <View style={[s.hubCardDivider, { backgroundColor: c.border }]} />
+      <Text style={[s.hubCardBalanceEyebrow, { color: c.textMuted }]}>
+        {mode === "send" ? "DISPONIBLE" : "TU SALDO"}
+      </Text>
+      <Text
+        style={[s.hubCardBalance, { color: c.text }]}
+        numberOfLines={1}
+      >
+        {balanceLabel}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -591,7 +712,9 @@ function formatMoney(value: number, cur: DepositCurrency): string {
 }
 
 function SendFlow() {
-  const [step, setStep] = useState<SendStep>("amount");
+  // Step inicial: 'currency' = picker de 4 cards. 'amount' = AmountStep
+  // existente. Después destination/done.
+  const [step, setStep] = useState<SendStep | "currency">("currency");
   const [cur, setCur] = useState<DepositCurrency>("ars");
   const [amount, setAmount] = useState("0");
   const [destination, setDestination] = useState<LinkedAccount | null>(null);
@@ -618,17 +741,86 @@ function SendFlow() {
     );
   }
 
+  if (step === "amount") {
+    return (
+      <AmountStep
+        cur={cur}
+        onChangeCur={(v) => {
+          setCur(v);
+          setAmount("0");
+        }}
+        amount={amount}
+        onChangeAmount={setAmount}
+        onNext={() => setStep("destination")}
+        onBack={() => setStep("currency")}
+      />
+    );
+  }
+
+  // step === "currency" — hub picker.
+  return <SendCurrencyHub onPick={(id) => {
+    // Mappeo de AccountId → DepositCurrency. usd-us también es 'usd'
+    // (mismo flow del AmountStep). usdt-crypto: por ahora redirigimos
+    // a un próximamente — el send de crypto requiere otro flow (asset
+    // + red + dirección).
+    if (id === "ars-ar") {
+      setCur("ars");
+      setAmount("0");
+      setStep("amount");
+    } else if (id === "usd-ar" || id === "usd-us") {
+      setCur("usd");
+      setAmount("0");
+      setStep("amount");
+    } else {
+      // usdt-crypto — próximamente.
+      Alert.alert(
+        "Próximamente",
+        "El envío de cripto va a estar disponible muy pronto.",
+      );
+    }
+  }} />;
+}
+
+/* ─── Hub picker para Send ─── */
+
+function SendCurrencyHub({ onPick }: { onPick: (id: AccountId) => void }) {
+  const { c } = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   return (
-    <AmountStep
-      cur={cur}
-      onChangeCur={(v) => {
-        setCur(v);
-        setAmount("0");
-      }}
-      amount={amount}
-      onChangeAmount={setAmount}
-      onNext={() => setStep("destination")}
-    />
+    <View style={[s.root, { backgroundColor: c.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color={c.text} />
+        </Pressable>
+        <Text style={[s.headerTitle, { color: c.text }]}>Enviar dinero</Text>
+        <View style={{ width: 36 }} />
+      </View>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[s.depositTitle, { color: c.text }]}>
+          ¿Qué moneda querés{"\n"}enviar?
+        </Text>
+        <Text style={[s.hubSub, { color: c.textMuted }]}>
+          Solo se muestran las cuentas con saldo disponible.
+        </Text>
+        <CurrencyHubCards
+          mode="send"
+          hideEmpty
+          onPick={(id) => {
+            Haptics.selectionAsync().catch(() => {});
+            onPick(id);
+          }}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -640,16 +832,17 @@ function AmountStep({
   amount,
   onChangeAmount,
   onNext,
+  onBack,
 }: {
   cur: DepositCurrency;
   onChangeCur: (v: DepositCurrency) => void;
   amount: string;
   onChangeAmount: (v: string) => void;
   onNext: () => void;
+  onBack: () => void;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   const max = BALANCES[cur];
   const parsed = Number.parseFloat(amount) || 0;
@@ -704,7 +897,7 @@ function AmountStep({
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
           style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => router.back()}
+          onPress={onBack}
           hitSlop={12}
         >
           <Feather name="arrow-left" size={18} color={c.text} />
@@ -1208,56 +1401,117 @@ const s = StyleSheet.create({
   /* Deposit info */
   depositTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 24,
-    letterSpacing: -0.7,
+    fontSize: 28,
+    letterSpacing: -1,
+    lineHeight: 34,
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  /* Picker fiat — vertical stack de 3 rows seleccionables. */
-  fiatStack: {
+  hubSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
     paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 24,
+    paddingTop: 8,
+    paddingBottom: 22,
   },
-  fiatRow: {
+
+  /* Currency hub — 2×2 floating cards */
+  hubGrid: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
+    paddingHorizontal: 14,
     gap: 12,
-    padding: 14,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    rowGap: 12,
   },
-  fiatRowTitle: {
+  hubCard: {
+    width: "47%",
+    flexGrow: 1,
+    flexBasis: "47%",
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
+    minHeight: 168,
+  },
+  hubCardTop: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    marginBottom: 14,
+  },
+  hubCardCurrency: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.7,
+  },
+  hubCardLocation: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+  hubCardDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 14,
+    marginHorizontal: -16,
+  },
+  hubCardBalanceEyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
+    fontSize: 9.5,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  hubCardBalance: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
     letterSpacing: -0.2,
   },
-  fiatRowSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: -0.05,
+
+  /* Send empty state */
+  emptyWrap: {
+    alignItems: "center",
+    paddingHorizontal: 36,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
-  /* Entrada Crypto — single tappable row que navega a su propio screen. */
-  cryptoEntry: {
+  emptyIconBubble: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 19,
+    letterSpacing: -0.4,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    marginBottom: 22,
+  },
+  emptyCta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    marginHorizontal: 20,
-    padding: 14,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
   },
-  cryptoEntryTitle: {
+  emptyCtaText: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.25,
-  },
-  cryptoEntrySub: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: -0.05,
+    fontSize: 14,
+    letterSpacing: -0.2,
+    color: "#FFFFFF",
   },
   curPillsWrap: {
     paddingHorizontal: 20,
