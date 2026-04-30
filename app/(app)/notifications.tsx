@@ -111,16 +111,7 @@ export default function NotificationsScreen() {
           <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
         <Text style={[s.headerTitle, { color: c.text }]}>Notificaciones</Text>
-        {/* Atajo a Actividad — la campanita del home abre Notificaciones
-            por default; desde acá el user salta a Actividad si quiere
-            ver el historial. */}
-        <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
-          onPress={() => router.replace("/(app)/activity")}
-          hitSlop={12}
-        >
-          <Feather name="activity" size={18} color={c.text} />
-        </Pressable>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView

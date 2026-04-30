@@ -551,11 +551,11 @@ function BaseHome() {
           </Animated.View>
           <Tap
             style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-            onPress={() => router.push("/(app)/notifications")}
+            onPress={() => router.push("/(app)/activity")}
             hitSlop={8}
             haptic="selection"
           >
-            <Feather name="bell" size={18} color={c.text} />
+            <Ionicons name="notifications" size={20} color={c.text} />
           </Tap>
         </View>
       </View>
