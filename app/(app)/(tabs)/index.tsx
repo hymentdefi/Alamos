@@ -369,10 +369,11 @@ function BaseHome() {
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
-  // Color del trazo del chart: verde Alamos específico para charts
-  // El chart usa el verde-positive (delta del periodo) — separado del
-  // trendColor de textos/pills aunque comparta hue, distinto rol.
-  const chartColor = isUp ? c.positive : c.red;
+  // Color del trazo del chart + timeline: usa el verde-action (mismo
+  // que el botón "Ingresar") para que la identidad Alamos se vea más
+  // viva en el chart y los rangos. El delta numérico sigue usando
+  // c.positive más oscuro porque ahí lee mejor como "subió".
+  const chartColor = isUp ? c.action : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
