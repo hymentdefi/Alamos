@@ -85,7 +85,7 @@ function instrumentLabelFor(asset: Asset): string {
     case "letras":
       return "Las letras";
     case "caucion":
-      return "La caución";
+      return "Las cauciones";
     case "fci":
       return "Los fondos comunes";
     case "crypto":
@@ -93,7 +93,7 @@ function instrumentLabelFor(asset: Asset): string {
     case "futuros":
       return "Los futuros";
     default:
-      return "Este instrumento";
+      return "Estos instrumentos";
   }
 }
 

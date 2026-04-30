@@ -1,110 +1,64 @@
-import Svg, {
-  Circle,
-  G,
-  Line,
-  Path,
-  Polygon,
-  Rect,
-} from "react-native-svg";
+import Svg, { Path, Polygon, Rect } from "react-native-svg";
 import { useTheme } from "../../theme";
 
 interface Props {
-  /** Tamaño del cuadrado del SVG. Default 180. */
+  /** Tamaño del cuadrado del SVG. Default 200. */
   size?: number;
 }
 
 /**
- * Ilustración "Mercado cerrado" — estilo brand-kit/14-illustrations:
- * geometría limpia, line-style, monocromática + verde brand de
- * acento. Nada de stock art ni sobrediseño.
+ * Ilustración "Mercado cerrado" — copia textual de la card "Privacidad"
+ * del brand-kit/14-illustrations: candado outline con los dos
+ * triángulos del isotipo Alamos adentro (uno verde, uno negro).
  *
- * Composición:
- *   - Los dos triángulos del isotipo Alamos (geometría oficial: back
- *     centrado en x=38 ancho 44 alto 60, front en x=56 ancho 54 alto
- *     74) renderizados en outline gris muted — "logo apagado"
- *     visualmente, comunica "fuera de servicio".
- *   - Un candado pequeño centrado entre los triángulos, en verde
- *     brand. Lock body redondeado + shackle (arco) arriba.
- *   - Línea horizontal sutil debajo, tipo "horizonte cerrado".
- *
- * Sin sombras, sin gradientes, sin texto. La tipografía vive en el
- * sheet padre.
+ * Geometría exacta del brand-kit:
+ *   - viewBox 200×160
+ *   - candado: rect 60,68 80×72 r=6 + shackle path
+ *   - tri verde:  92,98 80,124 108,124 (stroke 2.5, verde brand)
+ *   - tri negro:  108,90 96,124 124,124 (stroke 2.5, ink)
+ *   - todo outline, sin fills (excepto overlap natural).
  */
-export function MarketClosedIllustration({ size = 180 }: Props) {
+export function MarketClosedIllustration({ size = 200 }: Props) {
   const { c } = useTheme();
-  // Outline para los triángulos — gris apagado para "logo cerrado".
-  const triStroke = c.borderStrong;
-  const lockColor = c.brand;
-  const subtle = c.border;
+  const ink = c.text;
+  const brand = c.brand;
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      {/* Línea de horizonte sutil — ancla la composición y evoca un
-          chart "plano" (sin movimiento, mercado cerrado). */}
-      <Line
-        x1="14"
-        y1="86"
-        x2="86"
-        y2="86"
-        stroke={subtle}
-        strokeWidth={1.6}
-        strokeLinecap="round"
+    <Svg width={size} height={(size * 160) / 200} viewBox="0 0 200 160">
+      {/* Cuerpo del candado */}
+      <Rect
+        x="60"
+        y="68"
+        width="80"
+        height="72"
+        rx="6"
+        fill="none"
+        stroke={ink}
+        strokeWidth={3}
       />
-
-      {/* Triángulo trasero — outline grueso, gris muted. Geometría
-          oficial del isotipo (ver brand-assets/README.md). */}
+      {/* Shackle (arco superior) */}
+      <Path
+        d="M76 68V52a24 24 0 0 1 48 0v16"
+        stroke={ink}
+        strokeWidth={3}
+        fill="none"
+      />
+      {/* Triángulo trasero — verde brand. */}
       <Polygon
-        points="38,28 17,82 59,82"
-        stroke={triStroke}
-        strokeWidth={4.5}
+        points="92,98 80,124 108,124"
+        stroke={brand}
+        strokeWidth={2.5}
         strokeLinejoin="round"
         fill="none"
-        opacity={0.45}
       />
-      {/* Triángulo delantero — overlap clásico del logo. */}
+      {/* Triángulo delantero — ink, overlap clásico del isotipo. */}
       <Polygon
-        points="56,16 30,82 82,82"
-        stroke={triStroke}
-        strokeWidth={4.5}
+        points="108,90 96,124 124,124"
+        stroke={ink}
+        strokeWidth={2.5}
         strokeLinejoin="round"
         fill="none"
-        opacity={0.55}
       />
-
-      {/* Candado centrado entre los triángulos. La altura del candado
-          ocupa ~22 unidades del viewBox (del 50 al 72). */}
-      <G>
-        {/* Shackle (arco superior). Path semicircular tipo candado
-            cerrado — los dos extremos bajan al cuerpo. */}
-        <Path
-          d="M44 54 L44 50 A6 6 0 0 1 56 50 L56 54"
-          stroke={lockColor}
-          strokeWidth={2.6}
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Cuerpo — rectángulo redondeado verde brand sólido. */}
-        <Rect
-          x="40"
-          y="54"
-          width="20"
-          height="16"
-          rx="3"
-          fill={lockColor}
-        />
-        {/* Hueco de la cerradura — pequeño círculo blanco al centro
-            del cuerpo, indica claramente "candado". */}
-        <Circle cx="50" cy="62" r="1.6" fill="#FFFFFF" />
-        <Line
-          x1="50"
-          y1="62"
-          x2="50"
-          y2="65.5"
-          stroke="#FFFFFF"
-          strokeWidth={1.4}
-          strokeLinecap="round"
-        />
-      </G>
     </Svg>
   );
 }

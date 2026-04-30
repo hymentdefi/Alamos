@@ -77,7 +77,7 @@ export function MarketClosedSheet({
 
           <Text style={[s.title, { color: c.text }]}>Mercado cerrado</Text>
           <Text style={[s.subtitle, { color: c.textMuted }]}>
-            {instrumentLabel} se opera{" "}
+            {instrumentLabel} se operan{" "}
             <Text style={[s.subtitleBold, { color: c.text }]}>
               {session.days}
             </Text>
