@@ -2237,9 +2237,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   actionPillText: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[600],
     fontSize: 15,
-    letterSpacing: -0.3,
+    letterSpacing: -0.25,
   },
   /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
      isotipo verde + acento en "más". */
