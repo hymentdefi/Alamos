@@ -20,10 +20,22 @@ import {
   RefreshControl,
   PanResponder,
   Easing,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Reanimated, {
+  Easing as ReEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -720,87 +732,102 @@ function DetailSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(0)).current;
-  const scrollYRef = useRef(0);
-  const { height: screenH } = Dimensions.get("window");
+  const { height: screenH } = useWindowDimensions();
 
-  // Reset translateY y scrollY cuando se abre
+  // translateY del sheet — empieza fuera de pantalla y entra animado
+  // cuando hay item. Mismo patrón que ChartSettingsSheet /
+  // MarketClosedSheet (Reanimated 4 + Gesture Handler v2 en UI thread).
+  const translateY = useSharedValue(screenH);
+  const backdropOpacity = useSharedValue(0);
+  // Flag para que el pan sólo arranque si el scroll interno está al tope.
+  const scrollAtTop = useSharedValue(true);
+
   useEffect(() => {
     if (item) {
-      translateY.setValue(0);
-      scrollYRef.current = 0;
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: ReEasing.out(ReEasing.cubic),
+      });
+      backdropOpacity.value = withTiming(1, {
+        duration: 280,
+        easing: ReEasing.out(ReEasing.cubic),
+      });
+      scrollAtTop.value = true;
     }
-  }, [item, translateY]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item]);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: () => false,
-        // Capture gana el gesto ANTES que los children (ScrollView).
-        // Condición: scroll interno en el tope + tirando hacia abajo vertical.
-        onMoveShouldSetPanResponderCapture: (_, g) => {
-          return (
-            scrollYRef.current <= 0 &&
-            g.dy > 8 &&
-            Math.abs(g.dy) > Math.abs(g.dx)
-          );
-        },
-        onMoveShouldSetPanResponder: (_, g) => {
-          return (
-            scrollYRef.current <= 0 &&
-            g.dy > 8 &&
-            Math.abs(g.dy) > Math.abs(g.dx)
-          );
-        },
-        onPanResponderMove: (_, g) => {
-          if (g.dy > 0) translateY.setValue(g.dy);
-        },
-        onPanResponderRelease: (_, g) => {
-          if (g.dy > 120 || g.vy > 0.8) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-              () => {},
-            );
-            Animated.timing(translateY, {
-              toValue: screenH,
-              duration: 220,
-              useNativeDriver: true,
-            }).start(onClose);
-          } else {
-            Animated.spring(translateY, {
-              toValue: 0,
-              useNativeDriver: true,
-              tension: 180,
-              friction: 12,
-            }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 180,
-            friction: 12,
-          }).start();
-        },
-      }),
-    [screenH, onClose, translateY],
-  );
+  const dismiss = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    translateY.value = withTiming(
+      screenH,
+      { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      // Sólo arrastramos si el scroll interno está al tope, sino el
+      // user está scrolleando contenido. Y sólo permitimos drag hacia
+      // abajo (translationY > 0).
+      if (e.translationY > 0 && scrollAtTop.value) {
+        translateY.value = e.translationY;
+        backdropOpacity.value = Math.max(
+          0,
+          1 - e.translationY / screenH,
+        );
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss =
+        e.translationY > 120 || e.velocityY > 600;
+      if (shouldDismiss && scrollAtTop.value) {
+        translateY.value = withTiming(
+          screenH,
+          { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: ReEasing.out(ReEasing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   return (
     <Modal
       visible={!!item}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={dismiss}
       statusBarTranslucent
     >
-      <View style={sheet.wrap}>
-        <Pressable style={sheet.backdrop} onPress={onClose} />
-        <Animated.View
-          style={[sheet.body, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
-        >
+      <Reanimated.View style={[sheet.backdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Reanimated.View>
+
+      <GestureDetector gesture={pan}>
+        <Reanimated.View style={[sheet.body, sheetStyle]}>
           <View style={sheet.dragArea}>
             <View style={sheet.handle} />
           </View>
@@ -809,7 +836,8 @@ function DetailSheet({
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               showsVerticalScrollIndicator={false}
               onScroll={(e) => {
-                scrollYRef.current = e.nativeEvent.contentOffset.y;
+                const y = e.nativeEvent.contentOffset.y;
+                scrollAtTop.value = y <= 0;
               }}
               scrollEventThrottle={16}
               bounces={false}
@@ -848,8 +876,8 @@ function DetailSheet({
               </View>
             </ScrollView>
           ) : null}
-        </Animated.View>
-      </View>
+        </Reanimated.View>
+      </GestureDetector>
     </Modal>
   );
 }
@@ -1006,15 +1034,15 @@ const hint = StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
-  wrap: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   body: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
