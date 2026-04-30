@@ -1,6 +1,25 @@
-import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useEffect } from "react";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../theme";
 import { MiniSparkline, seriesFromSeed } from "./Sparkline";
@@ -23,9 +42,14 @@ interface Props {
   onClose: () => void;
 }
 
+// Threshold para considerar el swipe como dismiss.
+const DISMISS_TRANSLATE = 110;
+const DISMISS_VELOCITY = 600;
+
 /**
- * Sheet de ajustes del chart — hero ilustrado + el toggle principal
- * como par de cards interactivas + tres toggles compactos.
+ * Sheet de ajustes del chart — sin botones de cerrar. Se cierra
+ * deslizando hacia abajo (swipe gesture en el sheet entero, smooth
+ * con reanimated en UI thread).
  */
 export function ChartSettingsSheet({
   visible,
@@ -41,6 +65,85 @@ export function ChartSettingsSheet({
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
+
+  // translateY del sheet — empieza fuera de pantalla y entra animado
+  // cuando visible=true. El usuario también lo arrastra con el pan.
+  const translateY = useSharedValue(windowH);
+  // Backdrop opacity — fadea con el progreso del sheet.
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      backdropOpacity.value = withTiming(1, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+    // No animamos al cerrar acá — el cierre lo dispara el dismiss().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      windowH,
+      { duration: 240, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      // Sólo permitimos arrastrar hacia abajo (translationY positivo).
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+        // Backdrop opacity se atenúa con el progreso del drag.
+        backdropOpacity.value = Math.max(
+          0,
+          1 - e.translationY / windowH,
+        );
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss =
+        e.translationY > DISMISS_TRANSLATE ||
+        e.velocityY > DISMISS_VELOCITY;
+      if (shouldDismiss) {
+        translateY.value = withTiming(
+          windowH,
+          { duration: 240, easing: Easing.in(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        // Snap back — vuelve a su posición.
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   const selectCashflow = (next: boolean) => {
     if (next === considerCashflow) return;
@@ -52,105 +155,98 @@ export function ChartSettingsSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={dismiss}
     >
-      <Pressable style={s.backdrop} onPress={onClose} />
-      <View
-        style={[
-          s.sheet,
-          {
-            backgroundColor: c.bg,
-            borderColor: c.border,
-            paddingBottom: insets.bottom + 18,
-          },
-        ]}
-      >
-        <View style={s.grabber}>
-          <View style={[s.grabberPill, { backgroundColor: c.borderStrong }]} />
-        </View>
+      <Animated.View style={[s.backdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Animated.View>
 
-        {/* Close X arriba a la izquierda. */}
-        <Pressable
-          onPress={onClose}
-          hitSlop={12}
-          style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
-        >
-          <Feather name="x" size={16} color={c.text} />
-        </Pressable>
-
-        {/* Hero — ilustración on-brand de la sección Finanzas & data
-            del brand-kit/14-illustrations + título display + sub. */}
-        <View style={s.hero}>
-          <ChartSettingsIllustration size={200} />
-          <Text style={[s.title, { color: c.text }]}>Ajustes del chart</Text>
-          <Text style={[s.subtitle, { color: c.textMuted }]}>
-            ¿Cómo querés ver tu portfolio?
-          </Text>
-        </View>
-
-        {/* Eyebrow + cards visuales del setting principal. */}
-        <Text style={[s.eyebrow, { color: c.textMuted }]}>
-          MOVIMIENTOS DE DINERO
-        </Text>
-        <View style={s.cardsRow}>
-          <OptionCard
-            selected={considerCashflow}
-            onPress={() => selectCashflow(true)}
-            label="Considerar"
-            description="Sube cuando ingresás · Baja cuando egresás"
-            previewSeed="cashflow-on"
-            previewTrend="up"
-          />
-          <OptionCard
-            selected={!considerCashflow}
-            onPress={() => selectCashflow(false)}
-            label="Ignorar"
-            description="Solo el rendimiento puro de los activos"
-            previewSeed="cashflow-off"
-            previewTrend="flat"
-          />
-        </View>
-
-        {/* Toggles compactos — el resto de los settings. */}
-        <Text style={[s.eyebrow, { color: c.textMuted, marginTop: 18 }]}>
-          PREFERENCIAS
-        </Text>
-        <View
+      <GestureDetector gesture={pan}>
+        <Animated.View
           style={[
-            s.toggleList,
-            { backgroundColor: c.surface, borderColor: c.border },
+            s.sheet,
+            {
+              backgroundColor: c.bg,
+              borderColor: c.border,
+              paddingBottom: insets.bottom + 18,
+            },
+            sheetStyle,
           ]}
         >
-          <ToggleRow
-            label="Modo privacidad"
-            description="Oculta los montos como ••••"
-            value={hideAmounts}
-            onChange={onChangeHideAmounts}
-            divider
-          />
-          <ToggleRow
-            label="Línea de referencia"
-            description="Horizontal al inicio del periodo"
-            value={referenceLine}
-            onChange={onChangeReferenceLine}
-            divider
-          />
-          <ToggleRow
-            label="Suavizar el trazo"
-            description="Curva continua en vez de líneas filosas"
-            value={smoothChart}
-            onChange={onChangeSmoothChart}
-          />
-        </View>
+          {/* Grabber — visualmente sugiere "deslizable hacia abajo". */}
+          <View style={s.grabber}>
+            <View
+              style={[s.grabberPill, { backgroundColor: c.borderStrong }]}
+            />
+          </View>
 
-        <Pressable
-          onPress={onClose}
-          style={[s.cta, { backgroundColor: c.text, marginTop: 18 }]}
-        >
-          <Text style={[s.ctaText, { color: c.bg }]}>Listo</Text>
-        </Pressable>
-      </View>
+          {/* Hero — ilustración on-brand + título display. Sin
+              subtítulo: el título lo dice todo. */}
+          <View style={s.hero}>
+            <ChartSettingsIllustration size={200} />
+            <Text style={[s.title, { color: c.text }]}>
+              Ajustes del chart
+            </Text>
+          </View>
+
+          {/* Eyebrow + cards visuales del setting principal. */}
+          <Text style={[s.eyebrow, { color: c.textMuted }]}>
+            MOVIMIENTOS DE DINERO
+          </Text>
+          <View style={s.cardsRow}>
+            <OptionCard
+              selected={considerCashflow}
+              onPress={() => selectCashflow(true)}
+              label="Considerar"
+              description="Sube cuando ingresás · Baja cuando egresás"
+              previewSeed="cashflow-on"
+              previewTrend="up"
+            />
+            <OptionCard
+              selected={!considerCashflow}
+              onPress={() => selectCashflow(false)}
+              label="Ignorar"
+              description="Solo el rendimiento puro de los activos"
+              previewSeed="cashflow-off"
+              previewTrend="flat"
+            />
+          </View>
+
+          {/* Toggles compactos — el resto de los settings. */}
+          <Text style={[s.eyebrow, { color: c.textMuted, marginTop: 18 }]}>
+            PREFERENCIAS
+          </Text>
+          <View
+            style={[
+              s.toggleList,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <ToggleRow
+              label="Modo privacidad"
+              description="Oculta los montos como ••••"
+              value={hideAmounts}
+              onChange={onChangeHideAmounts}
+              divider
+            />
+            <ToggleRow
+              label="Línea de referencia"
+              description="Horizontal al inicio del periodo"
+              value={referenceLine}
+              onChange={onChangeReferenceLine}
+              divider
+            />
+            <ToggleRow
+              label="Suavizar el trazo"
+              description="Curva continua en vez de líneas filosas"
+              value={smoothChart}
+              onChange={onChangeSmoothChart}
+            />
+          </View>
+        </Animated.View>
+      </GestureDetector>
     </Modal>
   );
 }
@@ -206,7 +302,7 @@ function OptionCard({
         </Text>
         {selected ? (
           <View style={[cs.checkBubble, { backgroundColor: accent }]}>
-            <Feather name="check" size={11} color="#FFFFFF" />
+            <Text style={cs.checkText}>✓</Text>
           </View>
         ) : null}
       </View>
@@ -269,7 +365,7 @@ function ToggleRow({
 
 const s = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
   sheet: {
@@ -293,17 +389,6 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
-  closeBtn: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
   hero: {
     alignItems: "center",
     paddingTop: 4,
@@ -314,12 +399,6 @@ const s = StyleSheet.create({
     fontSize: 24,
     letterSpacing: -0.7,
     marginTop: 6,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
   },
   eyebrow: {
     fontFamily: fontFamily[700],
@@ -336,17 +415,6 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 14,
-  },
-  cta: {
-    height: 52,
-    borderRadius: radius.btn,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
   },
 });
 
@@ -379,6 +447,12 @@ const cs = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+  },
+  checkText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 13,
   },
   description: {
     fontFamily: fontFamily[500],
