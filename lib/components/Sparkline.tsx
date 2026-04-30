@@ -288,27 +288,45 @@ export function Sparkline({
       {/* Live dot — sobre el último punto del chart, NO se distorsiona
           con preserveAspectRatio='none' porque renderea en un SVG
           separado con coords 1:1 en px. Halo pulsa, dot sólido fijo.
-          Se oculta durante el scrub para no competir con el cursor. */}
+          Se oculta durante el scrub para no competir con el cursor.
+
+          Inset desde el borde derecho: el último punto del chart está
+          en `x = VB_W` (borde exacto), pero el halo de hasta 16px se
+          clippea al SVG. Con un offset de 14px hacia adentro queda
+          alineado con el cap redondeado del path y el halo entero
+          se ve. El dot sigue visualmente "al final" del trazo. */}
       {live && points.length > 0 && layoutWidth > 0 && !activePoint ? (
         <Svg
           width={layoutWidth}
           height={height}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
+          // overflow visible para que el halo no se clippee si el
+          // SVG queda al ras del View (algún renderer en RN-svg sí
+          // recorta los hijos al bbox del SVG si no se le indica).
+          // @ts-expect-error react-native-svg acepta overflow string
+          overflow="visible"
         >
-          <AnimatedCircle
-            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
-            cy={(points[points.length - 1].y / VB_H) * height}
-            r={haloR}
-            fill={color}
-            opacity={haloOpacity}
-          />
-          <Circle
-            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
-            cy={(points[points.length - 1].y / VB_H) * height}
-            r={3.5}
-            fill={color}
-          />
+          {(() => {
+            const last = points[points.length - 1];
+            const cx = Math.max(
+              14,
+              Math.min((last.x / VB_W) * layoutWidth - 6, layoutWidth - 14),
+            );
+            const cy = (last.y / VB_H) * height;
+            return (
+              <>
+                <AnimatedCircle
+                  cx={cx}
+                  cy={cy}
+                  r={haloR}
+                  fill={color}
+                  opacity={haloOpacity}
+                />
+                <Circle cx={cx} cy={cy} r={3.5} fill={color} />
+              </>
+            );
+          })()}
         </Svg>
       ) : null}
 
