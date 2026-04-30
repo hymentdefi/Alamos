@@ -2339,7 +2339,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    height: 52,
+    /* Misma altura que el pill activo del nav bar inferior (ver
+     * (tabs)/_layout.tsx — ISLAND_HEIGHT 64 con padding 6 interno).
+     * Antes 52 — los botones se sentían muy altos vs la jerarquía
+     * del nav. */
+    height: 44,
     borderRadius: radius.btn,
     paddingHorizontal: 4,
   },
