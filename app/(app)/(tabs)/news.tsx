@@ -1043,10 +1043,13 @@ const sheet = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    /* Top a 20% de la pantalla — el sheet ocupa los 4/5 inferiores y
+     * deja 1/5 arriba "vacío" donde se ve el backdrop. Da aire y feel
+     * de modal premium tipo Twitter/Instagram. */
+    top: "20%",
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "92%",
     overflow: "hidden",
   },
   dragArea: {
