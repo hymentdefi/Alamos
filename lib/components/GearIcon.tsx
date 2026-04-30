@@ -1,52 +1,24 @@
-import Svg, { Circle, Rect } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 
 interface Props {
   size?: number;
   color: string;
-  /** Color del agujero central. Default 'transparent' (deja ver el
-   *  bg padre); pasale c.bg si querés un agujero "blanco" sólido. */
+  /** Mantenido por compatibilidad con call-sites previos — Ionicons
+   *  ya maneja el agujero internamente, no se usa. */
   holeColor?: string;
 }
 
 /**
- * Gear icon construido con primitivas — body circular + 8 dientes
- * rectangulares rotados a 45° + agujero central. Más robusto que un
- * Path con `fillRule="evenodd"`, que algunos renderers de RN-svg
- * ignoraban dejando el centro relleno (eso era el "gear bugueado").
+ * Gear icon — usa Ionicons `settings-sharp`, el clásico de iOS
+ * settings. Lo wrappeamos en este componente para mantener un
+ * único punto de entrada en la app y poder cambiar la implementación
+ * más tarde si hace falta.
  *
- * viewBox 24×24, mismo grid que el set core del brand-kit.
+ * Antes intenté un SVG custom (Path con fillRule, después con
+ * primitivas Circle+Rect) pero ningún approach replicaba el gear
+ * iOS canónico de manera consistente entre iOS y Android. Ionicons
+ * lo tiene resuelto, sin necesidad de reinventarlo.
  */
-export function GearIcon({ size = 18, color, holeColor }: Props) {
-  const cx = 12;
-  const cy = 12;
-  const teethAngles = [0, 45, 90, 135, 180, 225, 270, 315];
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      {/* Body — círculo principal del gear. */}
-      <Circle cx={cx} cy={cy} r={6.5} fill={color} />
-      {/* 8 dientes — cada uno es un rect chiquito rotado alrededor
-          del centro. */}
-      {teethAngles.map((angle) => (
-        <Rect
-          key={angle}
-          x={11}
-          y={1.6}
-          width={2}
-          height={4.4}
-          rx={0.5}
-          fill={color}
-          origin={`${cx}, ${cy}`}
-          rotation={angle}
-        />
-      ))}
-      {/* Agujero central — Circle del holeColor. Si holeColor es
-          transparent, RN-svg deja ver el bg del padre. */}
-      <Circle
-        cx={cx}
-        cy={cy}
-        r={2.7}
-        fill={holeColor ?? "transparent"}
-      />
-    </Svg>
-  );
+export function GearIcon({ size = 18, color }: Props) {
+  return <Ionicons name="settings-sharp" size={size} color={color} />;
 }
