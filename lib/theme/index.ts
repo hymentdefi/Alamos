@@ -61,8 +61,10 @@ const light = {
   greenDark: "#00A304",
   greenDim: "rgba(0,163,4,0.14)",
 
-  red: "#C83B3B",
-  redDim: "rgba(200,59,59,0.10)",
+  // Rojo brand: vivo y saturado para emparejar la "viveza" visual del
+  // verde-action (#5ac43e). Antes era #C83B3B — apagado y opaco.
+  red: "#EF3939",
+  redDim: "rgba(239,57,57,0.12)",
   ink: brand.ink,
 } as const;
 
