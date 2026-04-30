@@ -70,7 +70,6 @@ import {
   AlamosIcon,
   type AlamosIconName,
 } from "../../../lib/components/AlamosIcon";
-import { TrianglesWatermark } from "../../../lib/components/TrianglesWatermark";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -478,14 +477,6 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
-          {/* Watermark de los triángulos brand atrás del hero — todo
-              verde (default) para acompañar la identidad "logo verde
-              everywhere". */}
-          <TrianglesWatermark
-            size={220}
-            opacity={0.09}
-            style={{ bottom: -40, right: -30 }}
-          />
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
