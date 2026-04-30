@@ -1658,7 +1658,7 @@ function UsMarket() {
           </Pressable>
         </View>
         <Text style={[s.usSubtitle, { color: c.textMuted }]}>
-          Operá en NYSE y NASDAQ directo desde Alamos, sin intervención
+          Operá en NYSE y NASDAQ directo desde Álamos, sin intervención
           local ni CEDEARs.{" "}
           <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
             El mercado más grande del mundo, en tu bolsillo.
@@ -1794,7 +1794,7 @@ function UsMarketInfoModal({
             Acceso directo al NYSE y NASDAQ. Comprás la acción real en
             dólares, sin pasar por CEDEARs ni tipo de cambio implícito.
             Disponible para usuarios con cuenta en USD habilitada en
-            Alamos. Liquidez T+1 y comisiones más bajas que la operación
+            Álamos. Liquidez T+1 y comisiones más bajas que la operación
             local.
           </Text>
           <Tap
@@ -2034,7 +2034,7 @@ function CryptoMarketInfoModal({
             <CryptoIcon ticker="₿" iconText="₿" bg="#F7931A" fg="#FFFFFF" size={42} />
           </View>
           <Text style={[s.modalTitle, { color: c.text }]}>
-            Crypto en Alamos
+            Crypto en Álamos
           </Text>
           <Text style={[s.modalBody, { color: c.textSecondary }]}>
             Operá Bitcoin, Ethereum, Solana, USDT, USDC y +200 monedas

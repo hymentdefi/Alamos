@@ -239,7 +239,7 @@ export default function RegisterScreen() {
             Al continuar aceptás los{" "}
             <Text style={[s.legalLink, { color: c.text }]}>Términos</Text> y la{" "}
             <Text style={[s.legalLink, { color: c.text }]}>Política de Privacidad</Text>{" "}
-            de Alamos Capital.
+            de Álamos Capital.
           </Text>
         ) : null}
       </Animated.View>

@@ -72,7 +72,7 @@ const notificationItems: NotificationItem[] = [
   {
     id: "n5",
     icon: "award",
-    title: "Ya podés usar Alamos Pro",
+    title: "Ya podés usar Álamos Pro",
     body: "Terminal con profundidad de mercado y órdenes avanzadas.",
     date: "10 abr, 09:45",
   },

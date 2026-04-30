@@ -37,7 +37,7 @@ export default function AboutScreen() {
       >
         <View style={s.hero}>
           <AlamosLogo variant="mark" tone="green" size={64} />
-          <Text style={[s.heroTitle, { color: c.text }]}>Alamos Capital</Text>
+          <Text style={[s.heroTitle, { color: c.text }]}>Álamos Capital</Text>
           <Text style={[s.heroSub, { color: c.textMuted }]}>
             Inversiones simples y transparentes para el mercado argentino.
           </Text>
@@ -49,7 +49,7 @@ export default function AboutScreen() {
             { backgroundColor: c.surface, borderColor: c.border },
           ]}
         >
-          <FactRow label="Razón social" value="Alamos Capital ALyC S.A." />
+          <FactRow label="Razón social" value="Álamos Capital ALyC S.A." />
           <FactRow label="CUIT" value="30-•••••••••-•" />
           <FactRow label="Matrícula CNV" value="N° 000" />
           <FactRow label="Domicilio" value="Av. Corrientes ···, CABA" />

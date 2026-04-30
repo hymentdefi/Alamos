@@ -183,7 +183,7 @@ export default function AlamoScreen() {
           />
           <Row
             icon="info"
-            label="Sobre Alamos Capital"
+            label="Sobre Álamos Capital"
             onPress={() => router.push("/(app)/about")}
           />
         </View>
@@ -216,7 +216,7 @@ export default function AlamoScreen() {
             }
           >
             <Text style={[s.footerText, { color: c.textMuted }]}>
-              <Text style={{ fontFamily: fontFamily[600] }}>Alamos</Text>{" "}
+              <Text style={{ fontFamily: fontFamily[600] }}>Álamos</Text>{" "}
               <Text style={s.underline}>
                 Términos y Condiciones y Política de Privacidad
               </Text>

@@ -65,7 +65,7 @@ export default function LoginScreen() {
       <View style={s.content}>
         <Text style={[s.title, { color: c.text }]}>Iniciá sesión</Text>
         <Text style={[s.subtitle, { color: c.textMuted }]}>
-          Ingresá con tu cuenta de Alamos.
+          Ingresá con tu cuenta de Álamos.
         </Text>
 
         <View style={s.fields}>
@@ -181,7 +181,7 @@ export default function LoginScreen() {
           onPress={() => router.replace("/(auth)/register")}
         >
           <Text style={[s.registerText, { color: c.textMuted }]}>
-            ¿Primera vez en Alamos?{" "}
+            ¿Primera vez en Álamos?{" "}
             <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
               Crear cuenta
             </Text>

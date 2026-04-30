@@ -103,7 +103,7 @@ export default function SupportScreen() {
           <View style={s.sectionHead}>
             <View style={{ flex: 1 }}>
               <Text style={[s.eyebrow, { color: c.textMuted }]}>
-                ALAMOS ACADEMY
+                ÁLAMOS ACADEMY
               </Text>
               <Text style={[s.sectionTitle, { color: c.text }]}>
                 Aprendé a invertir

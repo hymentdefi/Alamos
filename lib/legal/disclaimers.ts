@@ -13,7 +13,7 @@
 /** Identidad del Agente de Liquidación y Compensación (ALyC). Mover a
  *  config remoto / env var cuando esté definido el valor final. */
 export const ALYC = {
-  name: "Alamos Capital ALyC S.A.",
+  name: "Álamos Capital ALyC S.A.",
   matricula: "N° 000",
 } as const;
 
@@ -28,8 +28,8 @@ export const DISCLAIMER_SHORT =
 
 /** Texto largo — para el onboarding de primera vez, modal ⓘ, T&C. */
 export const DISCLAIMER_LONG = [
-  "Las noticias y contenidos informativos mostrados en Alamos Capital son provistos por fuentes de terceros debidamente identificadas. Alamos Capital no edita, verifica ni suscribe el contenido editorial de estas fuentes, y no se responsabiliza por su exactitud, completitud u oportunidad.",
+  "Las noticias y contenidos informativos mostrados en Álamos Capital son provistos por fuentes de terceros debidamente identificadas. Álamos Capital no edita, verifica ni suscribe el contenido editorial de estas fuentes, y no se responsabiliza por su exactitud, completitud u oportunidad.",
   "Esta información tiene carácter meramente informativo y no constituye oferta, recomendación, asesoramiento ni sugerencia de inversión en los términos de la Ley 26.831 y las normas de la Comisión Nacional de Valores. Las decisiones de inversión son de exclusiva responsabilidad del usuario y deben tomarse considerando su perfil de riesgo, situación patrimonial y objetivos.",
   "Los resultados pasados no garantizan rendimientos futuros. Invertir en instrumentos financieros implica riesgos, incluida la posibilidad de pérdida del capital invertido.",
-  `Alamos Capital opera a través de ${ALYC.name}, Agente de Liquidación y Compensación registrado ante la CNV bajo matrícula ${ALYC.matricula}.`,
+  `Álamos Capital opera a través de ${ALYC.name}, Agente de Liquidación y Compensación registrado ante la CNV bajo matrícula ${ALYC.matricula}.`,
 ] as const;

@@ -24,7 +24,7 @@ export default function SettingsScreen() {
           type: "toggle" as const,
           icon: "moon",
           label: "Modo oscuro",
-          hint: "Experimental · Alamos Pro",
+          hint: "Experimental · Álamos Pro",
           value: mode === "dark",
           onChange: () => toggle(),
         },

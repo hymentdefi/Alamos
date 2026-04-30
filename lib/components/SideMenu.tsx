@@ -198,7 +198,7 @@ export function SideMenu({ visible, onClose }: Props) {
         },
         {
           icon: "info",
-          label: "Sobre Alamos Capital",
+          label: "Sobre Álamos Capital",
           path: "/(app)/about",
         },
       ],

@@ -47,7 +47,7 @@ export default function WelcomeScreen() {
           right={<Feather name="arrow-right" size={16} color={c.bg} />}
         />
         <Text style={[s.disclaimer, { color: c.textMuted }]}>
-          Alamos Capital · Todas las inversiones implican riesgo.
+          Álamos Capital · Todas las inversiones implican riesgo.
         </Text>
       </View>
     </View>

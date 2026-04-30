@@ -334,7 +334,7 @@ export function ProTransition({ target, onCommit, onEnd }: Props) {
                 { color: isDark ? brand.bg : brand.ink },
               ]}
             >
-              Alamos
+              Álamos
             </Animated.Text>
             {toPro ? (
               <Animated.Text
