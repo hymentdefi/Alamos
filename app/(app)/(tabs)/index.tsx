@@ -836,9 +836,9 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* 2 acciones primarias: Ingresar + Enviar. Convertir vive en
-          el ⇅ de cada cuenta de "Tu dinero"; invertir tiene su propio
-          tab "Mercado" en la nav inferior. */}
+      {/* 3 acciones: Ingresar (primary) + Enviar + Convertir
+          (secondary). Convertir abre el ConvertSheet sin cuenta de
+          origen preseleccionada — el usuario elige adentro. */}
       <View style={s.actionsRow}>
         <ActionButton
           icon="download"
@@ -863,6 +863,13 @@ function Dinero(_: {
               params: { mode: "send" },
             })
           }
+        />
+        <ActionButton
+          icon="refresh"
+          label="Convertir"
+          variant="secondary"
+          haptic="medium"
+          onPress={() => openConvertFrom(undefined)}
         />
       </View>
 
