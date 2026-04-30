@@ -430,13 +430,19 @@ function BaseHome() {
             style={[
               s.giftBtnWrap,
               {
-                shadowColor: c.action,
+                // Matchea el chart: verde-action si el portfolio está
+                // up, rojo si está down. Mismo gesto que el botón
+                // "Ingresar" — color del CTA refleja el estado.
+                shadowColor: isUp ? c.action : c.red,
                 transform: [{ scale: giftPulse }],
               },
             ]}
           >
             <Tap
-              style={[s.giftBtn, { backgroundColor: c.action }]}
+              style={[
+                s.giftBtn,
+                { backgroundColor: isUp ? c.action : c.red },
+              ]}
               onPress={() =>
                 Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success,
