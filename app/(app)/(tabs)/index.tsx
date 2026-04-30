@@ -70,6 +70,7 @@ import {
   AlamosIcon,
   type AlamosIconName,
 } from "../../../lib/components/AlamosIcon";
+import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -222,6 +223,27 @@ function BaseHome() {
   // tick del scrub propagaba a un re-render de TODO BaseHome.
   const onScrub = useCallback((idx: number) => setScrubIndex(idx), []);
   const onScrubEnd = useCallback(() => setScrubIndex(null), []);
+
+  /* ─── Ajustes del chart ─── */
+  const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
+  // Si está activo, la curva refleja ingresos/egresos (default).
+  // Persistido entre sesiones.
+  const [considerCashflow, setConsiderCashflow] = useState(true);
+  useEffect(() => {
+    SecureStore.getItemAsync("home:chart_consider_cashflow")
+      .then((v) => {
+        if (v === "0") setConsiderCashflow(false);
+      })
+      .catch(() => {});
+  }, []);
+  const onChangeConsiderCashflow = useCallback((next: boolean) => {
+    setConsiderCashflow(next);
+    SecureStore.setItemAsync(
+      "home:chart_consider_cashflow",
+      next ? "1" : "0",
+    ).catch(() => {});
+  }, []);
+
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
@@ -308,15 +330,21 @@ function BaseHome() {
     return () => clearInterval(id);
   }, [range, isFocused]);
 
-  const series = useMemo(
-    () =>
-      generateSeries(
-        total,
-        rangeChanges[range],
-        range === "live" ? `home-live-${liveTick}` : `home-${range}`,
-      ),
-    [total, range, liveTick],
-  );
+  const series = useMemo(() => {
+    // Cuando "considerar movimientos" está apagado, el chart sólo
+    // refleja el rendimiento del activo: bajamos la amplitud del
+    // delta y usamos otro seed para que la curva sea más smooth /
+    // conservadora. Cuando está prendido (default), la curva sube
+    // y baja con los flujos de capital — más volátil, refleja la
+    // realidad del balance.
+    const ampMult = considerCashflow ? 1 : 0.55;
+    const seedSuffix = considerCashflow ? "" : "-pure";
+    const seed =
+      range === "live"
+        ? `home-live-${liveTick}${seedSuffix}`
+        : `home-${range}${seedSuffix}`;
+    return generateSeries(total, rangeChanges[range] * ampMult, seed);
+  }, [total, range, liveTick, considerCashflow]);
 
   // Pulse continuo del puntito de Live — corre solo cuando hace falta.
   const livePulse = useRef(new Animated.Value(1)).current;
@@ -621,6 +649,22 @@ function BaseHome() {
                 </Pressable>
               );
             })}
+            {/* Settings icon al final del timeline — abre el sheet
+                con los ajustes del chart. */}
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setChartSettingsOpen(true);
+              }}
+              hitSlop={8}
+              style={s.rangeSettingsBtn}
+            >
+              <AlamosIcon
+                name="settings"
+                size={16}
+                color={c.textMuted}
+              />
+            </Pressable>
           </View>
         </View>
 
@@ -664,6 +708,15 @@ function BaseHome() {
         <CryptoMarket />
 
       </ScrollView>
+
+      {/* Sheet de ajustes del chart — abierto desde el icon de
+          settings al final del timeline. */}
+      <ChartSettingsSheet
+        visible={chartSettingsOpen}
+        considerCashflow={considerCashflow}
+        onChangeConsiderCashflow={onChangeConsiderCashflow}
+        onClose={() => setChartSettingsOpen(false)}
+      />
     </View>
   );
 }
@@ -2783,6 +2836,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: radius.pill,
+  },
+  rangeSettingsBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    marginLeft: 4,
   },
   rangeText: {
     fontFamily: fontFamily[700],
