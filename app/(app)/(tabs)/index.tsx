@@ -217,6 +217,11 @@ function BaseHome() {
     }),
   ).current;
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  // Callbacks estables para que el Sparkline (memoizado) no se
+  // re-renderee en cada cambio de state del padre. Sin esto, cada
+  // tick del scrub propagaba a un re-render de TODO BaseHome.
+  const onScrub = useCallback((idx: number) => setScrubIndex(idx), []);
+  const onScrubEnd = useCallback(() => setScrubIndex(null), []);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
@@ -585,8 +590,8 @@ function BaseHome() {
               live={range === "live"}
               strokeWidth={1.4}
               smooth={false}
-              onScrub={(idx) => setScrubIndex(idx)}
-              onScrubEnd={() => setScrubIndex(null)}
+              onScrub={onScrub}
+              onScrubEnd={onScrubEnd}
             />
           </View>
 

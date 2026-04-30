@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   View,
@@ -61,7 +61,7 @@ const SHEEN_W = 80;
 const SHEEN_TRAVEL_MS = 5400;
 const SHEEN_PAUSE_MS = 2200;
 
-export function Sparkline({
+function SparklineImpl({
   series,
   color,
   height = 140,
@@ -79,6 +79,11 @@ export function Sparkline({
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [sheenX, setSheenX] = useState(-SHEEN_W);
   const lastIndexRef = useRef<number | null>(null);
+  // Throttle del haptic durante el scrub — disparar selectionAsync en
+  // cada cambio de idx satura el motor de haptics y siente lag al
+  // arrastrar el dedo. ~55ms entre haptics es ~18Hz, suficientemente
+  // denso para que se sienta táctil pero sin sobrecargar.
+  const lastHapticAtRef = useRef(0);
 
   const { points, d, fillD } = useMemo(
     () => computePath(series, smooth),
@@ -166,7 +171,11 @@ export function Sparkline({
           const idx = xToIndex(e.nativeEvent.locationX);
           if (idx !== lastIndexRef.current) {
             lastIndexRef.current = idx;
-            Haptics.selectionAsync().catch(() => {});
+            const now = Date.now();
+            if (now - lastHapticAtRef.current >= 55) {
+              lastHapticAtRef.current = now;
+              Haptics.selectionAsync().catch(() => {});
+            }
             setScrubIndex(idx);
             onScrub?.(idx, series[idx]);
           }
@@ -183,8 +192,10 @@ export function Sparkline({
           onScrubEnd?.();
         },
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [series, layoutWidth],
+    // Incluimos los callbacks porque ahora vienen estables (useCallback
+    // del padre) — sin esto el panResponder usaba la versión vieja
+    // de los callbacks de un render anterior, bug latente.
+    [series, layoutWidth, onScrub, onScrubStart, onScrubEnd],
   );
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -363,6 +374,13 @@ export function Sparkline({
     </View>
   );
 }
+
+/** Sparkline memoizado — evita re-renders cuando el padre cambia
+ *  state ajeno al chart (lo que se notaba como lag durante el scrub).
+ *  Las props son shallow-compared; con `series` estable (useMemo en el
+ *  padre) y los callbacks estables (useCallback) el chart sólo se
+ *  vuelve a montar cuando realmente cambia algo del trazo. */
+export const Sparkline = memo(SparklineImpl);
 
 function computePath(
   series: number[],
