@@ -95,7 +95,15 @@ function SparklineImpl({
     [series, smooth],
   );
 
-  /* ─── Live dot pulse — halo crece y desvanece en loop. ─── */
+  /* ─── Live dot pulse — halo crece y desvanece en loop. ───
+   *
+   * Animated.loop NECESITA resetBeforeIteration:true cuando la
+   * animación interna va de A→B con A≠B; sin eso el primer ciclo
+   * funciona pero los siguientes intentan ir de B→B (sin cambio
+   * visible) y el dot se ve "estático". También usamos sequence con
+   * un hold breve al final para que el ojo registre el silencio
+   * entre pulsos.
+   */
   const livePulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!live) {
@@ -103,25 +111,30 @@ function SparklineImpl({
       return;
     }
     const loop = Animated.loop(
-      Animated.timing(livePulse, {
-        toValue: 1,
-        duration: 1400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false, // animamos `r` y `opacity` de SVG Circle
-      }),
+      Animated.sequence([
+        Animated.timing(livePulse, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false, // animamos `r` y `opacity` de SVG
+        }),
+        Animated.delay(180),
+      ]),
+      { resetBeforeIteration: true },
     );
     loop.start();
     return () => loop.stop();
   }, [live, livePulse]);
 
-  // Halo: r de 4 a 16 px, opacity de 0.45 a 0 — es el "ondear" del dot.
+  // Halo: r de 5 a 20 px, opacity de 0.55 a 0 — más amplio y opaco
+  // que la versión inicial para que el pulso sea claramente visible.
   const haloR = livePulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [4, 16],
+    outputRange: [5, 20],
   });
   const haloOpacity = livePulse.interpolate({
-    inputRange: [0, 0.7, 1],
-    outputRange: [0.45, 0.08, 0],
+    inputRange: [0, 0.6, 1],
+    outputRange: [0.55, 0.12, 0],
   });
 
   // Loop del sheen vía RAF (no podemos usar Animated nativo en props
