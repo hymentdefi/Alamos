@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme, fontFamily, fontMono, radius, spacing } from "../../lib/theme";
+import Svg, { Path } from "react-native-svg";
+import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
-import { AlamosLogo } from "../../lib/components/Logo";
 
 /**
  * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
@@ -68,7 +68,19 @@ export default function SuccessScreen() {
         <View
           style={[s.checkCircle, { backgroundColor: c.positive }]}
         >
-          <AlamosIcon name="check" size={44} color="#FFFFFF" strokeWidth={2.4} />
+          {/* Mismo path del check que dibuja la animación de
+              confirm.tsx — para que la transición animación → success
+              sea visualmente continua (mismo trazo, mismo grosor). */}
+          <Svg width={44} height={44} viewBox="0 0 24 24">
+            <Path
+              d="M5 12 L10 17 L19 7"
+              stroke="#FFFFFF"
+              strokeWidth={3}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
         </View>
         <Text style={[s.title, { color: c.text }]}>
           Orden ejecutada
@@ -109,15 +121,16 @@ export default function SuccessScreen() {
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <Pressable
-          style={[
-            s.shareCta,
-            {
-              // Identidad de marca, no acción primaria — esto comparte
-              // ecosystem Alamos. Verde-brand en escala dim + border.
-              backgroundColor: c.brandDim,
-              borderColor: c.brand,
-            },
-          ]}
+          style={[s.cta, { backgroundColor: c.ink }]}
+          onPress={() => router.replace("/(app)")}
+        >
+          <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+        </Pressable>
+
+        {/* Compartir comprobante — link editorial sin chrome, alineado
+            central. La acción está, sin gritar. */}
+        <Pressable
+          style={s.shareLink}
           onPress={() =>
             router.push({
               pathname: "/(app)/receipt",
@@ -130,31 +143,13 @@ export default function SuccessScreen() {
               },
             })
           }
+          hitSlop={8}
         >
-          <AlamosLogo variant="mark" tone="green" size={20} />
-          <View style={s.shareCtaTextWrap}>
-            <Text style={[s.shareCtaTitle, { color: c.positive }]}>
-              Compartir comprobante
-            </Text>
-            <Text style={[s.shareCtaRef, { color: c.positive }]}>
-              {receiptId}
-            </Text>
-          </View>
-          <AlamosIcon name="arrow" size={16} color={c.positive} />
+          <Text style={[s.shareLinkText, { color: c.textMuted }]}>
+            Compartir comprobante
+          </Text>
+          <AlamosIcon name="arrow" size={13} color={c.textMuted} />
         </Pressable>
-
-        <Pressable
-          style={[s.cta, { backgroundColor: c.ink }]}
-          onPress={() => router.replace("/(app)")}
-        >
-          <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
-        </Pressable>
-        {/* Sello de marca al pie — lockup verde Alamos.
-            Confirmación de que la operación se ejecutó dentro del
-            ecosistema Alamos. */}
-        <View style={s.brandStamp}>
-          <AlamosLogo variant="lockup" tone="green" size={32} />
-        </View>
       </View>
     </View>
   );
@@ -213,13 +208,7 @@ const s = StyleSheet.create({
   },
   bottom: {
     paddingHorizontal: 20,
-    gap: 14,
-  },
-  brandStamp: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 4,
-    opacity: 0.85,
+    gap: 16,
   },
   cta: {
     height: 52,
@@ -232,36 +221,16 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.2,
   },
-  shareCta: {
+  shareLink: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.btn,
-    borderWidth: 1.5,
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
   },
-  shareCtaTextWrap: {
-    flex: 1,
-  },
-  shareCtaTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.15,
-  },
-  shareCtaRef: {
-    fontFamily: fontMono[500],
-    fontSize: 11,
-    letterSpacing: 0,
-    marginTop: 2,
-    opacity: 0.8,
-  },
-  secondary: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  secondaryText: {
+  shareLinkText: {
     fontFamily: fontFamily[600],
-    fontSize: 14,
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
 });
