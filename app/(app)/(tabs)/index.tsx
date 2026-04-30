@@ -14,9 +14,21 @@ import {
   Dimensions,
   TextInput,
   Alert,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Reanimated, {
+  Easing as ReEasing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { Tap } from "../../../lib/components/Tap";
@@ -539,11 +551,11 @@ function BaseHome() {
           </Animated.View>
           <Tap
             style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
-            onPress={() => router.push("/(app)/activity")}
+            onPress={() => router.push("/(app)/notifications")}
             hitSlop={8}
             haptic="selection"
           >
-            <Feather name="activity" size={18} color={c.text} />
+            <Feather name="bell" size={18} color={c.text} />
           </Tap>
         </View>
       </View>
@@ -1067,14 +1079,19 @@ function ConvertSheet({
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
   const [fromId, setFromId] = useState<AccountId>("ars-ar");
   const [toId, setToId] = useState<AccountId>("usd-ar");
   const [amount, setAmount] = useState("");
   // null si no hay picker abierto, sino indica para qué slot.
   const [pickerSlot, setPickerSlot] = useState<null | "from" | "to">(null);
 
-  // Setea defaults razonables al abrir: si llega initialFromId, usa esa
-  // como origen y elige la primera otra como destino.
+  /* ─── Swipe-down dismiss (mismo patrón que ChartSettingsSheet,
+   *      MarketClosedSheet y DetailSheet de noticias). ─── */
+  const translateY = useSharedValue(windowH);
+  const backdropOpacity = useSharedValue(0);
+
+  // Setea defaults razonables al abrir + dispara entry animation.
   useEffect(() => {
     if (!visible) return;
     const from = initialFromId ?? "ars-ar";
@@ -1083,7 +1100,67 @@ function ConvertSheet({
     setToId(firstOther);
     setAmount("");
     setPickerSlot(null);
+
+    translateY.value = withTiming(0, {
+      duration: 320,
+      easing: ReEasing.out(ReEasing.cubic),
+    });
+    backdropOpacity.value = withTiming(1, {
+      duration: 280,
+      easing: ReEasing.out(ReEasing.cubic),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, initialFromId]);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      windowH,
+      { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+        backdropOpacity.value = Math.max(0, 1 - e.translationY / windowH);
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss =
+        e.translationY > 110 || e.velocityY > 600;
+      if (shouldDismiss) {
+        translateY.value = withTiming(
+          windowH,
+          { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: ReEasing.out(ReEasing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   const from = accounts.find((a) => a.id === fromId)!;
   const to = accounts.find((a) => a.id === toId)!;
@@ -1124,7 +1201,7 @@ function ConvertSheet({
     Alert.alert(
       "Conversión enviada",
       `Vas a recibir ${formatConvertPreview(received, to.currency)} en ${to.location}.`,
-      [{ text: "Listo", onPress: onClose }],
+      [{ text: "Listo", onPress: dismiss }],
     );
   };
 
@@ -1132,28 +1209,25 @@ function ConvertSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={dismiss}
       statusBarTranslucent
     >
-      <View style={s.convertWrap}>
-        <Pressable style={s.convertBackdrop} onPress={onClose} />
-        <View
+      <Reanimated.View style={[s.convertBackdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Reanimated.View>
+
+      <GestureDetector gesture={pan}>
+        <Reanimated.View
           style={[
             s.convertSheet,
             { backgroundColor: c.bg, paddingBottom: insets.bottom + 18 },
+            sheetStyle,
           ]}
         >
           <View style={s.convertHandle} />
           <View style={s.convertHead}>
             <Text style={[s.convertTitle, { color: c.text }]}>Convertir</Text>
-            <Pressable
-              hitSlop={10}
-              onPress={onClose}
-              style={[s.convertClose, { backgroundColor: c.surfaceHover }]}
-            >
-              <Feather name="x" size={16} color={c.text} />
-            </Pressable>
           </View>
 
           {pickerSlot ? (
@@ -1348,8 +1422,8 @@ function ConvertSheet({
               </Tap>
             </>
           )}
-        </View>
-      </View>
+        </Reanimated.View>
+      </GestureDetector>
     </Modal>
   );
 }
@@ -2492,15 +2566,15 @@ const s = StyleSheet.create({
     letterSpacing: -0.05,
   },
   /* ConvertSheet */
-  convertWrap: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   convertBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   convertSheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -2525,13 +2599,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
-  },
-  convertClose: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
   },
   convertEyebrow: {
     fontFamily: fontFamily[700],
