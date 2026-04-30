@@ -923,20 +923,13 @@ function AccountRow({
     >
       <AccountAvatar account={account} size={40} />
       <View style={{ flex: 1 }}>
-        <View style={s.earningsTickerRow}>
-          <Text style={[s.earningsTicker, { color: c.text }]}>
-            {account.currency}
-          </Text>
-          <View style={[s.tnaBadge, { backgroundColor: c.surfaceHover }]}>
-            <Text style={[s.tnaBadgeText, { color: c.textSecondary }]}>
-              {account.yield.pct.toLocaleString("es-AR", {
-                minimumFractionDigits: 1,
-              })}
-              {account.yield.label}
-            </Text>
-          </View>
-        </View>
-        <Text style={[s.earningsName, { color: c.textMuted }]} numberOfLines={1}>
+        <Text style={[s.earningsTicker, { color: c.text }]}>
+          {account.currency}
+        </Text>
+        <Text
+          style={[s.earningsName, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
           {account.location}
         </Text>
       </View>
@@ -2386,25 +2379,10 @@ const s = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
   },
-  earningsTickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   earningsTicker: {
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.25,
-  },
-  tnaBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  tnaBadgeText: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: -0.1,
   },
   earningsName: {
     fontFamily: fontFamily[500],
