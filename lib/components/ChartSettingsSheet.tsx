@@ -1,7 +1,10 @@
-import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../theme";
+import { GearIcon } from "./GearIcon";
+import { MiniSparkline, seriesFromSeed } from "./Sparkline";
 
 interface Props {
   visible: boolean;
@@ -12,9 +15,11 @@ interface Props {
 }
 
 /**
- * Bottom sheet con preferencias del chart del Inicio. Por ahora una
- * sola opción — si la curva refleja movimientos de dinero
- * (ingresos/egresos) o solo el rendimiento puro de los activos.
+ * Sheet de ajustes del chart — formato visual interactivo en vez de
+ * un toggle plano. Cada opción es una card con su preview de cómo se
+ * vería el chart, el user tappea la que quiere y la card seleccionada
+ * queda con accent verde brand. Más entretenido y claro que un Switch
+ * binario.
  */
 export function ChartSettingsSheet({
   visible,
@@ -24,6 +29,12 @@ export function ChartSettingsSheet({
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const select = (next: boolean) => {
+    if (next === considerCashflow) return;
+    Haptics.selectionAsync().catch(() => {});
+    onChangeConsiderCashflow(next);
+  };
 
   return (
     <Modal
@@ -39,57 +50,135 @@ export function ChartSettingsSheet({
           {
             backgroundColor: c.bg,
             borderColor: c.border,
-            paddingBottom: insets.bottom + 16,
+            paddingBottom: insets.bottom + 18,
           },
         ]}
       >
+        {/* Grabber */}
         <View style={s.grabber}>
           <View style={[s.grabberPill, { backgroundColor: c.borderStrong }]} />
         </View>
 
-        <View style={s.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.title, { color: c.text }]}>Ajustes del chart</Text>
-            <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Cómo se calcula la curva de tu portfolio.
-            </Text>
+        {/* Hero — gear icon verde brand grande dentro de un círculo
+            pillow + título display + subtítulo. */}
+        <View style={s.hero}>
+          <View style={[s.gearWrap, { backgroundColor: c.brandDim }]}>
+            <GearIcon size={28} color={c.action} />
           </View>
-          <Pressable
-            onPress={onClose}
-            hitSlop={10}
-            style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
-          >
-            <Feather name="x" size={16} color={c.text} />
-          </Pressable>
+          <Text style={[s.title, { color: c.text }]}>Ajustes del chart</Text>
+          <Text style={[s.subtitle, { color: c.textMuted }]}>
+            ¿Cómo querés ver tu portfolio?
+          </Text>
         </View>
 
-        {/* Toggle: considerar movimientos. */}
-        <View
-          style={[
-            s.row,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={[s.rowLabel, { color: c.text }]}>
-              Considerar movimientos de dinero
-            </Text>
-            <Text style={[s.rowDesc, { color: c.textMuted }]}>
-              Si está activo, los ingresos y egresos suben o bajan la
-              curva. Si lo desactivás, solo se ve el rendimiento puro
-              de los activos.
-            </Text>
-          </View>
-          <Switch
-            value={considerCashflow}
-            onValueChange={onChangeConsiderCashflow}
-            trackColor={{ false: c.surfaceSunken, true: c.action }}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor={c.surfaceSunken}
+        {/* Eyebrow */}
+        <Text style={[s.eyebrow, { color: c.textMuted }]}>
+          MOVIMIENTOS DE DINERO
+        </Text>
+
+        {/* Dos cards lado a lado — cada una con preview, label y check
+            si está seleccionada. Tappable. */}
+        <View style={s.cardsRow}>
+          <OptionCard
+            selected={considerCashflow}
+            onPress={() => select(true)}
+            label="Considerar"
+            description="Sube cuando ingresás · Baja cuando egresás"
+            previewSeed="cashflow-on"
+            previewTrend="up"
+          />
+          <OptionCard
+            selected={!considerCashflow}
+            onPress={() => select(false)}
+            label="Ignorar"
+            description="Solo el rendimiento puro de los activos"
+            previewSeed="cashflow-off"
+            previewTrend="flat"
           />
         </View>
+
+        {/* CTA cerrar — el cambio aplica al instante, esto es para
+            confirmar y volver. */}
+        <Pressable
+          onPress={onClose}
+          style={[s.cta, { backgroundColor: c.text }]}
+        >
+          <Text style={[s.ctaText, { color: c.bg }]}>Listo</Text>
+        </Pressable>
       </View>
     </Modal>
+  );
+}
+
+function OptionCard({
+  selected,
+  onPress,
+  label,
+  description,
+  previewSeed,
+  previewTrend,
+}: {
+  selected: boolean;
+  onPress: () => void;
+  label: string;
+  description: string;
+  previewSeed: string;
+  previewTrend: "up" | "flat";
+}) {
+  const { c } = useTheme();
+  const accent = c.action;
+  const series = seriesFromSeed(previewSeed, 24, previewTrend);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        cs.card,
+        {
+          backgroundColor: c.surface,
+          borderColor: selected ? accent : c.border,
+          borderWidth: selected ? 1.6 : 1,
+        },
+      ]}
+    >
+      {/* Preview — sparkline del color accent cuando es la opción
+          seleccionada, gris muted cuando no. Da un vistazo del
+          comportamiento. */}
+      <View style={cs.previewWrap}>
+        <MiniSparkline
+          series={series}
+          color={selected ? accent : c.textFaint}
+          width={120}
+          height={48}
+          strokeWidth={2.4}
+        />
+      </View>
+
+      <View style={cs.labelRow}>
+        <Text
+          style={[
+            cs.label,
+            { color: selected ? c.text : c.textSecondary },
+          ]}
+        >
+          {label}
+        </Text>
+        {selected ? (
+          <View style={[cs.checkBubble, { backgroundColor: accent }]}>
+            <Feather name="check" size={11} color="#FFFFFF" />
+          </View>
+        ) : null}
+      </View>
+      <Text
+        style={[
+          cs.description,
+          { color: selected ? c.textMuted : c.textFaint },
+        ]}
+        numberOfLines={2}
+      >
+        {description}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -118,50 +207,89 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
-  head: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginTop: 4,
-    marginBottom: 18,
+  hero: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 22,
+  },
+  gearWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   title: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontSize: 24,
+    letterSpacing: -0.7,
     marginBottom: 4,
   },
   subtitle: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
     letterSpacing: -0.1,
   },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
+  eyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.3,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  cardsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+  },
+  cta: {
+    height: 52,
+    borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
+  ctaText: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+});
+
+const cs = StyleSheet.create({
+  card: {
+    flex: 1,
     padding: 14,
     borderRadius: radius.lg,
-    borderWidth: 1,
   },
-  rowLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
+  previewWrap: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 4,
   },
-  rowDesc: {
+  label: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.3,
+  },
+  checkBubble: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  description: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
     letterSpacing: -0.05,
   },
 });

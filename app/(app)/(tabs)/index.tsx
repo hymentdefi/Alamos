@@ -71,6 +71,7 @@ import {
   type AlamosIconName,
 } from "../../../lib/components/AlamosIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
+import { GearIcon } from "../../../lib/components/GearIcon";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -649,8 +650,9 @@ function BaseHome() {
                 </Pressable>
               );
             })}
-            {/* Settings icon al final del timeline — abre el sheet
-                con los ajustes del chart. */}
+            {/* Settings icon al final del timeline — gear filled
+                verde-action, mismo color que el resto de los CTAs
+                Álamos. Abre el sheet con los ajustes del chart. */}
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
@@ -659,11 +661,7 @@ function BaseHome() {
               hitSlop={8}
               style={s.rangeSettingsBtn}
             >
-              <AlamosIcon
-                name="settings"
-                size={16}
-                color={c.textMuted}
-              />
+              <GearIcon size={18} color={c.action} />
             </Pressable>
           </View>
         </View>
