@@ -1,6 +1,7 @@
 import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { fontFamily, useTheme, type FontWeight } from "../theme";
 import { formatARSParts } from "../data/assets";
+import { usePrivacy } from "../privacy/context";
 
 interface Props {
   value: number;
@@ -34,12 +35,21 @@ export function AmountDisplay({
   style,
 }: Props) {
   const { c } = useTheme();
+  const { hideAmounts } = usePrivacy();
   const parts = formatARSParts(value);
   const sign = prefix ?? parts.sign;
   const txt = color ?? c.text;
   const dec = decimalsColor ?? c.textMuted;
   const decSize = Math.max(12, Math.round(size * 0.38));
   const decMargin = Math.round(size * 0.14);
+
+  // Privacy mode: reemplaza dígitos por • preservando separadores.
+  const integerDisplay = hideAmounts
+    ? parts.integer.replace(/\d/g, "•")
+    : parts.integer;
+  const decimalsDisplay = hideAmounts
+    ? parts.decimals.replace(/\d/g, "•")
+    : parts.decimals;
 
   return (
     <View style={[{ flexDirection: "row", alignItems: "flex-start" }, style]}>
@@ -57,7 +67,7 @@ export function AmountDisplay({
           transform: stretchY === 1 ? undefined : [{ scaleY: stretchY }],
         }}
       >
-        {sign} {parts.integer}
+        {sign} {integerDisplay}
       </Text>
       <Text
         style={{
@@ -70,7 +80,7 @@ export function AmountDisplay({
           color: dec,
         }}
       >
-        ,{parts.decimals}
+        ,{decimalsDisplay}
       </Text>
     </View>
   );

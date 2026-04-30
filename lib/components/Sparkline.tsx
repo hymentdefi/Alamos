@@ -43,6 +43,10 @@ interface Props {
    *  expandiéndose en el último punto de la serie (estilo Robinhood
    *  cuando el rango es Live). */
   live?: boolean;
+  /** Línea horizontal punteada en el valor del primer punto del
+   *  periodo. Hace fácil leer "subí/bajé desde donde arrancó" sin
+   *  hacer scrub. Se muestra debajo del trazo, color textFaint. */
+  referenceLine?: boolean;
   /** Callback mientras el usuario arrastra el dedo sobre el chart. */
   onScrub?: (index: number, value: number) => void;
   onScrubStart?: () => void;
@@ -75,6 +79,7 @@ function SparklineImpl({
   smooth = true,
   sheen = false,
   live = false,
+  referenceLine = false,
   onScrub,
   onScrubStart,
   onScrubEnd,
@@ -303,6 +308,22 @@ function SparklineImpl({
               />
             </G>
           </>
+        ) : null}
+        {/* Reference line — horizontal punteada al valor del primer
+            punto de la serie. Da un visual ancla de "desde dónde
+            arrancó". Renderizada antes del path principal para
+            quedar atrás del trazo. */}
+        {referenceLine && points.length > 0 ? (
+          <Line
+            x1={0}
+            x2={VB_W}
+            y1={points[0].y}
+            y2={points[0].y}
+            stroke="#A3A3A3"
+            strokeWidth={0.6}
+            strokeDasharray="2,3"
+            strokeOpacity={0.7}
+          />
         ) : null}
         <Path
           d={d}

@@ -27,6 +27,7 @@ import {
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
 import { ProProvider } from "../lib/pro/context";
+import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
 import {
@@ -155,8 +156,10 @@ export default function RootLayout() {
           <LegalConsentProvider>
             <FavoritesProvider>
               <ProProvider>
-                <StatusBar style={mode === "light" ? "dark" : "light"} />
-                <AuthGate />
+                <PrivacyProvider>
+                  <StatusBar style={mode === "light" ? "dark" : "light"} />
+                  <AuthGate />
+                </PrivacyProvider>
               </ProProvider>
             </FavoritesProvider>
           </LegalConsentProvider>

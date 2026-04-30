@@ -1,36 +1,48 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../theme";
-import { GearIcon } from "./GearIcon";
 import { MiniSparkline, seriesFromSeed } from "./Sparkline";
+import { ChartSettingsIllustration } from "./illustrations/ChartSettingsIllustration";
 
 interface Props {
   visible: boolean;
   /** Si el chart considera ingresos/egresos al calcular la curva. */
   considerCashflow: boolean;
   onChangeConsiderCashflow: (next: boolean) => void;
+  /** Privacy mode — oculta los montos del home con `••••.•••`. */
+  hideAmounts: boolean;
+  onChangeHideAmounts: (next: boolean) => void;
+  /** Línea de referencia horizontal en el inicio del periodo. */
+  referenceLine: boolean;
+  onChangeReferenceLine: (next: boolean) => void;
+  /** Suavizado del trazo del chart (smooth bezier vs stepped). */
+  smoothChart: boolean;
+  onChangeSmoothChart: (next: boolean) => void;
   onClose: () => void;
 }
 
 /**
- * Sheet de ajustes del chart — formato visual interactivo en vez de
- * un toggle plano. Cada opción es una card con su preview de cómo se
- * vería el chart, el user tappea la que quiere y la card seleccionada
- * queda con accent verde brand. Más entretenido y claro que un Switch
- * binario.
+ * Sheet de ajustes del chart — hero ilustrado + el toggle principal
+ * como par de cards interactivas + tres toggles compactos.
  */
 export function ChartSettingsSheet({
   visible,
   considerCashflow,
   onChangeConsiderCashflow,
+  hideAmounts,
+  onChangeHideAmounts,
+  referenceLine,
+  onChangeReferenceLine,
+  smoothChart,
+  onChangeSmoothChart,
   onClose,
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const select = (next: boolean) => {
+  const selectCashflow = (next: boolean) => {
     if (next === considerCashflow) return;
     Haptics.selectionAsync().catch(() => {});
     onChangeConsiderCashflow(next);
@@ -54,34 +66,37 @@ export function ChartSettingsSheet({
           },
         ]}
       >
-        {/* Grabber */}
         <View style={s.grabber}>
           <View style={[s.grabberPill, { backgroundColor: c.borderStrong }]} />
         </View>
 
-        {/* Hero — gear icon verde brand grande dentro de un círculo
-            pillow + título display + subtítulo. */}
+        {/* Close X arriba a la izquierda. */}
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
+        >
+          <Feather name="x" size={16} color={c.text} />
+        </Pressable>
+
+        {/* Hero — ilustración on-brand de la sección Finanzas & data
+            del brand-kit/14-illustrations + título display + sub. */}
         <View style={s.hero}>
-          <View style={[s.gearWrap, { backgroundColor: c.brandDim }]}>
-            <GearIcon size={28} color={c.action} />
-          </View>
+          <ChartSettingsIllustration size={200} />
           <Text style={[s.title, { color: c.text }]}>Ajustes del chart</Text>
           <Text style={[s.subtitle, { color: c.textMuted }]}>
             ¿Cómo querés ver tu portfolio?
           </Text>
         </View>
 
-        {/* Eyebrow */}
+        {/* Eyebrow + cards visuales del setting principal. */}
         <Text style={[s.eyebrow, { color: c.textMuted }]}>
           MOVIMIENTOS DE DINERO
         </Text>
-
-        {/* Dos cards lado a lado — cada una con preview, label y check
-            si está seleccionada. Tappable. */}
         <View style={s.cardsRow}>
           <OptionCard
             selected={considerCashflow}
-            onPress={() => select(true)}
+            onPress={() => selectCashflow(true)}
             label="Considerar"
             description="Sube cuando ingresás · Baja cuando egresás"
             previewSeed="cashflow-on"
@@ -89,7 +104,7 @@ export function ChartSettingsSheet({
           />
           <OptionCard
             selected={!considerCashflow}
-            onPress={() => select(false)}
+            onPress={() => selectCashflow(false)}
             label="Ignorar"
             description="Solo el rendimiento puro de los activos"
             previewSeed="cashflow-off"
@@ -97,11 +112,41 @@ export function ChartSettingsSheet({
           />
         </View>
 
-        {/* CTA cerrar — el cambio aplica al instante, esto es para
-            confirmar y volver. */}
+        {/* Toggles compactos — el resto de los settings. */}
+        <Text style={[s.eyebrow, { color: c.textMuted, marginTop: 18 }]}>
+          PREFERENCIAS
+        </Text>
+        <View
+          style={[
+            s.toggleList,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <ToggleRow
+            label="Modo privacidad"
+            description="Oculta los montos como ••••"
+            value={hideAmounts}
+            onChange={onChangeHideAmounts}
+            divider
+          />
+          <ToggleRow
+            label="Línea de referencia"
+            description="Horizontal al inicio del periodo"
+            value={referenceLine}
+            onChange={onChangeReferenceLine}
+            divider
+          />
+          <ToggleRow
+            label="Suavizar el trazo"
+            description="Curva continua en vez de líneas filosas"
+            value={smoothChart}
+            onChange={onChangeSmoothChart}
+          />
+        </View>
+
         <Pressable
           onPress={onClose}
-          style={[s.cta, { backgroundColor: c.text }]}
+          style={[s.cta, { backgroundColor: c.text, marginTop: 18 }]}
         >
           <Text style={[s.ctaText, { color: c.bg }]}>Listo</Text>
         </Pressable>
@@ -141,9 +186,6 @@ function OptionCard({
         },
       ]}
     >
-      {/* Preview — sparkline del color accent cuando es la opción
-          seleccionada, gris muted cuando no. Da un vistazo del
-          comportamiento. */}
       <View style={cs.previewWrap}>
         <MiniSparkline
           series={series}
@@ -153,7 +195,6 @@ function OptionCard({
           strokeWidth={2.4}
         />
       </View>
-
       <View style={cs.labelRow}>
         <Text
           style={[
@@ -182,6 +223,50 @@ function OptionCard({
   );
 }
 
+function ToggleRow({
+  label,
+  description,
+  value,
+  onChange,
+  divider,
+}: {
+  label: string;
+  description: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+  divider?: boolean;
+}) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        ts.row,
+        divider && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: c.border,
+        },
+      ]}
+    >
+      <View style={{ flex: 1, paddingRight: 12 }}>
+        <Text style={[ts.label, { color: c.text }]}>{label}</Text>
+        <Text style={[ts.description, { color: c.textMuted }]}>
+          {description}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={(next) => {
+          Haptics.selectionAsync().catch(() => {});
+          onChange(next);
+        }}
+        trackColor={{ false: c.surfaceSunken, true: c.action }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor={c.surfaceSunken}
+      />
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -192,6 +277,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    maxHeight: "92%",
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -207,23 +293,27 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
-  hero: {
-    alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 22,
-  },
-  gearWrap: {
-    width: 60,
-    height: 60,
+  closeBtn: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    width: 32,
+    height: 32,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    zIndex: 10,
+  },
+  hero: {
+    alignItems: "center",
+    paddingTop: 4,
+    paddingBottom: 18,
   },
   title: {
     fontFamily: fontFamily[800],
     fontSize: 24,
     letterSpacing: -0.7,
+    marginTop: 6,
     marginBottom: 4,
   },
   subtitle: {
@@ -241,7 +331,11 @@ const s = StyleSheet.create({
   cardsRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 18,
+  },
+  toggleList: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: 14,
   },
   cta: {
     height: 52,
@@ -290,6 +384,26 @@ const cs = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 11,
     lineHeight: 14,
+    letterSpacing: -0.05,
+  },
+});
+
+const ts = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  label: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  description: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
     letterSpacing: -0.05,
   },
 });

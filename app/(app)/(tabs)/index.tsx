@@ -72,6 +72,7 @@ import {
 } from "../../../lib/components/AlamosIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { GearIcon } from "../../../lib/components/GearIcon";
+import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { ProHome } from "../../../lib/components/pro/ProHome";
 import { useProMode } from "../../../lib/pro/context";
 
@@ -158,7 +159,23 @@ function BaseHome() {
   const { c } = useTheme();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const { hideAmounts, set: setHideAmounts } = usePrivacy();
+  // Range del chart — persistido en SecureStore para que la próxima
+  // vez que el usuario abra la app vea el rango que dejó la última.
   const [range, setRange] = useState<Range>("1D");
+  useEffect(() => {
+    SecureStore.getItemAsync("home:chart_range")
+      .then((v) => {
+        if (v && (ranges as readonly string[]).includes(v)) {
+          setRange(v as Range);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const setRangeAndSave = useCallback((r: Range) => {
+    setRange(r);
+    SecureStore.setItemAsync("home:chart_range", r).catch(() => {});
+  }, []);
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
   const toggleCurrency = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
@@ -227,22 +244,50 @@ function BaseHome() {
 
   /* ─── Ajustes del chart ─── */
   const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
-  // Si está activo, la curva refleja ingresos/egresos (default).
-  // Persistido entre sesiones.
+  // Setting cards principales — considerar movimientos de plata.
   const [considerCashflow, setConsiderCashflow] = useState(true);
+  // Toggles compactos.
+  const [referenceLine, setReferenceLine] = useState(false);
+  const [smoothChart, setSmoothChart] = useState(false);
+
+  // Carga inicial de las preferencias persistidas.
   useEffect(() => {
     SecureStore.getItemAsync("home:chart_consider_cashflow")
       .then((v) => {
         if (v === "0") setConsiderCashflow(false);
       })
       .catch(() => {});
+    SecureStore.getItemAsync("home:chart_reference_line")
+      .then((v) => {
+        if (v === "1") setReferenceLine(true);
+      })
+      .catch(() => {});
+    SecureStore.getItemAsync("home:chart_smooth")
+      .then((v) => {
+        if (v === "1") setSmoothChart(true);
+      })
+      .catch(() => {});
   }, []);
+
   const onChangeConsiderCashflow = useCallback((next: boolean) => {
     setConsiderCashflow(next);
     SecureStore.setItemAsync(
       "home:chart_consider_cashflow",
       next ? "1" : "0",
     ).catch(() => {});
+  }, []);
+  const onChangeReferenceLine = useCallback((next: boolean) => {
+    setReferenceLine(next);
+    SecureStore.setItemAsync(
+      "home:chart_reference_line",
+      next ? "1" : "0",
+    ).catch(() => {});
+  }, []);
+  const onChangeSmoothChart = useCallback((next: boolean) => {
+    setSmoothChart(next);
+    SecureStore.setItemAsync("home:chart_smooth", next ? "1" : "0").catch(
+      () => {},
+    );
   }, []);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -582,11 +627,14 @@ function BaseHome() {
               {displayIsUp ? "▲" : "▼"}
             </Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
-              {currency === "ARS"
-                ? formatARS(Math.abs(arsDelta))
-                : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
-                    maximumFractionDigits: 2,
-                  })}`}
+              {maskAmount(
+                currency === "ARS"
+                  ? formatARS(Math.abs(arsDelta))
+                  : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
+                      maximumFractionDigits: 2,
+                    })}`,
+                hideAmounts,
+              )}
             </Text>
             <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
             <Text style={[s.deltaText, { color: trendColor }]}>
@@ -620,8 +668,9 @@ function BaseHome() {
               withFill={false}
               sheen
               live={range === "live"}
+              referenceLine={referenceLine}
               strokeWidth={1.4}
-              smooth={false}
+              smooth={smoothChart}
               onScrub={onScrub}
               onScrubEnd={onScrubEnd}
             />
@@ -636,7 +685,7 @@ function BaseHome() {
                   key={r}
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
-                    setRange(r);
+                    setRangeAndSave(r);
                   }}
                   style={[
                     s.rangePill,
@@ -651,17 +700,17 @@ function BaseHome() {
               );
             })}
             {/* Settings icon al final del timeline — gear filled
-                verde-action, mismo color que el resto de los CTAs
-                Álamos. Abre el sheet con los ajustes del chart. */}
+                que matchea el chartColor (verde si up, rojo si
+                down). Abre el sheet con los ajustes del chart. */}
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
                 setChartSettingsOpen(true);
               }}
-              hitSlop={8}
+              hitSlop={10}
               style={s.rangeSettingsBtn}
             >
-              <GearIcon size={18} color={c.action} />
+              <GearIcon size={20} color={chartColor} holeColor={c.bg} />
             </Pressable>
           </View>
         </View>
@@ -713,6 +762,12 @@ function BaseHome() {
         visible={chartSettingsOpen}
         considerCashflow={considerCashflow}
         onChangeConsiderCashflow={onChangeConsiderCashflow}
+        hideAmounts={hideAmounts}
+        onChangeHideAmounts={setHideAmounts}
+        referenceLine={referenceLine}
+        onChangeReferenceLine={onChangeReferenceLine}
+        smoothChart={smoothChart}
+        onChangeSmoothChart={onChangeSmoothChart}
         onClose={() => setChartSettingsOpen(false)}
       />
     </View>
@@ -979,6 +1034,7 @@ function AccountRow({
   onSwap?: () => void;
 }) {
   const { c } = useTheme();
+  const { hideAmounts } = usePrivacy();
   // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
   const arsEquiv =
     account.currency === "ARS"
@@ -1009,11 +1065,11 @@ function AccountRow({
       </View>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={[s.earningsPrimary, { color: c.text }]}>
-          {formatAccountBalance(account)}
+          {maskAmount(formatAccountBalance(account), hideAmounts)}
         </Text>
         {arsEquiv ? (
           <Text style={[s.earningsSecondary, { color: c.textMuted }]}>
-            {arsEquiv}
+            {maskAmount(arsEquiv, hideAmounts)}
           </Text>
         ) : null}
       </View>
@@ -2836,9 +2892,12 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
   },
   rangeSettingsBtn: {
+    /* Mismos paddings que rangePill para que el gear se alinee al
+     * baseline de los textos del timeline. */
     paddingHorizontal: 6,
     paddingVertical: 6,
-    marginLeft: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rangeText: {
     fontFamily: fontFamily[700],
