@@ -445,19 +445,13 @@ function BaseHome() {
             style={[
               s.giftBtnWrap,
               {
-                // Matchea el chart: verde-action si el portfolio está
-                // up, rojo si está down. Mismo gesto que el botón
-                // "Ingresar" — color del CTA refleja el estado.
-                shadowColor: isUp ? c.action : c.red,
+                shadowColor: c.action,
                 transform: [{ scale: giftPulse }],
               },
             ]}
           >
             <Tap
-              style={[
-                s.giftBtn,
-                { backgroundColor: isUp ? c.action : c.red },
-              ]}
+              style={[s.giftBtn, { backgroundColor: c.action }]}
               onPress={() =>
                 Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success,
@@ -633,7 +627,7 @@ function BaseHome() {
         {/* Divider sutil entre el chart y el resto */}
         <View style={[s.heroDivider, { backgroundColor: c.border }]} />
 
-        <Dinero byCategory={byCategory} isUp={isUp} />
+        <Dinero byCategory={byCategory} />
 
         <Investments byCategory={byCategory} onOpen={openDetail} />
 
@@ -808,13 +802,8 @@ function indexLabel(r: Range, index: number, length: number): string {
 /* ─── Subcomponentes ─── */
 
 /* ─── Dinero: 3 acciones + cuentas (ARS, USD MEP, USD USA, USDT) ─── */
-function Dinero({
-  isUp,
-}: {
+function Dinero(_: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
-  /** Estado del portfolio en el rango activo — el botón "Ingresar"
-   *  matchea el color del chart (rojo si bajó, verde-action si subió). */
-  isUp: boolean;
 }) {
   const { c } = useTheme();
   const router = useRouter();
@@ -856,9 +845,6 @@ function Dinero({
           label="Ingresar"
           variant="primary"
           haptic="medium"
-          // Color matchea el chart: rojo si el portfolio está down,
-          // verde-action si está up (default).
-          accentColor={isUp ? c.action : c.red}
           onPress={() =>
             router.push({
               pathname: "/(app)/transfer",
