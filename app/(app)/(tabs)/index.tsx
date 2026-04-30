@@ -60,7 +60,7 @@ import {
   StoryOverlay,
   type StoryConfig,
 } from "../../../lib/components/StoryOverlay";
-import { CRYPTO_STORY, US_MARKET_STORY } from "../../../lib/data/stories";
+import { US_MARKET_STORY } from "../../../lib/data/stories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
@@ -929,24 +929,6 @@ function Dinero(_: {
     setConvertOpen(true);
   }, []);
 
-  const cryptoStory = useGateStory(CRYPTO_STORY);
-
-  /** Wrapper para el ⇅ de cada cuenta: si es USDT y todavía no vio
-   *  la story de crypto, la mostramos primero y después abrimos
-   *  el ConvertSheet. */
-  const handleSwap = useCallback(
-    (id: AccountId) => {
-      const isCrypto =
-        accounts.find((a) => a.id === id)?.currency === "USDT";
-      if (isCrypto) {
-        cryptoStory.gate(() => openConvertFrom(id));
-      } else {
-        openConvertFrom(id);
-      }
-    },
-    [cryptoStory, openConvertFrom],
-  );
-
   return (
     <View style={s.sectionBlock}>
       {/* 3 acciones: Ingresar (primary) + Enviar + Convertir
@@ -1005,7 +987,6 @@ function Dinero(_: {
             key={a.id}
             account={a}
             withTopDivider={i > 0}
-            onSwap={() => handleSwap(a.id)}
           />
         ))}
       </View>
@@ -1019,11 +1000,6 @@ function Dinero(_: {
         onClose={() => setConvertOpen(false)}
         initialFromId={convertFromId}
       />
-      <StoryOverlay
-        visible={cryptoStory.open}
-        story={CRYPTO_STORY}
-        onClose={cryptoStory.close}
-      />
     </View>
   );
 }
@@ -1031,13 +1007,9 @@ function Dinero(_: {
 function AccountRow({
   account,
   withTopDivider,
-  onSwap,
 }: {
   account: Account;
   withTopDivider?: boolean;
-  /** Tap en el botón ⇅ — abre el ConvertSheet con esta cuenta como
-   *  origen preseleccionada. */
-  onSwap?: () => void;
 }) {
   const { c } = useTheme();
   const { hideAmounts } = usePrivacy();
@@ -1079,28 +1051,6 @@ function AccountRow({
           </Text>
         ) : null}
       </View>
-      {onSwap ? (
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            onSwap();
-          }}
-          hitSlop={6}
-          style={({ pressed }) => [
-            s.swapBtn,
-            {
-              backgroundColor: pressed ? c.surfaceHover : "transparent",
-              borderColor: c.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="swap-vertical"
-            size={16}
-            color={c.textSecondary}
-          />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -2541,18 +2491,6 @@ const s = StyleSheet.create({
     marginTop: 2,
     letterSpacing: -0.05,
   },
-  /* Per-card ⇅ button — shortcut a Convertir con esa moneda como
-     origen preseleccionada. Sutil: 32x32 circular, gris medio. */
-  swapBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    marginLeft: 12,
-  },
-
   /* ConvertSheet */
   convertWrap: {
     flex: 1,
