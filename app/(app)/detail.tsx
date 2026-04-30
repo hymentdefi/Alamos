@@ -15,7 +15,12 @@ import {
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useFavorites } from "../../lib/favorites/context";
-import { isMarketOpen, marketClosedMessage } from "../../lib/market/hours";
+import {
+  isMarketOpen,
+  marketClosedMessage,
+  marketSessionFor,
+} from "../../lib/market/hours";
+import { MarketClosedSheet } from "../../lib/components/MarketClosedSheet";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -60,6 +65,7 @@ export default function DetailScreen() {
   const { isFavorite, toggle: toggleFav } = useFavorites();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const [closedSheetOpen, setClosedSheetOpen] = useState(false);
 
   // IMPORTANT: todos los hooks se corren ANTES del early return para
   // respetar las reglas de React (mismo orden cada render). Si el
@@ -320,12 +326,17 @@ export default function DetailScreen() {
         <Tap
           style={[s.btn, { backgroundColor: c.ink }]}
           haptic="medium"
-          onPress={() =>
+          onPress={() => {
+            const session = marketSessionFor(asset);
+            if (!session.open) {
+              setClosedSheetOpen(true);
+              return;
+            }
             router.push({
               pathname: "/(app)/buy",
               params: { ticker: asset.ticker, mode: "buy" },
-            })
-          }
+            });
+          }}
         >
           <Text style={[s.btnText, { color: c.bg }]}>Comprar</Text>
         </Tap>
@@ -333,17 +344,29 @@ export default function DetailScreen() {
           <Tap
             style={[s.btn, { backgroundColor: c.surfaceHover }]}
             haptic="light"
-            onPress={() =>
+            onPress={() => {
+              const session = marketSessionFor(asset);
+              if (!session.open) {
+                setClosedSheetOpen(true);
+                return;
+              }
               router.push({
                 pathname: "/(app)/buy",
                 params: { ticker: asset.ticker, mode: "sell" },
-              })
-            }
+              });
+            }}
           >
             <Text style={[s.btnText, { color: c.text }]}>Vender</Text>
           </Tap>
         ) : null}
       </View>
+
+      <MarketClosedSheet
+        visible={closedSheetOpen}
+        instrumentLabel={marketSessionFor(asset).instrumentLabel}
+        session={marketSessionFor(asset)}
+        onClose={() => setClosedSheetOpen(false)}
+      />
     </View>
   );
 }
