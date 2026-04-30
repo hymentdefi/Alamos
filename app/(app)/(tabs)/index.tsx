@@ -689,20 +689,14 @@ function ActionButton({
 }) {
   const { c } = useTheme();
   const isPrimary = variant === "primary";
-  const bg = isPrimary ? accentColor ?? c.action : c.surface;
+  // Secondary: c.surfaceHover (gris muy sutil) — se distingue del bg
+  // blanco del home sin necesidad de border, y mantiene el feel
+  // editorial. Antes c.surface puro lo perdía contra el fondo.
+  const bg = isPrimary ? accentColor ?? c.action : c.surfaceHover;
   const fg = isPrimary ? "#FFFFFF" : c.text;
   return (
     <Tap
-      style={[
-        s.actionPill,
-        {
-          backgroundColor: bg,
-          // Secondary: border fino para que respire sobre el bg blanco
-          // del home. Primary: sin border, color sólido.
-          borderWidth: isPrimary ? 0 : StyleSheet.hairlineWidth,
-          borderColor: c.border,
-        },
-      ]}
+      style={[s.actionPill, { backgroundColor: bg }]}
       onPress={onPress}
       haptic={haptic}
     >
@@ -2243,9 +2237,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   actionPillText: {
-    fontFamily: fontFamily[800],
+    fontFamily: fontFamily[700],
     fontSize: 15,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
      isotipo verde + acento en "más". */
