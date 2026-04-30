@@ -575,6 +575,7 @@ function BaseHome() {
               height={300}
               withFill={false}
               sheen
+              live={range === "live"}
               strokeWidth={1.4}
               smooth={false}
               onScrub={(idx) => setScrubIndex(idx)}
@@ -611,7 +612,7 @@ function BaseHome() {
         {/* Divider sutil entre el chart y el resto */}
         <View style={[s.heroDivider, { backgroundColor: c.border }]} />
 
-        <Dinero byCategory={byCategory} />
+        <Dinero byCategory={byCategory} isUp={isUp} />
 
         <Investments byCategory={byCategory} onOpen={openDetail} />
 
@@ -659,15 +660,21 @@ function ActionButton({
   onPress,
   haptic,
   variant,
+  accentColor,
 }: {
   icon: AlamosIconName;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
   variant: "primary" | "secondary";
+  /** Override del fondo del primary CTA. Se usa para que el botón
+   *  "Ingresar" matchee el color del chart (rojo si hay loss, verde
+   *  action si hay profit). */
+  accentColor?: string;
 }) {
   const { c } = useTheme();
-  const bg = variant === "primary" ? c.action : c.surfaceHover;
+  const bg =
+    variant === "primary" ? accentColor ?? c.action : c.surfaceHover;
   const fg = variant === "primary" ? "#FFFFFF" : c.text;
   return (
     <Tap
@@ -780,8 +787,13 @@ function indexLabel(r: Range, index: number, length: number): string {
 /* ─── Subcomponentes ─── */
 
 /* ─── Dinero: 3 acciones + cuentas (ARS, USD MEP, USD USA, USDT) ─── */
-function Dinero(_: {
+function Dinero({
+  isUp,
+}: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
+  /** Estado del portfolio en el rango activo — el botón "Ingresar"
+   *  matchea el color del chart (rojo si bajó, verde-action si subió). */
+  isUp: boolean;
 }) {
   const { c } = useTheme();
   const router = useRouter();
@@ -823,6 +835,9 @@ function Dinero(_: {
           label="Ingresar"
           variant="primary"
           haptic="medium"
+          // Color matchea el chart: rojo si el portfolio está down,
+          // verde-action si está up (default).
+          accentColor={isUp ? c.action : c.red}
           onPress={() =>
             router.push({
               pathname: "/(app)/transfer",

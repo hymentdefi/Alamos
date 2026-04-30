@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   View,
   PanResponder,
   StyleSheet,
+  Easing,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
@@ -21,6 +23,8 @@ import Svg, {
 } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 interface Props {
   /** Serie de valores raw (ej: precios). El componente los normaliza a y. */
   series: number[];
@@ -35,6 +39,10 @@ interface Props {
   /** Reflejo animado debajo de la línea — barre horizontalmente.
    * Clippeado al área bajo la curva, sutil. */
   sheen?: boolean;
+  /** Indicador "live" — dot del color del chart pulsando con halo
+   *  expandiéndose en el último punto de la serie (estilo Robinhood
+   *  cuando el rango es Live). */
+  live?: boolean;
   /** Callback mientras el usuario arrastra el dedo sobre el chart. */
   onScrub?: (index: number, value: number) => void;
   onScrubStart?: () => void;
@@ -61,6 +69,7 @@ export function Sparkline({
   strokeWidth = 2.4,
   smooth = true,
   sheen = false,
+  live = false,
   onScrub,
   onScrubStart,
   onScrubEnd,
@@ -75,6 +84,35 @@ export function Sparkline({
     () => computePath(series, smooth),
     [series, smooth],
   );
+
+  /* ─── Live dot pulse — halo crece y desvanece en loop. ─── */
+  const livePulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!live) {
+      livePulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(livePulse, {
+        toValue: 1,
+        duration: 1400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // animamos `r` y `opacity` de SVG Circle
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [live, livePulse]);
+
+  // Halo: r de 4 a 16 px, opacity de 0.45 a 0 — es el "ondear" del dot.
+  const haloR = livePulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [4, 16],
+  });
+  const haloOpacity = livePulse.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.45, 0.08, 0],
+  });
 
   // Loop del sheen vía RAF (no podemos usar Animated nativo en props
   // SVG). Easing in-out para que se sienta orgánico, con pausa entre
@@ -246,6 +284,33 @@ export function Sparkline({
           strokeLinejoin="round"
         />
       </Svg>
+
+      {/* Live dot — sobre el último punto del chart, NO se distorsiona
+          con preserveAspectRatio='none' porque renderea en un SVG
+          separado con coords 1:1 en px. Halo pulsa, dot sólido fijo.
+          Se oculta durante el scrub para no competir con el cursor. */}
+      {live && points.length > 0 && layoutWidth > 0 && !activePoint ? (
+        <Svg
+          width={layoutWidth}
+          height={height}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        >
+          <AnimatedCircle
+            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
+            cy={(points[points.length - 1].y / VB_H) * height}
+            r={haloR}
+            fill={color}
+            opacity={haloOpacity}
+          />
+          <Circle
+            cx={(points[points.length - 1].x / VB_W) * layoutWidth}
+            cy={(points[points.length - 1].y / VB_H) * height}
+            r={3.5}
+            fill={color}
+          />
+        </Svg>
+      ) : null}
 
       {/* Scrub overlay — SVG separado con viewBox 1:1 en píxeles, para
           que la Circle y la línea vertical no se distorsionen con el
