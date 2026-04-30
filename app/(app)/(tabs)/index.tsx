@@ -2889,7 +2889,9 @@ const s = StyleSheet.create({
   rangePill: {
     paddingHorizontal: 9,
     paddingVertical: 6,
-    borderRadius: radius.pill,
+    /* radius.md (12) en vez de radius.pill (999) — menos cápsula,
+     * más editorial. Las pills 100% redondeadas se sentían genéricas. */
+    borderRadius: radius.md,
   },
   rangeSettingsBtn: {
     /* Mismos paddings que rangePill para que el gear se alinee al
