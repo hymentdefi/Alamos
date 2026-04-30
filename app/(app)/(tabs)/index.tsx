@@ -688,16 +688,25 @@ function ActionButton({
   accentColor?: string;
 }) {
   const { c } = useTheme();
-  const bg =
-    variant === "primary" ? accentColor ?? c.action : c.surfaceHover;
-  const fg = variant === "primary" ? "#FFFFFF" : c.text;
+  const isPrimary = variant === "primary";
+  const bg = isPrimary ? accentColor ?? c.action : c.surface;
+  const fg = isPrimary ? "#FFFFFF" : c.text;
   return (
     <Tap
-      style={[s.actionPill, { backgroundColor: bg }]}
+      style={[
+        s.actionPill,
+        {
+          backgroundColor: bg,
+          // Secondary: border fino para que respire sobre el bg blanco
+          // del home. Primary: sin border, color sólido.
+          borderWidth: isPrimary ? 0 : StyleSheet.hairlineWidth,
+          borderColor: c.border,
+        },
+      ]}
       onPress={onPress}
       haptic={haptic}
     >
-      <AlamosIcon name={icon} size={16} color={fg} />
+      <AlamosIcon name={icon} size={17} color={fg} />
       <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
@@ -2228,15 +2237,15 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    height: 46,
-    borderRadius: radius.md,
+    gap: 7,
+    height: 52,
+    borderRadius: radius.btn,
     paddingHorizontal: 4,
   },
   actionPillText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily[800],
+    fontSize: 15,
+    letterSpacing: -0.4,
   },
   /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
      isotipo verde + acento en "más". */
