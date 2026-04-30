@@ -14,6 +14,7 @@ import {
 } from "../../lib/data/assets";
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
+import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { useFavorites } from "../../lib/favorites/context";
 import {
   isMarketOpen,
@@ -146,7 +147,14 @@ export default function DetailScreen() {
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
-            <View style={[s.closedDot, { backgroundColor: c.green }]} />
+            {/* Clock outline del set core del brand-kit (13-icons →
+                'pendiente'). Comunica 'fuera de horario' mejor que un
+                dot y es coherente con la iconografía del resto. */}
+            <AlamosIcon
+              name="pendiente"
+              size={18}
+              color={c.textSecondary}
+            />
             <Text
               style={[s.closedText, { color: c.textSecondary }]}
               numberOfLines={2}
@@ -628,11 +636,6 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  closedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
   closedText: {
     flex: 1,
