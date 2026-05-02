@@ -95,43 +95,53 @@ function FloatingTabBar() {
   // pill es compartido y se traslada en X. Trigger: cambia
   // activeIndex, withTiming + cubic out → slide smooth en UI thread.
   const pillIndex = useSharedValue(activeIndex);
-  // Pulse del pill — squash & stretch estilo Zoho Mail. Durante el
-  // viaje el pill se ESTIRA en X (rubber-band, leading edge tira al
-  // pill hacia adelante) y se aplasta en Y; al aterrizar pega un
-  // bounce inverso (X comprimido, Y expandido) y vuelve al tamaño
-  // real. Es lo que da el feel "vivo" al cambio de sección.
+  // Pulse del pill — squash & stretch marcado, idéntico a Zoho Mail.
+  // Durante el viaje el pill se ESTIRA agresivamente en X (rubber-
+  // band) y se aplasta en Y; al aterrizar invierte (X comprimido,
+  // Y expandido) y vuelve al tamaño real con un easing-out que
+  // suaviza el final. Todo corre en UI thread (Reanimated 4 con
+  // shared values + worklets nativos) → sin saltos JS, sin
+  // bridge-cost por frame, sin re-renders durante la animación.
   const pillScaleX = useSharedValue(1);
   const pillScaleY = useSharedValue(1);
   useEffect(() => {
+    // Slide en X: cubic-out clásico, suficiente duración para que
+    // acompañe el pulse sin sentirse pesado.
     pillIndex.value = withTiming(activeIndex, {
-      duration: 360,
+      duration: 380,
       easing: Easing.out(Easing.cubic),
     });
+    // Stretch en X (1 → 1.32 → 0.88 → 1). Más amplitud = pulse más
+    // marcado. Todo cubic-out → arranque inmediato + deceleración
+    // suave hacia cada target = sin sensación de retardo.
     pillScaleX.value = withSequence(
-      withTiming(1.22, {
-        duration: 160,
+      withTiming(1.32, {
+        duration: 170,
         easing: Easing.out(Easing.cubic),
       }),
-      withTiming(0.94, {
-        duration: 130,
+      withTiming(0.88, {
+        duration: 140,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(1, {
-        duration: 110,
+        duration: 130,
         easing: Easing.out(Easing.quad),
       }),
     );
+    // Squash en Y (1 → 0.74 → 1.16 → 1) — inverso a X para preservar
+    // volumen visual. Más pronunciado vertical porque el ojo nota
+    // más fácil la compresión que la elongación.
     pillScaleY.value = withSequence(
-      withTiming(0.84, {
-        duration: 160,
+      withTiming(0.74, {
+        duration: 170,
         easing: Easing.out(Easing.cubic),
       }),
-      withTiming(1.08, {
-        duration: 130,
+      withTiming(1.16, {
+        duration: 140,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(1, {
-        duration: 110,
+        duration: 130,
         easing: Easing.out(Easing.quad),
       }),
     );
