@@ -95,33 +95,47 @@ function FloatingTabBar() {
   // pill es compartido y se traslada en X. Trigger: cambia
   // activeIndex, withTiming + cubic out → slide smooth en UI thread.
   const pillIndex = useSharedValue(activeIndex);
-  // Pulse del pill al cambiar de tab — squash mientras viaja, bounce
-  // al llegar (estilo Zoho Mail). Va en paralelo con la traslación
-  // y le da el feel "vivo" al cambio de sección.
-  const pillScale = useSharedValue(1);
+  // Pulse del pill — squash & stretch estilo Zoho Mail. Durante el
+  // viaje el pill se ESTIRA en X (rubber-band, leading edge tira al
+  // pill hacia adelante) y se aplasta en Y; al aterrizar pega un
+  // bounce inverso (X comprimido, Y expandido) y vuelve al tamaño
+  // real. Es lo que da el feel "vivo" al cambio de sección.
+  const pillScaleX = useSharedValue(1);
+  const pillScaleY = useSharedValue(1);
   useEffect(() => {
     pillIndex.value = withTiming(activeIndex, {
-      duration: 320,
+      duration: 360,
       easing: Easing.out(Easing.cubic),
     });
-    pillScale.value = withSequence(
-      // Squash mientras arranca el slide.
-      withTiming(0.86, {
-        duration: 130,
-        easing: Easing.in(Easing.quad),
-      }),
-      // Overshoot al llegar al destino.
-      withTiming(1.07, {
-        duration: 150,
+    pillScaleX.value = withSequence(
+      withTiming(1.22, {
+        duration: 160,
         easing: Easing.out(Easing.cubic),
       }),
-      // Settle al tamaño real.
+      withTiming(0.94, {
+        duration: 130,
+        easing: Easing.out(Easing.cubic),
+      }),
       withTiming(1, {
         duration: 110,
         easing: Easing.out(Easing.quad),
       }),
     );
-  }, [activeIndex, pillIndex, pillScale]);
+    pillScaleY.value = withSequence(
+      withTiming(0.84, {
+        duration: 160,
+        easing: Easing.out(Easing.cubic),
+      }),
+      withTiming(1.08, {
+        duration: 130,
+        easing: Easing.out(Easing.cubic),
+      }),
+      withTiming(1, {
+        duration: 110,
+        easing: Easing.out(Easing.quad),
+      }),
+    );
+  }, [activeIndex, pillIndex, pillScaleX, pillScaleY]);
 
   const itemWidth =
     islandWidth > 0 ? (islandWidth - PILL_INSET_X * 2) / TAB_ROUTES.length : 0;
@@ -129,7 +143,8 @@ function FloatingTabBar() {
   const pillStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: PILL_INSET_X + pillIndex.value * itemWidth },
-      { scale: pillScale.value },
+      { scaleX: pillScaleX.value },
+      { scaleY: pillScaleY.value },
     ],
     width: itemWidth,
   }));
