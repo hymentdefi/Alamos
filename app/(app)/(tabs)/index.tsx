@@ -463,14 +463,13 @@ function BaseHome() {
   };
 
   const isDark = mode === "dark";
-  // Backdrop sutil estilo Revolut — warm top, neutral mid, cool
-  // bottom (light); o leve elevación negro→puro (dark). Las cards
-  // glass de abajo se apoyan sobre este gradient para que la
-  // sensación sea "vidrio sobre superficie tintada", no "cuadrado
-  // blanco sobre fondo blanco".
+  // Backdrop sutil — bg blanco neutro con un toque de off-white
+  // intermedio (light), o leve elevación negro→puro (dark). Las
+  // cards/botones de abajo aportan la calidez cremita del brand;
+  // el bg les da contraste limpio.
   const bgGradient: readonly [string, string, string] = isDark
     ? ["#0E0E0C", "#080808", "#000000"]
-    : ["#EFEEE8", "#F7F6F2", "#FBFBFA"];
+    : ["#FFFFFF", "#FCFCFB", "#FFFFFF"];
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -510,10 +509,10 @@ function BaseHome() {
               {
                 backgroundColor: isDark
                   ? "rgba(255,255,255,0.06)"
-                  : "rgba(255,255,255,0.78)",
+                  : "rgba(238,232,220,0.70)",
                 borderColor: isDark
                   ? "rgba(255,255,255,0.10)"
-                  : "rgba(14,15,12,0.06)",
+                  : "rgba(124,96,48,0.10)",
                 borderWidth: StyleSheet.hairlineWidth,
               },
             ]}
@@ -738,11 +737,11 @@ function ActionButton({
   const isDark = mode === "dark";
   // Surface uniforme — todos los botones se ven iguales; jerarquía
   // por orden y label, no por color (estilo Revolut). Translúcido
-  // para acompañar el lenguaje glass del resto del home.
-  const bg = isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.78)";
+  // cremita en light (matchea las cards) / blanco al 7% en dark.
+  const bg = isDark ? "rgba(255,255,255,0.07)" : "rgba(238,232,220,0.70)";
   const borderColor = isDark
     ? "rgba(255,255,255,0.10)"
-    : "rgba(14,15,12,0.06)";
+    : "rgba(124,96,48,0.10)";
   return (
     <Tap
       style={s.actionItem}
@@ -963,10 +962,10 @@ function AccountRow({
 }) {
   const { c, mode } = useTheme();
   const { hideAmounts } = usePrivacy();
-  // Backing del badge AR (en flag usd-ar) — en light mode el beige
-  // del bg cálido; en dark, un gris muy oscuro tirando al surface
-  // del card glass para que el badge se sienta integrado.
-  const badgeBacking = mode === "dark" ? "#1F1F1E" : "#FAFAF7";
+  // Backing del badge AR (en flag usd-ar) — blanco puro en light
+  // (contrasta con la card cremita), gris oscuro en dark (matchea
+  // el surface translúcido del card).
+  const badgeBacking = mode === "dark" ? "#1F1F1E" : "#FFFFFF";
   // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
   const arsEquiv =
     account.currency === "ARS"

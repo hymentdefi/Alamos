@@ -18,9 +18,9 @@ interface Props {
  * Card con lenguaje "vidrio levemente esmerilado" estilo Revolut.
  * Tres capas combinadas:
  *
- *   1. Surface translúcida — no es `#FFF` puro sino blanco al ~85%
- *      (light) / white-ish al 4% (dark) sobre el bg. Permite que el
- *      gradient backdrop del root se vea por debajo.
+ *   1. Surface translúcida — en light tinta cremita sobre bg blanco
+ *      (las cards "calientan" el blanco neutro del root); en dark
+ *      sigue siendo white-ish al 4% sobre negro.
  *   2. Border 1px en negro/blanco a 6-10% — visible pero nunca duro.
  *   3. Highlight superior — gradient blanco al 10-12% en el top que
  *      se desvanece a transparente al ~35% de altura, simulando luz
@@ -34,27 +34,31 @@ export function GlassCard({ children, style, padding = 16, raised }: Props) {
   const { mode } = useTheme();
   const isDark = mode === "dark";
 
-  // Surface — translúcida sobre el bg para que se sienta vidrio.
+  // Surface — en light, cremita translúcida sobre bg blanco; en
+  // dark, white-ish al 4-6% sobre negro. Invertido vs versión
+  // anterior: ahora la card es la que tiene la calidez del brand,
+  // no el fondo.
   const surface = isDark
     ? raised
       ? "rgba(255,255,255,0.06)"
       : "rgba(255,255,255,0.04)"
     : raised
-      ? "rgba(255,255,255,0.92)"
-      : "rgba(255,255,255,0.78)";
+      ? "rgba(238,232,220,0.85)"
+      : "rgba(238,232,220,0.70)";
 
-  // Border — más visible en dark (whites a 8-10%) que en light
-  // (blacks a 6%).
+  // Border — más visible en dark (whites a 8-10%) que en light. En
+  // light, un brown muy suave que arma contraste con el bg blanco
+  // sin gritar.
   const borderColor = isDark
     ? "rgba(255,255,255,0.08)"
-    : "rgba(14,15,12,0.06)";
+    : "rgba(124, 96, 48, 0.10)";
 
-  // Highlight — luz desde arriba. Light: white más intenso pero más
-  // breve. Dark: white más sutil pero llega un poco más abajo para
-  // separar la card del bg negro.
+  // Highlight — luz desde arriba. Light: white intenso para "iluminar"
+  // el top de la card cremita. Dark: white más sutil pero llega un
+  // poco más abajo para separar la card del bg negro.
   const highlightColors: readonly [string, string] = isDark
     ? ["rgba(255,255,255,0.10)", "rgba(255,255,255,0)"]
-    : ["rgba(255,255,255,0.85)", "rgba(255,255,255,0)"];
+    : ["rgba(255,255,255,0.55)", "rgba(255,255,255,0)"];
 
   // Shadow — vertical, blur amplio, opacity baja. raised duplica.
   const shadowOpacity = isDark
