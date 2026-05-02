@@ -11,6 +11,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -94,18 +95,42 @@ function FloatingTabBar() {
   // pill es compartido y se traslada en X. Trigger: cambia
   // activeIndex, withTiming + cubic out → slide smooth en UI thread.
   const pillIndex = useSharedValue(activeIndex);
+  // Pulse del pill al cambiar de tab — squash mientras viaja, bounce
+  // al llegar (estilo Zoho Mail). Va en paralelo con la traslación
+  // y le da el feel "vivo" al cambio de sección.
+  const pillScale = useSharedValue(1);
   useEffect(() => {
     pillIndex.value = withTiming(activeIndex, {
       duration: 320,
       easing: Easing.out(Easing.cubic),
     });
-  }, [activeIndex, pillIndex]);
+    pillScale.value = withSequence(
+      // Squash mientras arranca el slide.
+      withTiming(0.86, {
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+      }),
+      // Overshoot al llegar al destino.
+      withTiming(1.07, {
+        duration: 150,
+        easing: Easing.out(Easing.cubic),
+      }),
+      // Settle al tamaño real.
+      withTiming(1, {
+        duration: 110,
+        easing: Easing.out(Easing.quad),
+      }),
+    );
+  }, [activeIndex, pillIndex, pillScale]);
 
   const itemWidth =
     islandWidth > 0 ? (islandWidth - PILL_INSET_X * 2) / TAB_ROUTES.length : 0;
 
   const pillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: PILL_INSET_X + pillIndex.value * itemWidth }],
+    transform: [
+      { translateX: PILL_INSET_X + pillIndex.value * itemWidth },
+      { scale: pillScale.value },
+    ],
     width: itemWidth,
   }));
 
