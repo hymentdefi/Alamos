@@ -1,14 +1,18 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, useRouter, useSegments } from "expo-router";
 import {
-  Animated,
-  Easing,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import MaskedView from "@react-native-masked-view/masked-view";
@@ -58,6 +62,12 @@ const TAB_ROUTES: TabRoute[] = [
  * Tab activa: pill verde brand atrás del icono+label que aparece con
  * fade al focusear.
  */
+// Padding interno horizontal de la island — el pill respeta este
+// margen, igual que los tab items. Coincide con styles.island
+// `paddingHorizontal: 4` y con styles.activePill `inset: 6`.
+const PILL_INSET_X = 4;
+const PILL_INSET_Y = 6;
+
 function FloatingTabBar() {
   const router = useRouter();
   const segments = useSegments();
@@ -65,13 +75,39 @@ function FloatingTabBar() {
   // cualquier navegación (botones internos, deep links, etc.) sincronice
   // la pill activa con la ruta real. Antes era state local y se
   // desincronizaba al navegar desde fuera del tab bar.
-  const tabSegment = (segments[2] as string | undefined) ?? "index";
+  const tabSegment =
+    ((segments as readonly string[])[2] as string | undefined) ?? "index";
   const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
   const activeIndex = segIdx >= 0 ? segIdx : 0;
   const { mode, c } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
   const bottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
+
+  // Ancho real de la island — lo medimos con onLayout para calcular
+  // la posición exacta del pill (flex no nos da las coordenadas).
+  const [islandWidth, setIslandWidth] = useState(0);
+
+  // Posición animada del pill — un único elemento que se desliza
+  // entre tabs. Esta es la diferencia clave vs el patrón anterior:
+  // antes cada item tenía su propio pill que hacía fade; ahora el
+  // pill es compartido y se traslada en X. Trigger: cambia
+  // activeIndex, withTiming + cubic out → slide smooth en UI thread.
+  const pillIndex = useSharedValue(activeIndex);
+  useEffect(() => {
+    pillIndex.value = withTiming(activeIndex, {
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [activeIndex, pillIndex]);
+
+  const itemWidth =
+    islandWidth > 0 ? (islandWidth - PILL_INSET_X * 2) / TAB_ROUTES.length : 0;
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: PILL_INSET_X + pillIndex.value * itemWidth }],
+    width: itemWidth,
+  }));
 
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -130,6 +166,7 @@ function FloatingTabBar() {
           left: ISLAND_SIDE_GAP,
           right: ISLAND_SIDE_GAP,
         }}
+        onLayout={(e) => setIslandWidth(e.nativeEvent.layout.width)}
       >
         <BlurView
           tint={isDark ? "dark" : "light"}
@@ -147,6 +184,29 @@ function FloatingTabBar() {
             },
           ]}
         >
+          {/* Pill compartido — se desliza entre items en lugar de
+              fadear por item (estilo Zoho Mail). Vive en el container
+              de la island, debajo de los tab items. */}
+          {itemWidth > 0 ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.slidingPill,
+                {
+                  top: PILL_INSET_Y,
+                  bottom: PILL_INSET_Y,
+                  backgroundColor: isDark
+                    ? "rgba(14, 203, 129, 0.14)"
+                    : "rgba(0, 200, 5, 0.10)",
+                  borderColor: isDark
+                    ? "rgba(14, 203, 129, 0.20)"
+                    : "rgba(0, 200, 5, 0.16)",
+                },
+                pillStyle,
+              ]}
+            />
+          ) : null}
+
           {TAB_ROUTES.map((route, index) => {
             const focused = index === activeIndex;
             return (
@@ -154,7 +214,6 @@ function FloatingTabBar() {
                 key={route.name}
                 route={route}
                 focused={focused}
-                isDark={isDark}
                 inactiveColor={c.textSecondary}
                 onPress={() => onPressTab(route, index)}
               />
@@ -169,27 +228,16 @@ function FloatingTabBar() {
 interface TabItemProps {
   route: TabRoute;
   focused: boolean;
-  isDark: boolean;
   inactiveColor: string;
   onPress: () => void;
 }
 
-function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProps) {
-  const pillOpacity = useRef(
-    new Animated.Value(focused ? 1 : 0),
-  ).current;
-
-  useEffect(() => {
-    Animated.timing(pillOpacity, {
-      toValue: focused ? 1 : 0,
-      duration: focused ? 260 : 180,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
-  }, [focused, pillOpacity]);
-
+function TabItem({ route, focused, inactiveColor, onPress }: TabItemProps) {
+  // El pill ahora vive en el padre y se desliza — el item solo
+  // alterna el color de icon+label entre activo/inactivo. El swap es
+  // instantáneo en el destino (igual que Zoho Mail) mientras el pill
+  // viaja por debajo.
   const color = focused ? ACTIVE_COLOR : inactiveColor;
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -199,21 +247,6 @@ function TabItem({ route, focused, isDark, inactiveColor, onPress }: TabItemProp
       style={styles.tabItem}
       hitSlop={6}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.activePill,
-          {
-            opacity: pillOpacity,
-            backgroundColor: isDark
-              ? "rgba(14, 203, 129, 0.14)"
-              : "rgba(0, 200, 5, 0.10)",
-            borderColor: isDark
-              ? "rgba(14, 203, 129, 0.20)"
-              : "rgba(0, 200, 5, 0.16)",
-          },
-        ]}
-      />
       <DrawingIcon path={route.path} focused={focused} color={color} />
       <Text numberOfLines={1} style={[styles.label, { color }]}>
         {route.title}
@@ -276,12 +309,9 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     gap: 3,
   },
-  activePill: {
+  slidingPill: {
     position: "absolute",
-    top: 6,
-    bottom: 6,
-    left: 6,
-    right: 6,
+    left: 0,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
