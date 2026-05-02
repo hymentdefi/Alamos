@@ -68,6 +68,7 @@ import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { AccountAvatar } from "../../../lib/components/AccountAvatar";
+import { AccountFlag } from "../../../lib/components/AccountFlag";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import {
   AlamosIcon,
@@ -960,8 +961,12 @@ function AccountRow({
   account: Account;
   withTopDivider?: boolean;
 }) {
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const { hideAmounts } = usePrivacy();
+  // Backing del badge AR (en flag usd-ar) — en light mode el beige
+  // del bg cálido; en dark, un gris muy oscuro tirando al surface
+  // del card glass para que el badge se sienta integrado.
+  const badgeBacking = mode === "dark" ? "#1F1F1E" : "#FAFAF7";
   // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
   const arsEquiv =
     account.currency === "ARS"
@@ -978,7 +983,11 @@ function AccountRow({
         },
       ]}
     >
-      <AccountAvatar account={account} size={40} />
+      <AccountFlag
+        accountId={account.id}
+        size={40}
+        badgeBackingColor={badgeBacking}
+      />
       <View style={{ flex: 1 }}>
         <Text style={[s.earningsTicker, { color: c.text }]}>
           {account.currency}
