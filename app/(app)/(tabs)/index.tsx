@@ -397,8 +397,8 @@ function BaseHome() {
 
   // En modo live, el % no es constante — oscila por liveTick para
   // simular movimiento real de mercado (a veces sube, a veces baja).
-  // El chartColor y el botón Ingresar siguen este pct, así que en
-  // ticks "rojos" todo el ecosistema visual se vuelve rojo.
+  // El chartColor sigue este pct, así que en ticks "rojos" la línea
+  // y el delta del hero se vuelven rojos en tiempo real.
   const livePct = useMemo(() => {
     // Pseudo random walk determinístico: combina dos sinusoides de
     // frecuencias distintas para no ser predecible. Rango ~ ±0.6%.
@@ -716,15 +716,13 @@ function BaseHome() {
   );
 }
 
-/* ─── Action button: pill estilo Binance con ícono + texto al lado ─── */
+/* ─── Action button: círculo glass con label debajo (estilo Revolut) ─── */
 function ActionButton({
   icon,
   customIcon,
   label,
   onPress,
   haptic,
-  variant,
-  accentColor,
 }: {
   icon?: AlamosIconName;
   /** Render custom del ícono — si se pasa, override el AlamosIcon
@@ -734,43 +732,38 @@ function ActionButton({
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
-  variant: "primary" | "secondary";
-  /** Override del fondo del primary CTA. Se usa para que el botón
-   *  "Ingresar" matchee el color del chart (rojo si hay loss, verde
-   *  action si hay profit). */
-  accentColor?: string;
 }) {
   const { c, mode } = useTheme();
-  const isPrimary = variant === "primary";
   const isDark = mode === "dark";
-  const bg = isPrimary
-    ? accentColor ?? c.action
-    : isDark
-      ? "rgba(255,255,255,0.06)"
-      : "rgba(255,255,255,0.78)";
-  const borderColor = isPrimary
-    ? "transparent"
-    : isDark
-      ? "rgba(255,255,255,0.10)"
-      : "rgba(14,15,12,0.06)";
-  const fg = isPrimary ? "#FFFFFF" : c.text;
+  // Surface uniforme — todos los botones se ven iguales; jerarquía
+  // por orden y label, no por color (estilo Revolut). Translúcido
+  // para acompañar el lenguaje glass del resto del home.
+  const bg = isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.78)";
+  const borderColor = isDark
+    ? "rgba(255,255,255,0.10)"
+    : "rgba(14,15,12,0.06)";
   return (
     <Tap
-      style={[
-        s.actionPill,
-        {
-          backgroundColor: bg,
-          borderColor,
-          borderWidth: isPrimary ? 0 : StyleSheet.hairlineWidth,
-        },
-      ]}
+      style={s.actionItem}
       onPress={onPress}
       haptic={haptic}
+      pressScale={0.94}
     >
-      {customIcon ?? (
-        icon ? <AlamosIcon name={icon} size={17} color={fg} /> : null
-      )}
-      <Text style={[s.actionPillText, { color: fg }]} numberOfLines={1}>
+      <View
+        style={[
+          s.actionCircle,
+          {
+            backgroundColor: bg,
+            borderColor,
+            borderWidth: StyleSheet.hairlineWidth,
+          },
+        ]}
+      >
+        {customIcon ?? (
+          icon ? <AlamosIcon name={icon} size={22} color={c.text} /> : null
+        )}
+      </View>
+      <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
         {label}
       </Text>
     </Tap>
@@ -890,14 +883,13 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* 3 acciones: Ingresar (primary) + Enviar + Convertir
-          (secondary). Convertir abre el ConvertSheet sin cuenta de
-          origen preseleccionada — el usuario elige adentro. */}
+      {/* Acciones del home — estilo Revolut: círculos verticales
+          glass, todos del mismo peso visual. La jerarquía la da el
+          orden, no el color. */}
       <View style={s.actionsRow}>
         <ActionButton
           icon="download"
           label="Ingresar"
-          variant="primary"
           haptic="medium"
           onPress={() =>
             router.push({
@@ -909,7 +901,6 @@ function Dinero(_: {
         <ActionButton
           icon="upload"
           label="Enviar"
-          variant="secondary"
           haptic="light"
           onPress={() =>
             router.push({
@@ -920,10 +911,9 @@ function Dinero(_: {
         />
         <ActionButton
           customIcon={
-            <Ionicons name="swap-vertical" size={18} color={c.text} />
+            <Ionicons name="swap-vertical" size={22} color={c.text} />
           }
           label="Convertir"
-          variant="secondary"
           haptic="medium"
           onPress={() => openConvertFrom(undefined)}
         />
@@ -1647,33 +1637,32 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  /* Acciones de Dinero (Ingresar / Enviar / Convertir / Invertir):
-     pills estilo Binance con ícono + texto. Ingresar es primario
-     (BRAND_GREEN), el resto secundario (surfaceHover). */
+  /* Acciones del home — estilo Revolut: círculo glass arriba con
+     label sans abajo. Todos los items pesan visualmente lo mismo. */
   actionsRow: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: 14,
-    marginBottom: 24,
-  },
-  actionPill: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    /* Misma altura que el pill activo del nav bar inferior (ver
-     * (tabs)/_layout.tsx — ISLAND_HEIGHT 64 con padding 6 interno).
-     * Antes 52 — los botones se sentían muy altos vs la jerarquía
-     * del nav. */
-    height: 44,
-    borderRadius: radius.btn,
+    justifyContent: "space-around",
+    marginTop: 18,
+    marginBottom: 28,
     paddingHorizontal: 4,
   },
-  actionPillText: {
+  actionItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    flex: 1,
+  },
+  actionCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionLabel: {
     fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.25,
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
   /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
      isotipo verde + acento en "más". */
