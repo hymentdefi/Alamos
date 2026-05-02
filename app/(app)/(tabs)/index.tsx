@@ -29,7 +29,9 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
+import { GlassCard } from "../../../lib/components/GlassCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -104,7 +106,7 @@ export default function HomeScreen() {
 function BaseHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
@@ -459,8 +461,24 @@ function BaseHome() {
     });
   };
 
+  const isDark = mode === "dark";
+  // Backdrop sutil estilo Revolut — warm top, neutral mid, cool
+  // bottom (light); o leve elevación negro→puro (dark). Las cards
+  // glass de abajo se apoyan sobre este gradient para que la
+  // sensación sea "vidrio sobre superficie tintada", no "cuadrado
+  // blanco sobre fondo blanco".
+  const bgGradient: readonly [string, string, string] = isDark
+    ? ["#0E0E0C", "#080808", "#000000"]
+    : ["#EFEEE8", "#F7F6F2", "#FBFBFA"];
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={bgGradient}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={s.topActions}>
           <Animated.View
@@ -486,7 +504,18 @@ function BaseHome() {
             </Tap>
           </Animated.View>
           <Tap
-            style={[s.topBtn, { backgroundColor: c.surfaceHover }]}
+            style={[
+              s.topBtn,
+              {
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.06)"
+                  : "rgba(255,255,255,0.78)",
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.10)"
+                  : "rgba(14,15,12,0.06)",
+                borderWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
             onPress={() => router.push("/(app)/activity")}
             hitSlop={8}
             haptic="selection"
@@ -663,9 +692,6 @@ function BaseHome() {
           </View>
         </View>
 
-        {/* Divider sutil entre el chart y el resto */}
-        <View style={[s.heroDivider, { backgroundColor: c.border }]} />
-
         <Dinero byCategory={byCategory} />
 
         <Investments byCategory={byCategory} onOpen={openDetail} />
@@ -714,13 +740,30 @@ function ActionButton({
    *  action si hay profit). */
   accentColor?: string;
 }) {
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const isPrimary = variant === "primary";
-  const bg = isPrimary ? accentColor ?? c.action : c.surfaceHover;
+  const isDark = mode === "dark";
+  const bg = isPrimary
+    ? accentColor ?? c.action
+    : isDark
+      ? "rgba(255,255,255,0.06)"
+      : "rgba(255,255,255,0.78)";
+  const borderColor = isPrimary
+    ? "transparent"
+    : isDark
+      ? "rgba(255,255,255,0.10)"
+      : "rgba(14,15,12,0.06)";
   const fg = isPrimary ? "#FFFFFF" : c.text;
   return (
     <Tap
-      style={[s.actionPill, { backgroundColor: bg }]}
+      style={[
+        s.actionPill,
+        {
+          backgroundColor: bg,
+          borderColor,
+          borderWidth: isPrimary ? 0 : StyleSheet.hairlineWidth,
+        },
+      ]}
       onPress={onPress}
       haptic={haptic}
     >
@@ -886,18 +929,18 @@ function Dinero(_: {
         />
       </View>
 
-      <View style={s.earningsBlock}>
-        <View style={s.earningsHead}>
-          <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
-          <Pressable
-            hitSlop={10}
-            onPress={() => setInfoOpen(true)}
-            style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
-          >
-            <Feather name="info" size={12} color={c.textSecondary} />
-          </Pressable>
-        </View>
+      <View style={s.earningsHead}>
+        <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
+        <Pressable
+          hitSlop={10}
+          onPress={() => setInfoOpen(true)}
+          style={[s.infoDot, { backgroundColor: c.surfaceHover }]}
+        >
+          <Feather name="info" size={12} color={c.textSecondary} />
+        </Pressable>
+      </View>
 
+      <GlassCard padding={4}>
         {accounts.map((a, i) => (
           <AccountRow
             key={a.id}
@@ -905,7 +948,7 @@ function Dinero(_: {
             withTopDivider={i > 0}
           />
         ))}
-      </View>
+      </GlassCard>
 
       <EarningsInfoModal
         visible={infoOpen}
@@ -1420,18 +1463,18 @@ function Investments({
 
   return (
     <View style={[s.sectionBlock, { marginTop: 28 }]}>
-      <View style={s.earningsBlock}>
-        <Pressable
-          style={s.earningsHead}
-          onPress={() => router.push("/(app)/investments-detail")}
-          hitSlop={8}
-        >
-          <Text style={[s.earningsTitle, { color: c.text }]}>
-            Tus inversiones
-          </Text>
-          <Feather name="chevron-right" size={16} color={c.textFaint} />
-        </Pressable>
+      <Pressable
+        style={s.earningsHead}
+        onPress={() => router.push("/(app)/investments-detail")}
+        hitSlop={8}
+      >
+        <Text style={[s.earningsTitle, { color: c.text }]}>
+          Tus inversiones
+        </Text>
+        <Feather name="chevron-right" size={16} color={c.textFaint} />
+      </Pressable>
 
+      <GlassCard padding={items.length > 0 ? 4 : 16}>
         {items.length > 0 ? (
           items.map((asset, i) => (
             <AssetRow
@@ -1446,7 +1489,7 @@ function Investments({
             Todavía no tenés inversiones. Entrá a Mercado para empezar.
           </Text>
         )}
-      </View>
+      </GlassCard>
     </View>
   );
 }
@@ -1792,6 +1835,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingVertical: 14,
+    paddingHorizontal: 12,
   },
   earningsTicker: {
     fontFamily: fontFamily[700],
@@ -2185,6 +2229,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
+    paddingHorizontal: 12,
     gap: 12,
   },
   rowChart: {
