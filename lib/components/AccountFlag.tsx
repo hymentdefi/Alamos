@@ -28,9 +28,12 @@ import type { AccountId } from "../data/accounts";
 // Clip-path squircle 64×64 — mismo que el SVG original.
 const SQUIRCLE_64 =
   "M 16.64 0 H 47.36 Q 64 0 64 16.64 V 47.36 Q 64 64 47.36 64 H 16.64 Q 0 64 0 47.36 V 16.64 Q 0 0 16.64 0 Z";
-// Squircle 30×30 — usado por el badge AR del flag usd-ar.
-const SQUIRCLE_30 =
-  "M 7.8 0 H 22.2 Q 30 0 30 7.8 V 22.2 Q 30 30 22.2 30 H 7.8 Q 0 30 0 22.2 V 7.8 Q 0 0 7.8 0 Z";
+// Squircle 30×30 trasladado a (33,33) — clipea el badge AR en la
+// esquina inferior-derecha del flag usd-ar. Cuento las coords
+// absolutas porque react-native-svg no respeta los `x`/`y` props
+// en `<Svg>` anidado (renderiza en (0,0) ignorando la posición).
+const SQUIRCLE_30_AT_33_33 =
+  "M 40.8 33 H 55.2 Q 63 33 63 40.8 V 55.2 Q 63 63 55.2 63 H 40.8 Q 33 63 33 55.2 V 40.8 Q 33 33 40.8 33 Z";
 
 // Posiciones de las "estrellas" simplificadas del canton de USA —
 // 4 columnas × 4 filas. Hardcodeadas a partir del SVG original.
@@ -124,28 +127,31 @@ export const AccountFlag = memo(function AccountFlag({
       {accountId === "usd-ar" ? (
         // Badge AR encima del flag US, abajo-derecha. Backing
         // rounded-square + bandera AR clipeada con squircle chiquito.
-        <Svg x={32} y={32} width={32} height={32} viewBox="0 0 32 32">
+        // Todo en coords absolutas del viewBox 64×64 — sin SVG
+        // anidado para evitar que react-native-svg renderee en
+        // (0,0).
+        <>
           <Rect
+            x={32}
+            y={32}
             width={32}
             height={32}
             fill={badgeBackingColor}
             rx={9}
             ry={9}
           />
-          <Svg x={1} y={1} width={30} height={30} viewBox="0 0 30 30">
-            <Defs>
-              <ClipPath id={innerClipId}>
-                <Path d={SQUIRCLE_30} />
-              </ClipPath>
-            </Defs>
-            <G clipPath={`url(#${innerClipId})`}>
-              <Rect width={30} height={10} fill="#74ACDF" />
-              <Rect y={10} width={30} height={10} fill="#FFFFFF" />
-              <Rect y={20} width={30} height={10} fill="#74ACDF" />
-              <Circle cx={15} cy={15} r={2.5} fill="#F6B40E" />
-            </G>
-          </Svg>
-        </Svg>
+          <Defs>
+            <ClipPath id={innerClipId}>
+              <Path d={SQUIRCLE_30_AT_33_33} />
+            </ClipPath>
+          </Defs>
+          <G clipPath={`url(#${innerClipId})`}>
+            <Rect x={33} y={33} width={30} height={10} fill="#74ACDF" />
+            <Rect x={33} y={43} width={30} height={10} fill="#FFFFFF" />
+            <Rect x={33} y={53} width={30} height={10} fill="#74ACDF" />
+            <Circle cx={48} cy={48} r={2.5} fill="#F6B40E" />
+          </G>
+        </>
       ) : null}
     </Svg>
   );
