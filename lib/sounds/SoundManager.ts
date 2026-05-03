@@ -48,7 +48,11 @@ export type SoundName = "order_success" | "confetti_pop";
  */
 const SOUND_SOURCES: Record<SoundName, number> = {
   order_success: require("../../assets/sounds/order_success.wav"),
-  confetti_pop: require("../../assets/sounds/confetti_pop.wav"),
+  // _v2: el archivo viejo (confetti_pop.wav) sigue en la carpeta para
+  // referencia, pero apuntamos al _v2 para forzar fresh load del
+  // asset (cambio de path bypasea el cache nativo de expo-audio).
+  // Si en el futuro se modifica el WAV otra vez, bumpear a _v3 etc.
+  confetti_pop: require("../../assets/sounds/confetti_pop_v2.wav"),
 };
 
 class SoundManagerImpl {

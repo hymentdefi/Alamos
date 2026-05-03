@@ -184,7 +184,13 @@ const source = fs.readFileSync(sourcePath);
 const { wav, meta } = buildSpliced(source, SPLIT_MS);
 
 const outDir = path.join(__dirname, "..", "assets", "sounds");
-const outPath = path.join(outDir, "confetti_pop.wav");
+// Filename versioning: cuando el WAV cambia bytes pero conserva el
+// mismo path, expo-audio puede mantener cacheada la versión vieja en
+// el native side (CoreAudio AVAudioFile cachea por path en algunos
+// builds). Renombrar el archivo fuerza un asset ID nuevo en Metro
+// y un fresh load nativo. Bumpeá el `_v2` a `_v3` etc si hace falta
+// regenerar este file.
+const outPath = path.join(outDir, "confetti_pop_v2.wav");
 
 if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
