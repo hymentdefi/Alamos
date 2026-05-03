@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, type LayoutChangeEvent } from "react
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import * as Haptics from "expo-haptics";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -149,6 +150,17 @@ export default function SuccessScreen() {
   // para que el ding sincronice con el momento perceptible de la
   // ejecución (cambio de texto + cover verde + check). Disparar acá
   // sería ~1 frame tarde y se sentiría desconectado.
+
+  // Light haptic on mount — pero SOLO si no es first trade. Los
+  // first-trade tienen el burst de confetti con su propia secuencia
+  // de haptics (Heavy + Light), agregar otro Light acá sería ruido
+  // sobre ruido. Para los demás trades (que no celebran con
+  // confetti), este Light es la única señal táctil del aterrizaje
+  // en la pantalla de comprobante: dice "todo terminó OK".
+  useEffect(() => {
+    if (isFirstTrade) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, [isFirstTrade]);
 
   // Burst del confetti: SOLO si es el primer trade del usuario.
   // Origen = centro del check verde (medido vía measureInWindow).
