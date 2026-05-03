@@ -31,7 +31,7 @@ import {
  *   sonido que no suena no debe crashear la app.
  */
 
-export type SoundName = "order_success" | "confetti_pop";
+export type SoundName = "order_success" | "confetti_pop" | "confetti_windup";
 
 /**
  * Mapping `name → require()` de los assets. `require()` se evalúa
@@ -49,6 +49,7 @@ export type SoundName = "order_success" | "confetti_pop";
 const SOUND_SOURCES: Record<SoundName, number> = {
   order_success: require("../../assets/sounds/order_success.wav"),
   confetti_pop: require("../../assets/sounds/confetti_pop.wav"),
+  confetti_windup: require("../../assets/sounds/confetti_windup.wav"),
 };
 
 class SoundManagerImpl {

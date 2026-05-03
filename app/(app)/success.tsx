@@ -181,29 +181,30 @@ export default function SuccessScreen() {
           y: cy,
           onAnticipation: () => {
             cancelAnimation(checkScale);
-            checkScale.value = withSequence(
-              withTiming(1.15, {
-                duration: 50,
-                easing: Easing.out(Easing.cubic),
-              }),
-              withTiming(1.0, {
-                duration: 50,
-                easing: Easing.out(Easing.cubic),
-              }),
-            );
+            // Windup: el check se ESTIRA progresivamente hasta 1.3
+            // sobre 280ms, sincronizado con el sonido de windup
+            // ("weeooo" rising). Da el efecto "se está cargando algo
+            // grande". El peak (300ms después) toma desde acá y
+            // hace el overshoot final.
+            checkScale.value = withTiming(1.3, {
+              duration: 280,
+              easing: Easing.out(Easing.cubic),
+            });
           },
           onPeak: () => {
             cancelAnimation(checkScale);
-            // Spring overshoot estilo gacha — friction baja /
-            // damping bajo para que rebote visiblemente al pico.
+            // Peak rebote: viene de 1.3 (post-windup), spring up a
+            // 1.5 (overshoot máximo, el "punch") y vuelve a 1.0.
+            // damping 6 hace que se vea bien el rebote, no que
+            // amortigüe instantáneamente.
             checkScale.value = withSequence(
-              withSpring(1.3, {
-                damping: 7,
-                stiffness: 200,
+              withSpring(1.5, {
+                damping: 6,
+                stiffness: 220,
                 mass: 0.7,
               }),
               withSpring(1.0, {
-                damping: 12,
+                damping: 11,
                 stiffness: 200,
                 mass: 0.7,
               }),
@@ -212,7 +213,7 @@ export default function SuccessScreen() {
             // sincronizar con el haptic, 60ms decay para fadear
             // antes de que el ojo lo lea como "pantalla apagada".
             flashOpacity.value = withSequence(
-              withTiming(0.35, {
+              withTiming(0.4, {
                 duration: 30,
                 easing: Easing.out(Easing.cubic),
               }),

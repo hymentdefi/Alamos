@@ -72,71 +72,70 @@ export function ConfettiPortal() {
 /**
  * Hook que expone burst() para celebrar trades exitosos.
  *
- * Burst secuencial 3-stage post-research (Apple Pay / Cash App /
- * Duolingo: la celebración tiene "arc" emocional, no es un pico
- * único):
+ * Burst secuencial 4-stage — windup + dos explosiones + ambient
+ * tail. Lleva a la celebración con anticipación auditiva y visual
+ * en lugar de empezar "en frío" con un pum de la nada:
  *
- *   t = 0    Anticipación. Solo `onAnticipation` callback (la screen
- *            hace un pulse sutil del check icon). Sin haptic — el
- *            telegrafiado es puramente visual para no competir con
- *            el haptic del peak 100ms después.
+ *   t = 0    WINDUP. confetti_windup sound ("weeoooo" rising 280ms)
+ *            + onAnticipation callback (la screen estira el check
+ *            scale 1.0 → 1.3 progresivamente). Sin haptic. Le da
+ *            al cerebro 280-300ms de "viene algo grande".
  *
- *   t = +100ms PEAK. Heavy impact (un solo punch fuerte) + `onPeak`
- *            callback (la screen tira flash blanco + spring overshoot
- *            del check) + burst principal de 1000 partículas + el
- *            sonido que la screen disparó al mount. Es EL momento.
+ *   t = +300ms PEAK. Heavy haptic + confetti_pop sound (volume 0.75)
+ *            + onPeak callback (flash blanco + spring del check
+ *            con overshoot 1.3 → 1.5 → 1.0) + burst principal de
+ *            1000 partículas. EL momento de la explosión.
  *
- *   t = +450ms Encore. Light impact (era Medium — too much) +
- *            segundo burst de 500 partículas con velocidad 30%
- *            reducida. "La ola que sigue".
+ *   t = +650ms Encore. Light haptic + segundo burst de 500
+ *            partículas con velocidad 30% reducida. SIN sonido
+ *            extra acá — la segunda explosion del WAV de
+ *            confetti_pop está splicada a 350ms internos del file,
+ *            que coincide exactamente con este momento.
  *
- *   t = +800ms Sparkle tail. 100 partículas chiquitas (4-6px) que
- *            flotan largo (TTL 2.5-3.5s). Sin haptic. Es el "polvo"
- *            ambiental que cierra la celebración.
+ *   t = +1000ms Sparkle tail. 100 partículas chiquitas (4-6px)
+ *            que flotan largo (TTL 2.5-3.5s). Sin haptic. El
+ *            debris natural del WAV (post-splice) acompaña.
  *
  * Sonidos:
- *   - `order_success` (el bell ding) NO vive acá — se dispara en
- *     confirm.tsx en el momento de "Orden Ejecutada", para que suene
- *     en TODAS las órdenes (no solo la primera con burst).
- *   - `confetti_pop` SÍ vive acá — se dispara UNA VEZ en peak. El
- *     WAV tiene `[explosion][explosion][debris]` splicado (ver
- *     scripts/splice-confetti-sound.js), así que la segunda
- *     explosion del file coincide naturalmente con el encore visual
- *     y el debris acompaña al sparkle tail.
+ *   - `order_success` (bell ding) vive en confirm.tsx — suena en
+ *     todas las órdenes en el momento de "Orden Ejecutada".
+ *   - `confetti_windup` ("weeoooo") en t=0 — solo first trade.
+ *   - `confetti_pop` (PUM PUM + debris splicado) en t=+300 — solo
+ *     first trade.
  */
 export function useConfetti() {
   const burst = useCallback((opts: BurstOptions) => {
     const { x, y, count, onAnticipation, onPeak } = opts;
 
-    // t = 0 — anticipación. SIN haptic, solo el callback visual
-    // (pulse del check). El haptic acá pelea con el del peak (100ms
-    // después) y se siente over-stimulating. El telegrafiado lo da
-    // el visual.
+    // t = 0 — windup. Sound rising "weeooo" + el callback visual
+    // que estira el check progresivamente. SIN haptic — quiero que
+    // el cerebro registre solo audio + visual leadup, sin
+    // distracción táctil. El haptic se reserva para EL momento
+    // del peak (300ms después).
+    playSound("confetti_windup");
     onAnticipation?.();
 
-    // t = +100ms — peak. Heavy impact + un solo playSound del WAV
-    // de confetti spliced. El file tiene `[explosion][explosion][debris]`
-    // — la SEGUNDA explosion adentro del file está splicada a 350ms,
-    // que coincide exactamente con cuando dispara el encore visual
-    // a t=+450ms (350ms después del peak). El debris natural del
-    // file acompaña al sparkle tail.
+    // t = +300ms — peak. Heavy impact + confetti_pop a volume 0.75
+    // (un poco más bajo que full para no competir con el debris
+    // que sigue del windup) + onPeak callback (flash + spring del
+    // check con overshoot) + burst principal de 1000 partículas.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      playSound("confetti_pop");
+      playSound("confetti_pop", { volume: 0.75 });
       onPeak?.();
       globalManager.burst({ x, y, count });
-    }, 100);
+    }, 300);
 
-    // t = +450ms — encore. Light haptic SOLAMENTE — el sonido de
-    // esta segunda explosion ya está dentro del WAV que disparamos
-    // en peak (splicing). Si tirábamos otro playSound acá se
-    // pisaba con el del file y sonaba doble feo.
+    // t = +650ms — encore. Light haptic SOLAMENTE — la segunda
+    // explosion ya viene en el WAV de confetti_pop splicada a 350ms
+    // internos (= +650ms desde windup, exactamente ahora).
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       globalManager.burst({ x, y, count: 500, speedScale: 0.7 });
-    }, 450);
+    }, 650);
 
-    // t = +800ms — sparkle tail.
+    // t = +1000ms — sparkle tail. El debris natural del WAV sigue
+    // sonando, las partículas pequeñas acompañan el cierre.
     setTimeout(() => {
       globalManager.burst({
         x,
@@ -146,7 +145,7 @@ export function useConfetti() {
         speedRange: [200, 400],
         ttlRange: [2500, 3500],
       });
-    }, 800);
+    }, 1000);
   }, []);
 
   return { burst };
