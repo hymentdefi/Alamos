@@ -18,7 +18,9 @@ import { Tap } from "../../lib/components/Tap";
 import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import { AccountAvatar } from "../../lib/components/AccountAvatar";
-import { accounts, type AccountId } from "../../lib/data/accounts";
+import { AccountFlag } from "../../lib/components/AccountFlag";
+import { GlassCard } from "../../lib/components/GlassCard";
+import { accounts, formatAccountBalance, type AccountId } from "../../lib/data/accounts";
 
 /** Balances disponibles por moneda — mockeados. */
 const BALANCES = {
@@ -218,146 +220,110 @@ function currencyLabelOf(id: AccountId): string {
   return a?.currency ?? "";
 }
 
-/* ─── Hub picker: 4 floating cards en grid 2×2, estilo premium Álamos ─── */
+/* ─── Hub picker: lista vertical estilo "Tu dinero" del home ─── */
 
 interface HubProps {
   mode: "deposit" | "send";
-  /** Si mode=send, sólo se muestran cards con balance > 0; el resto
-   *  quedan disabled o se ocultan según `hideEmpty`. */
-  hideEmpty?: boolean;
   onPick: (id: AccountId) => void;
 }
 
-function CurrencyHubCards({
-  mode,
-  hideEmpty = false,
-  onPick,
-}: HubProps) {
-  const { c } = useTheme();
-
-  const router = useRouter();
-
-  // Para deposit mostramos las 4; para send filtramos según balance.
-  const visible = useMemo(() => {
-    if (mode === "deposit") return accounts;
-    return hideEmpty ? accounts.filter((a) => a.balance > 0) : accounts;
-  }, [mode, hideEmpty]);
-
-  // Empty state para send sin saldo.
-  if (mode === "send" && visible.every((a) => a.balance <= 0)) {
-    return (
-      <View style={s.emptyWrap}>
-        <View style={[s.emptyIconBubble, { backgroundColor: c.brandDim }]}>
-          <Feather name="inbox" size={28} color={c.action} />
-        </View>
-        <Text style={[s.emptyTitle, { color: c.text }]}>
-          No tenés saldo para enviar
-        </Text>
-        <Text style={[s.emptyDesc, { color: c.textMuted }]}>
-          Cuando ingreses dinero a tu cuenta, vas a poder enviarlo desde acá.
-        </Text>
-        <Pressable
-          onPress={() => router.replace("/(app)/transfer?mode=deposit")}
-          style={[s.emptyCta, { backgroundColor: c.action }]}
-        >
-          <Feather name="arrow-down-left" size={14} color="#FFFFFF" />
-          <Text style={s.emptyCtaText}>Ingresar dinero</Text>
-        </Pressable>
-      </View>
-    );
-  }
+function CurrencyHubCards({ mode, onPick }: HubProps) {
+  const { mode: themeMode } = useTheme();
+  const isDark = themeMode === "dark";
+  // Backing del badge AR del flag usd-ar — blanco en light, gris
+  // oscuro en dark. Mismo patrón que Dinero.
+  const badgeBacking = isDark ? "#1F1F1E" : "#FFFFFF";
 
   return (
-    <View style={s.hubGrid}>
-      {visible.map((a) => {
-        const disabled = mode === "send" && a.balance <= 0;
-        return (
-          <HubCard
-            key={a.id}
-            accountId={a.id}
-            currency={a.currency}
-            location={a.location}
-            balance={a.balance}
-            mode={mode}
-            disabled={disabled}
-            onPress={() => onPick(a.id)}
-          />
-        );
-      })}
+    <View style={s.hubListWrap}>
+      <GlassCard padding={4}>
+        {accounts.map((a, i) => {
+          const disabled = mode === "send" && a.balance <= 0;
+          return (
+            <HubRow
+              key={a.id}
+              account={a}
+              withTopDivider={i > 0}
+              mode={mode}
+              disabled={disabled}
+              badgeBacking={badgeBacking}
+              onPress={() => onPick(a.id)}
+            />
+          );
+        })}
+      </GlassCard>
     </View>
   );
 }
 
-function HubCard({
-  accountId,
-  currency,
-  location,
-  balance,
+function HubRow({
+  account,
+  withTopDivider,
   mode,
   disabled,
+  badgeBacking,
   onPress,
 }: {
-  accountId: AccountId;
-  currency: "ARS" | "USD" | "USDT";
-  location: string;
-  balance: number;
+  account: (typeof accounts)[number];
+  withTopDivider: boolean;
   mode: "deposit" | "send";
   disabled: boolean;
+  badgeBacking: string;
   onPress: () => void;
 }) {
   const { c } = useTheme();
-  const account = accounts.find((a) => a.id === accountId)!;
-
-  const balanceLabel =
-    currency === "ARS"
-      ? "$ " + Math.round(balance).toLocaleString("es-AR")
-      : currency === "USD"
-      ? "US$ " +
-        balance.toLocaleString("es-AR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      : "USDT " +
-        balance.toLocaleString("es-AR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        });
+  // En send, las cuentas sin saldo se muestran "0 disponible" en
+  // gris no clickeable. En el resto de los casos mostramos el saldo
+  // real formateado.
+  const balanceLabel = disabled
+    ? "0 disponible"
+    : formatAccountBalance(account);
 
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       style={({ pressed }) => [
-        s.hubCard,
+        s.hubRow,
+        withTopDivider && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        },
         {
-          backgroundColor: c.surface,
-          borderColor: c.border,
-          opacity: disabled ? 0.45 : 1,
-          transform: [{ scale: pressed && !disabled ? 0.97 : 1 }],
+          opacity: disabled ? 0.42 : pressed ? 0.85 : 1,
         },
       ]}
     >
-      <View style={s.hubCardTop}>
-        <AccountAvatar account={account} size={44} />
+      <AccountFlag
+        accountId={account.id}
+        size={40}
+        badgeBackingColor={badgeBacking}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={[s.hubRowCurrency, { color: c.text }]}>
+          {account.currency}
+        </Text>
+        <Text
+          style={[s.hubRowLocation, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {account.location}
+        </Text>
       </View>
-      <Text style={[s.hubCardCurrency, { color: c.text }]}>
-        {currency === "USDT" ? "Cripto" : currency}
-      </Text>
-      <Text
-        style={[s.hubCardLocation, { color: c.textMuted }]}
-        numberOfLines={1}
-      >
-        {location}
-      </Text>
-      <View style={[s.hubCardDivider, { backgroundColor: c.border }]} />
-      <Text style={[s.hubCardBalanceEyebrow, { color: c.textMuted }]}>
-        {mode === "send" ? "DISPONIBLE" : "TU SALDO"}
-      </Text>
-      <Text
-        style={[s.hubCardBalance, { color: c.text }]}
-        numberOfLines={1}
-      >
-        {balanceLabel}
-      </Text>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text
+          style={[
+            s.hubRowBalance,
+            { color: disabled ? c.textMuted : c.text },
+          ]}
+          numberOfLines={1}
+        >
+          {balanceLabel}
+        </Text>
+      </View>
+      {!disabled ? (
+        <Feather name="chevron-right" size={18} color={c.textFaint} />
+      ) : null}
     </Pressable>
   );
 }
@@ -809,11 +775,10 @@ function SendCurrencyHub({ onPick }: { onPick: (id: AccountId) => void }) {
           ¿Qué moneda querés{"\n"}enviar?
         </Text>
         <Text style={[s.hubSub, { color: c.textMuted }]}>
-          Solo se muestran las cuentas con saldo disponible.
+          Solo podés enviar desde cuentas con saldo.
         </Text>
         <CurrencyHubCards
           mode="send"
-          hideEmpty
           onPick={(id) => {
             Haptics.selectionAsync().catch(() => {});
             onPick(id);
@@ -1416,102 +1381,32 @@ const s = StyleSheet.create({
     paddingBottom: 22,
   },
 
-  /* Currency hub — 2×2 floating cards */
-  hubGrid: {
+  /* Currency hub — lista vertical estilo "Tu dinero" */
+  hubListWrap: {
+    paddingHorizontal: 20,
+  },
+  hubRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 14,
+    alignItems: "center",
     gap: 12,
-    rowGap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
   },
-  hubCard: {
-    width: "47%",
-    flexGrow: 1,
-    flexBasis: "47%",
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 16,
-    minHeight: 168,
+  hubRowCurrency: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.25,
   },
-  hubCardTop: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    marginBottom: 14,
-  },
-  hubCardCurrency: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.7,
-  },
-  hubCardLocation: {
+  hubRowLocation: {
     fontFamily: fontFamily[500],
     fontSize: 12,
-    letterSpacing: -0.05,
     marginTop: 2,
+    letterSpacing: -0.05,
   },
-  hubCardDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 14,
-    marginHorizontal: -16,
-  },
-  hubCardBalanceEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 9.5,
-    letterSpacing: 1.1,
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  hubCardBalance: {
+  hubRowBalance: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
-  },
-
-  /* Send empty state */
-  emptyWrap: {
-    alignItems: "center",
-    paddingHorizontal: 36,
-    paddingTop: 12,
-    paddingBottom: 40,
-  },
-  emptyIconBubble: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-  },
-  emptyTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 19,
-    letterSpacing: -0.4,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  emptyDesc: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    textAlign: "center",
-    marginBottom: 22,
-  },
-  emptyCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: radius.pill,
-  },
-  emptyCtaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-    color: "#FFFFFF",
   },
   curPillsWrap: {
     paddingHorizontal: 20,
