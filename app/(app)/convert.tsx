@@ -81,16 +81,30 @@ export default function ConvertScreen() {
   // Default: ARS → USD-AR (caso típico para usuarios argentinos).
   const [fromId, setFromId] = useState<AccountId>("ars-ar");
   const [toId, setToId] = useState<AccountId>("usd-ar");
+  // Lado activo del input: el que está siendo escrito en el keypad.
+  // Tap en cualquiera de los dos cards lo cambia. Permite escribir
+  // tanto del lado from (cuánto pago) como del lado to (cuánto
+  // recibo) — el otro slot se calcula automáticamente con el rate.
+  const [activeSide, setActiveSide] = useState<"from" | "to">("from");
   const [amount, setAmount] = useState("0");
   const [pickerSlot, setPickerSlot] = useState<null | "from" | "to">(null);
 
   const from = accounts.find((a) => a.id === fromId)!;
   const to = accounts.find((a) => a.id === toId)!;
   const numericAmount = Number(amount.replace(",", ".")) || 0;
-  const received = convertAmount(numericAmount, from.currency, to.currency);
   const rate = rateBetween(from.currency, to.currency);
-  const insufficient = numericAmount > from.balance;
-  const canConfirm = numericAmount > 0 && !insufficient && fromId !== toId;
+  // Si el usuario está escribiendo del lado from → to se calcula.
+  // Si está escribiendo del lado to → from se calcula.
+  const fromValue =
+    activeSide === "from"
+      ? numericAmount
+      : convertAmount(numericAmount, to.currency, from.currency);
+  const toValue =
+    activeSide === "to"
+      ? numericAmount
+      : convertAmount(numericAmount, from.currency, to.currency);
+  const insufficient = fromValue > from.balance;
+  const canConfirm = fromValue > 0 && !insufficient && fromId !== toId;
 
   // ─── Animación de swap ───────────────────────────────────────
   // Cuando from y to se intercambian (botón de swap o porque el
@@ -211,9 +225,21 @@ export default function ConvertScreen() {
     );
     Alert.alert(
       "Conversión enviada",
-      `Vas a recibir ${formatAmount(received, to.currency)} en ${to.location}.`,
+      `Vas a recibir ${formatAmount(toValue, to.currency)} en ${to.location}.`,
       [{ text: "Listo", onPress: () => router.back() }],
     );
+  };
+
+  // Cuando el usuario tapea un slot que no está activo, lo activamos
+  // y copiamos el valor calculado de ese lado al input — así puede
+  // seguir editando desde donde estaba sin perder el monto.
+  const switchActive = (side: "from" | "to") => {
+    if (side === activeSide) return;
+    Haptics.selectionAsync().catch(() => {});
+    const carry = side === "from" ? fromValue : toValue;
+    const truncated = carry > 0 ? Math.round(carry * 100) / 100 : 0;
+    setAmount(truncated > 0 ? String(truncated) : "0");
+    setActiveSide(side);
   };
 
   return (
@@ -226,63 +252,74 @@ export default function ConvertScreen() {
         >
           <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
-        <Text style={[s.headerTitle, { color: c.text }]}>Convertir</Text>
+        <View style={{ flex: 1 }} />
         <View style={{ width: 36 }} />
       </View>
 
       <View style={s.body}>
-        {/* FROM */}
-        <Animated.View style={fromRowStyle}>
-          <CurrencyRow
-            mode="from"
-            accountId={from.id}
-            currency={from.currency}
-            balance={formatAccountBalance(from)}
-            amountLabel={`- ${formatAmount(numericAmount, from.currency)}`}
-            insufficient={insufficient}
-            badgeBacking={badgeBacking}
-            onPress={() => setPickerSlot("from")}
-          />
-        </Animated.View>
-
-        {/* SWAP + RATE */}
-        <View style={s.middleRow}>
-          <Pressable
-            style={[s.swapBtn, { backgroundColor: c.action }]}
-            onPress={swap}
-            hitSlop={8}
+        {/* Title + rate chip — estilo Revolut, arriba de los cards. */}
+        <Text style={[s.bigTitle, { color: c.text }]}>Convertir</Text>
+        <View
+          style={[
+            s.ratePill,
+            { borderColor: c.border, backgroundColor: c.surface },
+          ]}
+        >
+          <Feather name="trending-up" size={13} color={c.positive} />
+          <Text
+            style={[s.rateText, { color: c.positive }]}
+            numberOfLines={1}
           >
-            <Feather name="arrow-down" size={20} color="#FFFFFF" />
-          </Pressable>
-          <View
-            style={[
-              s.ratePill,
-              { borderColor: c.border, backgroundColor: c.surface },
-            ]}
-          >
-            <Feather name="trending-up" size={14} color={c.positive} />
-            <Text
-              style={[s.rateText, { color: c.positive }]}
-              numberOfLines={1}
-            >
-              1 {from.currency} = {formatRate(rate, to.currency)}{" "}
-              {to.currency}
-            </Text>
-          </View>
+            1 {from.currency} = {formatRate(rate, to.currency)}{" "}
+            {to.currency}
+          </Text>
         </View>
 
-        {/* TO */}
-        <Animated.View style={toRowStyle}>
-          <CurrencyRow
-            mode="to"
-            accountId={to.id}
-            currency={to.currency}
-            balance={formatAccountBalance(to)}
-            amountLabel={`+ ${formatAmount(received, to.currency)}`}
-            badgeBacking={badgeBacking}
-            onPress={() => setPickerSlot("to")}
-          />
-        </Animated.View>
+        {/* Cards stack: FROM arriba, TO abajo, swap btn flotando entre. */}
+        <View style={s.cardsStack}>
+          <Animated.View style={fromRowStyle}>
+            <CurrencyCard
+              accountId={from.id}
+              currency={from.currency}
+              balance={formatAccountBalance(from)}
+              amountLabel={`- ${formatAmount(fromValue, from.currency)}`}
+              active={activeSide === "from"}
+              insufficient={insufficient}
+              badgeBacking={badgeBacking}
+              onPickerPress={() => setPickerSlot("from")}
+              onAmountPress={() => switchActive("from")}
+            />
+          </Animated.View>
+
+          <View style={s.swapBtnFloater}>
+            <Pressable
+              style={[
+                s.swapBtn,
+                {
+                  backgroundColor: c.action,
+                  borderColor: c.bg,
+                },
+              ]}
+              onPress={swap}
+              hitSlop={8}
+            >
+              <Feather name="arrow-down" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <Animated.View style={toRowStyle}>
+            <CurrencyCard
+              accountId={to.id}
+              currency={to.currency}
+              balance={formatAccountBalance(to)}
+              amountLabel={`+ ${formatAmount(toValue, to.currency)}`}
+              active={activeSide === "to"}
+              badgeBacking={badgeBacking}
+              onPickerPress={() => setPickerSlot("to")}
+              onAmountPress={() => switchActive("to")}
+            />
+          </Animated.View>
+        </View>
       </View>
 
       {/* Spacer + keypad + CTA al fondo */}
@@ -537,54 +574,82 @@ function AccountPickerSheet({
   );
 }
 
-function CurrencyRow({
+function CurrencyCard({
   accountId,
   currency,
   balance,
   amountLabel,
+  active,
   insufficient,
   badgeBacking,
-  onPress,
+  onPickerPress,
+  onAmountPress,
 }: {
-  mode: "from" | "to";
   accountId: AccountId;
   currency: "ARS" | "USD" | "USDT";
   balance: string;
   amountLabel: string;
+  active: boolean;
   insufficient?: boolean;
   badgeBacking: string;
-  onPress: () => void;
+  onPickerPress: () => void;
+  onAmountPress: () => void;
 }) {
   const { c } = useTheme();
+  // Borde + sombra cambian cuando el card está activo (recibe input
+  // del keypad). En light queda un acento sutil; en dark más
+  // marcado para que se note bien sobre el bg negro.
+  const borderColor = active ? c.action : c.border;
+  const borderWidth = active ? 1.5 : StyleSheet.hairlineWidth;
+
   return (
-    <View style={s.rowBlock}>
-      <Pressable style={s.row} onPress={onPress} hitSlop={4}>
-        <View style={s.rowLeft}>
-          <Text style={[s.rowCurrency, { color: c.text }]}>{currency}</Text>
-          <Feather name="chevron-down" size={20} color={c.text} />
-        </View>
-        <Text
-          style={[
-            s.rowAmount,
-            { color: insufficient ? c.red : c.text },
-          ]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
+    <View
+      style={[
+        s.card,
+        {
+          backgroundColor: c.surface,
+          borderColor,
+          borderWidth,
+        },
+      ]}
+    >
+      <View style={s.cardTopRow}>
+        <Pressable
+          style={s.cardCurrencyTap}
+          onPress={onPickerPress}
+          hitSlop={6}
         >
-          {amountLabel}
-        </Text>
-      </Pressable>
-      <View style={s.rowBalance}>
-        <AccountFlag
-          accountId={accountId}
-          size={16}
-          badgeBackingColor={badgeBacking}
-        />
-        <Text style={[s.rowBalanceText, { color: c.textMuted }]}>
+          <AccountFlag
+            accountId={accountId}
+            size={28}
+            badgeBackingColor={badgeBacking}
+          />
+          <Text style={[s.cardCurrency, { color: c.text }]}>{currency}</Text>
+          <Feather name="chevron-down" size={18} color={c.textMuted} />
+        </Pressable>
+        <Pressable
+          style={s.cardAmountTap}
+          onPress={onAmountPress}
+          hitSlop={6}
+        >
+          <Text
+            style={[
+              s.cardAmount,
+              { color: insufficient ? c.red : c.text },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {amountLabel}
+          </Text>
+        </Pressable>
+      </View>
+      <View style={s.cardBalance}>
+        <Text style={[s.cardBalanceText, { color: c.textMuted }]}>
           Saldo: {balance}
         </Text>
         {insufficient ? (
-          <Text style={[s.rowBalanceText, { color: c.red, marginLeft: 6 }]}>
+          <Text style={[s.cardBalanceText, { color: c.red, marginLeft: 6 }]}>
             · Insuficiente
           </Text>
         ) : null}
@@ -615,51 +680,90 @@ const s = StyleSheet.create({
     letterSpacing: -0.25,
   },
   body: {
-    paddingHorizontal: 24,
-    paddingTop: 28,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    alignItems: "center",
   },
-  rowBlock: {
-    paddingVertical: 4,
+  bigTitle: {
+    fontFamily: fontFamily[800],
+    fontSize: 32,
+    letterSpacing: -1.2,
+    marginBottom: 10,
+    alignSelf: "flex-start",
+    paddingHorizontal: 4,
   },
-  row: {
+  ratePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+    marginLeft: 4,
+    marginBottom: 24,
+  },
+  rateText: {
+    fontFamily: fontMono[700],
+    fontSize: 12,
+    letterSpacing: 0,
+  },
+
+  cardsStack: {
+    width: "100%",
+    gap: 6,
+    position: "relative",
+  },
+  card: {
+    borderRadius: radius.lg,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  cardTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
   },
-  rowLeft: {
+  cardCurrencyTap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 8,
   },
-  rowCurrency: {
+  cardCurrency: {
     fontFamily: fontFamily[700],
-    fontSize: 32,
-    letterSpacing: -1.2,
+    fontSize: 22,
+    letterSpacing: -0.7,
   },
-  rowAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 32,
-    letterSpacing: -1,
+  cardAmountTap: {
     flexShrink: 1,
+  },
+  cardAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 24,
+    letterSpacing: -0.7,
     textAlign: "right",
   },
-  rowBalance: {
+  cardBalance: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 6,
+    marginTop: 8,
   },
-  rowBalanceText: {
+  cardBalanceText: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
+    fontSize: 12,
+    letterSpacing: -0.05,
   },
-  middleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16,
+
+  /* Swap btn flotante entre cards: posicionado absoluto en el medio
+     vertical de la stack para que solape ambos cards visualmente. */
+  swapBtnFloater: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -22,
+    alignSelf: "center",
+    zIndex: 2,
   },
   swapBtn: {
     width: 44,
@@ -667,20 +771,7 @@ const s = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-  ratePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  rateText: {
-    fontFamily: fontMono[700],
-    fontSize: 12,
-    letterSpacing: 0,
+    borderWidth: 4,
   },
 
   keypad: {
