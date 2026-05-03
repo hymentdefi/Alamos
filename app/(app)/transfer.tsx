@@ -81,7 +81,7 @@ const LINKED_ACCOUNTS: LinkedAccount[] = [
   {
     id: "santander-usd",
     bankName: "Banco Santander",
-    accountType: "Caja de ahorro en USD",
+    accountType: "Caja de ahorro en US$",
     tail: "9012",
     alias: "chris.santander.usd",
     cbu: "0720•••••••••••••9012",
@@ -722,7 +722,7 @@ function formatMoney(value: number, cur: DepositCurrency): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return cur === "ars" ? `$ ${num}` : `${num} USD`;
+  return cur === "ars" ? `$ ${num}` : `${num} US$`;
 }
 
 function SendFlow() {
@@ -911,7 +911,7 @@ function AmountStep({
 
   // Convención de la app: ARS con "$" antes, USD con " USD" después.
   const signPrefix = cur === "ars" ? "$" : "";
-  const signSuffix = cur === "ars" ? "" : " USD";
+  const signSuffix = cur === "ars" ? "" : " US$";
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -1258,7 +1258,7 @@ function DepositFromAccount({
 
   // Convención de la app: ARS con "$" antes, USD con " USD" después.
   const signPrefix = cur === "ars" ? "$" : "";
-  const signSuffix = cur === "ars" ? "" : " USD";
+  const signSuffix = cur === "ars" ? "" : " US$";
 
   if (done) {
     return (

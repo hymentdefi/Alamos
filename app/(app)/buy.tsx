@@ -68,14 +68,16 @@ function nativeBalanceFor(market: AssetMarket): number {
  * Affix de moneda para los inputs (calculadora del buy). Devuelve
  * prefix o suffix según la convención de la app:
  *   ARS → "$" antes
- *   USD/USDT → " USD" / " USDT" después
+ *   USD → " US$" después (símbolo, no ticker)
+ *   USDT → " USDT" después
  */
 function moneyAffix(currency: AssetCurrency): {
   prefix: string;
   suffix: string;
 } {
   if (currency === "ARS") return { prefix: "$", suffix: "" };
-  return { prefix: "", suffix: ` ${currency}` };
+  const suffix = currency === "USD" ? " US$" : ` ${currency}`;
+  return { prefix: "", suffix };
 }
 
 const keys = [
@@ -107,7 +109,7 @@ export default function BuyScreen() {
     () => (asset ? assetMarket(asset) : "AR"),
     [asset],
   );
-  // Moneda nativa del activo (display del input: $, USD, USDT). Aún
+  // Moneda nativa del activo (display del input: $, US$, USDT). Aún
   // usa assetCurrency porque el cálculo de currency cae al market.
   const nativeCurrency = useMemo<AssetCurrency>(
     () => (asset ? assetCurrency(asset) : "ARS"),

@@ -763,12 +763,13 @@ export function formatVolume(n: number): string {
 /**
  * Convención de formato de moneda en la app:
  *   - ARS: "$ 342.180"           — peso argentino con SÍMBOLO antes
- *   - USD: "850,00 USD"          — ticker de 3 letras DESPUÉS
- *   - USDT: "580,00 USDT"        — idem, ticker después
+ *   - USD: "850,00 US$"          — símbolo de dólar al FINAL (no "USD")
+ *   - USDT: "580,00 USDT"        — ticker al final (no tiene símbolo)
  *   - cualquier crypto (BTC, ETH, etc.): número + " " + ticker
  *
- * Excepción única: el peso argentino con $ antes. Cualquier otra
- * moneda con código de 3 letras va al final.
+ * El peso argentino es el único con símbolo ANTES. El dólar se
+ * representa con el símbolo "US$" pero ubicado DESPUÉS del monto.
+ * Las demás monedas (sin símbolo asociado) van con su ticker después.
  *
  * Separadores: argentino (es-AR) — punto para miles, coma para decimal.
  */
@@ -777,13 +778,13 @@ export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");
 }
 
-/** "850,00 USD" — siempre con dos decimales, ticker al final. */
+/** "850,00 US$" — siempre con dos decimales, símbolo al final. */
 export function formatUSD(n: number): string {
   return (
     Math.abs(n).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }) + " USD"
+    }) + " US$"
   );
 }
 
@@ -875,7 +876,10 @@ export function formatMoneyParts(
   if (currency === "ARS") {
     return { integer, decimals: dec, prefix: "$" };
   }
-  return { integer, decimals: dec, suffix: currency };
+  // USD usa el símbolo "US$" al final; las otras monedas (USDT,
+  // crypto, etc.) van con su ticker tal cual.
+  const suffix = currency === "USD" ? "US$" : currency;
+  return { integer, decimals: dec, suffix };
 }
 
 /** @deprecated Usá formatMoneyParts(n, 'ARS'). Mantenido para back-compat. */

@@ -59,7 +59,7 @@ const notificationItems: NotificationItem[] = [
     id: "n3",
     icon: "bell",
     title: "Tu alerta de BTC se disparó",
-    body: "BTC cruzó los 68.000 USD como pediste.",
+    body: "BTC cruzó los 68.000 US$ como pediste.",
     date: "13 abr, 18:22",
   },
   {

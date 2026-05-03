@@ -1110,7 +1110,7 @@ function AssetRow({
   const cur = assetCurrency(asset);
   const primaryValue = isCash
     ? isUSD
-      ? `${qty.toLocaleString("es-AR")} USD`
+      ? `${qty.toLocaleString("es-AR")} US$`
       : formatARS(qty)
     : formatMoney(asset.price * (asset.qty ?? 1), cur);
   const secondaryValue = isCash && isUSD ? formatARS(asset.price * qty) : null;
