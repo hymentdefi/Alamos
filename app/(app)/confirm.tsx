@@ -37,6 +37,7 @@ import {
 import { accounts } from "../../lib/data/accounts";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
+import { playSound } from "../../lib/sounds/SoundManager";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -502,6 +503,12 @@ export default function ConfirmScreen() {
       timeoutRef.current = null;
     }
     setStatusText("Orden Ejecutada");
+
+    // Sonido sincrónico con la transición — disparado en el mismo
+    // tick que el setStatusText para que el usuario asocie el ding
+    // con el momento del cambio "recibida → ejecutada", no con el
+    // mount de la success screen 1-2 frames después.
+    playSound("order_success");
 
     // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {

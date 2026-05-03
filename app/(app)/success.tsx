@@ -19,7 +19,6 @@ import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { useAuth } from "../../lib/auth/context";
 import { useConfetti } from "../../lib/hooks/useConfetti";
-import { playSound } from "../../lib/sounds/SoundManager";
 
 /**
  * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
@@ -145,13 +144,11 @@ export default function SuccessScreen() {
   const flashOpacity = useSharedValue(0);
   const flashStyle = useAnimatedStyle(() => ({ opacity: flashOpacity.value }));
 
-  // Sonido de orden ejecutada — corre en TODAS las órdenes (no solo
-  // first trade). El sonido vive en el mount de la screen, separado
-  // del burst (que es first-trade only). Si el usuario tiene el
-  // celular en silencio, no suena (ver SoundManager — `playsInSilentMode: false`).
-  useEffect(() => {
-    playSound("order_success");
-  }, []);
+  // El sonido de orden ejecutada NO se dispara acá — vive en
+  // confirm.tsx en el mismo tick que setStatusText("Orden Ejecutada"),
+  // para que el ding sincronice con el momento perceptible de la
+  // ejecución (cambio de texto + cover verde + check). Disparar acá
+  // sería ~1 frame tarde y se sentiría desconectado.
 
   // Burst del confetti: SOLO si es el primer trade del usuario.
   // Origen = centro del check verde (medido vía measureInWindow).
