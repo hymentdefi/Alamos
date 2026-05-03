@@ -210,6 +210,17 @@ const CHECK_PATH_LEN = 24;
  * SIMULTÁNEOS y "co-localizados". Patrón Apple Pay.
  */
 const HAPTIC_AUDIO_LEAD_MS = 40;
+/**
+ * Delay del haptic Medium tras el cambio a "Orden Recibida...".
+ *
+ * Por qué 200ms: el crossfade del texto tiene IN_DELAY=100 +
+ * IN_DURATION=700 (1100ms total); a los 200ms el texto entrante
+ * recién está al ~14% de opacidad pero ya VISIBLE. Si el haptic
+ * dispara en t=0 (cambio de prop), el ojo todavía está procesando
+ * el texto saliente y no asocia el haptic con "Recibida". Con
+ * 200ms el haptic llega cuando el ojo ya enganchó el nuevo texto.
+ */
+const RECIBIDA_HAPTIC_DELAY_MS = 200;
 const SPIN_DURATION_MS = 1000;
 // SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
@@ -481,13 +492,18 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received. Medium haptic sincrónico con
-    // el cambio de texto — funciona como BUILD-UP del peak Heavy
-    // que viene 700ms después en "Ejecutada". Medium ahora, Heavy
-    // después: rampa táctil clásica.
+    // Phase 2: sending → received. Medium haptic con un pequeño
+    // delay (RECIBIDA_HAPTIC_DELAY_MS=200ms) para que coincida con
+    // cuando el texto entrante "Recibida..." ya empezó a aparecer
+    // visualmente. Sin el delay el haptic dispara antes de que el
+    // ojo enganche el nuevo texto y no se asocian. Funciona como
+    // BUILD-UP del peak Heavy a +700ms.
     setPhase("received");
     setStatusText("Orden Recibida...");
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setTimeout(() => {
+      if (completedRef.current && phase !== "received") return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }, RECIBIDA_HAPTIC_DELAY_MS);
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;

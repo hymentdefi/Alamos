@@ -111,13 +111,12 @@ export function useConfetti() {
     // y los próximos 100ms son la última calma antes del PUM.
     onAnticipation?.();
 
-    // t = +100ms — peak. Heavy impact + confetti_pop a volume 0.7
-    // (30% más bajo que full — sigue impactando pero no jarring)
-    // + onPeak callback (flash + spring del check) + burst
-    // principal de 1000 partículas.
+    // t = +100ms — peak. Heavy impact + confetti_pop a volume FULL
+    // (1.0). Probamos a 0.7 y se sentía apagado / no se notaba el
+    // POP. Volume full + 1000 partículas + flash + spring = EL momento.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      playSound("confetti_pop", { volume: 0.7 });
+      playSound("confetti_pop");
       onPeak?.();
       globalManager.burst({ x, y, count });
     }, 100);
