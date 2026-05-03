@@ -1,5 +1,14 @@
-import { useEffect, useRef } from "react";
-import { Animated, Easing } from "react-native";
+import { useEffect } from "react";
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
 interface Segment {
@@ -36,7 +45,10 @@ interface Props {
 // Dentro de cada icono, el tiempo se reparte proporcional al largo
 // de cada segmento — así la velocidad del lápiz es uniforme dentro
 // de cada dibujo, y el "principio a fin" es igual entre dibujos.
-const TOTAL_DURATION = 550;
+// 400ms es el sweet spot ahora que el shift de bottom-tabs no está:
+// suficientemente largo para que se vea el lápiz dibujando, lo
+// suficientemente corto para que matchee el snap de la pantalla.
+const TOTAL_DURATION = 400;
 // Gap entre segmentos (simula al lápiz levantándose al próximo
 // subpath). Se descuenta del total para que TOTAL_DURATION sea la
 // duración real de principio a fin, contando gaps.
@@ -44,21 +56,95 @@ const INTER_SEGMENT_DELAY = 20;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+interface DrawingSegmentProps {
+  d: string;
+  len: number;
+  duration: number;
+  delay: number;
+  focused: boolean;
+  color: string;
+}
+
+/**
+ * Un segmento del icono. Vive en su propio sub-componente porque
+ * `useSharedValue` y `useAnimatedProps` son hooks — y como distintos
+ * iconos tienen distinta cantidad de segmentos (home=1, news=5), no
+ * podemos llamarlos en un .map() del padre sin violar las rules of
+ * hooks. Cada segmento maneja su propio shared value y su propio
+ * trigger.
+ */
+function DrawingSegment({
+  d,
+  len,
+  duration,
+  delay,
+  focused,
+  color,
+}: DrawingSegmentProps) {
+  // Inicializamos en `len` (invisible) si la tab arranca focused, así
+  // el primer frame ya está listo para dibujarse — sin flash de "todo
+  // visible" antes de que el useEffect mande el reset a invisible.
+  const offset = useSharedValue(focused ? len : 0);
+
+  useEffect(() => {
+    cancelAnimation(offset);
+    if (focused) {
+      // Forzamos arranque en invisible (cubre el caso de venir de
+      // unfocused, donde offset ya estaba en 0).
+      offset.value = len;
+      offset.value = withDelay(
+        delay,
+        // Linear a propósito: el ease-out cubic que usábamos antes
+        // "mentía" la duración percibida — completaba ~87% del trazo
+        // en el 50% del tiempo y el último tramo era arrastre
+        // imperceptible. Con linear, velocidad constante del lápiz
+        // dentro de cada segmento.
+        withTiming(0, { duration, easing: Easing.linear }),
+      );
+    } else {
+      // Tab inactiva: trazo completo, sin animación.
+      offset.value = 0;
+    }
+  }, [focused, len, duration, delay, offset]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: offset.value,
+  }));
+
+  return (
+    <AnimatedPath
+      d={d}
+      stroke={color}
+      strokeWidth={2}
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeDasharray={len}
+      animatedProps={animatedProps}
+    />
+  );
+}
+
 /**
  * Icono de tab que SE DIBUJA trazo a trazo (efecto lápiz).
  *
+ * Migrado a Reanimated 3 con `useAnimatedProps`: el strokeDashoffset
+ * corre 100% en UI thread vía worklets. La versión anterior usaba el
+ * `Animated` de react-native con `useNativeDriver: false`
+ * (strokeDashoffset no soporta native driver), por lo que cada frame
+ * de la animación pasaba por el JS thread. Durante un router.navigate
+ * el JS thread queda saturado (resolución de ruta + mount de la
+ * pantalla nueva + shift de bottom-tabs), entonces la animación se
+ * comía 200-400ms de frames y los iconos de un solo segmento (home,
+ * alamo) parecían aparecer ya dibujados. Con worklets esto no pasa.
+ *
  * Duración total IGUAL para todos los iconos: TOTAL_DURATION ms de
  * principio a fin, sin importar cuántos trazos ni qué tan largos.
- *
- * Cada subpath es su propio <Path> con su propia Animated.Value (si
- * lo hacíamos con un solo Path multi-subpath, el strokeDashoffset
- * distribuía el tiempo proporcional al largo total y los subpaths
- * cortos se flasheaban). Dentro de cada icono, el tiempo se reparte
- * PROPORCIONAL al largo de cada segmento — así la velocidad del
- * lápiz es uniforme dentro del dibujo. Entre iconos, como el total
- * es fijo, iconos con más trazo total (news) dibujan más rápido
- * por unidad que iconos con menos (alamo), pero tardan lo mismo en
- * completarse.
+ * Dentro de cada icono el tiempo se reparte proporcional al largo de
+ * cada segmento — velocidad uniforme del lápiz por dibujo. Entre
+ * iconos, como el total es fijo, iconos con más trazo total (news)
+ * dibujan más rápido por unidad que iconos con menos (alamo), pero
+ * tardan lo mismo en completarse.
  */
 export function DrawingIcon({
   path,
@@ -67,77 +153,46 @@ export function DrawingIcon({
   size = 24,
   viewBox = "0 0 24 24",
 }: Props) {
-  // Un Animated.Value por segmento. Inicializamos con el largo del
-  // segmento (trazo invisible) si focused al mount, o en 0 (trazo
-  // visible completo) si inactivo.
-  const segmentOffsets = useRef(
-    path.segments.map((seg) => new Animated.Value(focused ? seg.len : 0)),
-  ).current;
-  const pop = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
+  // Reparto del tiempo entre segmentos. Calculado en cada render pero
+  // estable si path no cambia (no cambia: viene de tabPaths definido
+  // con `as const` a nivel módulo).
+  const totalLen = path.segments.reduce((a, s) => a + s.len, 0);
+  const totalGap = Math.max(0, path.segments.length - 1) * INTER_SEGMENT_DELAY;
+  const drawingTime = Math.max(0, TOTAL_DURATION - totalGap);
+  let cumulative = 0;
+  const timings = path.segments.map((seg) => {
+    const dur = (seg.len / totalLen) * drawingTime;
+    const delay = cumulative;
+    cumulative += dur + INTER_SEGMENT_DELAY;
+    return { duration: dur, delay };
+  });
 
+  // Pop scale del icono entero al focusear. También en UI thread.
+  const popScale = useSharedValue(focused ? 1 : 0.92);
   useEffect(() => {
-    if (focused) {
-      // Reset todos los segmentos a invisible antes de secuenciar.
-      path.segments.forEach((seg, i) => {
-        segmentOffsets[i].setValue(seg.len);
-      });
-      // Reparto TOTAL_DURATION entre los segmentos proporcional al
-      // largo de cada uno, descontando los gaps. Así el total de
-      // principio a fin (incluyendo gaps) es exactamente
-      // TOTAL_DURATION para todos los iconos.
-      const totalLen = path.segments.reduce((a, s) => a + s.len, 0);
-      const totalGap = Math.max(0, path.segments.length - 1) * INTER_SEGMENT_DELAY;
-      const drawingTime = Math.max(0, TOTAL_DURATION - totalGap);
-      let delay = 0;
-      path.segments.forEach((seg, i) => {
-        const dur = (seg.len / totalLen) * drawingTime;
-        Animated.timing(segmentOffsets[i], {
-          toValue: 0,
-          duration: dur,
-          delay,
-          // Linear a propósito: el ease-out cubic que usábamos antes
-          // "mentía" la duración percibida — completaba visualmente
-          // ~87% del trazo en el 50% del tiempo y el último tramo era
-          // un arrastre imperceptible. Con trazos únicos (home, alamo)
-          // se veía terminado a ~540ms aunque el animation seguía 360ms
-          // más. Con multi-segmento el último segmento corto hacía que
-          // el arrastre no se notara, así que parecían terminar a 900.
-          // Con linear, el lápiz va a velocidad constante dentro de
-          // cada segmento, y el momento visual de "terminó" coincide
-          // con TOTAL_DURATION para todos los iconos.
-          easing: Easing.linear,
-          useNativeDriver: false, // strokeDashoffset no soporta native driver
-        }).start();
-        delay += dur + INTER_SEGMENT_DELAY;
-      });
-    } else {
-      // Tab inactiva: todos los trazos completos, sin animación.
-      path.segments.forEach((seg, i) => {
-        segmentOffsets[i].setValue(0);
-      });
-    }
-    Animated.spring(pop, {
-      toValue: focused ? 1 : 0.92,
-      friction: 6,
-      tension: 120,
-      useNativeDriver: true,
-    }).start();
-  }, [focused, path.segments, segmentOffsets, pop]);
+    popScale.value = withSpring(focused ? 1 : 0.92, {
+      damping: 12,
+      stiffness: 180,
+      mass: 0.6,
+    });
+  }, [focused, popScale]);
+
+  const popStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: popScale.value }],
+  }));
 
   return (
-    <Animated.View style={{ transform: [{ scale: pop }] }}>
+    <Animated.View style={popStyle}>
       <Svg width={size} height={size} viewBox={viewBox}>
         {path.segments.map((seg, i) => (
-          <AnimatedPath
+          <DrawingSegment
             key={i}
             d={seg.d}
-            stroke={color}
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={seg.len}
-            strokeDashoffset={segmentOffsets[i]}
+            len={seg.len}
+            duration={timings[i].duration}
+            delay={timings[i].delay}
+            focused={focused}
+            color={color}
           />
         ))}
       </Svg>

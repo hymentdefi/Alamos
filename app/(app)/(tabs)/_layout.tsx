@@ -105,43 +105,43 @@ function FloatingTabBar() {
   const pillScaleX = useSharedValue(1);
   const pillScaleY = useSharedValue(1);
   useEffect(() => {
-    // Slide en X: cubic-out clásico, suficiente duración para que
-    // acompañe el pulse sin sentirse pesado.
+    // Slide en X: cubic-out clásico. 250ms ahora que sacamos el
+    // shift de bottom-tabs — sin nada que esperar, la pill puede
+    // aterrizar punchy.
     pillIndex.value = withTiming(activeIndex, {
-      duration: 380,
+      duration: 250,
       easing: Easing.out(Easing.cubic),
     });
     // Stretch en X (1 → 1.32 → 0.88 → 1). Más amplitud = pulse más
-    // marcado. Todo cubic-out → arranque inmediato + deceleración
-    // suave hacia cada target = sin sensación de retardo.
+    // marcado. Total 280ms, levemente más largo que el slide para
+    // preservar el rubber-band feel sin sentirse arrastrado.
     pillScaleX.value = withSequence(
       withTiming(1.32, {
-        duration: 170,
+        duration: 110,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(0.88, {
-        duration: 140,
+        duration: 90,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(1, {
-        duration: 130,
+        duration: 80,
         easing: Easing.out(Easing.quad),
       }),
     );
     // Squash en Y (1 → 0.74 → 1.16 → 1) — inverso a X para preservar
-    // volumen visual. Más pronunciado vertical porque el ojo nota
-    // más fácil la compresión que la elongación.
+    // volumen visual.
     pillScaleY.value = withSequence(
       withTiming(0.74, {
-        duration: 170,
+        duration: 110,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(1.16, {
-        duration: 140,
+        duration: 90,
         easing: Easing.out(Easing.cubic),
       }),
       withTiming(1, {
-        duration: 130,
+        duration: 80,
         easing: Easing.out(Easing.quad),
       }),
     );
@@ -312,9 +312,13 @@ export default function TabsLayout() {
         backBehavior="none"
         screenOptions={{
           headerShown: false,
-          // Slide direccional en X axis nativo de bottom-tabs v7. No es
-          // un slide full-page como Stack, pero al menos hay movimiento.
-          animation: "shift",
+          // Sin animación entre pantallas: el cambio de tab es
+          // instantáneo. La señal visual de "cambié" la dan la pill que
+          // se desliza + el icono que se redibuja en el nav bar — no
+          // necesitamos un shift horizontal de la pantalla entera, que
+          // pelea por frames con esas dos animaciones y hace que todo
+          // se sienta laggy. Snap-switch, estilo Robinhood/Instagram.
+          animation: "none",
         }}
         tabBar={() => null}
       >

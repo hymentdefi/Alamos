@@ -69,8 +69,9 @@ text:          #0E0F0C   // ink
 textSecondary: #2A2B27
 textMuted:     #6B6C66
 textFaint:     #B8B8B0
-green:         #00E676   // brand
-greenDark:     #00B85C   // chart lines, deltas
+brand:         #00C805   // verde de marca — único, definido en lib/theme/index.ts brand.green
+action:        #5ac43e   // verde un poco más tierra para CTAs y nav active pill
+positive:      #00A304   // verde técnico para deltas/% positivos en charts
 red:           #C83B3B   // negativos
 ```
 
@@ -102,7 +103,7 @@ Usar `<AlamosLogo variant tone size />`:
 - `variant="lockupShort"` — ícono + "Alamos"
 - `tone="light"|"dark"` — según fondo
 
-Regla: el verde de marca es `#00E676`. No inventar otros verdes.
+Regla: el verde de marca es `#00C805` (constante `brand.green` en `lib/theme/index.ts`, igual que `c.brand` del theme). No inventar otros verdes para identidad de marca — los tokens `action` y `positive` son para CTAs y deltas, NO para marca.
 
 ## API de Manteca
 

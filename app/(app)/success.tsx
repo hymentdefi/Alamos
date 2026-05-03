@@ -4,12 +4,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
@@ -17,6 +19,7 @@ import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { useAuth } from "../../lib/auth/context";
 import { useConfetti } from "../../lib/hooks/useConfetti";
+import { playSound } from "../../lib/sounds/SoundManager";
 
 /**
  * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
@@ -79,49 +82,92 @@ export default function SuccessScreen() {
   );
 
   // Animación del check verde:
-  //   - Pop-in: scale 0 → 1.1 → 1.0 (300+200ms) cuando aparece.
-  //   - Pulse infinito: 1.0 → 1.03 → 1.0 cada 2s, mantiene el ojo
-  //     enganchado mientras el usuario lee el detalle del trade.
-  //     Empieza después del confetti (delay 700ms ≈ post pop-in
-  //     + post primer impacto del burst) para no competir.
+  //   - Pop-in (siempre): scale 0 → 1.1 → 1.0 (300+200ms = 500ms).
+  //   - Si NO es first trade: pulse infinito sutil 1.0 ↔ 1.03 cada
+  //     2s, mantiene el ojo enganchado.
+  //   - Si SÍ es first trade: el pulse no corre, porque la secuencia
+  //     anticipation/peak del burst (ver onCheckLayout más abajo)
+  //     toma el control del checkScale a t=+500ms con un pulse
+  //     fuerte (1.15) seguido de un spring overshoot (1.3 → 1.0).
+  //     Coreografiar las dos cosas a la vez se sentía caótico — el
+  //     pulse infinito queda solo para el modo "compra subsiguiente"
+  //     donde no hay celebración.
   const checkScale = useSharedValue(0);
   useEffect(() => {
-    checkScale.value = withSequence(
-      withTiming(1.1, {
-        duration: 300,
-        easing: Easing.out(Easing.back(1.4)),
-      }),
-      withTiming(1.0, {
-        duration: 200,
-        easing: Easing.out(Easing.cubic),
-      }),
-      withDelay(
-        700,
-        withRepeat(
-          withSequence(
-            withTiming(1.03, {
-              duration: 1000,
-              easing: Easing.inOut(Easing.sin),
-            }),
-            withTiming(1.0, {
-              duration: 1000,
-              easing: Easing.inOut(Easing.sin),
-            }),
+    if (isFirstTrade) {
+      checkScale.value = withSequence(
+        withTiming(1.1, {
+          duration: 300,
+          easing: Easing.out(Easing.back(1.4)),
+        }),
+        withTiming(1.0, {
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+        }),
+      );
+    } else {
+      checkScale.value = withSequence(
+        withTiming(1.1, {
+          duration: 300,
+          easing: Easing.out(Easing.back(1.4)),
+        }),
+        withTiming(1.0, {
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+        }),
+        withDelay(
+          700,
+          withRepeat(
+            withSequence(
+              withTiming(1.03, {
+                duration: 1000,
+                easing: Easing.inOut(Easing.sin),
+              }),
+              withTiming(1.0, {
+                duration: 1000,
+                easing: Easing.inOut(Easing.sin),
+              }),
+            ),
+            -1,
+            false,
           ),
-          -1,
-          false,
         ),
-      ),
-    );
-  }, [checkScale]);
+      );
+    }
+  }, [checkScale, isFirstTrade]);
   const checkAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: checkScale.value }],
   }));
 
+  // Flash blanco overlay — pulso opacity 0 → 0.35 → 0 disparado
+  // desde el `onPeak` del burst. Da el "fogonazo" gacha-style
+  // sincrónico con el haptic Success y el spring overshoot del check.
+  const flashOpacity = useSharedValue(0);
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flashOpacity.value }));
+
+  // Sonido de orden ejecutada — corre en TODAS las órdenes (no solo
+  // first trade). El sonido vive en el mount de la screen, separado
+  // del burst (que es first-trade only). Si el usuario tiene el
+  // celular en silencio, no suena (ver SoundManager — `playsInSilentMode: false`).
+  useEffect(() => {
+    playSound("order_success");
+  }, []);
+
   // Burst del confetti: SOLO si es el primer trade del usuario.
   // Origen = centro del check verde (medido vía measureInWindow).
-  // Disparo 250ms DESPUÉS de aparecer el check para crear el micro
-  // arco emocional éxito → celebración.
+  //
+  // Disparo a t=+500ms post-mount: deja que el pop-in del check
+  // termine limpio antes de que la secuencia anticipation/peak
+  // tome el control del mismo `checkScale`. Si lo disparábamos
+  // antes (250ms, valor previo), las dos animaciones se pisaban.
+  //
+  // Callbacks:
+  //   - onAnticipation (t=+500ms): pulse 1.0 → 1.15 → 1.0 en 100ms.
+  //     Telegrafia "viene algo grande". cancelAnimation primero
+  //     porque podría seguir corriendo el último frame del pop-in.
+  //   - onPeak (t=+600ms): spring overshoot del check (1.0 → 1.3
+  //     → 1.0) + flash blanco overlay (0 → 0.35 → 0 en 90ms).
+  //     Sincrónico con el haptic Success y el burst de partículas.
   const { burst } = useConfetti();
   const checkRef = useRef<View>(null);
   const burstedRef = useRef(false);
@@ -133,12 +179,58 @@ export default function SuccessScreen() {
       const cx = x + width / 2;
       const cy = y + height / 2;
       setTimeout(() => {
-        burst({ x: cx, y: cy });
+        burst({
+          x: cx,
+          y: cy,
+          onAnticipation: () => {
+            cancelAnimation(checkScale);
+            checkScale.value = withSequence(
+              withTiming(1.15, {
+                duration: 50,
+                easing: Easing.out(Easing.cubic),
+              }),
+              withTiming(1.0, {
+                duration: 50,
+                easing: Easing.out(Easing.cubic),
+              }),
+            );
+          },
+          onPeak: () => {
+            cancelAnimation(checkScale);
+            // Spring overshoot estilo gacha — friction baja /
+            // damping bajo para que rebote visiblemente al pico.
+            checkScale.value = withSequence(
+              withSpring(1.3, {
+                damping: 7,
+                stiffness: 200,
+                mass: 0.7,
+              }),
+              withSpring(1.0, {
+                damping: 12,
+                stiffness: 200,
+                mass: 0.7,
+              }),
+            );
+            // Flash blanco — corto y agresivo. 30ms ramp-up para
+            // sincronizar con el haptic, 60ms decay para fadear
+            // antes de que el ojo lo lea como "pantalla apagada".
+            flashOpacity.value = withSequence(
+              withTiming(0.35, {
+                duration: 30,
+                easing: Easing.out(Easing.cubic),
+              }),
+              withTiming(0, {
+                duration: 60,
+                easing: Easing.out(Easing.cubic),
+              }),
+            );
+          },
+        });
         // Marca el flag en AuthContext (in-memory en mock; POST en
         // prod). Idempotente — siguientes compras de la sesión ya
         // no disparan.
         markFirstTrade();
-      }, 250);
+      }, 500);
     });
   };
 
@@ -191,13 +283,13 @@ export default function SuccessScreen() {
             <Text style={[s.title, { color: c.text }]}>
               Felicitaciones, {firstName}.
             </Text>
-            <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Hiciste tu primera compra.{" "}
-              <Text
-                style={{ color: c.text, fontFamily: fontFamily[700] }}
-              >
-                {subheadlineBold}
-              </Text>
+            <Text
+              style={[
+                s.subtitle,
+                { color: c.text, fontFamily: fontFamily[700] },
+              ]}
+            >
+              Hiciste tu primera compra. {subheadlineBold}
             </Text>
             <Text style={[s.subtitleTech, { color: c.textMuted }]}>
               Tu orden de mercado por {formatARS(numAmount)} de{" "}
@@ -280,6 +372,20 @@ export default function SuccessScreen() {
           <AlamosIcon name="arrow" size={13} color={c.textMuted} />
         </Pressable>
       </View>
+
+      {/* Flash blanco overlay — invisible 99% del tiempo, pulsa en el
+          `onPeak` del burst para dar el "fogonazo" sincrónico con el
+          haptic Success. pointerEvents=none así no come taps. Está
+          DEBAJO del ConfettiPortal (que vive en el root layout) — el
+          confetti se ve sobre el flash. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: "#FFFFFF" },
+          flashStyle,
+        ]}
+      />
     </View>
   );
 }

@@ -13,6 +13,10 @@
  *     que la animación se lea rica, no homogénea.
  *   - Gravedad fuerte (700) + TTL más corto (1800-2400ms) → libera
  *     el card del trade rápido para que sea legible.
+ *
+ * Overrides opcionales (speedScale / sizeRange / ttlRange): permiten
+ * que las etapas posteriores del burst secuencial (encore, sparkle
+ * tail) usen distintas físicas sin duplicar la clase entera.
  */
 
 export type Shape = "square" | "circle" | "triangle";
@@ -23,6 +27,19 @@ export interface SpawnInput {
   color: string;
   shape: Shape;
   rng?: () => number;
+  /** Multiplica la velocidad pickeada por pickSpeed. Default 1.
+   *  El encore usa 0.7 → partículas que viajan menos lejos. */
+  speedScale?: number;
+  /** Override del rango de tamaño (px). Si está, ignora pickSize.
+   *  El sparkle tail usa [4, 6] → "polvo" muy fino. */
+  sizeRange?: [number, number];
+  /** Override del rango de TTL (ms). Si está, ignora el default
+   *  1800-2400. El sparkle tail usa [2500, 3500] → flota largo. */
+  ttlRange?: [number, number];
+  /** Override del rango de velocidad ABSOLUTO (px/s). Si está,
+   *  ignora pickSpeed entera (y por ende speedScale no aplica).
+   *  El sparkle tail usa [200, 400]. */
+  speedRange?: [number, number];
 }
 
 const TAU = Math.PI * 2;
@@ -46,12 +63,15 @@ function pickAngle(rng: () => number): number {
   return goesRight ? offset : Math.PI + offset;
 }
 
-/** Picker de velocidad — 3 buckets temporales. */
+/** Picker de velocidad — 3 buckets temporales. Bumpeado +20% sobre
+ *  los valores originales para que el burst se sienta más explosivo:
+ *  las rápidas llegan al borde de pantalla, las medianas pueblan el
+ *  campo visual, las lentas dan el "polvo" que cae cerca del origen. */
 function pickSpeed(rng: () => number): number {
   const r = rng();
-  if (r < 0.25) return 600 + rng() * 300; // 25% rápidas (600-900)
-  if (r < 0.75) return 350 + rng() * 250; // 50% medianas (350-600)
-  return 200 + rng() * 150;               // 25% lentas (200-350)
+  if (r < 0.25) return 720 + rng() * 360; // 25% rápidas (720-1080)
+  if (r < 0.75) return 420 + rng() * 300; // 50% medianas (420-720)
+  return 240 + rng() * 180;               // 25% lentas (240-420)
 }
 
 /** Picker de tamaño — bimodal con hero particles. */
@@ -76,18 +96,34 @@ export class Confetto {
   color: string;
   shape: Shape;
 
-  constructor({ x, y, color, shape, rng = Math.random }: SpawnInput) {
+  constructor({
+    x,
+    y,
+    color,
+    shape,
+    rng = Math.random,
+    speedScale = 1,
+    sizeRange,
+    ttlRange,
+    speedRange,
+  }: SpawnInput) {
     // Jitter ±20px en X — el burst no se ve como un chorro alineado.
     this.x = x + (rng() * 40 - 20);
     this.y = y;
     const angle = pickAngle(rng);
-    const speed = pickSpeed(rng);
+    const speed = speedRange
+      ? speedRange[0] + rng() * (speedRange[1] - speedRange[0])
+      : pickSpeed(rng) * speedScale;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     this.rotation = rng() * TAU;
     this.rotationSpeed = (rng() * 6 - 3) * Math.PI; // ±3π rad/s — tumbling más vívido
-    this.size = pickSize(rng);
-    this.ttl = 1800 + rng() * 600; // 1.8-2.4s — antes 2.2-3.0s
+    this.size = sizeRange
+      ? sizeRange[0] + rng() * (sizeRange[1] - sizeRange[0])
+      : pickSize(rng);
+    this.ttl = ttlRange
+      ? ttlRange[0] + rng() * (ttlRange[1] - ttlRange[0])
+      : 1800 + rng() * 600; // default 1.8-2.4s
     this.color = color;
     this.shape = shape;
   }

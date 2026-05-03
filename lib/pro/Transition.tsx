@@ -52,7 +52,7 @@ function AnimatedAlamosMark({
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Path
         d="M 38 26 L 16 86 L 60 86 Z"
-        stroke="#00E676"
+        stroke={brand.green}
         strokeWidth={6.5}
         strokeLinejoin="round"
         strokeLinecap="round"

@@ -3,6 +3,10 @@
  * Robinhood (Super Bowl LIV) — versión Álamos. Pesos sumados = 100,
  * la selección random es ponderada (no uniforme) para que el verde
  * primario domine visualmente.
+ *
+ * Verde de marca: #00C805 (mismo que `brand.green` en lib/theme).
+ * Las otras tonalidades son vecinas cromáticas para que la familia
+ * se sienta coherente sin ser monocroma plana.
  */
 export interface PaletteEntry {
   hex: string;
@@ -10,11 +14,11 @@ export interface PaletteEntry {
 }
 
 export const PALETTE: readonly PaletteEntry[] = [
-  { hex: "#00e676", weight: 45 }, // verde primario Álamos
-  { hex: "#00b85c", weight: 20 }, // verde profundo
-  { hex: "#5cffa8", weight: 18 }, // verde claro
-  { hex: "#c8ffe0", weight: 10 }, // verde casi blanco
-  { hex: "#ffffff", weight: 7 },  // blanco puro
+  { hex: "#00C805", weight: 45 }, // verde primario Álamos (brand.green)
+  { hex: "#009A04", weight: 20 }, // verde profundo
+  { hex: "#4DEB55", weight: 18 }, // verde claro
+  { hex: "#B8FFB5", weight: 10 }, // verde casi blanco
+  { hex: "#FFFFFF", weight: 7 },  // blanco puro
 ];
 
 const TOTAL_WEIGHT = PALETTE.reduce((s, p) => s + p.weight, 0);

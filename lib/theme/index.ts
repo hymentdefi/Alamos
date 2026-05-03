@@ -12,19 +12,17 @@ export const brand = {
  *     Light: blanco puro + grises neutros fríos.
  *     Dark:  negro puro + grises muy oscuros.
  *
- * El verde tiene 3 ROLES distintos en escalas distintas (mismo hue,
- * diferente luminosidad) — el diagnóstico de claude-design exige
- * separar marca / acción / positivo para que un mismo color no
- * signifique todo:
+ * El verde de marca es UN solo color, definido en `brand.green` arriba:
+ * `#00C805` (mismo en light y dark). Es el verde que usa el isotipo
+ * del logo, la pantalla de orden ejecutada, y todo lo que represente
+ * identidad de marca.
  *
- *   - `brand` (#00E676 light, #0ECB81 dark) — logo, watermark, sello
- *     de identidad. Verde más saturado, alto recall.
- *   - `action` (#5ac43e light, #4FB833 dark) — CTAs primarios
- *     (Ingresar / Convertir y comprar / etc.). Más empujado a tierra,
- *     mejor contraste con texto blanco.
- *   - `positive` (#00A304 light, #02A05C dark) — deltas, retornos
- *     positivos, "subió". Más oscuro y técnico, NO se confunde con
- *     un botón.
+ * Conviven dos tokens auxiliares — `action` y `positive` — que tienen
+ * roles funcionales distintos al brand y NO son verdes de marca:
+ *   - `action` — verde un poco más tierra, usado en CTAs y la pill
+ *     activa del nav bar.
+ *   - `positive` — verde más oscuro/técnico para deltas positivos en
+ *     charts y % de retorno.
  *
  * Cada uno tiene su `Dim` (rgba al 14%) para badges/pills sin
  * dominar. Los tokens viejos `green/greenDark/greenDim` se mantienen
@@ -48,8 +46,8 @@ const light = {
   textFaint: "#A3A3A3",
 
   /* Roles de verde — semánticos. */
-  brand: "#00E676",
-  brandDim: "rgba(0,230,118,0.14)",
+  brand: "#00C805",
+  brandDim: "rgba(0,200,5,0.14)",
   action: "#5ac43e",
   actionDim: "rgba(90,196,62,0.14)",
   positive: "#00A304",
@@ -86,8 +84,8 @@ const dark = {
   textMuted: "#848E9C",
   textFaint: "#5E6673",
 
-  brand: "#0ECB81",
-  brandDim: "rgba(14,203,129,0.18)",
+  brand: "#00C805",
+  brandDim: "rgba(0,200,5,0.18)",
   action: "#4FB833",
   actionDim: "rgba(79,184,51,0.16)",
   positive: "#02A05C",

@@ -31,6 +31,7 @@ import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
 import { ConfettiPortal } from "../lib/hooks/useConfetti";
+import { SoundManager } from "../lib/sounds/SoundManager";
 import {
   ThemeContext,
   themes,
@@ -108,6 +109,14 @@ export default function RootLayout() {
         if (v === "dark" || v === "light" || v === "system") setPrefState(v);
       })
       .catch(() => {});
+  }, []);
+
+  // Pre-cargar el subsistema de audio + sonidos al boot. Idempotente,
+  // silencioso ante fallas (un sonido que no carga no debe romper la
+  // app). Crítico: setea `playsInSilentMode: false` adentro, así que
+  // la app respeta el silent mode del usuario.
+  useEffect(() => {
+    SoundManager.init();
   }, []);
 
   // Escuchar cambios del color scheme del sistema.
