@@ -888,7 +888,7 @@ function AmountStep({
       <View
         style={{
           paddingTop: 28,
-          paddingBottom: insets.bottom + 180,
+          paddingBottom: insets.bottom + 24,
           paddingHorizontal: 20,
         }}
       >
@@ -1539,7 +1539,11 @@ const s = StyleSheet.create({
   /* Send flow — paso 1 (monto + slider) */
   amountBlock: {
     flex: 1,
-    justifyContent: "center",
+    // flex-end ancla amount + slider al fondo del block, justo
+    // arriba del keypad. Resultado: el espacio extra del flex queda
+    // entre el header y la pregunta, no abajo. Todo el bloque
+    // input baja como un grupo.
+    justifyContent: "flex-end",
   },
   sendAmountSection: {
     alignItems: "center",
