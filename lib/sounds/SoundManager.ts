@@ -31,7 +31,7 @@ import {
  *   sonido que no suena no debe crashear la app.
  */
 
-export type SoundName = "order_success";
+export type SoundName = "order_success" | "confetti_pop";
 
 /**
  * Mapping `name → require()` de los assets. `require()` se evalúa
@@ -39,9 +39,14 @@ export type SoundName = "order_success";
  *
  * Para agregar más sonidos: agregar entry acá + extender el type
  * `SoundName` arriba. Sin cambios en el resto del código.
+ *
+ * `confetti_pop` también es placeholder generado sintéticamente
+ * (white noise + pop transient). Reemplazar por uno real de
+ * Mixkit/Pixabay con el mismo path.
  */
 const SOUND_SOURCES: Record<SoundName, number> = {
   order_success: require("../../assets/sounds/order_success.wav"),
+  confetti_pop: require("../../assets/sounds/confetti_pop.wav"),
 };
 
 class SoundManagerImpl {

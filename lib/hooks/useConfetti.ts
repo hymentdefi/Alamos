@@ -6,6 +6,7 @@ import {
   type BurstConfig,
 } from "../components/Confetti/ConfettiManager";
 import { ConfettiCanvas } from "../components/Confetti/ConfettiCanvas";
+import { playSound } from "../sounds/SoundManager";
 
 export interface BurstOptions {
   /** Coordenadas en window-space del epicentro. */
@@ -93,9 +94,12 @@ export function ConfettiPortal() {
  *            flotan largo (TTL 2.5-3.5s). Sin haptic. Es el "polvo"
  *            ambiental que cierra la celebración.
  *
- * El SONIDO (`order_success`) NO se dispara desde acá — vive en el
- * mount de la success screen, así suena en TODAS las órdenes (no
- * solo en la primera donde corre el burst). Ver SoundManager.
+ * Sonidos:
+ *   - `order_success` (el bell ding) NO vive acá — se dispara en
+ *     confirm.tsx en el momento de "Orden Ejecutada", para que suene
+ *     en TODAS las órdenes (no solo la primera con burst).
+ *   - `confetti_pop` SÍ vive acá — se dispara en peak (volume 1.0)
+ *     y encore (volume 0.55, eco), sincrónico con cada explosión.
  */
 export function useConfetti() {
   const burst = useCallback((opts: BurstOptions) => {
@@ -108,20 +112,22 @@ export function useConfetti() {
     onAnticipation?.();
 
     // t = +100ms — peak. UN solo Heavy impact (un punch fuerte y
-    // único) en lugar de notificationAsync(Success) que es 3-tap
-    // rápido y entra en conflicto con la melodía del WAV. Heavy +
-    // ding-dong se complementan: el haptic es la "puñalada"
-    // percusiva, el sonido es la melodía que la acompaña.
+    // único) + sonido confetti_pop a volumen full, sincrónico con
+    // la explosión visual. Heavy + pop sound + 1000 partículas =
+    // EL momento.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      playSound("confetti_pop");
       onPeak?.();
       globalManager.burst({ x, y, count });
     }, 100);
 
-    // t = +450ms — encore. Light impact (era Medium) — un toquecito
-    // sutil que confirma "todavía pasa algo", sin re-pegarte.
+    // t = +450ms — encore. Light impact + mismo sonido confetti_pop
+    // pero a 0.55 volume — se siente como "eco" del peak, no como
+    // un re-hit con la misma intensidad.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      playSound("confetti_pop", { volume: 0.55 });
       globalManager.burst({ x, y, count: 500, speedScale: 0.7 });
     }, 450);
 
