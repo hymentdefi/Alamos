@@ -47,20 +47,10 @@ function fireErrorHaptic() {
     Haptics.NotificationFeedbackType.Error,
   ).catch(() => {});
 }
-/**
- * Build-up haptic en "Orden Recibida..." — Medium 250ms antes del
- * peak Heavy de "Ejecutada". Forma una rampa Medium → Heavy con
- * gap perceptual que arma la anticipación al payoff. Sin esto el
- * peak se siente "aislado"; con esto el cerebro ya sabe que algo
- * grande viene.
- *
- * fireSuccessHaptic sigue removido — el spring del check al final
- * es solo visual, no necesita su propio haptic (sería redundante
- * 250ms después del peak).
- */
-function fireMediumHaptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-}
+// fireMediumHaptic + fireSuccessHaptic removidos — el peak táctil
+// ahora vive directamente en el cambio a "Orden Recibida..." (Heavy
+// inmediato al setStatusText). Sin build-up Medium intermedio y
+// sin Success notification al final del spring del check.
 
 /* ───────────── CrossFadeStatusText (spec section F) ───────────────────
  *
@@ -211,29 +201,6 @@ const DONE_HOLD_MS = 2000;
 const MIN_LOADING_MS = 600;
 const TIMEOUT_MS = 8000;
 const CHECK_PATH_LEN = 24;
-/**
- * Lead del haptic sobre el sonido en el peak de "Orden Ejecutada".
- *
- * Por qué 40ms: el cerebro procesa input táctil (~10ms latencia) más
- * rápido que el auditivo (~30-50ms al cortex). Si los dos events se
- * disparan en el mismo frame del JS, el oído los percibe como
- * desincronizados. Adelantar el haptic 40ms los hace sentir
- * SIMULTÁNEOS y "co-localizados" — esto es lo que hace que el
- * peak se sienta como un solo evento físico-sonoro, no dos
- * separados. Apple Pay usa ~30-40ms entre haptic y "ding".
- */
-const HAPTIC_AUDIO_LEAD_MS = 40;
-/**
- * Delay del haptic Medium dentro de la fase "Recibida..." — el
- * texto entrante cruza ~50% de opacidad alrededor de IN_DELAY +
- * IN_DURATION/2 ≈ 450ms. Tirar el haptic ahí lo sincroniza con el
- * cross-fade visual (ver section G del spec original).
- *
- * En tiempo absoluto: t=+800 (Recibida text) + 450 = t=+1250ms,
- * que es exactamente 250ms antes del peak Heavy a t=+1500ms.
- * Esos 250ms son el gap perceptual del build-up al payoff.
- */
-const RECIBIDA_HAPTIC_DELAY_MS = 450;
 const SPIN_DURATION_MS = 1000;
 // SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
@@ -505,18 +472,14 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received. El crossfade visual del texto
-    // dispara el cambio de prop. El haptic Medium se dispara cuando
-    // el texto entrante cruza ~50% de opacidad — funciona como
-    // BUILD-UP del peak Heavy que viene 250ms después en "Ejecutada".
-    // Medium → Heavy con gap de 250ms = rampa de anticipación al
-    // payoff.
+    // Phase 2: sending → received. PEAK TÁCTIL acá — Heavy haptic
+    // sincrónico con la aparición del texto "Orden Recibida...".
+    // El haptic se siente como "lo recibieron", no espera al
+    // crossfade ni al gap de build-up: dispara en el mismo tick
+    // que el setStatusText.
     setPhase("received");
     setStatusText("Orden Recibida...");
-    setTimeout(() => {
-      if (completedRef.current && phase !== "received") return;
-      fireMediumHaptic();
-    }, RECIBIDA_HAPTIC_DELAY_MS);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;
@@ -530,15 +493,12 @@ export default function ConfirmScreen() {
     }
     setStatusText("Orden Ejecutada");
 
-    // PEAK: haptic Heavy + sonido del ding co-localizados. El haptic
-    // dispara INMEDIATO, el sonido arranca HAPTIC_AUDIO_LEAD_MS (40ms)
-    // después — esto compensa la latencia diferencial táctil vs
-    // auditiva del cerebro y los hace percibir como un solo evento
-    // simultáneo. Patrón Apple Pay.
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    setTimeout(() => {
-      playSound("order_success");
-    }, HAPTIC_AUDIO_LEAD_MS);
+    // PAYOFF SONORO: el peak táctil ya disparó en "Recibida..." —
+    // acá suena el ding sin haptic propio. La separación táctil/
+    // sonora hace que cada modalidad tenga su momento ("recibido"
+    // físico → "ejecutado" sonoro), en vez de pisarse en el mismo
+    // beat.
+    playSound("order_success");
 
     // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {
