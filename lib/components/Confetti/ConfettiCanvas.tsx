@@ -48,6 +48,9 @@ export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
+    console.log(
+      `[confetti] canvas layout ${width.toFixed(0)}x${height.toFixed(0)}`,
+    );
     setSize((prev) =>
       prev.w === width && prev.h === height ? prev : { w: width, h: height },
     );

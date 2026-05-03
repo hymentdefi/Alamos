@@ -50,6 +50,9 @@ export class ConfettiManager {
     emitRate = 280,
   }: BurstConfig) {
     const initialCount = Math.round(initialBurst * this.particleScale);
+    console.log(
+      `[confetti] manager.burst x=${x.toFixed(0)} y=${y.toFixed(0)} initial=${initialCount} hasOnActivity=${!!this.onActivity}`,
+    );
     for (let i = 0; i < initialCount; i++) {
       this.spawnAt(x, y);
     }

@@ -55,22 +55,38 @@ export default function SuccessScreen() {
   // micro-arco emocional éxito → celebración.
   const { burst } = useConfetti();
   const checkRef = useRef<View>(null);
+  const burstedRef = useRef(false);
   const onCheckLayout = (_e: LayoutChangeEvent) => {
+    // Guard contra re-disparos en re-layouts (rotación, keyboard,
+    // re-render del padre). Solo una vez por monte de la pantalla.
+    if (burstedRef.current) return;
+    burstedRef.current = true;
     // measureInWindow nos da coords absolutas en el viewport — es
     // lo que el ConfettiPortal (mountado en el root) entiende.
     checkRef.current?.measureInWindow((x, y, width, height) => {
       const cx = x + width / 2;
       const cy = y + height / 2;
-      // Solo el primer trade del usuario — gate persistido en
-      // SecureStore. CNV no permite gamificar cada operación.
-      hasFirstTradeBeenCelebrated().then((alreadyDone) => {
-        if (alreadyDone) return;
+      console.log(
+        `[confetti] check measured at x=${cx.toFixed(0)} y=${cy.toFixed(0)} (size ${width}x${height})`,
+      );
+      // En desarrollo bypaseamos el gate para poder testear la
+      // animación todas las veces que querramos. En prod, sólo el
+      // primer trade del usuario (CNV).
+      const checkGate = __DEV__
+        ? Promise.resolve(false)
+        : hasFirstTradeBeenCelebrated();
+      checkGate.then((alreadyDone) => {
+        if (alreadyDone) {
+          console.log("[confetti] gate cerrado, skip");
+          return;
+        }
         // 250ms de pausa: el cerebro registra primero "éxito" y
         // después "celebración" — sentido como reward auténtico,
         // no como confeti coreografiado.
         setTimeout(() => {
+          console.log("[confetti] disparando burst");
           burst({ x: cx, y: cy });
-          markFirstTradeCelebrated();
+          if (!__DEV__) markFirstTradeCelebrated();
         }, 250);
       });
     });
