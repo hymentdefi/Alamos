@@ -825,37 +825,42 @@ function AmountStep({
         <View style={{ width: 36 }} />
       </View>
 
-      <View style={s.sendAmountSection}>
-        <Text style={[s.amountLabel, { color: c.textMuted }]}>
-          ¿Cuánto vas a mandar?
-        </Text>
-        <View style={s.amountRow}>
-          <Text style={[s.amountSign, { color: c.textMuted }]}>{sign}</Text>
-          <Text
-            style={[s.amountValue, { color: exceeds ? c.red : c.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {Number.parseFloat(amount || "0").toLocaleString("es-AR", {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 2,
-            })}
-            {amount.endsWith(".") ? "," : ""}
+      {/* Bloque monto + slider centrado en el espacio disponible
+          arriba del keypad — sin un flex spacer todo se apilaba al
+          top y la pantalla se veía sub-balanceada. */}
+      <View style={s.amountBlock}>
+        <View style={s.sendAmountSection}>
+          <Text style={[s.amountLabel, { color: c.textMuted }]}>
+            ¿Cuánto vas a mandar?
+          </Text>
+          <View style={s.amountRow}>
+            <Text style={[s.amountSign, { color: c.textMuted }]}>{sign}</Text>
+            <Text
+              style={[s.amountValue, { color: exceeds ? c.red : c.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {Number.parseFloat(amount || "0").toLocaleString("es-AR", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+              })}
+              {amount.endsWith(".") ? "," : ""}
+            </Text>
+          </View>
+          <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
+            {exceeds
+              ? `Supera el disponible (${formatMoney(max, cur)})`
+              : `Disponible ${formatMoney(max, cur)}`}
           </Text>
         </View>
-        <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
-          {exceeds
-            ? `Supera el disponible (${formatMoney(max, cur)})`
-            : `Disponible ${formatMoney(max, cur)}`}
-        </Text>
-      </View>
 
-      <View style={s.sendSliderRow}>
-        <PercentSlider
-          value={currentPct}
-          onChange={applyPct}
-          disabled={max <= 0}
-        />
+        <View style={s.sendSliderRow}>
+          <PercentSlider
+            value={currentPct}
+            onChange={applyPct}
+            disabled={max <= 0}
+          />
+        </View>
       </View>
 
       <View style={s.keypad}>
@@ -1532,10 +1537,14 @@ const s = StyleSheet.create({
   },
 
   /* Send flow — paso 1 (monto + slider) */
+  amountBlock: {
+    flex: 1,
+    justifyContent: "center",
+  },
   sendAmountSection: {
     alignItems: "center",
     paddingTop: 8,
-    paddingBottom: 4,
+    paddingBottom: 12,
   },
   sendSliderRow: {
     paddingHorizontal: 28,
