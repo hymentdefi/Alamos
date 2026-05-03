@@ -215,6 +215,12 @@ export default function ConvertScreen() {
     });
   };
 
+  // Hold "back" para limpiar el input entero. Heavy haptic.
+  const handleBackLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setAmount("0");
+  };
+
   const onConfirm = () => {
     if (!canConfirm) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -329,6 +335,8 @@ export default function ConvertScreen() {
               <Tap
                 key={k}
                 onPress={() => handleKey(k)}
+                onLongPress={k === "back" ? handleBackLongPress : undefined}
+                delayLongPress={400}
                 haptic="selection"
                 pressScale={0.92}
                 style={s.keyBtn}

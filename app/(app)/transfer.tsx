@@ -909,6 +909,13 @@ function AmountStep({
     onChangeAmount(next);
   };
 
+  // Hold "back" para limpiar el input entero — patrón estándar
+  // de calculadoras de banking. Heavy haptic para feedback.
+  const handleBackLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    onChangeAmount("0");
+  };
+
   // Convención de la app: ARS con "$" antes, USD con " USD" después.
   const signPrefix = cur === "ars" ? "$" : "";
   const signSuffix = cur === "ars" ? "" : " US$";
@@ -986,6 +993,8 @@ function AmountStep({
               <Tap
                 key={k}
                 onPress={() => handleKey(k)}
+                onLongPress={k === "back" ? handleBackLongPress : undefined}
+                delayLongPress={400}
                 haptic="selection"
                 pressScale={0.92}
                 style={s.keyBtn}
@@ -1256,6 +1265,12 @@ function DepositFromAccount({
     });
   };
 
+  // Hold "back" para limpiar input completo. Heavy haptic.
+  const handleBackLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setAmount("0");
+  };
+
   // Convención de la app: ARS con "$" antes, USD con " USD" después.
   const signPrefix = cur === "ars" ? "$" : "";
   const signSuffix = cur === "ars" ? "" : " US$";
@@ -1357,6 +1372,8 @@ function DepositFromAccount({
               <Tap
                 key={k}
                 onPress={() => handleKey(k)}
+                onLongPress={k === "back" ? handleBackLongPress : undefined}
+                delayLongPress={400}
                 haptic="selection"
                 pressScale={0.92}
                 style={s.keyBtn}

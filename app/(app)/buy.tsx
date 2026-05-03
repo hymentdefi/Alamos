@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import {
   assets,
@@ -191,6 +192,14 @@ export default function BuyScreen() {
     });
   };
 
+  // Hold "back" para limpiar el input entero — patrón estándar de
+  // calculadoras de banking (Mercado Pago, Brubank, Robinhood). Heavy
+  // haptic para feedback táctil contundente del "limpié todo".
+  const handleBackLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setInput("0");
+  };
+
   const switchInputMode = (next: InputMode) => {
     if (next === inputMode) return;
     if (hasInput) {
@@ -368,6 +377,8 @@ export default function BuyScreen() {
               <Tap
                 key={k}
                 onPress={() => handleKey(k)}
+                onLongPress={k === "back" ? handleBackLongPress : undefined}
+                delayLongPress={400}
                 haptic="selection"
                 pressScale={0.92}
                 rippleColor="rgba(14,15,12,0.08)"
