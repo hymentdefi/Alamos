@@ -160,16 +160,14 @@ function DepositInfo() {
   // Hub picker — 4 floating cards 2×2.
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[s.headerBare, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtnBare}
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={24} color={c.text} />
         </Pressable>
-        <Text style={[s.headerTitle, { color: c.text }]}>Ingresar dinero</Text>
-        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
@@ -748,16 +746,14 @@ function SendCurrencyHub({ onPick }: { onPick: (id: AccountId) => void }) {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[s.headerBare, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtnBare}
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={24} color={c.text} />
         </Pressable>
-        <Text style={[s.headerTitle, { color: c.text }]}>Enviar dinero</Text>
-        <View style={{ width: 36 }} />
       </View>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -1335,6 +1331,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
     gap: 12,
+  },
+  /* Header alternativo sin título — solo arrow-back sin chrome.
+     Usado en el hub picker (la pregunta del cuerpo es el título). */
+  headerBare: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
+  /* Back button "naked" — sin pill de fondo, solo el ícono. */
+  backBtnBare: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   iconBtn: {
     width: 36,
