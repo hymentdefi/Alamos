@@ -10,23 +10,9 @@ import {
   RefreshControl,
   Animated,
   Easing,
-  TextInput,
-  Alert,
-  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import {
-  Gesture,
-  GestureDetector,
-} from "react-native-gesture-handler";
-import Reanimated, {
-  Easing as ReEasing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -55,9 +41,7 @@ import {
   accounts,
   convertAmount,
   formatAccountBalance,
-  rateBetween,
   type Account,
-  type AccountId,
 } from "../../../lib/data/accounts";
 import {
   MiniSparkline,
@@ -67,7 +51,6 @@ import {
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
-import { AccountAvatar } from "../../../lib/components/AccountAvatar";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
 import { AlamosLogo } from "../../../lib/components/Logo";
 import {
@@ -874,13 +857,6 @@ function Dinero(_: {
   const { c } = useTheme();
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
-  const [convertFromId, setConvertFromId] = useState<AccountId | undefined>();
-
-  const openConvertFrom = useCallback((id?: AccountId) => {
-    setConvertFromId(id);
-    setConvertOpen(true);
-  }, []);
 
   return (
     <View style={s.sectionBlock}>
@@ -916,7 +892,7 @@ function Dinero(_: {
           }
           label="Convertir"
           haptic="medium"
-          onPress={() => openConvertFrom(undefined)}
+          onPress={() => router.push("/(app)/convert")}
         />
       </View>
 
@@ -944,11 +920,6 @@ function Dinero(_: {
       <EarningsInfoModal
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
-      />
-      <ConvertSheet
-        visible={convertOpen}
-        onClose={() => setConvertOpen(false)}
-        initialFromId={convertFromId}
       />
     </View>
   );
@@ -1013,377 +984,6 @@ function AccountRow({
   );
 }
 
-/* ─── Bottom sheet de conversión entre cuentas ─── */
-function ConvertSheet({
-  visible,
-  onClose,
-  initialFromId,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  initialFromId?: AccountId;
-}) {
-  const { c } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { height: windowH } = useWindowDimensions();
-  const [fromId, setFromId] = useState<AccountId>("ars-ar");
-  const [toId, setToId] = useState<AccountId>("usd-ar");
-  const [amount, setAmount] = useState("");
-  // null si no hay picker abierto, sino indica para qué slot.
-  const [pickerSlot, setPickerSlot] = useState<null | "from" | "to">(null);
-
-  /* ─── Swipe-down dismiss (mismo patrón que ChartSettingsSheet,
-   *      MarketClosedSheet y DetailSheet de noticias). ─── */
-  const translateY = useSharedValue(windowH);
-  const backdropOpacity = useSharedValue(0);
-
-  // Setea defaults razonables al abrir + dispara entry animation.
-  useEffect(() => {
-    if (!visible) return;
-    const from = initialFromId ?? "ars-ar";
-    setFromId(from);
-    const firstOther = accounts.find((a) => a.id !== from)?.id ?? "usd-ar";
-    setToId(firstOther);
-    setAmount("");
-    setPickerSlot(null);
-
-    translateY.value = withTiming(0, {
-      duration: 320,
-      easing: ReEasing.out(ReEasing.cubic),
-    });
-    backdropOpacity.value = withTiming(1, {
-      duration: 280,
-      easing: ReEasing.out(ReEasing.cubic),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, initialFromId]);
-
-  const dismiss = () => {
-    translateY.value = withTiming(
-      windowH,
-      { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
-      (finished) => {
-        "worklet";
-        if (finished) runOnJS(onClose)();
-      },
-    );
-    backdropOpacity.value = withTiming(0, { duration: 240 });
-  };
-
-  const pan = Gesture.Pan()
-    .onUpdate((e) => {
-      "worklet";
-      if (e.translationY > 0) {
-        translateY.value = e.translationY;
-        backdropOpacity.value = Math.max(0, 1 - e.translationY / windowH);
-      }
-    })
-    .onEnd((e) => {
-      "worklet";
-      const shouldDismiss =
-        e.translationY > 110 || e.velocityY > 600;
-      if (shouldDismiss) {
-        translateY.value = withTiming(
-          windowH,
-          { duration: 240, easing: ReEasing.in(ReEasing.cubic) },
-          (finished) => {
-            "worklet";
-            if (finished) runOnJS(onClose)();
-          },
-        );
-        backdropOpacity.value = withTiming(0, { duration: 240 });
-      } else {
-        translateY.value = withTiming(0, {
-          duration: 220,
-          easing: ReEasing.out(ReEasing.cubic),
-        });
-        backdropOpacity.value = withTiming(1, { duration: 220 });
-      }
-    });
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  const from = accounts.find((a) => a.id === fromId)!;
-  const to = accounts.find((a) => a.id === toId)!;
-  const numericAmount = parseFloat(amount.replace(",", ".")) || 0;
-  const received = convertAmount(numericAmount, from.currency, to.currency);
-  const rate = rateBetween(from.currency, to.currency);
-  const insufficient = numericAmount > from.balance;
-  const canConfirm = numericAmount > 0 && !insufficient && fromId !== toId;
-
-  const swap = () => {
-    Haptics.selectionAsync().catch(() => {});
-    setFromId(toId);
-    setToId(fromId);
-  };
-
-  const onPickAccount = (id: AccountId) => {
-    Haptics.selectionAsync().catch(() => {});
-    if (pickerSlot === "from") {
-      setFromId(id);
-      // Si quedó igual al destino, movemos el destino a otra cuenta.
-      if (id === toId) {
-        setToId(accounts.find((a) => a.id !== id)!.id);
-      }
-    } else if (pickerSlot === "to") {
-      setToId(id);
-      if (id === fromId) {
-        setFromId(accounts.find((a) => a.id !== id)!.id);
-      }
-    }
-    setPickerSlot(null);
-  };
-
-  const onConfirm = () => {
-    if (!canConfirm) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {},
-    );
-    Alert.alert(
-      "Conversión enviada",
-      `Vas a recibir ${formatConvertPreview(received, to.currency)} en ${to.location}.`,
-      [{ text: "Listo", onPress: dismiss }],
-    );
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={dismiss}
-      statusBarTranslucent
-    >
-      <Reanimated.View style={[s.convertBackdrop, backdropStyle]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
-      </Reanimated.View>
-
-      <GestureDetector gesture={pan}>
-        <Reanimated.View
-          style={[
-            s.convertSheet,
-            { backgroundColor: c.bg, paddingBottom: insets.bottom + 18 },
-            sheetStyle,
-          ]}
-        >
-          <View style={s.convertHandle} />
-          <View style={s.convertHead}>
-            <Text style={[s.convertTitle, { color: c.text }]}>Convertir</Text>
-          </View>
-
-          {pickerSlot ? (
-            <View style={s.convertPickerBlock}>
-              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>
-                ELEGÍ LA CUENTA
-              </Text>
-              {accounts.map((a) => {
-                const selected =
-                  pickerSlot === "from" ? a.id === fromId : a.id === toId;
-                return (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => onPickAccount(a.id)}
-                    style={[
-                      s.convertPickerRow,
-                      { borderBottomColor: c.border },
-                    ]}
-                  >
-                    <AccountAvatar account={a} size={36} />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[s.convertPickerCurrency, { color: c.text }]}
-                      >
-                        {a.currency}
-                      </Text>
-                      <Text
-                        style={[s.convertPickerLoc, { color: c.textMuted }]}
-                      >
-                        {a.location}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[s.convertPickerBal, { color: c.textSecondary }]}
-                    >
-                      {formatAccountBalance(a)}
-                    </Text>
-                    {selected ? (
-                      <Feather
-                        name="check"
-                        size={18}
-                        color={c.positive}
-                        style={{ marginLeft: 8 }}
-                      />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <>
-              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>DE</Text>
-              <Pressable
-                onPress={() => setPickerSlot("from")}
-                style={[
-                  s.convertSelector,
-                  { backgroundColor: c.surfaceHover, borderColor: c.border },
-                ]}
-              >
-                <AccountAvatar account={from} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.convertSelCurrency, { color: c.text }]}>
-                    {from.currency}
-                  </Text>
-                  <Text style={[s.convertSelLoc, { color: c.textMuted }]}>
-                    {from.location} · {formatAccountBalance(from)}
-                  </Text>
-                </View>
-                <Feather name="chevron-down" size={18} color={c.textMuted} />
-              </Pressable>
-
-              <View style={s.convertSwapWrap}>
-                <View style={[s.convertSwapLine, { backgroundColor: c.border }]} />
-                <Pressable
-                  onPress={swap}
-                  style={[s.convertSwap, { backgroundColor: c.ink }]}
-                  hitSlop={8}
-                >
-                  <Feather name="repeat" size={15} color={c.bg} />
-                </Pressable>
-                <View style={[s.convertSwapLine, { backgroundColor: c.border }]} />
-              </View>
-
-              <Text style={[s.convertEyebrow, { color: c.textMuted }]}>A</Text>
-              <Pressable
-                onPress={() => setPickerSlot("to")}
-                style={[
-                  s.convertSelector,
-                  { backgroundColor: c.surfaceHover, borderColor: c.border },
-                ]}
-              >
-                <AccountAvatar account={to} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.convertSelCurrency, { color: c.text }]}>
-                    {to.currency}
-                  </Text>
-                  <Text style={[s.convertSelLoc, { color: c.textMuted }]}>
-                    {to.location}
-                  </Text>
-                </View>
-                <Feather name="chevron-down" size={18} color={c.textMuted} />
-              </Pressable>
-
-              <Text
-                style={[
-                  s.convertEyebrow,
-                  { color: c.textMuted, marginTop: 18 },
-                ]}
-              >
-                CANTIDAD
-              </Text>
-              <View
-                style={[
-                  s.convertAmountWrap,
-                  { backgroundColor: c.surfaceHover, borderColor: c.border },
-                ]}
-              >
-                <Text style={[s.convertAmountCur, { color: c.textMuted }]}>
-                  {from.currency}
-                </Text>
-                <TextInput
-                  value={amount}
-                  onChangeText={setAmount}
-                  placeholder="0"
-                  placeholderTextColor={c.textFaint}
-                  keyboardType="decimal-pad"
-                  style={[s.convertAmountInput, { color: c.text }]}
-                />
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setAmount(String(from.balance));
-                  }}
-                  hitSlop={8}
-                  style={[s.convertMaxBtn, { backgroundColor: c.surface }]}
-                >
-                  <Text style={[s.convertMaxText, { color: c.text }]}>MAX</Text>
-                </Pressable>
-              </View>
-
-              <View style={s.convertPreviewBlock}>
-                <View style={s.convertPreviewRow}>
-                  <Text style={[s.convertPreviewLabel, { color: c.textMuted }]}>
-                    Recibís
-                  </Text>
-                  <Text style={[s.convertPreviewValue, { color: c.text }]}>
-                    ≈ {formatConvertPreview(received, to.currency)}
-                  </Text>
-                </View>
-                <View style={s.convertPreviewRow}>
-                  <Text style={[s.convertPreviewLabel, { color: c.textMuted }]}>
-                    Cotización
-                  </Text>
-                  <Text
-                    style={[s.convertPreviewSub, { color: c.textSecondary }]}
-                  >
-                    1 {from.currency} ={" "}
-                    {rate.toLocaleString("es-AR", {
-                      maximumFractionDigits: rate < 1 ? 6 : 2,
-                    })}{" "}
-                    {to.currency}
-                  </Text>
-                </View>
-                {insufficient ? (
-                  <Text style={[s.convertWarn, { color: c.red }]}>
-                    Saldo insuficiente — tenés{" "}
-                    {formatAccountBalance(from)} disponibles.
-                  </Text>
-                ) : null}
-              </View>
-
-              <Tap
-                haptic="medium"
-                onPress={onConfirm}
-                disabled={!canConfirm}
-                style={[
-                  s.convertCTA,
-                  {
-                    backgroundColor: canConfirm ? c.ink : c.surfaceHover,
-                    opacity: canConfirm ? 1 : 0.6,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    s.convertCTAText,
-                    { color: canConfirm ? c.bg : c.textMuted },
-                  ]}
-                >
-                  Convertir
-                </Text>
-              </Tap>
-            </>
-          )}
-        </Reanimated.View>
-      </GestureDetector>
-    </Modal>
-  );
-}
-
-function formatConvertPreview(n: number, currency: Account["currency"]): string {
-  if (currency === "ARS") {
-    return "$ " + Math.round(n).toLocaleString("es-AR");
-  }
-  const sym = currency === "USD" ? "US$" : "USDT";
-  return `${sym} ${n.toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 function EarningsInfoModal({
   visible,

@@ -42,6 +42,12 @@ export default function AppLayout() {
       />
       <Stack.Screen name="activity" />
       <Stack.Screen name="notifications" />
+      {/* Convert: misma protección que transfer — el slider/keypad
+          puede confundirse con un swipe-from-anywhere. */}
+      <Stack.Screen
+        name="convert"
+        options={{ fullScreenGestureEnabled: false }}
+      />
       {/* Transfer: fullscreen gesture OFF (el slider de % se
           confundía con el swipe-from-anywhere). El edge-swipe-back
           desde el borde izquierdo sigue habilitado para volver. */}
