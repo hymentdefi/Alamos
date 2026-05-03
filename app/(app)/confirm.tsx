@@ -779,13 +779,7 @@ export default function ConfirmScreen() {
             <AmountDisplay
               value={numAmount}
               size={36}
-              prefix={
-                nativeCurrency === "USD"
-                  ? "US$"
-                  : nativeCurrency === "USDT"
-                  ? "USDT"
-                  : "$"
-              }
+              currency={nativeCurrency}
             />
             <Text style={[s.available, { color: c.textMuted }]}>
               {bridge && bridge.from

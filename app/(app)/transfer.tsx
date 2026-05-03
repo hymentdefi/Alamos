@@ -81,7 +81,7 @@ const LINKED_ACCOUNTS: LinkedAccount[] = [
   {
     id: "santander-usd",
     bankName: "Banco Santander",
-    accountType: "Caja de ahorro en US$",
+    accountType: "Caja de ahorro en USD",
     tail: "9012",
     alias: "chris.santander.usd",
     cbu: "0720•••••••••••••9012",
@@ -722,7 +722,7 @@ function formatMoney(value: number, cur: DepositCurrency): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return cur === "ars" ? `$ ${num}` : `US$ ${num}`;
+  return cur === "ars" ? `$ ${num}` : `${num} USD`;
 }
 
 function SendFlow() {
@@ -909,7 +909,9 @@ function AmountStep({
     onChangeAmount(next);
   };
 
-  const sign = cur === "ars" ? "$" : "US$";
+  // Convención de la app: ARS con "$" antes, USD con " USD" después.
+  const signPrefix = cur === "ars" ? "$" : "";
+  const signSuffix = cur === "ars" ? "" : " USD";
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -939,7 +941,11 @@ function AmountStep({
             ¿Cuánto vas a mandar?
           </Text>
           <View style={s.amountRow}>
-            <Text style={[s.amountSign, { color: c.textMuted }]}>{sign}</Text>
+            {signPrefix ? (
+              <Text style={[s.amountSign, { color: c.textMuted }]}>
+                {signPrefix}
+              </Text>
+            ) : null}
             <Text
               style={[s.amountValue, { color: exceeds ? c.red : c.text }]}
               numberOfLines={1}
@@ -951,6 +957,11 @@ function AmountStep({
               })}
               {amount.endsWith(".") ? "," : ""}
             </Text>
+            {signSuffix ? (
+              <Text style={[s.amountSign, { color: c.textMuted }]}>
+                {signSuffix}
+              </Text>
+            ) : null}
           </View>
           <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
             {exceeds
@@ -1245,7 +1256,9 @@ function DepositFromAccount({
     });
   };
 
-  const sign = cur === "ars" ? "$" : "US$";
+  // Convención de la app: ARS con "$" antes, USD con " USD" después.
+  const signPrefix = cur === "ars" ? "$" : "";
+  const signSuffix = cur === "ars" ? "" : " USD";
 
   if (done) {
     return (
@@ -1300,7 +1313,11 @@ function DepositFromAccount({
           ¿Cuánto querés ingresar?
         </Text>
         <View style={s.amountRow}>
-          <Text style={[s.amountSign, { color: c.textMuted }]}>{sign}</Text>
+          {signPrefix ? (
+            <Text style={[s.amountSign, { color: c.textMuted }]}>
+              {signPrefix}
+            </Text>
+          ) : null}
           <Text
             style={[s.amountValue, { color: exceeds ? c.red : c.text }]}
             numberOfLines={1}
@@ -1312,6 +1329,11 @@ function DepositFromAccount({
             })}
             {amount.endsWith(".") ? "," : ""}
           </Text>
+          {signSuffix ? (
+            <Text style={[s.amountSign, { color: c.textMuted }]}>
+              {signSuffix}
+            </Text>
+          ) : null}
         </View>
         <Text style={[s.amountHint, { color: exceeds ? c.red : c.textMuted }]}>
           {exceeds

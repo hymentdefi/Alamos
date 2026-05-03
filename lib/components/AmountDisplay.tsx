@@ -1,6 +1,6 @@
 import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { fontFamily, useTheme, type FontWeight } from "../theme";
-import { formatARSParts } from "../data/assets";
+import { formatMoneyParts, type AssetCurrency } from "../data/assets";
 import { usePrivacy } from "../privacy/context";
 
 interface Props {
@@ -8,21 +8,33 @@ interface Props {
   /** Tamaño de la parte entera en px. Los decimales se escalan ~38%. */
   size: number;
   color?: string;
-  /** Color de los decimales. Si no se pasa, se usa textMuted. */
+  /** Color de los decimales y del ticker suffix. Si no se pasa, se
+   *  usa textMuted. */
   decimalsColor?: string;
   weight?: FontWeight;
   /** Multiplicador vertical del entero — útil para 'estirar' el monto
    * hacia abajo y darle más presencia. Default 1 (sin stretch). */
   stretchY?: number;
-  /** Prefijo custom (ej. 'US$'). Default es el '$' que devuelve
-   * formatARSParts. */
+  /** Moneda a renderear. ARS pinta el "$" antes; USD/USDT pintan el
+   *  ticker después de los decimales. Default ARS. */
+  currency?: AssetCurrency;
+  /** Override custom del prefix (legacy). Si pasás esto, gana sobre
+   *  lo que dictaría `currency`. Útil para cosas tipo "+ $", "-$".
+   *  Si no pasás ni este ni `currency`, default a "$" (ARS). */
   prefix?: string;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
  * Balance con centavos chiquitos arriba a la derecha (estilo Robinhood).
- * Ejemplo: "$ 1.284.620" grande + ",50" chiquito pegado arriba.
+ *
+ * Convención de moneda (toda la app usa esto, ver formatMoneyParts):
+ *   - ARS: "$ 1.284.620" grande + ",50" chiquito pegado arriba
+ *   - USD: "850" grande + ",00 USD" chiquito al costado
+ *   - USDT: "580" grande + ",00 USDT" chiquito al costado
+ *
+ * El "USD"/"USDT" usa el mismo estilo (size + color) que los decimales,
+ * para que se lea como un detalle subordinado al monto principal.
  */
 export function AmountDisplay({
   value,
@@ -31,13 +43,20 @@ export function AmountDisplay({
   decimalsColor,
   weight = 700,
   stretchY = 1,
+  currency = "ARS",
   prefix,
   style,
 }: Props) {
   const { c } = useTheme();
   const { hideAmounts } = usePrivacy();
-  const parts = formatARSParts(value);
-  const sign = prefix ?? parts.sign;
+  const parts = formatMoneyParts(value, currency);
+
+  // Override legacy: si llegó `prefix` explícito, lo usamos como
+  // sign forzado y no rendereamos suffix (incluso si la currency lo
+  // sugería). Esto preserva uses como `<AmountDisplay prefix="+" />`.
+  const sign = prefix ?? parts.prefix;
+  const suffix = prefix ? undefined : parts.suffix;
+
   const txt = color ?? c.text;
   const dec = decimalsColor ?? c.textMuted;
   const decSize = Math.max(12, Math.round(size * 0.38));
@@ -67,7 +86,8 @@ export function AmountDisplay({
           transform: stretchY === 1 ? undefined : [{ scaleY: stretchY }],
         }}
       >
-        {sign} {integerDisplay}
+        {sign ? `${sign} ` : ""}
+        {integerDisplay}
       </Text>
       <Text
         style={{
@@ -81,6 +101,7 @@ export function AmountDisplay({
         }}
       >
         ,{decimalsDisplay}
+        {suffix ? ` ${suffix}` : ""}
       </Text>
     </View>
   );

@@ -66,7 +66,7 @@ export const usePrivacy = () => useContext(PrivacyContext);
  * el formato original. Útil para envolver valores ya formateados:
  *
  *     mask("$ 342.180", true) → "$ •••.•••"
- *     mask("US$ 850,00", true) → "US$ •••,••"
+ *     mask("850,00 USD", true) → "•••,•• USD"
  *
  * Mantiene el prefix de moneda y los separadores; sólo reemplaza
  * dígitos por `•`.

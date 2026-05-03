@@ -33,6 +33,7 @@ import {
   assetCurrency,
   formatARS,
   formatMoney,
+  formatUSD,
   formatPct,
   type Asset,
   type AssetCategory,
@@ -556,7 +557,7 @@ function BaseHome() {
               value={currency === "ARS" ? arsCurrent : usdCurrent}
               size={38}
               weight={700}
-              prefix={currency === "ARS" ? "$" : "US$"}
+              currency={currency}
             />
             {/* Coachmark: sólo la primera vez, pill debajo de la
                 bandera con una flecha para arriba indicando que sea
@@ -591,9 +592,7 @@ function BaseHome() {
               {maskAmount(
                 currency === "ARS"
                   ? formatARS(Math.abs(arsDelta))
-                  : `US$ ${Math.abs(usdDelta).toLocaleString("es-AR", {
-                      maximumFractionDigits: 2,
-                    })}`,
+                  : formatUSD(Math.abs(usdDelta)),
                 hideAmounts,
               )}
             </Text>
@@ -1111,7 +1110,7 @@ function AssetRow({
   const cur = assetCurrency(asset);
   const primaryValue = isCash
     ? isUSD
-      ? `US$ ${qty.toLocaleString("es-AR")}`
+      ? `${qty.toLocaleString("es-AR")} USD`
       : formatARS(qty)
     : formatMoney(asset.price * (asset.qty ?? 1), cur);
   const secondaryValue = isCash && isUSD ? formatARS(asset.price * qty) : null;

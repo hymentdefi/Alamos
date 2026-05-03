@@ -760,33 +760,44 @@ export function formatVolume(n: number): string {
   return n.toFixed(0);
 }
 
+/**
+ * Convención de formato de moneda en la app:
+ *   - ARS: "$ 342.180"           — peso argentino con SÍMBOLO antes
+ *   - USD: "850,00 USD"          — ticker de 3 letras DESPUÉS
+ *   - USDT: "580,00 USDT"        — idem, ticker después
+ *   - cualquier crypto (BTC, ETH, etc.): número + " " + ticker
+ *
+ * Excepción única: el peso argentino con $ antes. Cualquier otra
+ * moneda con código de 3 letras va al final.
+ *
+ * Separadores: argentino (es-AR) — punto para miles, coma para decimal.
+ */
+
 export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");
 }
 
-/** "US$ 1.234,56" — siempre con dos decimales. */
+/** "850,00 USD" — siempre con dos decimales, ticker al final. */
 export function formatUSD(n: number): string {
   return (
-    "US$ " +
     Math.abs(n).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })
+    }) + " USD"
   );
 }
 
-/** "USDT 1.234,56" — para crypto. */
+/** "580,00 USDT" — para crypto stablecoin, ticker al final. */
 export function formatUSDT(n: number): string {
   return (
-    "USDT " +
     Math.abs(n).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })
+    }) + " USDT"
   );
 }
 
-/** Formatea un monto en la moneda especificada con su símbolo. */
+/** Formatea un monto en la moneda especificada. */
 export function formatMoney(n: number, currency: AssetCurrency): string {
   switch (currency) {
     case "USD":
@@ -797,6 +808,28 @@ export function formatMoney(n: number, currency: AssetCurrency): string {
     default:
       return formatARS(n);
   }
+}
+
+/**
+ * Formato genérico para cualquier crypto (no-stablecoin) — número
+ * + espacio + ticker. Ej: `formatCrypto(0.0421, "BTC")` → "0,0421 BTC".
+ *
+ * `maxDecimals` default 8 (precisión típica de wallets crypto). Para
+ * ETH suele alcanzar 6, para BTC 8, para tokens varía.
+ */
+export function formatCrypto(
+  n: number,
+  ticker: string,
+  maxDecimals = 8,
+): string {
+  return (
+    Math.abs(n).toLocaleString("es-AR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxDecimals,
+    }) +
+    " " +
+    ticker
+  );
 }
 
 /**
@@ -812,18 +845,47 @@ export function formatQty(n: number, maxDecimals = 4): string {
 }
 
 /**
- * Separa un monto en sus partes para poder renderizar los decimales más
- * chicos que la parte entera (estilo Robinhood / apps bancarias).
+ * Separa un monto en sus partes para poder renderizar los decimales
+ * más chicos que la parte entera (estilo Robinhood / apps bancarias)
+ * y posicionar el símbolo/ticker correctamente:
+ *   - ARS: prefix "$" antes del integer
+ *   - USD/USDT: suffix "USD"/"USDT" después de los decimales
+ *
+ * Devuelve uno de {prefix} o {suffix} según corresponda — nunca los
+ * dos. El componente que renderea decide layout en base a cuál vino.
  */
+export interface MoneyDisplayParts {
+  /** Parte entera con separador de miles. Ej: "342.180". */
+  integer: string;
+  /** Decimales sin coma. Ej: "00", "50", "1234". */
+  decimals: string;
+  /** Símbolo a renderear ANTES del integer. Solo para ARS. */
+  prefix?: string;
+  /** Ticker a renderear DESPUÉS de los decimales. Para USD/USDT. */
+  suffix?: string;
+}
+
+export function formatMoneyParts(
+  n: number,
+  currency: AssetCurrency = "ARS",
+): MoneyDisplayParts {
+  const abs = Math.abs(n);
+  const [int, dec = "00"] = abs.toFixed(2).split(".");
+  const integer = Number(int).toLocaleString("es-AR");
+  if (currency === "ARS") {
+    return { integer, decimals: dec, prefix: "$" };
+  }
+  return { integer, decimals: dec, suffix: currency };
+}
+
+/** @deprecated Usá formatMoneyParts(n, 'ARS'). Mantenido para back-compat. */
 export function formatARSParts(n: number): {
   sign: string;
   integer: string;
   decimals: string;
 } {
-  const abs = Math.abs(n);
-  const [int, dec = "00"] = abs.toFixed(2).split(".");
-  const integerFormatted = Number(int).toLocaleString("es-AR");
-  return { sign: "$", integer: integerFormatted, decimals: dec };
+  const { integer, decimals, prefix } = formatMoneyParts(n, "ARS");
+  return { sign: prefix ?? "$", integer, decimals };
 }
 
 export function formatPct(n: number, withSign = true): string {

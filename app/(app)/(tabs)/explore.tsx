@@ -400,13 +400,6 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
     [market.currency],
   );
 
-  const prefix =
-    market.currency === "USD"
-      ? "US$"
-      : market.currency === "USDT"
-      ? "USDT"
-      : "$";
-
   return (
     <View
       style={[
@@ -419,7 +412,7 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
         value={balance}
         size={20}
         weight={700}
-        prefix={prefix}
+        currency={market.currency}
         style={fs.amount}
       />
       <Tap

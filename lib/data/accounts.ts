@@ -5,6 +5,8 @@
  * (USD argentino vs USD USA) pero son cuentas distintas.
  */
 
+import { formatMoney } from "./assets";
+
 export type AccountId = "ars-ar" | "usd-ar" | "usd-us" | "usdt-crypto";
 
 export type AccountCurrency = "ARS" | "USD" | "USDT";
@@ -238,14 +240,18 @@ export const linkedBanks: LinkedBank[] = [
   },
 ];
 
-/** Formato del saldo en la moneda nativa de la cuenta. */
+/**
+ * Formato del saldo en la moneda nativa de la cuenta. Convención de
+ * la app: ARS con "$ " antes (entero, sin decimales en saldo de
+ * cuenta); USD/USDT con ticker DESPUÉS de los decimales.
+ *
+ * Nota: para ARS rendondeamos a entero (los saldos de cuenta no
+ * muestran centavos). Para USD/USDT delegamos en `formatMoney` que
+ * preserva los 2 decimales.
+ */
 export function formatAccountBalance(a: Account): string {
   if (a.currency === "ARS") {
     return "$ " + Math.round(a.balance).toLocaleString("es-AR");
   }
-  const symbol = a.currency === "USD" ? "US$" : "USDT";
-  return `${symbol} ${a.balance.toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoney(a.balance, a.currency);
 }

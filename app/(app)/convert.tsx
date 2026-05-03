@@ -38,20 +38,15 @@ const keys = [
   [".", "0", "back"],
 ] as const;
 
-function symbolFor(currency: "ARS" | "USD" | "USDT"): string {
-  if (currency === "ARS") return "$";
-  if (currency === "USD") return "US$";
-  return "USDT";
-}
-
-/** Formatea el monto con el símbolo de la moneda y separadores AR. */
+/** Formatea el monto con la convención de la app: ARS con "$" antes,
+ *  USD/USDT con ticker después. ARS sin decimales, otras con 2. */
 function formatAmount(value: number, currency: "ARS" | "USD" | "USDT"): string {
-  const sym = symbolFor(currency);
   const num = value.toLocaleString("es-AR", {
     minimumFractionDigits: currency === "ARS" ? 0 : 2,
     maximumFractionDigits: currency === "ARS" ? 0 : 2,
   });
-  return currency === "USDT" ? `${sym} ${num}` : `${sym}${num}`;
+  if (currency === "ARS") return `$${num}`;
+  return `${num} ${currency}`;
 }
 
 /** El rate suele ser un número con muchos decimales — lo redondeamos

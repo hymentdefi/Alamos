@@ -64,11 +64,18 @@ function nativeBalanceFor(market: AssetMarket): number {
   return accounts.find((a) => a.id === id)?.balance ?? 0;
 }
 
-/** Símbolo prefix para los inputs en la moneda nativa del activo. */
-function moneySymbol(currency: AssetCurrency): string {
-  if (currency === "USD") return "US$";
-  if (currency === "USDT") return "USDT ";
-  return "$";
+/**
+ * Affix de moneda para los inputs (calculadora del buy). Devuelve
+ * prefix o suffix según la convención de la app:
+ *   ARS → "$" antes
+ *   USD/USDT → " USD" / " USDT" después
+ */
+function moneyAffix(currency: AssetCurrency): {
+  prefix: string;
+  suffix: string;
+} {
+  if (currency === "ARS") return { prefix: "$", suffix: "" };
+  return { prefix: "", suffix: ` ${currency}` };
 }
 
 const keys = [
@@ -100,7 +107,7 @@ export default function BuyScreen() {
     () => (asset ? assetMarket(asset) : "AR"),
     [asset],
   );
-  // Moneda nativa del activo (display del input: $, US$, USDT). Aún
+  // Moneda nativa del activo (display del input: $, USD, USDT). Aún
   // usa assetCurrency porque el cálculo de currency cae al market.
   const nativeCurrency = useMemo<AssetCurrency>(
     () => (asset ? assetCurrency(asset) : "ARS"),
@@ -226,10 +233,10 @@ export default function BuyScreen() {
     bigPrimary = input === "0" ? "0" : input.replace(".", ",");
   }
 
-  const sym = moneySymbol(nativeCurrency);
+  const { prefix: symPrefix, suffix: symSuffix } = moneyAffix(nativeCurrency);
   const heroDisplay =
     inputMode === "amount"
-      ? `${sym}${bigPrimary}`
+      ? `${symPrefix}${bigPrimary}${symSuffix}`
       : `${bigPrimary} ${asset.ticker}`;
 
   // Truncado a 4 decimales para alinear con lo que el slider deja
