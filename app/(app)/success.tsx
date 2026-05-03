@@ -1,11 +1,16 @@
-import { useMemo } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { View, Text, Pressable, StyleSheet, type LayoutChangeEvent } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
+import {
+  useConfetti,
+  hasFirstTradeBeenCelebrated,
+  markFirstTradeCelebrated,
+} from "../../lib/hooks/useConfetti";
 
 /**
  * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
@@ -44,6 +49,33 @@ export default function SuccessScreen() {
     [ticker, amount, qty, mode],
   );
 
+  // Origen del burst — coordenadas absolutas del centro del check
+  // verde, capturadas vía onLayout + measureInWindow. El burst se
+  // dispara 250ms DESPUÉS de que el check aparece para crear el
+  // micro-arco emocional éxito → celebración.
+  const { burst } = useConfetti();
+  const checkRef = useRef<View>(null);
+  const onCheckLayout = (_e: LayoutChangeEvent) => {
+    // measureInWindow nos da coords absolutas en el viewport — es
+    // lo que el ConfettiPortal (mountado en el root) entiende.
+    checkRef.current?.measureInWindow((x, y, width, height) => {
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      // Solo el primer trade del usuario — gate persistido en
+      // SecureStore. CNV no permite gamificar cada operación.
+      hasFirstTradeBeenCelebrated().then((alreadyDone) => {
+        if (alreadyDone) return;
+        // 250ms de pausa: el cerebro registra primero "éxito" y
+        // después "celebración" — sentido como reward auténtico,
+        // no como confeti coreografiado.
+        setTimeout(() => {
+          burst({ x: cx, y: cy });
+          markFirstTradeCelebrated();
+        }, 250);
+      });
+    });
+  };
+
   const rows = [
     { label: "Activo", value: asset?.name ?? "—" },
     { label: "Monto", value: formatARS(numAmount) },
@@ -66,6 +98,8 @@ export default function SuccessScreen() {
     >
       <View style={s.heroBlock}>
         <View
+          ref={checkRef}
+          onLayout={onCheckLayout}
           style={[s.checkCircle, { backgroundColor: c.positive }]}
         >
           {/* Mismo path del check que dibuja la animación de

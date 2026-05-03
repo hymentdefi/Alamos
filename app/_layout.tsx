@@ -30,6 +30,7 @@ import { ProProvider } from "../lib/pro/context";
 import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
+import { ConfettiPortal } from "../lib/hooks/useConfetti";
 import {
   ThemeContext,
   themes,
@@ -159,6 +160,11 @@ export default function RootLayout() {
                 <PrivacyProvider>
                   <StatusBar style={mode === "light" ? "dark" : "light"} />
                   <AuthGate />
+                  {/* Confetti portal — UNA sola instancia montada en
+                      el root. Cualquier pantalla puede llamar
+                      `useConfetti().burst()` y la animación renderea
+                      acá, encima de todo. */}
+                  <ConfettiPortal />
                 </PrivacyProvider>
               </ProProvider>
             </FavoritesProvider>
