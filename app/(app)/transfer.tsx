@@ -17,9 +17,7 @@ import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { Tap } from "../../lib/components/Tap";
 import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
-import { AccountAvatar } from "../../lib/components/AccountAvatar";
 import { AccountFlag } from "../../lib/components/AccountFlag";
-import { GlassCard } from "../../lib/components/GlassCard";
 import { accounts, formatAccountBalance, type AccountId } from "../../lib/data/accounts";
 
 /** Balances disponibles por moneda — mockeados. */
@@ -220,7 +218,7 @@ function currencyLabelOf(id: AccountId): string {
   return a?.currency ?? "";
 }
 
-/* ─── Hub picker: lista vertical estilo "Tu dinero" del home ─── */
+/* ─── Hub picker: 4 floating cards en grid 2×2 con AccountFlag ─── */
 
 interface HubProps {
   mode: "deposit" | "send";
@@ -231,99 +229,93 @@ function CurrencyHubCards({ mode, onPick }: HubProps) {
   const { mode: themeMode } = useTheme();
   const isDark = themeMode === "dark";
   // Backing del badge AR del flag usd-ar — blanco en light, gris
-  // oscuro en dark. Mismo patrón que Dinero.
+  // oscuro en dark. Mismo patrón que el AccountRow del home.
   const badgeBacking = isDark ? "#1F1F1E" : "#FFFFFF";
 
   return (
-    <View style={s.hubListWrap}>
-      <GlassCard padding={4}>
-        {accounts.map((a, i) => {
-          const disabled = mode === "send" && a.balance <= 0;
-          return (
-            <HubRow
-              key={a.id}
-              account={a}
-              withTopDivider={i > 0}
-              mode={mode}
-              disabled={disabled}
-              badgeBacking={badgeBacking}
-              onPress={() => onPick(a.id)}
-            />
-          );
-        })}
-      </GlassCard>
+    <View style={s.hubGrid}>
+      {accounts.map((a) => {
+        const disabled = mode === "send" && a.balance <= 0;
+        return (
+          <HubCard
+            key={a.id}
+            account={a}
+            mode={mode}
+            disabled={disabled}
+            badgeBacking={badgeBacking}
+            onPress={() => onPick(a.id)}
+          />
+        );
+      })}
     </View>
   );
 }
 
-function HubRow({
+function HubCard({
   account,
-  withTopDivider,
   mode,
   disabled,
   badgeBacking,
   onPress,
 }: {
   account: (typeof accounts)[number];
-  withTopDivider: boolean;
   mode: "deposit" | "send";
   disabled: boolean;
   badgeBacking: string;
   onPress: () => void;
 }) {
   const { c } = useTheme();
-  // En send, las cuentas sin saldo se muestran "0 disponible" en
-  // gris no clickeable. En el resto de los casos mostramos el saldo
-  // real formateado.
+  // En send, las cuentas sin saldo muestran "0 disponible" en gris
+  // no clickeable. En el resto de los casos, saldo real formateado.
   const balanceLabel = disabled
     ? "0 disponible"
     : formatAccountBalance(account);
+  const eyebrowLabel = disabled
+    ? "SIN SALDO"
+    : mode === "send"
+      ? "DISPONIBLE"
+      : "TU SALDO";
 
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       style={({ pressed }) => [
-        s.hubRow,
-        withTopDivider && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-        },
+        s.hubCard,
         {
-          opacity: disabled ? 0.42 : pressed ? 0.85 : 1,
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: disabled ? 0.45 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.97 : 1 }],
         },
       ]}
     >
-      <AccountFlag
-        accountId={account.id}
-        size={40}
-        badgeBackingColor={badgeBacking}
-      />
-      <View style={{ flex: 1 }}>
-        <Text style={[s.hubRowCurrency, { color: c.text }]}>
-          {account.currency}
-        </Text>
-        <Text
-          style={[s.hubRowLocation, { color: c.textMuted }]}
-          numberOfLines={1}
-        >
-          {account.location}
-        </Text>
+      <View style={s.hubCardTop}>
+        <AccountFlag
+          accountId={account.id}
+          size={44}
+          badgeBackingColor={badgeBacking}
+        />
       </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text
-          style={[
-            s.hubRowBalance,
-            { color: disabled ? c.textMuted : c.text },
-          ]}
-          numberOfLines={1}
-        >
-          {balanceLabel}
-        </Text>
-      </View>
-      {!disabled ? (
-        <Feather name="chevron-right" size={18} color={c.textFaint} />
-      ) : null}
+      <Text style={[s.hubCardCurrency, { color: c.text }]}>
+        {account.currency === "USDT" ? "Cripto" : account.currency}
+      </Text>
+      <Text
+        style={[s.hubCardLocation, { color: c.textMuted }]}
+        numberOfLines={1}
+      >
+        {account.location}
+      </Text>
+      <View style={[s.hubCardDivider, { backgroundColor: c.border }]} />
+      <Text style={[s.hubCardBalanceEyebrow, { color: c.textMuted }]}>
+        {eyebrowLabel}
+      </Text>
+      <Text
+        style={[s.hubCardBalance, { color: c.text }]}
+        numberOfLines={1}
+      >
+        {balanceLabel}
+      </Text>
     </Pressable>
   );
 }
@@ -1381,29 +1373,54 @@ const s = StyleSheet.create({
     paddingBottom: 22,
   },
 
-  /* Currency hub — lista vertical estilo "Tu dinero" */
-  hubListWrap: {
-    paddingHorizontal: 20,
-  },
-  hubRow: {
+  /* Currency hub — 4 floating cards en grid 2×2 */
+  hubGrid: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
+    paddingHorizontal: 14,
     gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    rowGap: 12,
   },
-  hubRowCurrency: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.25,
+  hubCard: {
+    width: "47%",
+    flexGrow: 1,
+    flexBasis: "47%",
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
+    minHeight: 168,
   },
-  hubRowLocation: {
+  hubCardTop: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    marginBottom: 14,
+  },
+  hubCardCurrency: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.7,
+  },
+  hubCardLocation: {
     fontFamily: fontFamily[500],
     fontSize: 12,
-    marginTop: 2,
     letterSpacing: -0.05,
+    marginTop: 2,
   },
-  hubRowBalance: {
+  hubCardDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 14,
+    marginHorizontal: -16,
+  },
+  hubCardBalanceEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 9.5,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  hubCardBalance: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
