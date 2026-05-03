@@ -29,6 +29,19 @@ const path = require("path");
 const SOURCE_DEFAULT =
   "C:/Users/Desktop/Desktop/ES_Explosions, Misc, Confetti Cannon, Medium, Small Explosion, Debris - Epidemic Sound - 6019-10170.wav";
 const SPLIT_MS = 350;
+/**
+ * Fade-out lineal sobre los últimos N ms del WAV. Truco para
+ * "trimear sin trimear": el file queda en su duración original
+ * (4.5s) — expo-audio no se queja porque no se cambia la longitud
+ * de los datos — pero los últimos N ms son ramped a silencio. UX
+ * efectiva = audio se "termina" cuando los papelitos visuales
+ * desaparecen (~+4100ms desde burst start).
+ *
+ * 1500ms es bastante largo: el ramp arranca a t≈3000ms (cuando
+ * todavía hay debris activo en el visual) y llega a silencio a
+ * t≈4500ms. La pendiente acompaña la decay natural del visual.
+ */
+const FADE_OUT_MS = 1500;
 
 function parseWavHeader(buf) {
   if (buf.toString("ascii", 0, 4) !== "RIFF") {
@@ -79,6 +92,40 @@ function parseWavHeader(buf) {
   };
 }
 
+/**
+ * Aplica un fade-out lineal sobre los últimos `fadeOutMs` del buffer.
+ * Maneja 16-bit y 24-bit signed LE. Mutea in-place.
+ */
+function applyFadeOut(buf, meta, fadeOutMs) {
+  const fadeFrames = Math.floor((meta.sampleRate * fadeOutMs) / 1000);
+  const totalFrames = Math.floor(buf.length / meta.bytesPerFrame);
+  const fadeStartFrame = Math.max(0, totalFrames - fadeFrames);
+  const bytesPerSample = meta.bitsPerSample / 8;
+
+  for (let f = 0; f < fadeFrames; f++) {
+    const gain = 1 - f / fadeFrames; // lineal 1.0 → 0.0
+    const frameOffset = (fadeStartFrame + f) * meta.bytesPerFrame;
+    for (let ch = 0; ch < meta.numChannels; ch++) {
+      const sampleOffset = frameOffset + ch * bytesPerSample;
+      if (meta.bitsPerSample === 16) {
+        const sample = buf.readInt16LE(sampleOffset);
+        buf.writeInt16LE(Math.round(sample * gain), sampleOffset);
+      } else if (meta.bitsPerSample === 24) {
+        const b0 = buf[sampleOffset];
+        const b1 = buf[sampleOffset + 1];
+        const b2 = buf[sampleOffset + 2];
+        let val = b0 | (b1 << 8) | (b2 << 16);
+        if (val & 0x800000) val |= 0xff000000; // sign-extend a 32-bit
+        val = Math.round(val * gain);
+        val = Math.max(-0x800000, Math.min(0x7fffff, val));
+        buf[sampleOffset] = val & 0xff;
+        buf[sampleOffset + 1] = (val >> 8) & 0xff;
+        buf[sampleOffset + 2] = (val >> 16) & 0xff;
+      }
+    }
+  }
+}
+
 function buildSpliced(source, splitMs) {
   const meta = parseWavHeader(source);
   const splitFrames = Math.floor((meta.sampleRate * splitMs) / 1000);
@@ -95,7 +142,12 @@ function buildSpliced(source, splitMs) {
   const tail = audioData.slice(safeSplitBytes);
 
   // [explosion][explosion][debris]
-  const newAudioData = Buffer.concat([head, head, tail]);
+  const newAudioData = Buffer.from(Buffer.concat([head, head, tail]));
+
+  // Long fade-out — atenuamos los últimos FADE_OUT_MS para que el
+  // audio se silencie cuando el visual termina, sin trimear el file.
+  // Lineal 1.0 → 0.0. Maneja 24-bit signed LE (formato del source).
+  applyFadeOut(newAudioData, meta, FADE_OUT_MS);
 
   // Header limpio (44 bytes, sin chunks extras tipo LIST que el
   // source pudiera tener — la app no los necesita).
@@ -148,3 +200,4 @@ console.log(`  Total duration: ${(meta.dataSize / (meta.sampleRate * meta.bytesP
 console.log(`Spliced output: ${outPath}`);
 console.log(`  ${wav.length} bytes`);
 console.log(`  Split at: ${SPLIT_MS}ms (primera explosion duplicada)`);
+console.log(`  Fade-out tail: ${FADE_OUT_MS}ms (silencio efectivo al final)`);
