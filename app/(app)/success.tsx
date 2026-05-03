@@ -15,11 +15,8 @@ import Animated, {
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
-import {
-  useConfetti,
-  hasFirstTradeBeenCelebrated,
-  markFirstTradeCelebrated,
-} from "../../lib/hooks/useConfetti";
+import { useAuth } from "../../lib/auth/context";
+import { useConfetti } from "../../lib/hooks/useConfetti";
 
 /**
  * Genera un ID de comprobante mock — el formato `AC-YYYY-XXXXXX` es el
@@ -45,10 +42,26 @@ export default function SuccessScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
 
+  const { user, markFirstTrade } = useAuth();
   const isSell = mode === "sell";
   const asset = assets.find((a) => a.ticker === ticker);
   const numAmount = Number(amount) || 0;
   const numQty = Number(qty) || 0;
+
+  // Layout celebración: SOLO en la primera compra del usuario
+  // (`user.hasFirstTrade === false`) y no aplica a ventas — celebrar
+  // una venta no tiene la misma carga emocional. En mock el flag se
+  // resetea por sesión (cold start del bundler) → cada vez que abrís
+  // la app, la primera compra dispara el layout y el confetti. En
+  // prod, lo controla el backend.
+  const isFirstTrade = !!user && !user.hasFirstTrade && !isSell;
+  const firstName = user?.fullName?.split(" ")[0]?.trim() || "vos";
+  const subheadlineBold =
+    user?.gender === "female"
+      ? "Ya sos inversora."
+      : user?.gender === "male"
+        ? "Ya sos inversor."
+        : "Ya empezaste a invertir.";
 
   // El comprobante necesita un ID estable durante toda la sesión. Lo
   // derivamos de los params para que abrir/cerrar el receipt o
@@ -98,46 +111,27 @@ export default function SuccessScreen() {
     transform: [{ scale: checkScale.value }],
   }));
 
-  // Origen del burst — coordenadas absolutas del centro del check
-  // verde, capturadas vía onLayout + measureInWindow. El burst se
-  // dispara 250ms DESPUÉS de que el check aparece para crear el
-  // micro-arco emocional éxito → celebración.
+  // Burst del confetti: SOLO si es el primer trade del usuario.
+  // Origen = centro del check verde (medido vía measureInWindow).
+  // Disparo 250ms DESPUÉS de aparecer el check para crear el micro
+  // arco emocional éxito → celebración.
   const { burst } = useConfetti();
   const checkRef = useRef<View>(null);
   const burstedRef = useRef(false);
   const onCheckLayout = (_e: LayoutChangeEvent) => {
-    // Guard contra re-disparos en re-layouts (rotación, keyboard,
-    // re-render del padre). Solo una vez por monte de la pantalla.
     if (burstedRef.current) return;
+    if (!isFirstTrade) return;
     burstedRef.current = true;
-    // measureInWindow nos da coords absolutas en el viewport — es
-    // lo que el ConfettiPortal (mountado en el root) entiende.
     checkRef.current?.measureInWindow((x, y, width, height) => {
       const cx = x + width / 2;
       const cy = y + height / 2;
-      console.log(
-        `[confetti] check measured at x=${cx.toFixed(0)} y=${cy.toFixed(0)} (size ${width}x${height})`,
-      );
-      // En desarrollo bypaseamos el gate para poder testear la
-      // animación todas las veces que querramos. En prod, sólo el
-      // primer trade del usuario (CNV).
-      const checkGate = __DEV__
-        ? Promise.resolve(false)
-        : hasFirstTradeBeenCelebrated();
-      checkGate.then((alreadyDone) => {
-        if (alreadyDone) {
-          console.log("[confetti] gate cerrado, skip");
-          return;
-        }
-        // 250ms de pausa: el cerebro registra primero "éxito" y
-        // después "celebración" — sentido como reward auténtico,
-        // no como confeti coreografiado.
-        setTimeout(() => {
-          console.log("[confetti] disparando burst");
-          burst({ x: cx, y: cy });
-          if (!__DEV__) markFirstTradeCelebrated();
-        }, 250);
-      });
+      setTimeout(() => {
+        burst({ x: cx, y: cy });
+        // Marca el flag en AuthContext (in-memory en mock; POST en
+        // prod). Idempotente — siguientes compras de la sesión ya
+        // no disparan.
+        markFirstTrade();
+      }, 250);
     });
   };
 
@@ -185,16 +179,41 @@ export default function SuccessScreen() {
             />
           </Svg>
         </Animated.View>
-        <Text style={[s.title, { color: c.text }]}>
-          Orden ejecutada
-        </Text>
-        <Text style={[s.subtitle, { color: c.textMuted }]}>
-          Tu orden de mercado por {formatARS(numAmount)} de{" "}
-          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-            {ticker}
-          </Text>{" "}
-          fue ejecutada correctamente.
-        </Text>
+        {isFirstTrade ? (
+          <>
+            <Text style={[s.title, { color: c.text }]}>
+              Felicitaciones, {firstName}.
+            </Text>
+            <Text style={[s.subtitle, { color: c.textMuted }]}>
+              Hiciste tu primera compra.{" "}
+              <Text
+                style={{ color: c.text, fontFamily: fontFamily[700] }}
+              >
+                {subheadlineBold}
+              </Text>
+            </Text>
+            <Text style={[s.subtitleTech, { color: c.textMuted }]}>
+              Tu orden de mercado por {formatARS(numAmount)} de{" "}
+              <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+                {ticker}
+              </Text>{" "}
+              fue ejecutada correctamente.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={[s.title, { color: c.text }]}>
+              Orden ejecutada
+            </Text>
+            <Text style={[s.subtitle, { color: c.textMuted }]}>
+              Tu orden de mercado por {formatARS(numAmount)} de{" "}
+              <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+                {ticker}
+              </Text>{" "}
+              fue ejecutada correctamente.
+            </Text>
+          </>
+        )}
       </View>
 
       <View
@@ -288,6 +307,17 @@ const s = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: -0.15,
     textAlign: "center",
+  },
+  /* Linea técnica adicional debajo del subheadline en el layout
+     'primera compra' — tamaño un escalón abajo para que la jerarquía
+     sea: headline > subheadline emocional > detalle técnico. */
+  subtitleTech: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 19,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    marginTop: 12,
   },
   card: {
     marginHorizontal: 20,

@@ -1,9 +1,25 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { login as apiLogin, register as apiRegister, getMe, type User, type AuthTokens, type LoginPayload, type RegisterPayload } from "./manteca";
+import {
+  login as apiLogin,
+  register as apiRegister,
+  getMe,
+  markFirstTradeOnServer,
+  type User,
+  type AuthTokens,
+  type LoginPayload,
+  type RegisterPayload,
+} from "./manteca";
 
 interface AuthState { user: User | null; isLoading: boolean; isAuthenticated: boolean; }
-interface AuthActions { login: (p: LoginPayload) => Promise<void>; register: (p: RegisterPayload) => Promise<void>; logout: () => Promise<void>; }
+interface AuthActions {
+  login: (p: LoginPayload) => Promise<void>;
+  register: (p: RegisterPayload) => Promise<void>;
+  logout: () => Promise<void>;
+  /** Flippea `user.hasFirstTrade` a true. Si ya estaba en true es
+   *  no-op. Idempotente. */
+  markFirstTrade: () => Promise<void>;
+}
 type AuthContextValue = AuthState & AuthActions;
 
 const TOKEN_KEY = "alamos_tokens";
@@ -31,7 +47,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (p: RegisterPayload) => { const { user, tokens } = await apiRegister(p); await storeTokens(tokens); setUser(user); };
   const logout = async () => { await clearTokens(); setUser(null); };
 
-  return <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, logout }}>{children}</AuthContext.Provider>;
+  const markFirstTrade = useCallback(async () => {
+    // Idempotente: si ya estaba marcado, no hago nada.
+    if (!user || user.hasFirstTrade) return;
+    setUser({ ...user, hasFirstTrade: true });
+    try {
+      const tokens = await getStoredTokens();
+      if (tokens?.accessToken) await markFirstTradeOnServer(tokens.accessToken);
+    } catch {
+      // Si el server falla, dejamos el flag local en true igual —
+      // la celebración ya pasó. La próxima sesión va a re-leer de
+      // /auth/me; si no se persistió allá, se vuelve a celebrar
+      // (preferible a no celebrar nunca).
+    }
+  }, [user]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        login,
+        register,
+        logout,
+        markFirstTrade,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

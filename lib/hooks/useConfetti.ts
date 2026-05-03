@@ -1,7 +1,6 @@
 import { createElement, useCallback } from "react";
 import { Platform } from "react-native";
 import * as Haptics from "expo-haptics";
-import * as SecureStore from "expo-secure-store";
 import { ConfettiManager, type BurstConfig } from "../components/Confetti/ConfettiManager";
 import { ConfettiCanvas } from "../components/Confetti/ConfettiCanvas";
 
@@ -86,32 +85,11 @@ export function getConfettiManager(): ConfettiManager {
   return globalManager;
 }
 
-/* ─── Gate: primer trade celebrado ───
+/* ─── Notas regulatorias ───
  *
- * Por CNV (regulación argentina) no podemos celebrar CADA operación
- * — sería gamificar el trading. La gate vive en SecureStore con la
- * key `confetti:first-trade-celebrated` y solo se dispara en la
- * primera ejecución exitosa de la cuenta. */
-
-const FIRST_TRADE_KEY = "confetti:first-trade-celebrated";
-
-/** True si el usuario ya celebró su primer trade. */
-export async function hasFirstTradeBeenCelebrated(): Promise<boolean> {
-  try {
-    const v = await SecureStore.getItemAsync(FIRST_TRADE_KEY);
-    return v === "1";
-  } catch {
-    // Si SecureStore falla preferimos NO disparar — más conservador
-    // desde la lectura regulatoria (mejor no celebrar dos veces).
-    return true;
-  }
-}
-
-/** Marca que la celebración del primer trade ya ocurrió. */
-export async function markFirstTradeCelebrated(): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(FIRST_TRADE_KEY, "1");
-  } catch {
-    /* noop */
-  }
-}
+ * El gate "solo el primer trade del usuario" ya no vive acá.
+ * Migrado al user model — `user.hasFirstTrade` es la fuente de
+ * verdad (ver lib/auth/context.tsx). Cuando el usuario ejecuta su
+ * primera compra, success.tsx lee el flag, dispara el burst y
+ * llama a `auth.markFirstTrade()` para flippearlo. CNV no permite
+ * gamificar cada operación — solo este milestone. */
