@@ -1,26 +1,31 @@
 /**
- * Splice del WAV de confetti cannon: convierte
- *   [explosion][debris falling]
- * en
- *   [explosion][explosion][debris falling]
+ * Procesa el WAV de confetti cannon de Epidemic Sound:
  *
- * El primer segmento (`SPLIT_MS` ms) se duplica al inicio. La cola
- * (que tiene el "shhhhh" del papel cayendo) queda intacta.
+ *   1. Splice: convierte [explosion][debris] en
+ *      [explosion][explosion][debris]. La SEGUNDA explosion del
+ *      file resultante cae a SPLIT_MS desde el inicio, que coincide
+ *      con cuando el burst visual dispara su encore (a +350ms del
+ *      peak).
  *
- * Por qué: el burst del confetti tiene 2 explosiones visuales (peak
- * a t=+100ms y encore a t=+450ms). Splicing a 350ms hace que la
- * SEGUNDA explosión del file coincida exactamente con el encore
- * visual. El debris natural del file acompaña el sparkle tail.
+ *   2. Trim: corta a MAX_DURATION_MS para que el audio termine
+ *      cuando muere el último sparkle visual (~+4100ms desde el
+ *      inicio del burst).
+ *
+ *   3. Fade-out: rampa lineal de FADE_OUT_MS sobre el final para
+ *      evitar el "click" que deja un corte raw del PCM.
+ *
+ *   4. Conversión de formato: el source es 24-bit / 96kHz / stereo
+ *      (calidad estudio Epidemic Sound). expo-audio en iOS/Android
+ *      no soporta 24-bit / 96kHz confiablemente — convertimos a
+ *      **16-bit / 48kHz / stereo** que es universalmente soportado.
+ *      48kHz por decimación 2:1 (ratio entero, sin alias filter
+ *      necesario porque el source ya está band-limited).
  *
  * Cómo correrlo:
  *   node scripts/splice-confetti-sound.js [ruta-al-source.wav]
  *
- * Si no se pasa argumento, usa SOURCE_DEFAULT (la ruta donde el
- * usuario dropeó el archivo de Epidemic Sound).
- *
- * El source NO se commitea al repo (asset licenciado de Epidemic
- * Sound). Solo el output spliced (confetti_pop.wav) va al repo
- * porque es lo que la app necesita.
+ * El source NO se commitea al repo (asset licenciado). Solo el
+ * output procesado (confetti_pop.wav) va al repo.
  */
 
 const fs = require("fs");
@@ -29,22 +34,17 @@ const path = require("path");
 const SOURCE_DEFAULT =
   "C:/Users/Desktop/Desktop/ES_Explosions, Misc, Confetti Cannon, Medium, Small Explosion, Debris - Epidemic Sound - 6019-10170.wav";
 const SPLIT_MS = 350;
-
-/**
- * Tope de duración del WAV final. La razón: visual del confetti
- * termina cuando muere la última partícula del sparkle tail, lo
- * que pasa a los ~+4300ms desde el inicio del burst (TTL máximo
- * 3.5s + spawn a +800ms). Si el audio outlasts al visual, el
- * usuario oye "papelitos cayendo" cuando la pantalla ya está
- * vacía. Trim a 4000ms (audio empieza a +100ms = termina a
- * +4100ms, justo cuando los últimos sparkles están muriendo).
- */
 const MAX_DURATION_MS = 4000;
-/**
- * Fade-out lineal sobre los últimos N ms para evitar el "click"
- * que deja un corte raw del PCM (la onda no termina en cero).
- */
 const FADE_OUT_MS = 120;
+
+/* ─── Output format target ──────────────────────────────────────── */
+
+const OUT_BITS_PER_SAMPLE = 16;
+/** Decimación 2:1 desde 96kHz → 48kHz (ratio entero, sin filter
+ *  porque el source ya está band-limited de fábrica). */
+const SAMPLE_RATE_DECIMATION = 2;
+
+/* ─── WAV header parser (handle 16-bit y 24-bit, multi-channel) ─── */
 
 function parseWavHeader(buf) {
   if (buf.toString("ascii", 0, 4) !== "RIFF") {
@@ -54,7 +54,6 @@ function parseWavHeader(buf) {
     throw new Error("Not a WAVE file");
   }
 
-  // fmt chunk vive en offset 12; chunkSize en offset 16.
   const fmtChunkSize = buf.readUInt32LE(16);
   const audioFormat = buf.readUInt16LE(20);
   const numChannels = buf.readUInt16LE(22);
@@ -64,7 +63,7 @@ function parseWavHeader(buf) {
   const bytesPerFrame = bytesPerSample * numChannels;
 
   // Buscar el "data" chunk — algunos WAVs tienen LIST/INFO entre fmt
-  // y data (ej. los de Epidemic Sound), no asumir offset 36.
+  // y data (ej. Epidemic Sound), no asumir offset 36.
   let offset = 20 + fmtChunkSize;
   let dataStart = -1;
   let dataSize = 0;
@@ -77,7 +76,6 @@ function parseWavHeader(buf) {
       break;
     }
     offset += 8 + chunkSize;
-    // Padding a múltiplo de 2 si chunkSize es impar.
     if (chunkSize % 2 === 1) offset += 1;
   }
   if (dataStart === -1) {
@@ -89,111 +87,187 @@ function parseWavHeader(buf) {
     numChannels,
     sampleRate,
     bitsPerSample,
+    bytesPerSample,
     bytesPerFrame,
     dataStart,
     dataSize,
   };
 }
 
+/* ─── Helpers de samples (lectura/escritura 16/24-bit signed LE) ── */
+
+function readSample(buf, offset, bitsPerSample) {
+  if (bitsPerSample === 16) {
+    return buf.readInt16LE(offset);
+  }
+  if (bitsPerSample === 24) {
+    const b0 = buf[offset];
+    const b1 = buf[offset + 1];
+    const b2 = buf[offset + 2];
+    let val = b0 | (b1 << 8) | (b2 << 16);
+    if (val & 0x800000) val |= 0xff000000; // sign-extend a 32-bit
+    return val;
+  }
+  throw new Error(`bitsPerSample ${bitsPerSample} no soportado`);
+}
+
+function writeSample(buf, offset, val, bitsPerSample) {
+  if (bitsPerSample === 16) {
+    const clamped = Math.max(-0x8000, Math.min(0x7fff, val));
+    buf.writeInt16LE(clamped, offset);
+    return;
+  }
+  if (bitsPerSample === 24) {
+    const clamped = Math.max(-0x800000, Math.min(0x7fffff, val));
+    buf[offset] = clamped & 0xff;
+    buf[offset + 1] = (clamped >> 8) & 0xff;
+    buf[offset + 2] = (clamped >> 16) & 0xff;
+    return;
+  }
+  throw new Error(`bitsPerSample ${bitsPerSample} no soportado`);
+}
+
+/** Escala un sample de srcBits a 16-bit. Para 24→16 bit, dividimos
+ *  por 256 (= shift right 8) con redondeo. Para 16→16 es identity. */
+function sampleToInt16(val, srcBits) {
+  if (srcBits === 16) return val;
+  if (srcBits === 24) {
+    return Math.max(-0x8000, Math.min(0x7fff, Math.round(val / 256)));
+  }
+  throw new Error(`srcBits ${srcBits} no soportado`);
+}
+
+/* ─── Procesamiento ──────────────────────────────────────────────── */
+
 function applyFadeOut(buf, meta, fadeOutMs) {
   const fadeFrames = Math.floor((meta.sampleRate * fadeOutMs) / 1000);
   const totalFrames = Math.floor(buf.length / meta.bytesPerFrame);
   const fadeStartFrame = Math.max(0, totalFrames - fadeFrames);
-  const bytesPerSample = meta.bitsPerSample / 8;
 
   for (let f = 0; f < fadeFrames; f++) {
     const gain = 1 - f / fadeFrames; // lineal 1.0 → 0.0
     const frameOffset = (fadeStartFrame + f) * meta.bytesPerFrame;
     for (let ch = 0; ch < meta.numChannels; ch++) {
-      const sampleOffset = frameOffset + ch * bytesPerSample;
-      if (meta.bitsPerSample === 16) {
-        const sample = buf.readInt16LE(sampleOffset);
-        buf.writeInt16LE(Math.round(sample * gain), sampleOffset);
-      } else if (meta.bitsPerSample === 24) {
-        // Signed 24-bit little-endian: 3 bytes con sign extend.
-        const b0 = buf[sampleOffset];
-        const b1 = buf[sampleOffset + 1];
-        const b2 = buf[sampleOffset + 2];
-        let val = b0 | (b1 << 8) | (b2 << 16);
-        if (val & 0x800000) val |= 0xff000000; // sign-extend
-        val = Math.round(val * gain);
-        // Re-clamp dentro del rango 24-bit signed.
-        val = Math.max(-0x800000, Math.min(0x7fffff, val));
-        buf[sampleOffset] = val & 0xff;
-        buf[sampleOffset + 1] = (val >> 8) & 0xff;
-        buf[sampleOffset + 2] = (val >> 16) & 0xff;
-      }
-      // 32-bit float / otros: no implementado, source de Epidemic
-      // Sound suele venir 16 o 24-bit PCM, así que alcanza.
+      const sampleOffset = frameOffset + ch * meta.bytesPerSample;
+      const sample = readSample(buf, sampleOffset, meta.bitsPerSample);
+      writeSample(
+        buf,
+        sampleOffset,
+        Math.round(sample * gain),
+        meta.bitsPerSample,
+      );
     }
   }
 }
 
-function buildSpliced(source, splitMs, maxDurationMs, fadeOutMs) {
-  const meta = parseWavHeader(source);
-  const splitFrames = Math.floor((meta.sampleRate * splitMs) / 1000);
-  const splitBytes = splitFrames * meta.bytesPerFrame;
+/**
+ * Convierte el buffer source a 16-bit + decimación opcional. Devuelve
+ * un nuevo buffer con el formato target.
+ */
+function convertFormat(srcBuf, srcMeta, decimation) {
+  const srcFrames = Math.floor(srcBuf.length / srcMeta.bytesPerFrame);
+  const dstFrames = Math.floor(srcFrames / decimation);
+  const dstBytesPerSample = OUT_BITS_PER_SAMPLE / 8;
+  const dstBytesPerFrame = dstBytesPerSample * srcMeta.numChannels;
+  const dstBuf = Buffer.alloc(dstFrames * dstBytesPerFrame);
 
-  const safeSplitBytes = Math.min(splitBytes, meta.dataSize);
+  for (let f = 0; f < dstFrames; f++) {
+    const srcFrameIdx = f * decimation;
+    const srcFrameOffset = srcFrameIdx * srcMeta.bytesPerFrame;
+    const dstFrameOffset = f * dstBytesPerFrame;
+    for (let ch = 0; ch < srcMeta.numChannels; ch++) {
+      const srcSampleOffset =
+        srcFrameOffset + ch * srcMeta.bytesPerSample;
+      const dstSampleOffset = dstFrameOffset + ch * dstBytesPerSample;
+      const srcVal = readSample(
+        srcBuf,
+        srcSampleOffset,
+        srcMeta.bitsPerSample,
+      );
+      const dstVal = sampleToInt16(srcVal, srcMeta.bitsPerSample);
+      dstBuf.writeInt16LE(dstVal, dstSampleOffset);
+    }
+  }
+
+  return {
+    buf: dstBuf,
+    sampleRate: srcMeta.sampleRate / decimation,
+    numChannels: srcMeta.numChannels,
+    bitsPerSample: OUT_BITS_PER_SAMPLE,
+  };
+}
+
+function buildWav(audioBuf, sampleRate, numChannels, bitsPerSample) {
+  const bytesPerFrame = (bitsPerSample / 8) * numChannels;
+  const dataSize = audioBuf.length;
+  const fileSize = 36 + dataSize;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(fileSize, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * bytesPerFrame, 28);
+  header.writeUInt16LE(bytesPerFrame, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, audioBuf]);
+}
+
+function processWav(source, splitMs, maxDurationMs, fadeOutMs) {
+  const meta = parseWavHeader(source);
+
+  // Step 1: splice [head][head][tail]
+  const splitFrames = Math.floor((meta.sampleRate * splitMs) / 1000);
+  const splitBytes = Math.min(
+    splitFrames * meta.bytesPerFrame,
+    meta.dataSize,
+  );
   const audioData = source.slice(
     meta.dataStart,
     meta.dataStart + meta.dataSize,
   );
-  const head = audioData.slice(0, safeSplitBytes);
-  const tail = audioData.slice(safeSplitBytes);
+  const head = audioData.slice(0, splitBytes);
+  const tail = audioData.slice(splitBytes);
+  let processedAudio = Buffer.concat([head, head, tail]);
 
-  // [explosion][explosion][debris]
-  let newAudioData = Buffer.concat([head, head, tail]);
-
-  // Trim al máximo permitido (default 4000ms para que termine
-  // junto con los últimos sparkles del visual). Hacemos copia
-  // mutable para poder aplicar el fade-out después.
-  const targetTotalFrames = Math.floor(
-    (meta.sampleRate * maxDurationMs) / 1000,
-  );
-  const targetTotalBytes = targetTotalFrames * meta.bytesPerFrame;
-  if (newAudioData.length > targetTotalBytes) {
-    newAudioData = Buffer.from(newAudioData.slice(0, targetTotalBytes));
+  // Step 2: trim to maxDurationMs
+  const targetFrames = Math.floor((meta.sampleRate * maxDurationMs) / 1000);
+  const targetBytes = targetFrames * meta.bytesPerFrame;
+  if (processedAudio.length > targetBytes) {
+    processedAudio = Buffer.from(processedAudio.slice(0, targetBytes));
   } else {
-    newAudioData = Buffer.from(newAudioData);
+    processedAudio = Buffer.from(processedAudio); // copia mutable
   }
 
-  // Fade-out tail para evitar el click del corte raw.
-  applyFadeOut(newAudioData, meta, fadeOutMs);
+  // Step 3: fade-out tail
+  applyFadeOut(processedAudio, meta, fadeOutMs);
 
-  // Header limpio (44 bytes, sin chunks extras tipo LIST que el
-  // source pudiera tener — la app no los necesita).
-  const newDataSize = newAudioData.length;
-  const newFileSize = 36 + newDataSize;
-  const header = Buffer.alloc(44);
-  header.write("RIFF", 0);
-  header.writeUInt32LE(newFileSize, 4);
-  header.write("WAVE", 8);
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(meta.audioFormat, 20);
-  header.writeUInt16LE(meta.numChannels, 22);
-  header.writeUInt32LE(meta.sampleRate, 24);
-  header.writeUInt32LE(meta.sampleRate * meta.bytesPerFrame, 28);
-  header.writeUInt16LE(meta.bytesPerFrame, 32);
-  header.writeUInt16LE(meta.bitsPerSample, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(newDataSize, 40);
+  // Step 4: convert format (24→16 bit + decimation 96→48kHz)
+  const out = convertFormat(processedAudio, meta, SAMPLE_RATE_DECIMATION);
 
-  return { wav: Buffer.concat([header, newAudioData]), meta };
+  const wav = buildWav(
+    out.buf,
+    out.sampleRate,
+    out.numChannels,
+    out.bitsPerSample,
+  );
+
+  return { wav, srcMeta: meta, outFormat: out };
 }
 
 const sourcePath = process.argv[2] || SOURCE_DEFAULT;
 if (!fs.existsSync(sourcePath)) {
   console.error(`Source no encontrado: ${sourcePath}`);
-  console.error(
-    "Pasalo como argumento: node scripts/splice-confetti-sound.js /ruta/al/source.wav",
-  );
   process.exit(1);
 }
 
 const source = fs.readFileSync(sourcePath);
-const { wav, meta } = buildSpliced(
+const { wav, srcMeta, outFormat } = processWav(
   source,
   SPLIT_MS,
   MAX_DURATION_MS,
@@ -202,27 +276,26 @@ const { wav, meta } = buildSpliced(
 
 const outDir = path.join(__dirname, "..", "assets", "sounds");
 const outPath = path.join(outDir, "confetti_pop.wav");
-
-if (!fs.existsSync(outDir)) {
-  fs.mkdirSync(outDir, { recursive: true });
-}
-
+if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(outPath, wav);
 
-const sourceDurationS =
-  meta.dataSize / (meta.sampleRate * meta.bytesPerFrame);
-const outputAudioBytes = wav.length - 44;
-const outputDurationS =
-  outputAudioBytes / (meta.sampleRate * meta.bytesPerFrame);
+const srcDurationS =
+  srcMeta.dataSize / (srcMeta.sampleRate * srcMeta.bytesPerFrame);
+const outBytesPerFrame =
+  (outFormat.bitsPerSample / 8) * outFormat.numChannels;
+const outDurationS =
+  (wav.length - 44) / (outFormat.sampleRate * outBytesPerFrame);
 
 console.log(`Source: ${sourcePath}`);
 console.log(
-  `  ${source.length} bytes, ${meta.numChannels}ch, ${meta.sampleRate}Hz, ${meta.bitsPerSample}-bit`,
+  `  ${source.length} bytes, ${srcMeta.numChannels}ch, ${srcMeta.sampleRate}Hz, ${srcMeta.bitsPerSample}-bit`,
 );
-console.log(`  Total duration: ${sourceDurationS.toFixed(3)}s`);
-console.log(`Spliced output: ${outPath}`);
-console.log(`  ${wav.length} bytes`);
-console.log(`  Output duration: ${outputDurationS.toFixed(3)}s`);
-console.log(`  Split at: ${SPLIT_MS}ms (primera explosion duplicada)`);
-console.log(`  Trimmed to: ${MAX_DURATION_MS}ms`);
-console.log(`  Fade-out tail: ${FADE_OUT_MS}ms`);
+console.log(`  Duration: ${srcDurationS.toFixed(3)}s`);
+console.log(`Output: ${outPath}`);
+console.log(
+  `  ${wav.length} bytes, ${outFormat.numChannels}ch, ${outFormat.sampleRate}Hz, ${outFormat.bitsPerSample}-bit`,
+);
+console.log(`  Duration: ${outDurationS.toFixed(3)}s`);
+console.log(`  Splice: ${SPLIT_MS}ms (primera explosion duplicada)`);
+console.log(`  Trim: ${MAX_DURATION_MS}ms`);
+console.log(`  Fade-out: ${FADE_OUT_MS}ms`);
