@@ -1369,19 +1369,19 @@ const s = StyleSheet.create({
   /* Deposit info */
   depositTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 28,
-    letterSpacing: -1,
-    lineHeight: 34,
+    fontSize: 36,
+    letterSpacing: -1.4,
+    lineHeight: 42,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 24,
   },
   hubSub: {
     fontFamily: fontFamily[500],
-    fontSize: 14,
+    fontSize: 15,
     letterSpacing: -0.15,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 22,
+    paddingTop: 10,
+    paddingBottom: 36,
   },
 
   /* Currency hub — 4 floating cards en grid 2×2 */
