@@ -453,7 +453,7 @@ function BaseHome() {
   // blanco sobre fondo blanco".
   const bgGradient: readonly [string, string, string] = isDark
     ? ["#0E0E0C", "#080808", "#000000"]
-    : ["#EFEEE8", "#F7F6F2", "#FBFBFA"];
+    : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>

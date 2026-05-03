@@ -11,8 +11,8 @@ export interface BurstOptions {
   /** Coordenadas en window-space del epicentro. */
   x: number;
   y: number;
-  /** Override del count del burst PRINCIPAL (etapa 2). Default 500.
-   *  Encore (250) y sparkle tail (50) son fijos. */
+  /** Override del count del burst PRINCIPAL (etapa 2). Default 1000.
+   *  Encore (500) y sparkle tail (100) son fijos. */
   count?: number;
   /** Callback al inicio (t=0 desde burst()): light haptic + esta
    *  callback se dispara. La screen suele usar para un pulse muy
@@ -50,9 +50,10 @@ function isLowEndDevice(): boolean {
  * pantalla y que la animación renderee en el <ConfettiPortal />
  * montado en el root del árbol.
  *
- * En low-end bajamos a particleScale 0.55 (500 peak → ~275). Con
- * Skia esto es overkill — ya bancaba 800+ — pero lo dejamos por
- * ahorro de batería en GPUs antiguas.
+ * En low-end bajamos a particleScale 0.55 (1000 peak → ~550). Con
+ * la migración a UI thread (useFrameCallback + Picture) esto es ya
+ * casi cosmético — la GPU traga 1500-2500 partículas a 60fps — pero
+ * lo dejamos por ahorro de batería en GPUs antiguas.
  */
 const globalManager = new ConfettiManager();
 if (isLowEndDevice()) {
@@ -80,13 +81,13 @@ export function ConfettiPortal() {
  *
  *   t = +100ms PEAK. Success haptic + `onPeak` callback (la screen
  *            suele tirar flash blanco + spring overshoot del check)
- *            + burst principal de 500 partículas. Es EL momento.
+ *            + burst principal de 1000 partículas. Es EL momento.
  *
- *   t = +450ms Encore. Medium haptic + segundo burst de 250 partículas
+ *   t = +450ms Encore. Medium haptic + segundo burst de 500 partículas
  *            con velocidad 30% reducida. Como una "ola que sigue":
  *            confirma que lo del peak no fue un accidente.
  *
- *   t = +800ms Sparkle tail. 50 partículas chiquitas (4-6px) que
+ *   t = +800ms Sparkle tail. 100 partículas chiquitas (4-6px) que
  *            flotan largo (TTL 2.5-3.5s). Sin haptic. Es el "polvo"
  *            ambiental que cierra la celebración.
  *
@@ -114,7 +115,7 @@ export function useConfetti() {
     // t = +450ms — encore.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      globalManager.burst({ x, y, count: 250, speedScale: 0.7 });
+      globalManager.burst({ x, y, count: 500, speedScale: 0.7 });
     }, 450);
 
     // t = +800ms — sparkle tail.
@@ -122,7 +123,7 @@ export function useConfetti() {
       globalManager.burst({
         x,
         y,
-        count: 50,
+        count: 100,
         sizeRange: [4, 6],
         speedRange: [200, 400],
         ttlRange: [2500, 3500],

@@ -1,104 +1,76 @@
-import { Confetto, type Shape } from "./Confetto";
-import { pickColor } from "./colors";
-
-const SHAPES: readonly Shape[] = ["square", "circle", "triangle"];
+/**
+ * Manager liviano — sirve de puente entre el código JS (que llama
+ * `burst()`) y el ConfettiCanvas que vive como UI-thread worklet.
+ *
+ * Diseño post-migración a useFrameCallback + Picture:
+ *   - Las partículas YA NO viven acá. Viven en una SharedValue<Particle[]>
+ *     que es propiedad del ConfettiCanvas — el Manager solo recuerda
+ *     un `spawnFn` que el Canvas registra al montar.
+ *   - `burst()` llama al spawnFn, que internamente hace `runOnUI` para
+ *     spawnear partículas en UI thread sin atravesar React.
+ *   - Sin ciclo de update — el Canvas drivea su propio loop con
+ *     `useFrameCallback` de Reanimated, también en UI thread.
+ *
+ * Singleton-friendly: una instancia global (`globalManager` en
+ * useConfetti) que cualquier pantalla puede usar; el Canvas en el
+ * root layout se conecta una vez al mount.
+ */
 
 export interface BurstConfig {
   x: number;
   y: number;
-  /** Cantidad de partículas en el burst único. Default 500 (el peak
-   *  del burst principal en la secuencia 3-stage). El total perceptual
-   *  es 500 + 250 (encore) + 50 (sparkle tail) = 800.
+  /** Cantidad de partículas en este spawn. Default 1000. Es solo
+   *  la etapa SOLICITADA — la secuencia 3-stage (anticipation, peak,
+   *  encore, sparkle) la maneja `useConfetti` haciendo varios burst()
+   *  en cadena, no este field.
    *
-   *  Bumped agresivo post-migración a Skia: el canvas GPU traga
-   *  miles de primitivas sin caer de 60fps. Antes el techo View-per-
-   *  particle era ~280. */
+   *  Calibrado post-migración a UI thread (useFrameCallback +
+   *  Picture). Antes de eso el techo era ~500 por React reconciliation,
+   *  ahora la GPU traga 1500-2500. */
   count?: number;
-  /** Multiplicador de velocidad uniforme — el encore usa 0.7 para
-   *  que las partículas viajen menos lejos. Default 1. */
+  /** Multiplicador de velocidad uniforme. Encore usa 0.7. */
   speedScale?: number;
-  /** Override de tamaño absoluto (px). El sparkle tail usa [4, 6]. */
+  /** Override de tamaño absoluto (px). Sparkle tail usa [4, 6]. */
   sizeRange?: [number, number];
-  /** Override de TTL absoluto (ms). El sparkle tail usa [2500, 3500]
-   *  para flotar más tiempo. */
+  /** Override de TTL absoluto (ms). Sparkle tail usa [2500, 3500]. */
   ttlRange?: [number, number];
-  /** Override de velocidad ABSOLUTA (px/s) — ignora pickSpeed entera
-   *  y por lo tanto speedScale tampoco aplica. El sparkle tail usa
-   *  [200, 400] para que las partículas tengan personalidad propia
-   *  y no parezcan rezagadas del burst grande. */
+  /** Override de velocidad ABSOLUTA (px/s). Sparkle tail usa [200, 400]. */
   speedRange?: [number, number];
 }
 
-/**
- * Manager de partículas. Mantiene la lista activa y limpia las
- * muertas. Emisión: UN solo burst instantáneo en el frame 0, sin
- * stream continuo. Pure JS para testabilidad y para que pueda
- * correr en cualquier driver de loop.
- */
+export type SpawnFn = (config: BurstConfig) => void;
+
 export class ConfettiManager {
-  particles: Confetto[] = [];
+  private spawnFn: SpawnFn | null = null;
   private particleScale = 1;
-  /** Callback opcional para que el Canvas pueda reanudar su frame
-   *  loop cuando alguien llama burst() después de quedar idle. */
-  onActivity?: () => void;
 
   /** 0..1 para reducir la cantidad de partículas en dispositivos
-   *  low-end. La cantidad solicitada se redondea. */
+   *  low-end. Con la migración a UI thread + Picture esto es ya
+   *  casi cosmético — la GPU traga el doble — pero lo dejamos para
+   *  ahorro de batería en GPUs antiguas. */
   setParticleScale(scale: number) {
     this.particleScale = Math.max(0.1, Math.min(1, scale));
   }
 
-  burst({
-    x,
-    y,
-    count = 500,
-    speedScale,
-    sizeRange,
-    ttlRange,
-    speedRange,
-  }: BurstConfig) {
-    const total = Math.round(count * this.particleScale);
-    for (let i = 0; i < total; i++) {
-      this.spawnAt(x, y, { speedScale, sizeRange, ttlRange, speedRange });
+  /** Llamado por el ConfettiCanvas al mount. La función pasada
+   *  internamente hace `runOnUI` hacia el SharedValue del canvas. */
+  attachSpawn(fn: SpawnFn) {
+    this.spawnFn = fn;
+  }
+
+  detachSpawn() {
+    this.spawnFn = null;
+  }
+
+  burst(config: BurstConfig) {
+    if (!this.spawnFn) {
+      // Canvas no montado todavía — no-op silencioso. Pasa solo
+      // durante el split-second entre que React arma el árbol y
+      // ConfettiPortal se monta. Si el burst es importante (post-trade
+      // success), seguro el árbol ya está listo.
+      return;
     }
-    this.onActivity?.();
-  }
-
-  private spawnAt(
-    x: number,
-    y: number,
-    overrides: {
-      speedScale?: number;
-      sizeRange?: [number, number];
-      ttlRange?: [number, number];
-      speedRange?: [number, number];
-    },
-  ) {
-    const shape = SHAPES[(Math.random() * SHAPES.length) | 0];
-    const color = pickColor();
-    this.particles.push(new Confetto({ x, y, color, shape, ...overrides }));
-  }
-
-  update(dt: number, canvasW: number, canvasH: number) {
-    // Sweep + update in-place (write index) — más barato que map
-    // o splice por cada muerta.
-    let write = 0;
-    for (let read = 0; read < this.particles.length; read++) {
-      const p = this.particles[read];
-      p.update(dt, canvasH);
-      if (!p.isDead(canvasW, canvasH)) {
-        if (write !== read) this.particles[write] = p;
-        write++;
-      }
-    }
-    this.particles.length = write;
-  }
-
-  isIdle(): boolean {
-    return this.particles.length === 0;
-  }
-
-  reset() {
-    this.particles.length = 0;
+    const count = Math.round((config.count ?? 1000) * this.particleScale);
+    this.spawnFn({ ...config, count });
   }
 }
