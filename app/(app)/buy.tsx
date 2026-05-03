@@ -8,13 +8,15 @@ import {
   assets,
   assetIconCode,
   assetCurrency,
+  assetMarket,
   formatARS,
   formatMoney,
   formatQty,
   type AssetCategory,
   type AssetCurrency,
+  type AssetMarket,
 } from "../../lib/data/assets";
-import { accounts } from "../../lib/data/accounts";
+import { accounts, type AccountId } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 
@@ -38,14 +40,28 @@ function unitWordFor(cat: AssetCategory): string {
 }
 
 /**
- * Suma los saldos de cuentas en una moneda específica. Para USD hay
- * dos cuentas (AR y US) — para la compra el flujo nativo agrupa las
- * dos como un único pool.
+ * Cada mercado se opera contra UNA cuenta específica:
+ *   - AR     → ars-ar (acciones AR, bonos, FCI)
+ *   - US     → usd-us (acciones US — los USD en cuenta argentina NO
+ *              sirven para operar en este mercado, son saldo aparte)
+ *   - CRYPTO → usdt-crypto (cripto)
  */
-function nativeBalanceFor(currency: AssetCurrency): number {
-  return accounts
-    .filter((a) => a.currency === currency)
-    .reduce((sum, a) => sum + a.balance, 0);
+function sourceAccountIdForMarket(market: AssetMarket): AccountId {
+  switch (market) {
+    case "US":
+      return "usd-us";
+    case "CRYPTO":
+      return "usdt-crypto";
+    case "AR":
+    default:
+      return "ars-ar";
+  }
+}
+
+/** Saldo disponible para operar en el mercado del asset. */
+function nativeBalanceFor(market: AssetMarket): number {
+  const id = sourceAccountIdForMarket(market);
+  return accounts.find((a) => a.id === id)?.balance ?? 0;
 }
 
 /** Símbolo prefix para los inputs en la moneda nativa del activo. */
@@ -79,20 +95,22 @@ export default function BuyScreen() {
   const [inputMode, setInputMode] = useState<InputMode>("amount");
   const [input, setInput] = useState("0");
 
-  // Moneda nativa del activo. Si el activo es US, todo se opera en USD;
-  // si es crypto, en USDT. Para AR, en ARS. Cada mercado se compra con
-  // su propia moneda nativa — sin bridge, sin conversión.
+  // Mercado del asset — driver del saldo source y de la moneda nativa.
+  const market = useMemo<AssetMarket>(
+    () => (asset ? assetMarket(asset) : "AR"),
+    [asset],
+  );
+  // Moneda nativa del activo (display del input: $, US$, USDT). Aún
+  // usa assetCurrency porque el cálculo de currency cae al market.
   const nativeCurrency = useMemo<AssetCurrency>(
     () => (asset ? assetCurrency(asset) : "ARS"),
     [asset],
   );
 
-  // Pool de saldo en la moneda nativa del activo — es lo que se puede
-  // gastar directo. ARS para AR, USD para US, USDT para crypto.
-  const nativeBalance = useMemo(
-    () => nativeBalanceFor(nativeCurrency),
-    [nativeCurrency],
-  );
+  // Saldo disponible para operar = saldo de la cuenta específica del
+  // mercado (no se mezclan los USD de la cuenta argentina con los USD
+  // de la cuenta USA — son pools separados).
+  const nativeBalance = useMemo(() => nativeBalanceFor(market), [market]);
 
   if (!asset) return null;
 
