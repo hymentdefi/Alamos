@@ -73,10 +73,9 @@ function hapticLight() {
 function hapticMedium() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 }
-// hapticHeavy removido — el peak Heavy se reserva ahora para el
-// momento de "Orden Ejecutada" (co-localizado con el sonido), no
-// para el commit del swipe. El swipe usa Light/Light/Medium para
-// dejar headroom táctil al peak.
+function hapticHeavy() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+}
 
 /** Log temporal para debuggear la race del onEnd (bug 1). */
 function logSwipeEnd(
@@ -201,10 +200,7 @@ export function SwipeToSubmit({
 
           if (v > SWIPE_COMMIT_FRACTION && !crossedCommit.value) {
             crossedCommit.value = true;
-            // Light al cruzar threshold (era Medium) — preserva el
-            // crescendo táctil hacia el commit Medium, sin gastar
-            // intensidad antes de tiempo.
-            runOnJS(hapticLight)();
+            runOnJS(hapticMedium)();
           } else if (
             v < SWIPE_COMMIT_FRACTION - 0.1 &&
             crossedCommit.value
@@ -238,11 +234,7 @@ export function SwipeToSubmit({
           );
 
           if (commit) {
-            // Medium en el commit (era Heavy) — el peak Heavy se
-            // mueve al momento de "Orden Ejecutada" (co-localizado
-            // con el sonido). Acá Medium dice "decisión tomada"
-            // sin pisar al peak que viene 1.5s después.
-            runOnJS(hapticMedium)();
+            runOnJS(hapticHeavy)();
             // Spring físico. El triggerSubmit lo dispara useAnimatedReaction
             // cuando progress.value cruza 0.99 (primary path). Mantenemos
             // también el callback del spring como segundo red de seguridad.

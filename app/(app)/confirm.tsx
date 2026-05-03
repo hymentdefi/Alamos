@@ -47,10 +47,20 @@ function fireErrorHaptic() {
     Haptics.NotificationFeedbackType.Error,
   ).catch(() => {});
 }
-// fireSuccessHaptic + fireMediumHaptic removidos en el refactor de
-// haptics: ahora el flow tiene UN solo peak Heavy en "Ejecutada"
-// (co-localizado con el sonido), sin mini-hits intermedios. Ver
-// HAPTIC_AUDIO_LEAD_MS más abajo.
+/**
+ * Build-up haptic en "Orden Recibida..." — Medium 250ms antes del
+ * peak Heavy de "Ejecutada". Forma una rampa Medium → Heavy con
+ * gap perceptual que arma la anticipación al payoff. Sin esto el
+ * peak se siente "aislado"; con esto el cerebro ya sabe que algo
+ * grande viene.
+ *
+ * fireSuccessHaptic sigue removido — el spring del check al final
+ * es solo visual, no necesita su propio haptic (sería redundante
+ * 250ms después del peak).
+ */
+function fireMediumHaptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+}
 
 /* ───────────── CrossFadeStatusText (spec section F) ───────────────────
  *
@@ -213,6 +223,17 @@ const CHECK_PATH_LEN = 24;
  * separados. Apple Pay usa ~30-40ms entre haptic y "ding".
  */
 const HAPTIC_AUDIO_LEAD_MS = 40;
+/**
+ * Delay del haptic Medium dentro de la fase "Recibida..." — el
+ * texto entrante cruza ~50% de opacidad alrededor de IN_DELAY +
+ * IN_DURATION/2 ≈ 450ms. Tirar el haptic ahí lo sincroniza con el
+ * cross-fade visual (ver section G del spec original).
+ *
+ * En tiempo absoluto: t=+800 (Recibida text) + 450 = t=+1250ms,
+ * que es exactamente 250ms antes del peak Heavy a t=+1500ms.
+ * Esos 250ms son el gap perceptual del build-up al payoff.
+ */
+const RECIBIDA_HAPTIC_DELAY_MS = 450;
 const SPIN_DURATION_MS = 1000;
 // SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
@@ -484,13 +505,18 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received. Solo crossfade visual del texto,
-    // SIN haptic intermedio — el haptic Medium acá se sentía como un
-    // mini-pico que competía con el peak Heavy del "Ejecutada" 700ms
-    // después. Mejor preservar el silencio dramático y que todo el
-    // peso táctil viva en el momento de la confirmación.
+    // Phase 2: sending → received. El crossfade visual del texto
+    // dispara el cambio de prop. El haptic Medium se dispara cuando
+    // el texto entrante cruza ~50% de opacidad — funciona como
+    // BUILD-UP del peak Heavy que viene 250ms después en "Ejecutada".
+    // Medium → Heavy con gap de 250ms = rampa de anticipación al
+    // payoff.
     setPhase("received");
     setStatusText("Orden Recibida...");
+    setTimeout(() => {
+      if (completedRef.current && phase !== "received") return;
+      fireMediumHaptic();
+    }, RECIBIDA_HAPTIC_DELAY_MS);
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;
