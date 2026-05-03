@@ -75,17 +75,19 @@ export function ConfettiPortal() {
  * Duolingo: la celebración tiene "arc" emocional, no es un pico
  * único):
  *
- *   t = 0    Anticipación. Light haptic + callback `onAnticipation`
- *            (la screen suele hacer un pulse sutil del check icon).
- *            Le dice al cerebro "viene algo".
+ *   t = 0    Anticipación. Solo `onAnticipation` callback (la screen
+ *            hace un pulse sutil del check icon). Sin haptic — el
+ *            telegrafiado es puramente visual para no competir con
+ *            el haptic del peak 100ms después.
  *
- *   t = +100ms PEAK. Success haptic + `onPeak` callback (la screen
- *            suele tirar flash blanco + spring overshoot del check)
- *            + burst principal de 1000 partículas. Es EL momento.
+ *   t = +100ms PEAK. Heavy impact (un solo punch fuerte) + `onPeak`
+ *            callback (la screen tira flash blanco + spring overshoot
+ *            del check) + burst principal de 1000 partículas + el
+ *            sonido que la screen disparó al mount. Es EL momento.
  *
- *   t = +450ms Encore. Medium haptic + segundo burst de 500 partículas
- *            con velocidad 30% reducida. Como una "ola que sigue":
- *            confirma que lo del peak no fue un accidente.
+ *   t = +450ms Encore. Light impact (era Medium — too much) +
+ *            segundo burst de 500 partículas con velocidad 30%
+ *            reducida. "La ola que sigue".
  *
  *   t = +800ms Sparkle tail. 100 partículas chiquitas (4-6px) que
  *            flotan largo (TTL 2.5-3.5s). Sin haptic. Es el "polvo"
@@ -99,22 +101,27 @@ export function useConfetti() {
   const burst = useCallback((opts: BurstOptions) => {
     const { x, y, count, onAnticipation, onPeak } = opts;
 
-    // t = 0 — anticipación.
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // t = 0 — anticipación. SIN haptic, solo el callback visual
+    // (pulse del check). El haptic acá pelea con el del peak (100ms
+    // después) y se siente over-stimulating. El telegrafiado lo da
+    // el visual.
     onAnticipation?.();
 
-    // t = +100ms — peak.
+    // t = +100ms — peak. UN solo Heavy impact (un punch fuerte y
+    // único) en lugar de notificationAsync(Success) que es 3-tap
+    // rápido y entra en conflicto con la melodía del WAV. Heavy +
+    // ding-dong se complementan: el haptic es la "puñalada"
+    // percusiva, el sonido es la melodía que la acompaña.
     setTimeout(() => {
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
       onPeak?.();
       globalManager.burst({ x, y, count });
     }, 100);
 
-    // t = +450ms — encore.
+    // t = +450ms — encore. Light impact (era Medium) — un toquecito
+    // sutil que confirma "todavía pasa algo", sin re-pegarte.
     setTimeout(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       globalManager.burst({ x, y, count: 500, speedScale: 0.7 });
     }, 450);
 
