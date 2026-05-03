@@ -753,9 +753,9 @@ export default function ConfirmScreen() {
               onPress={() => router.back()}
               hitSlop={14}
               disabled={phase !== "idle"}
-              style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
+              style={s.backBtn}
             >
-              <Feather name="arrow-left" size={18} color={c.text} />
+              <Feather name="arrow-left" size={22} color={c.text} />
             </Pressable>
           </View>
 

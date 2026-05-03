@@ -240,11 +240,11 @@ export function SideMenu({ visible, onClose }: Props) {
         >
           <View style={s.closeRow}>
             <Pressable
-              style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
+              style={s.closeBtn}
               onPress={onClose}
               hitSlop={10}
             >
-              <Feather name="arrow-left" size={20} color={c.text} />
+              <Feather name="arrow-left" size={22} color={c.text} />
             </Pressable>
           </View>
 

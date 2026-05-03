@@ -154,13 +154,13 @@ export default function RegisterScreen() {
     >
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtn}
           onPress={goBack}
           hitSlop={12}
         >
           <Feather
             name={currentStep === 0 ? "x" : "arrow-left"}
-            size={18}
+            size={22}
             color={c.text}
           />
         </Pressable>

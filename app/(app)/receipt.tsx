@@ -102,9 +102,9 @@ export default function ReceiptScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <Text style={[s.headerTitle, { color: c.text }]}>Comprobante</Text>
         <Pressable

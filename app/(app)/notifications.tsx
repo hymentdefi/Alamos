@@ -104,11 +104,11 @@ export default function NotificationsScreen() {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <Text style={[s.headerTitle, { color: c.text }]}>Notificaciones</Text>
         <View style={{ width: 36 }} />

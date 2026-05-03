@@ -78,11 +78,11 @@ function AssetList({ onPick }: { onPick: (a: CryptoAsset) => void }) {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <Text style={[s.headerTitle, { color: c.text }]}>Depositar crypto</Text>
         <View style={{ width: 36 }} />
@@ -204,11 +204,11 @@ function NetworkPicker({
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={onBack}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>
@@ -334,11 +334,11 @@ function AddressView({
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={onBack}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>

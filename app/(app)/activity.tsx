@@ -88,12 +88,12 @@ export default function ActivityScreen() {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Tap
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={() => router.back()}
           hitSlop={12}
           haptic="selection"
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Tap>
         <Text style={[s.headerTitle, { color: c.text }]}>Actividad</Text>
         <View style={{ width: 36 }} />

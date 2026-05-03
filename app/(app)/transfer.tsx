@@ -126,11 +126,11 @@ function DepositInfo() {
       <View style={[s.root, { backgroundColor: c.bg }]}>
         <View style={[s.header, { paddingTop: insets.top + 12 }]}>
           <Pressable
-            style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+            style={s.iconBtn}
             onPress={() => setKindId(null)}
             hitSlop={12}
           >
-            <Feather name="arrow-left" size={18} color={c.text} />
+            <Feather name="arrow-left" size={22} color={c.text} />
           </Pressable>
           <Text style={[s.headerTitle, { color: c.text }]}>
             Ingresar {kindId === "usdt-crypto" ? "USDT" : currencyLabelOf(kindId)}
@@ -174,7 +174,7 @@ function DepositInfo() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.depositTitle, { color: c.text }]}>
-          ¿En qué moneda querés{"\n"}ingresar?
+          ¿Qué moneda querés{"\n"}ingresar?
         </Text>
         <Text style={[s.hubSub, { color: c.textMuted }]}>
           Elegí la cuenta donde vas a recibir.
@@ -810,11 +810,11 @@ function AmountStep({
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={onBack}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>Enviar</Text>
@@ -888,7 +888,7 @@ function AmountStep({
       <View
         style={{
           paddingTop: 28,
-          paddingBottom: insets.bottom + 48,
+          paddingBottom: insets.bottom + 96,
           paddingHorizontal: 20,
         }}
       >
@@ -941,11 +941,11 @@ function DestinationStep({
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={onBack}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>Enviar a</Text>
@@ -1175,11 +1175,11 @@ function DepositFromAccount({
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={onBack}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: c.text }]}>Ingresar</Text>

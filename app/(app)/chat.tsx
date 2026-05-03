@@ -198,9 +198,9 @@ export default function ChatScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={14}
-          style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtn}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
 
         <View style={s.headerIdentity}>

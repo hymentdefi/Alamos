@@ -107,12 +107,12 @@ export default function DetailScreen() {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Tap
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={() => router.back()}
           hitSlop={12}
           haptic="selection"
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Tap>
         <View style={s.topCenter}>
           <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>

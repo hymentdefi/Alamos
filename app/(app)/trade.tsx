@@ -138,11 +138,11 @@ export default function TradeScreen() {
       {/* ── Top bar ── */}
       <View style={[s.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           onPress={() => router.back()}
           hitSlop={10}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <View style={s.topCenter}>
           <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>

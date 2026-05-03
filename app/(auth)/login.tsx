@@ -52,11 +52,11 @@ export default function LoginScreen() {
     >
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable
-          style={[s.backBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtn}
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Feather name="arrow-left" size={18} color={c.text} />
+          <Feather name="arrow-left" size={22} color={c.text} />
         </Pressable>
         <AlamosLogo variant="mark" tone="green" size={26} />
         <View style={{ width: 36 }} />
