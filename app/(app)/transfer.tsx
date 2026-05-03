@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -105,11 +105,29 @@ export default function TransferScreen() {
 function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   // null = hub picker (4 cards). AccountId = detalle de esa moneda.
   const [kindId, setKindId] = useState<AccountId | null>(null);
   // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
   const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
+
+  // Interceptamos el back nativo (swipe-from-edge + hardware back en
+  // Android) para que respete los sub-steps internos. Sin esto, el
+  // swipe popea TODA la pantalla y vuelve a home aunque estemos en
+  // un sub-step.
+  useEffect(() => {
+    const sub = navigation.addListener("beforeRemove", (e) => {
+      if (depositFrom) {
+        e.preventDefault();
+        setDepositFrom(null);
+      } else if (kindId) {
+        e.preventDefault();
+        setKindId(null);
+      }
+    });
+    return sub;
+  }, [navigation, kindId, depositFrom]);
 
   if (depositFrom) {
     return (
@@ -133,7 +151,7 @@ function DepositInfo() {
             <Feather name="arrow-left" size={22} color={c.text} />
           </Pressable>
           <Text style={[s.headerTitle, { color: c.text }]}>
-            Ingresar {kindId === "usdt-crypto" ? "USDT" : currencyLabelOf(kindId)}
+            Ingresar {depositTitleFor(kindId)}
           </Text>
           <View style={{ width: 36 }} />
         </View>
@@ -221,6 +239,21 @@ function CryptoDepositRedirect() {
 function currencyLabelOf(id: AccountId): string {
   const a = accounts.find((x) => x.id === id);
   return a?.currency ?? "";
+}
+
+/** Etiqueta humana de la moneda en el header del detalle de
+ *  Ingresar — "pesos" / "dólares" / "crypto" en lugar del code
+ *  ISO-ish (ARS/USD/USDT). */
+function depositTitleFor(id: AccountId): string {
+  switch (id) {
+    case "ars-ar":
+      return "pesos";
+    case "usd-ar":
+    case "usd-us":
+      return "dólares";
+    case "usdt-crypto":
+      return "crypto";
+  }
 }
 
 /* ─── Hub picker: 4 floating cards en grid 2×2 con AccountFlag ─── */
@@ -337,118 +370,176 @@ function BankDepositCard({
   const data = RECEIVE_BANK_AR[kind];
   const linkedCurrency = kind === "ars-ar" ? "ars" : "usd";
   const linked = LINKED_ACCOUNTS.filter((a) => a.currency === linkedCurrency);
+  // Tabs: separamos el alias/CBU del listado de cuentas vinculadas
+  // para no abrumar todo en un mismo scroll. Default: alias (es el
+  // caso más común — venir a copiar un dato para pasarle a alguien).
+  const [tab, setTab] = useState<"alias" | "linked">("alias");
 
   return (
     <>
-      <Text style={[s.depositEyebrow, { color: c.text }]}>
-        Desde un banco o billetera
-      </Text>
-      <View
-        style={[
-          s.depositCard,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-      >
-        <CopyRow label="Alias" value={data.alias} />
-        <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
-        <CopyRow label="CBU" value={data.cbu} mono />
-        {data.legend ? (
-          <>
-            <View
-              style={[s.depositRowDivider, { backgroundColor: c.border }]}
-            />
-            <Text style={[s.depositLegend, { color: c.textMuted }]}>
-              {data.legend}
-            </Text>
-          </>
-        ) : null}
+      <View style={s.tabsWrap}>
+        <View style={[s.tabGroup, { backgroundColor: c.surfaceHover }]}>
+          <DepositTabBtn
+            label="Alias y CBU"
+            active={tab === "alias"}
+            onPress={() => {
+              if (tab !== "alias")
+                Haptics.selectionAsync().catch(() => {});
+              setTab("alias");
+            }}
+          />
+          <DepositTabBtn
+            label="Cuentas vinculadas"
+            active={tab === "linked"}
+            onPress={() => {
+              if (tab !== "linked")
+                Haptics.selectionAsync().catch(() => {});
+              setTab("linked");
+            }}
+          />
+        </View>
       </View>
 
-      <Tap
-        style={[
-          s.shareAliasBtn,
-          { backgroundColor: c.surface, borderColor: c.border },
-        ]}
-        haptic="light"
-        onPress={() => {
-          Share.share({ message: data.alias }).catch(() => {});
-        }}
-      >
-        <Feather name="share" size={16} color={c.greenDark} />
-        <Text style={[s.shareAliasText, { color: c.greenDark }]}>
-          Compartir alias
-        </Text>
-      </Tap>
-
-      <Text style={[s.depositEyebrow, { color: c.text, marginTop: 28 }]}>
-        Desde cuentas vinculadas
-      </Text>
-      {linked.length > 0 ? (
-        <View
-          style={[
-            s.depositCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          {linked.map((acc, i) => (
-            <View key={acc.id}>
-              {i > 0 ? (
+      {tab === "alias" ? (
+        <>
+          <View
+            style={[
+              s.depositCard,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+          >
+            <CopyRow label="Alias" value={data.alias} />
+            <View style={[s.depositRowDivider, { backgroundColor: c.border }]} />
+            <CopyRow label="CBU" value={data.cbu} mono />
+            {data.legend ? (
+              <>
                 <View
-                  style={[
-                    s.depositRowDivider,
-                    { backgroundColor: c.border },
-                  ]}
+                  style={[s.depositRowDivider, { backgroundColor: c.border }]}
                 />
-              ) : null}
-              <LinkedAccountRow acc={acc} onPress={() => onPickLinked(acc)} />
-            </View>
-          ))}
-        </View>
+                <Text style={[s.depositLegend, { color: c.textMuted }]}>
+                  {data.legend}
+                </Text>
+              </>
+            ) : null}
+          </View>
+
+          <Tap
+            style={[
+              s.shareAliasBtn,
+              { backgroundColor: c.surface, borderColor: c.border },
+            ]}
+            haptic="light"
+            onPress={() => {
+              Share.share({ message: data.alias }).catch(() => {});
+            }}
+          >
+            <Feather name="share" size={16} color={c.greenDark} />
+            <Text style={[s.shareAliasText, { color: c.greenDark }]}>
+              Compartir alias
+            </Text>
+          </Tap>
+
+          <View
+            style={[
+              s.noteCard,
+              {
+                backgroundColor: c.surfaceHover,
+                borderColor: c.border,
+                marginTop: 20,
+              },
+            ]}
+          >
+            <Feather name="clock" size={14} color={c.textSecondary} />
+            <Text style={[s.noteText, { color: c.textSecondary }]}>
+              Los ingresos acreditan de inmediato cuando el banco confirme la
+              transferencia.
+            </Text>
+          </View>
+        </>
       ) : (
-        <View
-          style={[
-            s.depositCard,
-            s.emptyLinkedCard,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <Text style={[s.emptyLinkedText, { color: c.textMuted }]}>
-            Todavía no tenés cuentas{" "}
-            {kind === "ars-ar" ? "en pesos" : "en dólares"} vinculadas.
-          </Text>
-        </View>
+        <>
+          {linked.length > 0 ? (
+            <View
+              style={[
+                s.depositCard,
+                { backgroundColor: c.surface, borderColor: c.border },
+              ]}
+            >
+              {linked.map((acc, i) => (
+                <View key={acc.id}>
+                  {i > 0 ? (
+                    <View
+                      style={[
+                        s.depositRowDivider,
+                        { backgroundColor: c.border },
+                      ]}
+                    />
+                  ) : null}
+                  <LinkedAccountRow
+                    acc={acc}
+                    onPress={() => onPickLinked(acc)}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View
+              style={[
+                s.depositCard,
+                s.emptyLinkedCard,
+                { backgroundColor: c.surface, borderColor: c.border },
+              ]}
+            >
+              <Text style={[s.emptyLinkedText, { color: c.textMuted }]}>
+                Todavía no tenés cuentas{" "}
+                {kind === "ars-ar" ? "en pesos" : "en dólares"} vinculadas.
+              </Text>
+            </View>
+          )}
+
+          <Tap
+            style={s.addAccountBtn}
+            haptic="light"
+            onPress={() => {
+              /* TODO: wizard de agregar cuenta */
+            }}
+          >
+            <Feather name="plus" size={16} color={c.text} />
+            <Text style={[s.addAccountText, { color: c.text }]}>
+              Agregar otra cuenta
+            </Text>
+          </Tap>
+        </>
       )}
-
-      <Tap
-        style={s.addAccountBtn}
-        haptic="light"
-        onPress={() => {
-          /* TODO: wizard de agregar cuenta */
-        }}
-      >
-        <Feather name="plus" size={16} color={c.text} />
-        <Text style={[s.addAccountText, { color: c.text }]}>
-          Agregar otra cuenta
-        </Text>
-      </Tap>
-
-      <View
-        style={[
-          s.noteCard,
-          {
-            backgroundColor: c.surfaceHover,
-            borderColor: c.border,
-            marginTop: 20,
-          },
-        ]}
-      >
-        <Feather name="clock" size={14} color={c.textSecondary} />
-        <Text style={[s.noteText, { color: c.textSecondary }]}>
-          Los ingresos acreditan de inmediato cuando el banco confirme la
-          transferencia.
-        </Text>
-      </View>
     </>
+  );
+}
+
+function DepositTabBtn({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      style={[
+        s.tab,
+        active && [
+          s.tabActive,
+          { backgroundColor: c.surface, shadowColor: c.ink },
+        ],
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[s.tabLabel, { color: active ? c.text : c.textMuted }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -635,12 +726,26 @@ function formatMoney(value: number, cur: DepositCurrency): string {
 }
 
 function SendFlow() {
+  const navigation = useNavigation();
   // Step inicial: 'currency' = picker de 4 cards. 'amount' = AmountStep
   // existente. Después destination/done.
   const [step, setStep] = useState<SendStep | "currency">("currency");
   const [cur, setCur] = useState<DepositCurrency>("ars");
   const [amount, setAmount] = useState("0");
   const [destination, setDestination] = useState<LinkedAccount | null>(null);
+
+  // Intercepto del back nativo (swipe-from-edge + hardware back) →
+  // navegación entre sub-steps en lugar de pop full-screen.
+  useEffect(() => {
+    const sub = navigation.addListener("beforeRemove", (e) => {
+      if (step === "currency") return;
+      e.preventDefault();
+      if (step === "amount") setStep("currency");
+      else if (step === "destination") setStep("amount");
+      else if (step === "done") setStep("destination");
+    });
+    return sub;
+  }, [navigation, step]);
 
   const parsed = Number.parseFloat(amount) || 0;
 
@@ -888,7 +993,7 @@ function AmountStep({
       <View
         style={{
           paddingTop: 28,
-          paddingBottom: insets.bottom + 24,
+          paddingBottom: insets.bottom + 60,
           paddingHorizontal: 20,
         }}
       >
@@ -1395,6 +1500,40 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 10,
   },
+
+  /* Tabs Alias|CBU vs Cuentas vinculadas — mismo patrón que el
+     tabGroup de activity.tsx (segmented control con pill activa
+     elevada por shadow sutil). */
+  tabsWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 16,
+  },
+  tabGroup: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: radius.md,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+  },
+  tabActive: {
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  tabLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+
   depositCard: {
     marginHorizontal: 20,
     borderRadius: radius.lg,
@@ -1539,11 +1678,10 @@ const s = StyleSheet.create({
   /* Send flow — paso 1 (monto + slider) */
   amountBlock: {
     flex: 1,
-    // flex-end ancla amount + slider al fondo del block, justo
-    // arriba del keypad. Resultado: el espacio extra del flex queda
-    // entre el header y la pregunta, no abajo. Todo el bloque
-    // input baja como un grupo.
-    justifyContent: "flex-end",
+    // Centrado vertical: amount + slider quedan en el medio del
+    // espacio entre header y keypad. Equilibrado, no apilado a
+    // ningún extremo.
+    justifyContent: "center",
   },
   sendAmountSection: {
     alignItems: "center",
