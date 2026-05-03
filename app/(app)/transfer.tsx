@@ -888,7 +888,7 @@ function AmountStep({
       <View
         style={{
           paddingTop: 28,
-          paddingBottom: insets.bottom + 96,
+          paddingBottom: insets.bottom + 180,
           paddingHorizontal: 20,
         }}
       >
