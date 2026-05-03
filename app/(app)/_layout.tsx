@@ -42,7 +42,14 @@ export default function AppLayout() {
       />
       <Stack.Screen name="activity" />
       <Stack.Screen name="notifications" />
-      <Stack.Screen name="transfer" />
+      {/* Transfer (send amount step): fullscreen gesture OFF para que
+          arrastrar el slider de % no dispare el swipe-back. Mismo
+          fix que el screen 'buy'. El swipe desde el borde izquierdo
+          sigue andando como back. */}
+      <Stack.Screen
+        name="transfer"
+        options={{ fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen name="settings" />
       <Stack.Screen name="security" />
       <Stack.Screen name="chat" />
