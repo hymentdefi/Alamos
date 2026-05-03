@@ -42,22 +42,15 @@ import { playSound } from "../../lib/sounds/SoundManager";
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-function fireSuccessHaptic() {
-  Haptics.notificationAsync(
-    Haptics.NotificationFeedbackType.Success,
-  ).catch(() => {});
-}
 function fireErrorHaptic() {
   Haptics.notificationAsync(
     Haptics.NotificationFeedbackType.Error,
   ).catch(() => {});
 }
-/** Spec section G: "Orden Recibida..." mini-hit de dopamina (Medium),
- * firmeza + seca. Se dispara en el frame en que el texto entrante cruza
- * ~50% de opacidad → IN_DELAY + IN_DURATION / 2 ≈ 450 ms post-trigger. */
-function fireMediumHaptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-}
+// fireSuccessHaptic + fireMediumHaptic removidos en el refactor de
+// haptics: ahora el flow tiene UN solo peak Heavy en "Ejecutada"
+// (co-localizado con el sonido), sin mini-hits intermedios. Ver
+// HAPTIC_AUDIO_LEAD_MS más abajo.
 
 /* ───────────── CrossFadeStatusText (spec section F) ───────────────────
  *
@@ -208,9 +201,18 @@ const DONE_HOLD_MS = 2000;
 const MIN_LOADING_MS = 600;
 const TIMEOUT_MS = 8000;
 const CHECK_PATH_LEN = 24;
-/** Delay del haptic Medium al entrar a "Orden Recibida..." — el
- * entrante cruza 50 % de opacidad ~en IN_DELAY + IN_DURATION / 2. */
-const RECIBIDA_HAPTIC_DELAY_MS = 450;
+/**
+ * Lead del haptic sobre el sonido en el peak de "Orden Ejecutada".
+ *
+ * Por qué 40ms: el cerebro procesa input táctil (~10ms latencia) más
+ * rápido que el auditivo (~30-50ms al cortex). Si los dos events se
+ * disparan en el mismo frame del JS, el oído los percibe como
+ * desincronizados. Adelantar el haptic 40ms los hace sentir
+ * SIMULTÁNEOS y "co-localizados" — esto es lo que hace que el
+ * peak se sienta como un solo evento físico-sonoro, no dos
+ * separados. Apple Pay usa ~30-40ms entre haptic y "ding".
+ */
+const HAPTIC_AUDIO_LEAD_MS = 40;
 const SPIN_DURATION_MS = 1000;
 // SVG viewBox is 100x100, radius = 44 → circumference.
 const CIRC = 2 * Math.PI * 44;
@@ -482,15 +484,13 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    // Phase 2: sending → received (state 2 = primera mini-hit dopa).
-    // El crossfade lo dispara el cambio de prop. El haptic Medium se
-    // dispara cuando el texto entrante cruza ~50 % de opacidad.
+    // Phase 2: sending → received. Solo crossfade visual del texto,
+    // SIN haptic intermedio — el haptic Medium acá se sentía como un
+    // mini-pico que competía con el peak Heavy del "Ejecutada" 700ms
+    // después. Mejor preservar el silencio dramático y que todo el
+    // peso táctil viva en el momento de la confirmación.
     setPhase("received");
     setStatusText("Orden Recibida...");
-    setTimeout(() => {
-      if (completedRef.current && phase !== "received") return;
-      fireMediumHaptic();
-    }, RECIBIDA_HAPTIC_DELAY_MS);
 
     await wait(PHASE_RECEIVED_MS);
     if (completedRef.current) return;
@@ -504,11 +504,15 @@ export default function ConfirmScreen() {
     }
     setStatusText("Orden Ejecutada");
 
-    // Sonido sincrónico con la transición — disparado en el mismo
-    // tick que el setStatusText para que el usuario asocie el ding
-    // con el momento del cambio "recibida → ejecutada", no con el
-    // mount de la success screen 1-2 frames después.
-    playSound("order_success");
+    // PEAK: haptic Heavy + sonido del ding co-localizados. El haptic
+    // dispara INMEDIATO, el sonido arranca HAPTIC_AUDIO_LEAD_MS (40ms)
+    // después — esto compensa la latencia diferencial táctil vs
+    // auditiva del cerebro y los hace percibir como un solo evento
+    // simultáneo. Patrón Apple Pay.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setTimeout(() => {
+      playSound("order_success");
+    }, HAPTIC_AUDIO_LEAD_MS);
 
     // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {
@@ -527,21 +531,17 @@ export default function ConfirmScreen() {
     });
 
     // Check: 250ms after the logo fade begins (= ~50ms after logo is gone).
-    // Spring pop with overshoot; haptic fires on the spring's rest frame.
+    // Spring pop con overshoot — solo visual, sin haptic. El peak
+    // táctil ya se disparó en el playSound co-localizado más arriba;
+    // tirar otro Success haptic acá (3-tap notification) se sentía
+    // redundante y rompía la regla de "un peak por evento".
     checkOpacity.value = withDelay(
       250,
       withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }),
     );
     checkScale.value = withDelay(
       250,
-      withSpring(
-        1,
-        { mass: 0.8, stiffness: 220, damping: 12 },
-        (finished) => {
-          "worklet";
-          if (finished) runOnJS(fireSuccessHaptic)();
-        },
-      ),
+      withSpring(1, { mass: 0.8, stiffness: 220, damping: 12 }),
     );
     checkOffset.value = withDelay(
       280,
