@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, type LayoutChangeEvent } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -50,11 +50,18 @@ export default function SuccessScreen() {
 
   // Layout celebración: SOLO en la primera compra del usuario
   // (`user.hasFirstTrade === false`) y no aplica a ventas — celebrar
-  // una venta no tiene la misma carga emocional. En mock el flag se
-  // resetea por sesión (cold start del bundler) → cada vez que abrís
-  // la app, la primera compra dispara el layout y el confetti. En
-  // prod, lo controla el backend.
-  const isFirstTrade = !!user && !user.hasFirstTrade && !isSell;
+  // una venta no tiene la misma carga emocional.
+  //
+  // El valor lo snapshoteamos AL MONTAR la pantalla con useState
+  // inicializador. Después llamamos markFirstTrade() (flippea
+  // user.hasFirstTrade en el AuthContext), eso re-renderea esta
+  // pantalla; sin el snapshot, isFirstTrade pasaría de true a
+  // false instantáneamente y el layout celebración desaparecería.
+  // El snapshot mantiene el layout "primera compra" durante toda
+  // la vida de esta instancia de la pantalla.
+  const [isFirstTrade] = useState(
+    () => !!user && !user.hasFirstTrade && !isSell,
+  );
   const firstName = user?.fullName?.split(" ")[0]?.trim() || "vos";
   const subheadlineBold =
     user?.gender === "female"
