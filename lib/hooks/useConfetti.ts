@@ -98,8 +98,11 @@ export function ConfettiPortal() {
  *   - `order_success` (el bell ding) NO vive acá — se dispara en
  *     confirm.tsx en el momento de "Orden Ejecutada", para que suene
  *     en TODAS las órdenes (no solo la primera con burst).
- *   - `confetti_pop` SÍ vive acá — se dispara en peak (volume 1.0)
- *     y encore (volume 0.55, eco), sincrónico con cada explosión.
+ *   - `confetti_pop` SÍ vive acá — se dispara UNA VEZ en peak. El
+ *     WAV tiene `[explosion][explosion][debris]` splicado (ver
+ *     scripts/splice-confetti-sound.js), así que la segunda
+ *     explosion del file coincide naturalmente con el encore visual
+ *     y el debris acompaña al sparkle tail.
  */
 export function useConfetti() {
   const burst = useCallback((opts: BurstOptions) => {
@@ -111,10 +114,12 @@ export function useConfetti() {
     // el visual.
     onAnticipation?.();
 
-    // t = +100ms — peak. UN solo Heavy impact (un punch fuerte y
-    // único) + sonido confetti_pop a volumen full, sincrónico con
-    // la explosión visual. Heavy + pop sound + 1000 partículas =
-    // EL momento.
+    // t = +100ms — peak. Heavy impact + un solo playSound del WAV
+    // de confetti spliced. El file tiene `[explosion][explosion][debris]`
+    // — la SEGUNDA explosion adentro del file está splicada a 350ms,
+    // que coincide exactamente con cuando dispara el encore visual
+    // a t=+450ms (350ms después del peak). El debris natural del
+    // file acompaña al sparkle tail.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
       playSound("confetti_pop");
@@ -122,12 +127,12 @@ export function useConfetti() {
       globalManager.burst({ x, y, count });
     }, 100);
 
-    // t = +450ms — encore. Light impact + mismo sonido confetti_pop
-    // pero a 0.55 volume — se siente como "eco" del peak, no como
-    // un re-hit con la misma intensidad.
+    // t = +450ms — encore. Light haptic SOLAMENTE — el sonido de
+    // esta segunda explosion ya está dentro del WAV que disparamos
+    // en peak (splicing). Si tirábamos otro playSound acá se
+    // pisaba con el del file y sonaba doble feo.
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      playSound("confetti_pop", { volume: 0.55 });
       globalManager.burst({ x, y, count: 500, speedScale: 0.7 });
     }, 450);
 

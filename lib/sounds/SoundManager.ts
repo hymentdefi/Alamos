@@ -40,9 +40,11 @@ export type SoundName = "order_success" | "confetti_pop";
  * Para agregar más sonidos: agregar entry acá + extender el type
  * `SoundName` arriba. Sin cambios en el resto del código.
  *
- * `confetti_pop` también es placeholder generado sintéticamente
- * (white noise + pop transient). Reemplazar por uno real de
- * Mixkit/Pixabay con el mismo path.
+ * `confetti_pop` es un splice del WAV de Epidemic Sound (Confetti
+ * Cannon Medium): `[explosion][explosion][debris]`. La duplicación
+ * de la primera explosion se hace en build-time vía
+ * `scripts/splice-confetti-sound.js`. Para regenerar, correr el
+ * script con la ruta al WAV original como argumento.
  */
 const SOUND_SOURCES: Record<SoundName, number> = {
   order_success: require("../../assets/sounds/order_success.wav"),
