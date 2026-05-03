@@ -29,17 +29,6 @@ const path = require("path");
 const SOURCE_DEFAULT =
   "C:/Users/Desktop/Desktop/ES_Explosions, Misc, Confetti Cannon, Medium, Small Explosion, Debris - Epidemic Sound - 6019-10170.wav";
 const SPLIT_MS = 350;
-/**
- * Tope de duración del WAV final. Visual del confetti termina cuando
- * muere el último sparkle (~+4100ms desde el inicio del burst). Si el
- * audio outlasts al visual, se oye debris cuando los papelitos ya
- * desaparecieron. Trim a 4000ms (audio empieza a +100ms = termina a
- * +4100ms, justo cuando los últimos sparkles están muriendo).
- *
- * SIN fade-out por ahora — solo corte raw. Si causa click audible,
- * se evalúa agregar fade después en una iteración separada.
- */
-const MAX_DURATION_MS = 4000;
 
 function parseWavHeader(buf) {
   if (buf.toString("ascii", 0, 4) !== "RIFF") {
@@ -106,15 +95,7 @@ function buildSpliced(source, splitMs) {
   const tail = audioData.slice(safeSplitBytes);
 
   // [explosion][explosion][debris]
-  let newAudioData = Buffer.concat([head, head, tail]);
-
-  // Trim al MAX_DURATION_MS — corta la cola de debris que sobrepasa
-  // la duración del visual. Sin fade-out por ahora (corte raw).
-  const targetFrames = Math.floor((meta.sampleRate * MAX_DURATION_MS) / 1000);
-  const targetBytes = targetFrames * meta.bytesPerFrame;
-  if (newAudioData.length > targetBytes) {
-    newAudioData = newAudioData.slice(0, targetBytes);
-  }
+  const newAudioData = Buffer.concat([head, head, tail]);
 
   // Header limpio (44 bytes, sin chunks extras tipo LIST que el
   // source pudiera tener — la app no los necesita).
@@ -164,10 +145,6 @@ console.log(
   `  ${source.length} bytes, ${meta.numChannels}ch, ${meta.sampleRate}Hz, ${meta.bitsPerSample}-bit`,
 );
 console.log(`  Total duration: ${(meta.dataSize / (meta.sampleRate * meta.bytesPerFrame)).toFixed(3)}s`);
-const outDurationS =
-  (wav.length - 44) / (meta.sampleRate * meta.bytesPerFrame);
 console.log(`Spliced output: ${outPath}`);
 console.log(`  ${wav.length} bytes`);
-console.log(`  Output duration: ${outDurationS.toFixed(3)}s`);
 console.log(`  Split at: ${SPLIT_MS}ms (primera explosion duplicada)`);
-console.log(`  Trimmed to: ${MAX_DURATION_MS}ms`);
