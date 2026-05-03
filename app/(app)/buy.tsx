@@ -14,14 +14,9 @@ import {
   type AssetCategory,
   type AssetCurrency,
 } from "../../lib/data/assets";
-import {
-  accounts,
-  bridgeOptionsFor,
-  type BridgeOption,
-} from "../../lib/data/accounts";
+import { accounts } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
 import { PercentSlider } from "../../lib/components/PercentSlider";
-import { ConversionBridgeSheet } from "../../lib/components/ConversionBridgeSheet";
 
 function unitWordFor(cat: AssetCategory): string {
   switch (cat) {
@@ -83,45 +78,27 @@ export default function BuyScreen() {
 
   const [inputMode, setInputMode] = useState<InputMode>("amount");
   const [input, setInput] = useState("0");
-  const [bridgeOpen, setBridgeOpen] = useState(false);
 
   // Moneda nativa del activo. Si el activo es US, todo se opera en USD;
-  // si es crypto, en USDT. Para AR, en ARS.
+  // si es crypto, en USDT. Para AR, en ARS. Cada mercado se compra con
+  // su propia moneda nativa — sin bridge, sin conversión.
   const nativeCurrency = useMemo<AssetCurrency>(
     () => (asset ? assetCurrency(asset) : "ARS"),
     [asset],
   );
 
-  // Pool de saldo nativo — el "flujo directo" del spec sólo aplica
-  // mientras el monto solicitado quepa acá. Si supera, ofrecemos puente.
+  // Pool de saldo en la moneda nativa del activo — es lo que se puede
+  // gastar directo. ARS para AR, USD para US, USDT para crypto.
   const nativeBalance = useMemo(
     () => nativeBalanceFor(nativeCurrency),
     [nativeCurrency],
   );
 
-  // Saldo total convertido a la moneda nativa, sumando todas las cuentas.
-  // Es el techo absoluto del slider — más allá de eso ni con bridge se
-  // puede cubrir.
-  const totalConvertibleBalance = useMemo(() => {
-    // Para cada cuenta, el "ceiling" en moneda nativa que aporta es
-    // su rate efectivo (post-fee) — bridgeOptionsFor con un target
-    // arbitrario nos da exactamente eso vía rateNet.
-    return accounts.reduce((sum, a) => {
-      // rateNet vía bridgeOptionsFor: es independiente del target.
-      const opts = bridgeOptionsFor(1, nativeCurrency, [a]);
-      const r = opts[0]?.rateNet ?? 0;
-      return sum + a.balance * r;
-    }, 0);
-  }, [nativeCurrency]);
-
   if (!asset) return null;
 
-  // El input siempre está en la moneda nativa del activo (no más
-  // "monto en pesos" hardcodeado). El sell vende contra la propia
-  // tenencia, sigue siendo una operación same-currency.
-  const maxCash = isSell
-    ? asset.price * (asset.qty ?? 0)
-    : totalConvertibleBalance;
+  // En compra: el techo es el saldo nativo. En venta: contra la
+  // tenencia del propio activo (same-currency).
+  const maxCash = isSell ? asset.price * (asset.qty ?? 0) : nativeBalance;
   const maxQty = isSell ? asset.qty ?? 0 : maxCash / asset.price;
 
   const parsed = Number.parseFloat(input) || 0;
@@ -132,12 +109,6 @@ export default function BuyScreen() {
 
   const exceeds =
     inputMode === "amount" ? targetAmount > maxCash : qtyAmount > maxQty;
-
-  // ¿Necesita puente de conversión? Sólo en compra y cuando el monto
-  // pedido supera el saldo en la moneda nativa pero hay otra fuente
-  // que lo cubra (totalConvertible).
-  const needsBridge =
-    !isSell && hasInput && !exceeds && targetAmount > nativeBalance;
 
   const unitWord = unitWordFor(asset.category);
 
@@ -205,7 +176,7 @@ export default function BuyScreen() {
     setInputMode(next);
   };
 
-  const goToConfirm = (bridge?: BridgeOption) => {
+  const goToConfirm = () => {
     const params: Record<string, string> = {
       ticker: asset.ticker,
       amount: String(targetAmount.toFixed(2)),
@@ -213,23 +184,11 @@ export default function BuyScreen() {
       mode: isSell ? "sell" : "buy",
       currency: nativeCurrency,
     };
-    if (bridge) {
-      params.bridgeFrom = bridge.from.id;
-      params.bridgeRate = String(bridge.rateNet.toFixed(6));
-      params.bridgeFeePct = String(bridge.feePct.toFixed(4));
-      params.bridgeDebit = String(bridge.debitSource.toFixed(2));
-      params.bridgeArs = String(Math.round(bridge.arsEquivalent));
-      params.bridgeSettles = bridge.settles;
-    }
     router.push({ pathname: "/(app)/confirm", params });
   };
 
   const onContinue = () => {
     if (!hasInput || exceeds) return;
-    if (needsBridge) {
-      setBridgeOpen(true);
-      return;
-    }
     goToConfirm();
   };
 
@@ -266,16 +225,12 @@ export default function BuyScreen() {
     ? inputMode === "amount"
       ? `Supera lo disponible (${formatMoney(maxCash, nativeCurrency)})`
       : `Supera lo disponible (${formatQty(maxQtyFloored)} ${asset.ticker})`
-    : needsBridge
-    ? `Vamos a usar otra cuenta para cubrir ${formatMoney(targetAmount, nativeCurrency)}`
     : inputMode === "amount"
     ? `≈ ${formatQty(qtyAmount)} ${asset.ticker}`
     : `≈ ${formatMoney(targetAmount, nativeCurrency)}`;
 
   const availableLabel = isSell
     ? `Disponible para vender: ${formatQty(asset.qty ?? 0)} ${asset.ticker}`
-    : nativeBalance < totalConvertibleBalance
-    ? `Disponible directo: ${formatMoney(nativeBalance, nativeCurrency)} · con conversión: ${formatMoney(totalConvertibleBalance, nativeCurrency)}`
     : `Fondos disponibles para operar: ${formatMoney(maxCash, nativeCurrency)}`;
 
   return (
@@ -457,7 +412,7 @@ export default function BuyScreen() {
               },
             ]}
           >
-            {needsBridge ? "Convertir y comprar" : "Revisar orden"}
+            Revisar orden
           </Text>
           <Feather
             name="arrow-right"
@@ -466,18 +421,6 @@ export default function BuyScreen() {
           />
         </Tap>
       </View>
-
-      <ConversionBridgeSheet
-        visible={bridgeOpen}
-        targetCurrency={nativeCurrency}
-        targetAmount={targetAmount}
-        assetTicker={asset.ticker}
-        onClose={() => setBridgeOpen(false)}
-        onConfirm={(opt) => {
-          setBridgeOpen(false);
-          goToConfirm(opt);
-        }}
-      />
     </View>
   );
 }
