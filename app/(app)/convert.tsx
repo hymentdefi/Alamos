@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,11 +6,20 @@ import {
   Modal,
   StyleSheet,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useTheme, fontFamily, fontMono, radius } from "../../lib/theme";
 import { Tap } from "../../lib/components/Tap";
 import { AccountFlag } from "../../lib/components/AccountFlag";
@@ -83,24 +92,96 @@ export default function ConvertScreen() {
   const insufficient = numericAmount > from.balance;
   const canConfirm = numericAmount > 0 && !insufficient && fromId !== toId;
 
-  const swap = () => {
+  // ─── Animación de swap ───────────────────────────────────────
+  // Cuando from y to se intercambian (botón de swap o porque el
+  // user eligió en el picker la moneda que ya está en el otro
+  // slot), animamos las dos rows: cada una se desplaza hacia la
+  // otra y se desvanece, hacemos el swap del estado en el midpoint
+  // y reaparecen en su nueva identidad. Da la lectura visual de
+  // "intercambiaron lugares".
+  const fromY = useSharedValue(0);
+  const toY = useSharedValue(0);
+  const fromOpacity = useSharedValue(1);
+  const toOpacity = useSharedValue(1);
+  const SWAP_TRAVEL = 32;
+  const SWAP_HALF = 180;
+
+  const fromRowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: fromY.value }],
+    opacity: fromOpacity.value,
+  }));
+  const toRowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: toY.value }],
+    opacity: toOpacity.value,
+  }));
+
+  const animateSwap = (apply: () => void) => {
     Haptics.selectionAsync().catch(() => {});
-    setFromId(toId);
-    setToId(fromId);
+    // Phase 1: fade-out + acercarse mutuamente.
+    fromY.value = withTiming(SWAP_TRAVEL, {
+      duration: SWAP_HALF,
+      easing: Easing.in(Easing.cubic),
+    });
+    toY.value = withTiming(-SWAP_TRAVEL, {
+      duration: SWAP_HALF,
+      easing: Easing.in(Easing.cubic),
+    });
+    fromOpacity.value = withTiming(0, { duration: SWAP_HALF });
+    toOpacity.value = withTiming(
+      0,
+      { duration: SWAP_HALF },
+      (finished) => {
+        "worklet";
+        if (!finished) return;
+        // Estado swappeado en el midpoint (ya no se ve, opacity 0).
+        runOnJS(apply)();
+        // Phase 2: las rows aparecen en sus nuevas identidades,
+        // viajando desde el lado opuesto hacia su posición de
+        // reposo.
+        fromY.value = -SWAP_TRAVEL;
+        toY.value = SWAP_TRAVEL;
+        fromY.value = withTiming(0, {
+          duration: SWAP_HALF,
+          easing: Easing.out(Easing.cubic),
+        });
+        toY.value = withTiming(0, {
+          duration: SWAP_HALF,
+          easing: Easing.out(Easing.cubic),
+        });
+        fromOpacity.value = withTiming(1, { duration: SWAP_HALF });
+        toOpacity.value = withTiming(1, { duration: SWAP_HALF });
+      },
+    );
+  };
+
+  const swap = () => {
+    animateSwap(() => {
+      setFromId(toId);
+      setToId(fromId);
+    });
   };
 
   const onPickAccount = (id: AccountId) => {
-    Haptics.selectionAsync().catch(() => {});
     if (pickerSlot === "from") {
-      setFromId(id);
-      // Si quedó igual al destino, movemos el destino a otra cuenta.
+      // ¿Intercambio (la moneda elegida ya está en el otro slot)?
       if (id === toId) {
-        setToId(accounts.find((a) => a.id !== id)!.id);
+        animateSwap(() => {
+          setFromId(toId);
+          setToId(fromId);
+        });
+      } else {
+        Haptics.selectionAsync().catch(() => {});
+        setFromId(id);
       }
     } else if (pickerSlot === "to") {
-      setToId(id);
       if (id === fromId) {
-        setFromId(accounts.find((a) => a.id !== id)!.id);
+        animateSwap(() => {
+          setFromId(toId);
+          setToId(fromId);
+        });
+      } else {
+        Haptics.selectionAsync().catch(() => {});
+        setToId(id);
       }
     }
     setPickerSlot(null);
@@ -151,16 +232,18 @@ export default function ConvertScreen() {
 
       <View style={s.body}>
         {/* FROM */}
-        <CurrencyRow
-          mode="from"
-          accountId={from.id}
-          currency={from.currency}
-          balance={formatAccountBalance(from)}
-          amountLabel={`- ${formatAmount(numericAmount, from.currency)}`}
-          insufficient={insufficient}
-          badgeBacking={badgeBacking}
-          onPress={() => setPickerSlot("from")}
-        />
+        <Animated.View style={fromRowStyle}>
+          <CurrencyRow
+            mode="from"
+            accountId={from.id}
+            currency={from.currency}
+            balance={formatAccountBalance(from)}
+            amountLabel={`- ${formatAmount(numericAmount, from.currency)}`}
+            insufficient={insufficient}
+            badgeBacking={badgeBacking}
+            onPress={() => setPickerSlot("from")}
+          />
+        </Animated.View>
 
         {/* SWAP + RATE */}
         <View style={s.middleRow}>
@@ -189,15 +272,17 @@ export default function ConvertScreen() {
         </View>
 
         {/* TO */}
-        <CurrencyRow
-          mode="to"
-          accountId={to.id}
-          currency={to.currency}
-          balance={formatAccountBalance(to)}
-          amountLabel={`+ ${formatAmount(received, to.currency)}`}
-          badgeBacking={badgeBacking}
-          onPress={() => setPickerSlot("to")}
-        />
+        <Animated.View style={toRowStyle}>
+          <CurrencyRow
+            mode="to"
+            accountId={to.id}
+            currency={to.currency}
+            balance={formatAccountBalance(to)}
+            amountLabel={`+ ${formatAmount(received, to.currency)}`}
+            badgeBacking={badgeBacking}
+            onPress={() => setPickerSlot("to")}
+          />
+        </Animated.View>
       </View>
 
       {/* Spacer + keypad + CTA al fondo */}
@@ -248,36 +333,166 @@ export default function ConvertScreen() {
         </Pressable>
       </View>
 
-      {/* Picker modal: lista de las 4 cuentas */}
-      <Modal
-        visible={pickerSlot !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerSlot(null)}
-      >
-        <Pressable
-          style={s.pickerBackdrop}
-          onPress={() => setPickerSlot(null)}
+      <AccountPickerSheet
+        slot={pickerSlot}
+        currentFromId={fromId}
+        currentToId={toId}
+        badgeBacking={badgeBacking}
+        onPick={onPickAccount}
+        onClose={() => setPickerSlot(null)}
+      />
+    </View>
+  );
+}
+
+/* ─── Bottom sheet: picker de cuenta ─── */
+
+function AccountPickerSheet({
+  slot,
+  currentFromId,
+  currentToId,
+  badgeBacking,
+  onPick,
+  onClose,
+}: {
+  slot: null | "from" | "to";
+  currentFromId: AccountId;
+  currentToId: AccountId;
+  badgeBacking: string;
+  onPick: (id: AccountId) => void;
+  onClose: () => void;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
+  const visible = slot !== null;
+  // Cacheamos el slot del último open para que el header del sheet
+  // no parpadee a "Convertir desde/hacia null" durante la
+  // animación de cierre. Sólo se actualiza cuando el sheet se abre.
+  const slotRef = useRef<"from" | "to">("from");
+  if (slot !== null) slotRef.current = slot;
+  const activeSlot = slotRef.current;
+
+  const translateY = useSharedValue(windowH);
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      backdropOpacity.value = withTiming(1, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      windowH,
+      { duration: 240, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+        backdropOpacity.value = Math.max(
+          0,
+          1 - e.translationY / windowH,
+        );
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss = e.translationY > 110 || e.velocityY > 600;
+      if (shouldDismiss) {
+        translateY.value = withTiming(
+          windowH,
+          { duration: 240, easing: Easing.in(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={dismiss}
+    >
+      <Animated.View style={[s.sheetBackdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Animated.View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              backgroundColor: c.bg,
+              borderColor: c.border,
+              paddingBottom: insets.bottom + 18,
+            },
+            sheetStyle,
+          ]}
         >
-          <Pressable
-            style={[
-              s.pickerCard,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={[s.pickerTitle, { color: c.text }]}>
-              {pickerSlot === "from" ? "Convertir desde" : "Convertir hacia"}
-            </Text>
+          <View style={s.sheetGrabber}>
+            <View
+              style={[
+                s.sheetGrabberPill,
+                { backgroundColor: c.borderStrong },
+              ]}
+            />
+          </View>
+
+          <Text style={[s.sheetTitle, { color: c.text }]}>
+            {activeSlot === "from"
+              ? "Elegí la moneda de origen"
+              : "Elegí la moneda de destino"}
+          </Text>
+
+          <View style={s.sheetList}>
             {accounts.map((a, i) => {
               const selected =
-                pickerSlot === "from" ? a.id === fromId : a.id === toId;
+                activeSlot === "from"
+                  ? a.id === currentFromId
+                  : a.id === currentToId;
               return (
                 <Pressable
                   key={a.id}
-                  onPress={() => onPickAccount(a.id)}
+                  onPress={() => onPick(a.id)}
                   style={({ pressed }) => [
-                    s.pickerRow,
+                    s.sheetRow,
                     i > 0 && {
                       borderTopWidth: StyleSheet.hairlineWidth,
                       borderTopColor: c.border,
@@ -287,21 +502,21 @@ export default function ConvertScreen() {
                 >
                   <AccountFlag
                     accountId={a.id}
-                    size={36}
+                    size={40}
                     badgeBackingColor={badgeBacking}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.pickerCurrency, { color: c.text }]}>
+                    <Text style={[s.sheetRowCurrency, { color: c.text }]}>
                       {a.currency}
                     </Text>
                     <Text
-                      style={[s.pickerLocation, { color: c.textMuted }]}
+                      style={[s.sheetRowLocation, { color: c.textMuted }]}
                       numberOfLines={1}
                     >
                       {a.location}
                     </Text>
                   </View>
-                  <Text style={[s.pickerBalance, { color: c.text }]}>
+                  <Text style={[s.sheetRowBalance, { color: c.text }]}>
                     {formatAccountBalance(a)}
                   </Text>
                   {selected ? (
@@ -309,16 +524,16 @@ export default function ConvertScreen() {
                       name="check"
                       size={18}
                       color={c.positive}
-                      style={{ marginLeft: 8 }}
+                      style={{ marginLeft: 10 }}
                     />
                   ) : null}
                 </Pressable>
               );
             })}
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </Modal>
   );
 }
 
@@ -498,46 +713,62 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Picker modal */
-  pickerBackdrop: {
-    flex: 1,
+  /* Bottom sheet picker */
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    paddingHorizontal: 20,
   },
-  pickerCard: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    paddingVertical: 12,
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  sheetGrabber: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  sheetGrabberPill: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  sheetTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+    marginTop: 6,
+    marginBottom: 12,
     paddingHorizontal: 4,
   },
-  pickerTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.2,
-    paddingHorizontal: 16,
-    paddingBottom: 6,
+  sheetList: {
+    paddingTop: 4,
   },
-  pickerRow: {
+  sheetRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
   },
-  pickerCurrency: {
+  sheetRowCurrency: {
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.25,
   },
-  pickerLocation: {
+  sheetRowLocation: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     marginTop: 2,
   },
-  pickerBalance: {
+  sheetRowBalance: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.15,
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 });
