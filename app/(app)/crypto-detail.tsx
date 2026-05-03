@@ -80,11 +80,11 @@ export default function CryptoDetailScreen() {
             BALANCE TOTAL
           </Text>
           <Text style={[s.heroAmount, { color: c.text }]}>
-            USDT{" "}
             {totalNative.toLocaleString("es-AR", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
-            })}
+            })}{" "}
+            USDT
           </Text>
           <Text style={[s.heroSub, { color: c.textMuted }]}>
             ≈ {formatARS(totalArs)}

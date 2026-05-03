@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
-import { assets, formatARS } from "../../lib/data/assets";
+import { assets, assetCurrency, formatMoney } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { useAuth } from "../../lib/auth/context";
 import { useConfetti } from "../../lib/hooks/useConfetti";
@@ -231,12 +231,17 @@ export default function SuccessScreen() {
     });
   };
 
+  // Moneda nativa del activo (ARS para CEDEARs/bonos AR, USD para
+  // acciones US, USDT para crypto). Default ARS por seguridad si el
+  // ticker no matchea.
+  const orderCurrency = asset ? assetCurrency(asset) : "ARS";
+
   const rows = [
     { label: "Activo", value: asset?.name ?? "—" },
-    { label: "Monto", value: formatARS(numAmount) },
+    { label: "Monto", value: formatMoney(numAmount, orderCurrency) },
     {
       label: "Precio de ejecución",
-      value: asset ? formatARS(asset.price) : "—",
+      value: asset ? formatMoney(asset.price, orderCurrency) : "—",
     },
     {
       label: isSell ? "Unidades vendidas" : "Unidades compradas",
@@ -289,7 +294,7 @@ export default function SuccessScreen() {
               Hiciste tu primera compra. {subheadlineBold}
             </Text>
             <Text style={[s.subtitleTech, { color: c.textMuted }]}>
-              Tu orden de mercado por {formatARS(numAmount)} de{" "}
+              Tu orden de mercado por {formatMoney(numAmount, orderCurrency)} de{" "}
               <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
                 {ticker}
               </Text>{" "}
@@ -302,7 +307,7 @@ export default function SuccessScreen() {
               Orden ejecutada
             </Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Tu orden de mercado por {formatARS(numAmount)} de{" "}
+              Tu orden de mercado por {formatMoney(numAmount, orderCurrency)} de{" "}
               <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
                 {ticker}
               </Text>{" "}

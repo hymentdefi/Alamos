@@ -305,7 +305,7 @@ export default function BuyScreen() {
               {nativeCurrency === "ARS"
                 ? "Monto en pesos"
                 : nativeCurrency === "USD"
-                ? "Monto en USD"
+                ? "Monto en US$"
                 : "Monto en USDT"}
             </Text>
           </Tap>
