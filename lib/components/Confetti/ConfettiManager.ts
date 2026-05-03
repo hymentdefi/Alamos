@@ -6,31 +6,21 @@ const SHAPES: readonly Shape[] = ["square", "circle", "triangle"];
 export interface BurstConfig {
   x: number;
   y: number;
-  /** Partículas en el frame 0. Default 60 — es lo que da el "pop". */
-  initialBurst?: number;
-  /** Cuánto tiempo (ms) sigue emitiendo después del burst. */
-  emitDuration?: number;
-  /** Partículas por segundo durante la emisión continua. */
-  emitRate?: number;
-}
-
-interface ActiveBurst {
-  origin: { x: number; y: number };
-  startedAt: number;
-  emitDuration: number;
-  emitRate: number;
-  emitted: number;
+  /** Cantidad de partículas en el burst único. Default 180. Es
+   *  explosión, no fuente continua — esto es lo que da el "POP".
+   *  Robinhood-real era lluvia full-screen pero la explosión radial
+   *  (Cash App / Strava / Duolingo) genera más respuesta dopamínica. */
+  count?: number;
 }
 
 /**
- * Manager de partículas. Mantiene la lista activa, agenda emisiones
- * continuas y limpia las muertas. Sin React, sin Skia — pure JS para
- * testabilidad y para que pueda correr en cualquier driver de loop.
+ * Manager de partículas. Mantiene la lista activa y limpia las
+ * muertas. Emisión: UN solo burst instantáneo en el frame 0, sin
+ * stream continuo. Pure JS para testabilidad y para que pueda
+ * correr en cualquier driver de loop.
  */
 export class ConfettiManager {
   particles: Confetto[] = [];
-  private bursts: ActiveBurst[] = [];
-  private elapsed = 0;
   private particleScale = 1;
   /** Callback opcional para que el Canvas pueda reanudar su frame
    *  loop cuando alguien llama burst() después de quedar idle. */
@@ -42,27 +32,14 @@ export class ConfettiManager {
     this.particleScale = Math.max(0.1, Math.min(1, scale));
   }
 
-  burst({
-    x,
-    y,
-    initialBurst = 60,
-    emitDuration = 600,
-    emitRate = 280,
-  }: BurstConfig) {
-    const initialCount = Math.round(initialBurst * this.particleScale);
+  burst({ x, y, count = 180 }: BurstConfig) {
+    const total = Math.round(count * this.particleScale);
     console.log(
-      `[confetti] manager.burst x=${x.toFixed(0)} y=${y.toFixed(0)} initial=${initialCount} hasOnActivity=${!!this.onActivity}`,
+      `[confetti] manager.burst x=${x.toFixed(0)} y=${y.toFixed(0)} count=${total} hasOnActivity=${!!this.onActivity}`,
     );
-    for (let i = 0; i < initialCount; i++) {
+    for (let i = 0; i < total; i++) {
       this.spawnAt(x, y);
     }
-    this.bursts.push({
-      origin: { x, y },
-      startedAt: this.elapsed,
-      emitDuration,
-      emitRate: emitRate * this.particleScale,
-      emitted: 0,
-    });
     this.onActivity?.();
   }
 
@@ -73,35 +50,8 @@ export class ConfettiManager {
   }
 
   update(dt: number, canvasW: number, canvasH: number) {
-    this.elapsed += dt;
-
-    // Emisión continua de los bursts activos. Calculo la cantidad
-    // total que YA debería haberse emitido (rate * burstAge) y
-    // emito el delta hasta llegar — esto desacopla el emit-rate del
-    // frame-rate.
-    for (let i = this.bursts.length - 1; i >= 0; i--) {
-      const b = this.bursts[i];
-      const burstAge = this.elapsed - b.startedAt;
-      if (burstAge >= b.emitDuration) {
-        // Una última pasada para emitir los que quedaron pendientes
-        // dentro de la duración total, y la quito.
-        const targetFinal = (b.emitRate * b.emitDuration) / 1000;
-        while (b.emitted < targetFinal) {
-          this.spawnAt(b.origin.x, b.origin.y);
-          b.emitted++;
-        }
-        this.bursts.splice(i, 1);
-        continue;
-      }
-      const target = (b.emitRate * burstAge) / 1000;
-      while (b.emitted < target) {
-        this.spawnAt(b.origin.x, b.origin.y);
-        b.emitted++;
-      }
-    }
-
-    // Update + sweep de partículas muertas (filter in place — más
-    // barato que crear array nuevo cada frame).
+    // Sweep + update in-place (write index) — más barato que map
+    // o splice por cada muerta.
     let write = 0;
     for (let read = 0; read < this.particles.length; read++) {
       const p = this.particles[read];
@@ -115,12 +65,10 @@ export class ConfettiManager {
   }
 
   isIdle(): boolean {
-    return this.particles.length === 0 && this.bursts.length === 0;
+    return this.particles.length === 0;
   }
 
   reset() {
     this.particles.length = 0;
-    this.bursts.length = 0;
-    this.elapsed = 0;
   }
 }

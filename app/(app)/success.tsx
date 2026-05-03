@@ -3,6 +3,15 @@ import { View, Text, Pressable, StyleSheet, type LayoutChangeEvent } from "react
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import { assets, formatARS } from "../../lib/data/assets";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
@@ -48,6 +57,46 @@ export default function SuccessScreen() {
     () => buildReceiptId(`${ticker ?? ""}-${amount ?? ""}-${qty ?? ""}-${mode ?? ""}`),
     [ticker, amount, qty, mode],
   );
+
+  // Animación del check verde:
+  //   - Pop-in: scale 0 → 1.1 → 1.0 (300+200ms) cuando aparece.
+  //   - Pulse infinito: 1.0 → 1.03 → 1.0 cada 2s, mantiene el ojo
+  //     enganchado mientras el usuario lee el detalle del trade.
+  //     Empieza después del confetti (delay 700ms ≈ post pop-in
+  //     + post primer impacto del burst) para no competir.
+  const checkScale = useSharedValue(0);
+  useEffect(() => {
+    checkScale.value = withSequence(
+      withTiming(1.1, {
+        duration: 300,
+        easing: Easing.out(Easing.back(1.4)),
+      }),
+      withTiming(1.0, {
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+      }),
+      withDelay(
+        700,
+        withRepeat(
+          withSequence(
+            withTiming(1.03, {
+              duration: 1000,
+              easing: Easing.inOut(Easing.sin),
+            }),
+            withTiming(1.0, {
+              duration: 1000,
+              easing: Easing.inOut(Easing.sin),
+            }),
+          ),
+          -1,
+          false,
+        ),
+      ),
+    );
+  }, [checkScale]);
+  const checkAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkScale.value }],
+  }));
 
   // Origen del burst — coordenadas absolutas del centro del check
   // verde, capturadas vía onLayout + measureInWindow. El burst se
@@ -113,10 +162,14 @@ export default function SuccessScreen() {
       ]}
     >
       <View style={s.heroBlock}>
-        <View
+        <Animated.View
           ref={checkRef}
           onLayout={onCheckLayout}
-          style={[s.checkCircle, { backgroundColor: c.positive }]}
+          style={[
+            s.checkCircle,
+            { backgroundColor: c.positive },
+            checkAnimStyle,
+          ]}
         >
           {/* Mismo path del check que dibuja la animación de
               confirm.tsx — para que la transición animación → success
@@ -131,7 +184,7 @@ export default function SuccessScreen() {
               strokeLinejoin="round"
             />
           </Svg>
-        </View>
+        </Animated.View>
         <Text style={[s.title, { color: c.text }]}>
           Orden ejecutada
         </Text>
