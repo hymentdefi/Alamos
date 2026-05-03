@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 
 const SOURCE = "C:/Users/Desktop/Desktop/ES_Explosions, Misc, Confetti Cannon, Medium, Small Explosion, Debris - Epidemic Sound - 6019-10170.wav";
-const TARGET = path.join(__dirname, "..", "assets", "sounds", "confetti_pop_v2.wav");
+const TARGET = path.join(__dirname, "..", "assets", "sounds", "confetti_pop_v3.wav");
 const SPLIT_MS = 350;
 const FADE_OUT_MS = 1500;
 
@@ -39,9 +39,13 @@ function parseWav(buf) {
   return { audioFormat, numChannels, sampleRate, bitsPerSample, bytesPerSample, bytesPerFrame, dataStart, dataSize };
 }
 
-function read24(buf, off) {
+function readSample(buf, off, bps) {
+  if (bps === 16) return buf.readInt16LE(off);
   const v = buf[off] | (buf[off + 1] << 8) | (buf[off + 2] << 16);
   return v >= 0x800000 ? v - 0x1000000 : v;
+}
+function maxAbsForBits(bps) {
+  return (1 << (bps - 1)) - 1;
 }
 
 const source = fs.readFileSync(SOURCE);
@@ -85,32 +89,36 @@ if (firstDiff === -1) {
   console.log(`  Expected fade to start at ~${expectedFadeStart.toFixed(1)}ms (file end - ${FADE_OUT_MS}ms)`);
 }
 
-// Verify last 10 samples are valid 24-bit values (-0x800000 to 0x7FFFFF)
-console.log(`\n─── LAST 10 SAMPLES (should be near zero / silent) ───`);
-const last10Start = tgtAudio.length - 10 * srcMeta.bytesPerFrame;
+// Verify last 10 samples are silent — usa el bits/channel del TARGET
+// (no del source, porque pueden ser distintos tras conversión)
+console.log(`\n─── LAST 10 SAMPLES OF TARGET (should be 0 / silent) ───`);
+const tgtBPS = tgtMeta.bitsPerSample;
+const tgtBytesPerSample = tgtMeta.bytesPerSample;
+const tgtBytesPerFrame = tgtMeta.bytesPerFrame;
+const tgtMaxAbs = maxAbsForBits(tgtBPS);
+const last10Start = tgtAudio.length - 10 * tgtBytesPerFrame;
 for (let i = 0; i < 10; i++) {
-  const off = last10Start + i * srcMeta.bytesPerFrame;
-  const left = read24(tgtAudio, off);
-  const right = read24(tgtAudio, off + 3);
-  const valid = left >= -0x800000 && left <= 0x7FFFFF && right >= -0x800000 && right <= 0x7FFFFF;
-  console.log(`  Frame ${i}: L=${left.toString().padStart(8)} R=${right.toString().padStart(8)} ${valid ? "OK" : "INVALID"}`);
+  const off = last10Start + i * tgtBytesPerFrame;
+  const left = readSample(tgtAudio, off, tgtBPS);
+  const right = readSample(tgtAudio, off + tgtBytesPerSample, tgtBPS);
+  console.log(`  Frame ${i}: L=${left.toString().padStart(8)} R=${right.toString().padStart(8)}`);
 }
 
-// Sample max amplitude across the file
-console.log(`\n─── AMPLITUDE STATS ───`);
+// Sample max amplitude across the TARGET file
+console.log(`\n─── TARGET AMPLITUDE STATS ───`);
 let maxAbs = 0, sumAbs = 0;
-const totalFrames = Math.floor(tgtAudio.length / srcMeta.bytesPerFrame);
+const totalFrames = Math.floor(tgtAudio.length / tgtBytesPerFrame);
 for (let f = 0; f < totalFrames; f++) {
-  const off = f * srcMeta.bytesPerFrame;
-  for (let ch = 0; ch < srcMeta.numChannels; ch++) {
-    const v = read24(tgtAudio, off + ch * 3);
+  const off = f * tgtBytesPerFrame;
+  for (let ch = 0; ch < tgtMeta.numChannels; ch++) {
+    const v = readSample(tgtAudio, off + ch * tgtBytesPerSample, tgtBPS);
     const abs = Math.abs(v);
     if (abs > maxAbs) maxAbs = abs;
     sumAbs += abs;
   }
 }
-const avgAbs = sumAbs / (totalFrames * srcMeta.numChannels);
-console.log(`  Max amplitude: ${maxAbs} (= ${(maxAbs / 0x7FFFFF * 100).toFixed(1)}% of full scale)`);
+const avgAbs = sumAbs / (totalFrames * tgtMeta.numChannels);
+console.log(`  Max amplitude: ${maxAbs} (= ${(maxAbs / tgtMaxAbs * 100).toFixed(1)}% of full scale)`);
 console.log(`  Avg amplitude: ${avgAbs.toFixed(0)}`);
 
 // Header byte-level check

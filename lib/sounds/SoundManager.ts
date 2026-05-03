@@ -48,11 +48,14 @@ export type SoundName = "order_success" | "confetti_pop";
  */
 const SOUND_SOURCES: Record<SoundName, number> = {
   order_success: require("../../assets/sounds/order_success.wav"),
-  // _v2: el archivo viejo (confetti_pop.wav) sigue en la carpeta para
-  // referencia, pero apuntamos al _v2 para forzar fresh load del
-  // asset (cambio de path bypasea el cache nativo de expo-audio).
-  // Si en el futuro se modifica el WAV otra vez, bumpear a _v3 etc.
-  confetti_pop: require("../../assets/sounds/confetti_pop_v2.wav"),
+  // _v3: convertido a 16-bit/48kHz/stereo (era 24-bit/96kHz). El
+  // 24/96 funcionaba en speakers externos (JBL Bluetooth, etc) pero
+  // FALLABA SILENCIOSAMENTE en el speaker interno del iPhone porque
+  // iOS no resamplea bien 96kHz → 48kHz on-the-fly en speakers
+  // built-in. 16/48 es el formato nativo del speaker iPhone, sin
+  // conversión necesaria. Ver scripts/splice-confetti-sound.js.
+  // Si en el futuro se regenera el WAV: bumpear a _v4.
+  confetti_pop: require("../../assets/sounds/confetti_pop_v3.wav"),
 };
 
 class SoundManagerImpl {
