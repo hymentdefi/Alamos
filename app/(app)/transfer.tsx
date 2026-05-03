@@ -15,7 +15,6 @@ import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { Tap } from "../../lib/components/Tap";
-import { FlagIcon } from "../../lib/components/FlagIcon";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import { AccountFlag } from "../../lib/components/AccountFlag";
 import { accounts, formatAccountBalance, type AccountId } from "../../lib/data/accounts";
@@ -185,6 +184,14 @@ function DepositInfo() {
           mode="deposit"
           onPick={(id) => {
             Haptics.selectionAsync().catch(() => {});
+            // Crypto navega a su propia pantalla (asset + red picker)
+            // con `push` — así el back nativo regresa al hub. Antes
+            // usábamos `replace` desde un sub-componente y se
+            // perdía el hub del stack.
+            if (id === "usdt-crypto") {
+              router.push("/(app)/crypto-deposit");
+              return;
+            }
             setKindId(id);
           }}
         />
@@ -498,46 +505,6 @@ function WireDepositCard() {
   );
 }
 
-/* ─── Card de depósito crypto (USDT, multi-red) ─── */
-function CurPill({
-  label,
-  flag,
-  active,
-  onPress,
-}: {
-  label: string;
-  flag: "AR" | "US";
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        s.curPill,
-        active && {
-          backgroundColor: c.surface,
-          shadowColor: c.ink,
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
-        },
-      ]}
-    >
-      <View style={{ opacity: active ? 1 : 0.6 }}>
-        <FlagIcon code={flag} size={22} />
-      </View>
-      <Text
-        style={[s.curPillLabel, { color: active ? c.text : c.textMuted }]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 /**
  * Hook que maneja el estado 'recién copiado' — copia al clipboard,
  * dispara haptic, y retorna `copied` que vuelve a false después de
@@ -701,10 +668,6 @@ function SendFlow() {
     return (
       <AmountStep
         cur={cur}
-        onChangeCur={(v) => {
-          setCur(v);
-          setAmount("0");
-        }}
         amount={amount}
         onChangeAmount={setAmount}
         onNext={() => setStep("destination")}
@@ -781,14 +744,12 @@ function SendCurrencyHub({ onPick }: { onPick: (id: AccountId) => void }) {
 
 function AmountStep({
   cur,
-  onChangeCur,
   amount,
   onChangeAmount,
   onNext,
   onBack,
 }: {
   cur: DepositCurrency;
-  onChangeCur: (v: DepositCurrency) => void;
   amount: string;
   onChangeAmount: (v: string) => void;
   onNext: () => void;
@@ -855,33 +816,13 @@ function AmountStep({
         >
           <Feather name="arrow-left" size={18} color={c.text} />
         </Pressable>
-        <Text style={[s.headerTitle, { color: c.text }]}>Enviar</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      {/* Pill Pesos / Dólares con banderas AR / US — mismo componente
-          visual que la pantalla de Ingresar para mantener coherencia. */}
-      <View style={s.curPillsWrap}>
-        <View style={[s.curPills, { backgroundColor: c.surfaceHover }]}>
-          <CurPill
-            label="Pesos"
-            flag="AR"
-            active={cur === "ars"}
-            onPress={() => {
-              if (cur !== "ars") Haptics.selectionAsync().catch(() => {});
-              onChangeCur("ars");
-            }}
-          />
-          <CurPill
-            label="Dólares"
-            flag="US"
-            active={cur === "usd"}
-            onPress={() => {
-              if (cur !== "usd") Haptics.selectionAsync().catch(() => {});
-              onChangeCur("usd");
-            }}
-          />
+        <View style={s.headerCenter}>
+          <Text style={[s.headerTitle, { color: c.text }]}>Enviar</Text>
+          <Text style={[s.headerSub, { color: c.textMuted }]}>
+            {cur === "ars" ? "Pesos argentinos" : "Dólares"}
+          </Text>
         </View>
+        <View style={{ width: 36 }} />
       </View>
 
       <View style={s.sendAmountSection}>
@@ -939,7 +880,13 @@ function AmountStep({
         ))}
       </View>
 
-      <View style={[{ paddingBottom: insets.bottom + 14, paddingHorizontal: 20 }]}>
+      <View
+        style={{
+          paddingTop: 28,
+          paddingBottom: insets.bottom + 18,
+          paddingHorizontal: 20,
+        }}
+      >
         <Pressable
           style={[
             s.cta,
@@ -1434,32 +1381,6 @@ const s = StyleSheet.create({
   hubCardBalance: {
     fontFamily: fontFamily[700],
     fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  curPillsWrap: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  curPills: {
-    flexDirection: "row",
-    padding: 4,
-    borderRadius: radius.pill,
-    gap: 4,
-  },
-  curPill: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-  },
-  curPillLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
     letterSpacing: -0.2,
   },
   depositEyebrow: {
