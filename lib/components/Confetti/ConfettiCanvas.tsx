@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
-import Svg, { Circle, G, Polygon, Rect } from "react-native-svg";
 import { ConfettiManager } from "./ConfettiManager";
 import type { Confetto } from "./Confetto";
 
@@ -9,16 +8,14 @@ interface Props {
 }
 
 /**
- * Canvas que dibuja el sistema de partículas. Usa `react-native-svg`
- * para no requerir un módulo nativo extra (Skia exige rebuild del
- * dev client). El frame loop es un requestAnimationFrame estándar
- * driveado por JS — cuando el manager queda idle se cancela para no
- * consumir batería.
+ * Canvas que dibuja el sistema de partículas con `<View>` nativos —
+ * NO svg, NO skia. Cada partícula es un View absoluto con transform
+ * + opacity + backgroundColor. Esto va directo por el path nativo
+ * de RN (Fabric en new arch), sin bridge cost por nodo, y rinde
+ * 60fps con ~150-200 partículas.
  *
- * Las partículas viven en JS (manager.particles) y mutan in-place.
- * Cada frame disparamos un setTick() para que React re-render el SVG
- * con las posiciones nuevas. Con ~230 partículas por 3s, el costo de
- * re-render es aceptable.
+ * El frame loop es RAF: cuando el manager queda idle se cancela
+ * para no consumir batería.
  */
 export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -36,7 +33,6 @@ export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
     );
   }, []);
 
-  // Loop de animación. RAF cuando hay actividad, idle cuando no.
   useEffect(() => {
     const step = (now: number) => {
       if (!runningRef.current) return;
@@ -72,29 +68,15 @@ export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
     };
   }, [manager]);
 
-  if (size.w === 0 || size.h === 0) {
-    // Sin layout no podemos dibujar nada útil — solo registramos
-    // para que el primer onLayout dispare el seteo y arranque.
-    return (
-      <View
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-        onLayout={onLayout}
-      />
-    );
-  }
-
   return (
     <View
       style={StyleSheet.absoluteFill}
       pointerEvents="none"
       onLayout={onLayout}
     >
-      <Svg width={size.w} height={size.h}>
-        {manager.particles.map((p, i) => (
-          <ParticleSprite key={i} confetto={p} />
-        ))}
-      </Svg>
+      {manager.particles.map((p, i) => (
+        <ParticleSprite key={i} confetto={p} />
+      ))}
     </View>
   );
 });
@@ -104,9 +86,15 @@ interface SpriteProps {
 }
 
 /**
- * Render de una partícula. NO está memoizado — el Confetto muta
- * in-place y necesitamos que cada re-render del padre lea los
- * valores actuales.
+ * Una partícula = un `<View>` posicionado absoluto. NO memoizado:
+ * el Confetto muta in-place y necesitamos que cada re-render del
+ * padre lea los valores actuales.
+ *
+ * Trick para los triángulos: el "CSS border triangle" — un View con
+ * width/height = 0 y bordes laterales transparentes deja un
+ * triángulo apuntando arriba relleno con borderBottomColor. No
+ * existe `<Triangle>` nativo en RN pero esto rinde igual de bien
+ * que un Rect.
  */
 function ParticleSprite({ confetto }: SpriteProps) {
   const { x, y, rotation, size, alpha, color, shape } = confetto;
@@ -116,36 +104,58 @@ function ParticleSprite({ confetto }: SpriteProps) {
   if (shape === "square") {
     const sy = confetto.squareScaleY();
     return (
-      <G
-        opacity={alpha}
-        transform={`translate(${x} ${y}) rotate(${rotDeg}) scale(1 ${sy})`}
-      >
-        <Rect
-          x={-half}
-          y={-half}
-          width={size}
-          height={size}
-          fill={color}
-        />
-      </G>
+      <View
+        style={{
+          position: "absolute",
+          left: x - half,
+          top: y - half,
+          width: size,
+          height: size,
+          backgroundColor: color,
+          opacity: alpha,
+          transform: [{ rotate: `${rotDeg}deg` }, { scaleY: sy }],
+        }}
+      />
     );
   }
 
   if (shape === "circle") {
     return (
-      <Circle cx={x} cy={y} r={half} fill={color} opacity={alpha} />
+      <View
+        style={{
+          position: "absolute",
+          left: x - half,
+          top: y - half,
+          width: size,
+          height: size,
+          borderRadius: half,
+          backgroundColor: color,
+          opacity: alpha,
+        }}
+      />
     );
   }
 
-  // triangle equilátero centrado en (0,0), apuntando arriba.
-  const t = half;
-  const points = `0,${-t} ${t * 0.866},${t * 0.5} ${-t * 0.866},${t * 0.5}`;
+  // Triangle equilátero — CSS-border trick. La altura natural del
+  // borderBottomWidth ya da el triángulo; centramos el bounding box
+  // en (x, y) restando half al top y dejando width 0.
   return (
-    <G
-      opacity={alpha}
-      transform={`translate(${x} ${y}) rotate(${rotDeg})`}
-    >
-      <Polygon points={points} fill={color} />
-    </G>
+    <View
+      style={{
+        position: "absolute",
+        left: x - half,
+        top: y - half,
+        width: 0,
+        height: 0,
+        borderLeftWidth: half,
+        borderRightWidth: half,
+        borderBottomWidth: size,
+        borderLeftColor: "transparent",
+        borderRightColor: "transparent",
+        borderBottomColor: color,
+        opacity: alpha,
+        transform: [{ rotate: `${rotDeg}deg` }],
+      }}
+    />
   );
 }
