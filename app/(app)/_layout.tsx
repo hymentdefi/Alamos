@@ -42,13 +42,21 @@ export default function AppLayout() {
       />
       <Stack.Screen name="activity" />
       <Stack.Screen name="notifications" />
-      {/* Transfer (send amount step): fullscreen gesture OFF para que
-          arrastrar el slider de % no dispare el swipe-back. Mismo
-          fix que el screen 'buy'. El swipe desde el borde izquierdo
-          sigue andando como back. */}
+      {/* Transfer: gestos nativos OFF.
+          - fullScreenGestureEnabled: el slider de % se confundía
+            con el swipe-back y se salía de la pantalla.
+          - gestureEnabled: el flow tiene 3 sub-steps internos
+            (currency → amount → destination → success). Si
+            permitimos el edge-swipe-back, iOS pop-ea toda la screen
+            y se va al home en vez de al sub-step anterior. Con el
+            gesture OFF, el botón de back del header se encarga de
+            la navegación entre steps de manera consistente. */}
       <Stack.Screen
         name="transfer"
-        options={{ fullScreenGestureEnabled: false }}
+        options={{
+          fullScreenGestureEnabled: false,
+          gestureEnabled: false,
+        }}
       />
       <Stack.Screen name="settings" />
       <Stack.Screen name="security" />
