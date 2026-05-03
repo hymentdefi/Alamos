@@ -1,15 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
-import {
-  Canvas,
-  Circle,
-  Group,
-  Path,
-  Rect,
-  Skia,
-} from "@shopify/react-native-skia";
-import { runOnJS } from "react-native-reanimated";
-import { useFrameCallback } from "react-native-reanimated";
+import Svg, { Circle, G, Polygon, Rect } from "react-native-svg";
 import { ConfettiManager } from "./ConfettiManager";
 import type { Confetto } from "./Confetto";
 
@@ -18,77 +9,80 @@ interface Props {
 }
 
 /**
- * Canvas que dibuja el sistema de partículas del manager. El frame
- * loop lo maneja Reanimated `useFrameCallback`: al disparar burst(),
- * el manager invoca onActivity() y nosotros activamos el callback;
- * cuando el manager queda idle, lo desactivamos para que el loop no
- * consuma batería.
+ * Canvas que dibuja el sistema de partículas. Usa `react-native-svg`
+ * para no requerir un módulo nativo extra (Skia exige rebuild del
+ * dev client). El frame loop es un requestAnimationFrame estándar
+ * driveado por JS — cuando el manager queda idle se cancela para no
+ * consumir batería.
  *
- * El estado de las partículas vive en JS (manager.particles), y
- * cada frame disparamos un setTick() para que React re-render el
- * Canvas con las posiciones nuevas. Skia hace diff propio sobre el
- * tree de drawing — es eficiente para nuestro tamaño (~230 sprites
- * solid color por unos 3 segundos).
+ * Las partículas viven en JS (manager.particles) y mutan in-place.
+ * Cada frame disparamos un setTick() para que React re-render el SVG
+ * con las posiciones nuevas. Con ~230 partículas por 3s, el costo de
+ * re-render es aceptable.
  */
 export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [, tick] = useReducer((x: number) => (x + 1) | 0, 0);
-  // Triángulo unitario centrado en (0,0), apuntando arriba. Lo
-  // creamos UNA vez con useMemo y escalamos por partícula vía
-  // transform — evita allocate de Path cada frame.
-  const trianglePath = useMemo(() => {
-    const p = Skia.Path.Make();
-    // Vértices de un triángulo equilátero inscrito en círculo r=1.
-    p.moveTo(0, -1);
-    p.lineTo(0.866, 0.5);
-    p.lineTo(-0.866, 0.5);
-    p.close();
-    return p;
-  }, []);
+  const rafRef = useRef<number | null>(null);
+  const lastRef = useRef(0);
+  const runningRef = useRef(false);
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
-    console.log(
-      `[confetti] canvas layout ${width.toFixed(0)}x${height.toFixed(0)}`,
-    );
     setSize((prev) =>
       prev.w === width && prev.h === height ? prev : { w: width, h: height },
     );
   }, []);
 
-  // El step se ejecuta en JS thread (manager.particles vive en JS).
-  // El frame callback de Reanimated corre en UI thread y nos da el
-  // delta exacto entre frames; usamos runOnJS para llamar al step.
-  const stepRef = useRef<(dt: number) => void>(() => {});
-  stepRef.current = (dt) => {
-    manager.update(dt, size.w, size.h);
-    tick();
-    if (manager.isIdle()) {
-      frameCb.setActive(false);
-    }
-  };
-
-  const frameCb = useFrameCallback((info) => {
-    "worklet";
-    const dt = info.timeSincePreviousFrame ?? 16;
-    runOnJS(callStep)(dt);
-  }, false);
-
-  // Wrapper para poder pasar a runOnJS sin que cambie de identidad.
-  const callStep = useCallback((dt: number) => {
-    stepRef.current(dt);
-  }, []);
-
-  // Cuando el manager tiene actividad nueva, activamos el frame
-  // callback. Si ya está activo no pasa nada (setActive es idempotente).
+  // Loop de animación. RAF cuando hay actividad, idle cuando no.
   useEffect(() => {
-    manager.onActivity = () => frameCb.setActive(true);
-    if (!manager.isIdle()) frameCb.setActive(true);
-    return () => {
-      manager.onActivity = undefined;
-      frameCb.setActive(false);
+    const step = (now: number) => {
+      if (!runningRef.current) return;
+      const dt = lastRef.current === 0 ? 16 : Math.min(50, now - lastRef.current);
+      lastRef.current = now;
+      manager.update(dt, sizeRef.current.w, sizeRef.current.h);
+      tick();
+      if (manager.isIdle()) {
+        runningRef.current = false;
+        rafRef.current = null;
+        return;
+      }
+      rafRef.current = requestAnimationFrame(step);
     };
-  }, [manager, frameCb]);
+
+    const start = () => {
+      if (runningRef.current) return;
+      runningRef.current = true;
+      lastRef.current = 0;
+      rafRef.current = requestAnimationFrame(step);
+    };
+
+    manager.onActivity = start;
+    if (!manager.isIdle()) start();
+
+    return () => {
+      runningRef.current = false;
+      manager.onActivity = undefined;
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [manager]);
+
+  if (size.w === 0 || size.h === 0) {
+    // Sin layout no podemos dibujar nada útil — solo registramos
+    // para que el primer onLayout dispare el seteo y arranque.
+    return (
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+        onLayout={onLayout}
+      />
+    );
+  }
 
   return (
     <View
@@ -96,69 +90,62 @@ export const ConfettiCanvas = memo(function ConfettiCanvas({ manager }: Props) {
       pointerEvents="none"
       onLayout={onLayout}
     >
-      <Canvas style={StyleSheet.absoluteFill}>
+      <Svg width={size.w} height={size.h}>
         {manager.particles.map((p, i) => (
-          <ParticleSprite key={i} confetto={p} trianglePath={trianglePath} />
+          <ParticleSprite key={i} confetto={p} />
         ))}
-      </Canvas>
+      </Svg>
     </View>
   );
 });
 
 interface SpriteProps {
   confetto: Confetto;
-  trianglePath: ReturnType<typeof Skia.Path.Make>;
 }
 
 /**
- * Render de una partícula. NO es memo — la mutación in-place del
- * Confetto haría que React no detecte cambios. Cada frame el padre
- * fuerza re-render y este componente lee los valores actuales.
+ * Render de una partícula. NO está memoizado — el Confetto muta
+ * in-place y necesitamos que cada re-render del padre lea los
+ * valores actuales.
  */
-function ParticleSprite({ confetto, trianglePath }: SpriteProps) {
+function ParticleSprite({ confetto }: SpriteProps) {
   const { x, y, rotation, size, alpha, color, shape } = confetto;
   const half = size / 2;
+  const rotDeg = (rotation * 180) / Math.PI;
 
   if (shape === "square") {
     const sy = confetto.squareScaleY();
     return (
-      <Group
-        transform={[
-          { translateX: x },
-          { translateY: y },
-          { rotate: rotation },
-          { scaleY: sy },
-        ]}
+      <G
         opacity={alpha}
+        transform={`translate(${x} ${y}) rotate(${rotDeg}) scale(1 ${sy})`}
       >
-        <Rect x={-half} y={-half} width={size} height={size} color={color} />
-      </Group>
+        <Rect
+          x={-half}
+          y={-half}
+          width={size}
+          height={size}
+          fill={color}
+        />
+      </G>
     );
   }
 
   if (shape === "circle") {
     return (
-      <Group
-        transform={[{ translateX: x }, { translateY: y }]}
-        opacity={alpha}
-      >
-        <Circle cx={0} cy={0} r={half} color={color} />
-      </Group>
+      <Circle cx={x} cy={y} r={half} fill={color} opacity={alpha} />
     );
   }
 
-  // triangle
+  // triangle equilátero centrado en (0,0), apuntando arriba.
+  const t = half;
+  const points = `0,${-t} ${t * 0.866},${t * 0.5} ${-t * 0.866},${t * 0.5}`;
   return (
-    <Group
-      transform={[
-        { translateX: x },
-        { translateY: y },
-        { rotate: rotation },
-        { scale: half },
-      ]}
+    <G
       opacity={alpha}
+      transform={`translate(${x} ${y}) rotate(${rotDeg})`}
     >
-      <Path path={trianglePath} color={color} />
-    </Group>
+      <Polygon points={points} fill={color} />
+    </G>
   );
 }
