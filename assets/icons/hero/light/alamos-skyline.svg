@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <rect width="400" height="200" fill="#FAFAF7" rx="16"></rect>
+  <line x1="20" y1="170" x2="380" y2="170" stroke="#0E0F0C" stroke-width="1.5" opacity="0.25"></line>
+  <g opacity="0.35">
+    <g transform="translate(30 109.8) scale(0.7)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+  <g opacity="1">
+    <g transform="translate(70 79.7) scale(1.05)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+  <g opacity="0.7">
+    <g transform="translate(140 96.9) scale(0.85)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+  <g opacity="1">
+    <g transform="translate(200 66.8) scale(1.2)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+  <g opacity="0.5">
+    <g transform="translate(270 105.5) scale(0.75)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+  <g opacity="1">
+    <g transform="translate(320 84) scale(1)">
+      <polygon points="38,26 16,86 60,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+      <polygon points="56,12 29,86 83,86" stroke="#00E676" stroke-width="6" stroke-linejoin="round" fill="none"></polygon>
+    </g>
+  </g>
+</svg>

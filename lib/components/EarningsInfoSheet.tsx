@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
-import { ActionIcon } from "./ActionIcon";
+import { HeroSkylineIllustration } from "./illustrations/HeroSkylineIllustration";
 
 interface Props {
   visible: boolean;
@@ -144,10 +144,8 @@ export function EarningsInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
-            <View style={s.iconsRow}>
-              <ActionIcon name="ingresar" size={48} />
-              <ActionIcon name="enviar" size={48} />
-              <ActionIcon name="convertir" size={48} />
+            <View style={s.heroWrap}>
+              <HeroSkylineIllustration width={340} />
             </View>
 
             <Text style={[s.title, { color: c.text }]}>Tu dinero</Text>
@@ -224,10 +222,8 @@ const s = StyleSheet.create({
     paddingTop: 14,
     paddingHorizontal: 6,
   },
-  iconsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 14,
+  heroWrap: {
+    alignItems: "center",
     marginBottom: 22,
   },
   title: {
