@@ -113,45 +113,6 @@ function BaseHome() {
     setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
   }, []);
 
-  // Coachmark: la primera vez que el user entra al Inicio, mostramos
-  // una pill debajo de la bandera explicando que es tappeable. Se
-  // auto-dismissea a los 6s, o cuando el user toca la bandera. Se
-  // persiste en SecureStore para no volver a aparecer.
-  const [currencyHintSeen, setCurrencyHintSeen] = useState(true);
-  const currencyHintOpacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    SecureStore.getItemAsync("hero:currency_hint_seen")
-      .then((v) => {
-        if (!v) setCurrencyHintSeen(false);
-      })
-      .catch(() => {});
-  }, []);
-  const markCurrencyHintSeen = useCallback(() => {
-    Animated.timing(currencyHintOpacity, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => setCurrencyHintSeen(true));
-    SecureStore.setItemAsync("hero:currency_hint_seen", "1").catch(() => {});
-  }, [currencyHintOpacity]);
-  useEffect(() => {
-    if (currencyHintSeen) return;
-    // Fade in con un pequeño delay para que no aparezca exactamente
-    // al mount.
-    const t = setTimeout(() => {
-      Animated.timing(currencyHintOpacity, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: true,
-      }).start();
-    }, 450);
-    // Auto-dismiss a los 6s.
-    const d = setTimeout(markCurrencyHintSeen, 6000);
-    return () => {
-      clearTimeout(t);
-      clearTimeout(d);
-    };
-  }, [currencyHintSeen, currencyHintOpacity, markCurrencyHintSeen]);
   // Swipe horizontal sobre el hero para cambiar de moneda.
   const currencyPan = useRef(
     PanResponder.create({
@@ -531,54 +492,66 @@ function BaseHome() {
             style={s.amountRow}
             onPress={() => {
               toggleCurrency();
-              if (!currencyHintSeen) markCurrencyHintSeen();
             }}
             {...currencyPan.panHandlers}
           >
-            <View style={s.flagWrap} pointerEvents="none">
-              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
-              {/* Indicador persistente — chip chiquito con icono de
-                  swap en el borde. Le avisa al ojo que la bandera es
-                  interactiva. */}
-              <View
-                style={[
-                  s.flagSwapBadge,
-                  { backgroundColor: c.ink, borderColor: c.bg },
-                ]}
-              >
-                <Feather name="repeat" size={7} color={c.bg} />
-              </View>
-            </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
               size={38}
               weight={700}
               currency={currency}
             />
-            {/* Coachmark: sólo la primera vez, pill debajo de la
-                bandera con una flecha para arriba indicando que sea
-                tappeada. */}
-            {!currencyHintSeen ? (
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  s.currencyHintWrap,
-                  { opacity: currencyHintOpacity },
-                ]}
-              >
-                <View
-                  style={[s.currencyHintArrow, { borderBottomColor: c.ink }]}
-                />
-                <View
-                  style={[s.currencyHintPill, { backgroundColor: c.ink }]}
-                >
-                  <Text style={[s.currencyHintText, { color: c.bg }]}>
-                    Tocá para cambiar de moneda
-                  </Text>
-                </View>
-              </Animated.View>
-            ) : null}
+            <View style={s.flagWrap} pointerEvents="none">
+              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
+            </View>
           </Pressable>
+
+          {/* Indicador de moneda — dos dots abajo del saldo.
+              El activo es texto-color, el inactivo es muted. Cada
+              dot es tappable para saltar directo a esa moneda
+              (además del tap/swipe sobre el monto que togglea). */}
+          <View style={s.currencyDots}>
+            <Pressable
+              hitSlop={10}
+              onPress={() => {
+                if (currency !== "ARS") {
+                  toggleCurrency();
+                }
+              }}
+            >
+              <View
+                style={[
+                  s.currencyDot,
+                  {
+                    backgroundColor:
+                      currency === "ARS" ? c.text : c.textFaint,
+                    width: currency === "ARS" ? 8 : 6,
+                    height: currency === "ARS" ? 8 : 6,
+                  },
+                ]}
+              />
+            </Pressable>
+            <Pressable
+              hitSlop={10}
+              onPress={() => {
+                if (currency !== "USD") {
+                  toggleCurrency();
+                }
+              }}
+            >
+              <View
+                style={[
+                  s.currencyDot,
+                  {
+                    backgroundColor:
+                      currency === "USD" ? c.text : c.textFaint,
+                    width: currency === "USD" ? 8 : 6,
+                    height: currency === "USD" ? 8 : 6,
+                  },
+                ]}
+              />
+            </Pressable>
+          </View>
 
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color: trendColor }]}>
@@ -1704,50 +1677,27 @@ const s = StyleSheet.create({
   amountRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
+    gap: 10,
+    marginBottom: 8,
     position: "relative",
   },
   flagWrap: {
     position: "relative",
   },
-  flagSwapBadge: {
-    position: "absolute",
-    bottom: -3,
-    right: -4,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    borderWidth: 1.5,
+  /* Indicador de moneda — dos dots horizontales abajo del saldo.
+     El activo es full-color y un toque más grande (8px) que el
+     inactivo (6px), para que la jerarquía sea clara aunque la
+     diferencia sea sutil. Tap directo a cualquiera salta a esa
+     moneda. */
+  currencyDots: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 7,
+    marginBottom: 10,
+    paddingVertical: 4,
   },
-  currencyHintWrap: {
-    position: "absolute",
-    top: 62,
-    left: -4,
-    alignItems: "flex-start",
-    zIndex: 20,
-  },
-  currencyHintArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 6,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    marginLeft: 16,
-  },
-  currencyHintPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.md,
-  },
-  currencyHintText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
+  currencyDot: {
+    borderRadius: 999,
   },
   balance: {
     fontFamily: fontFamily[700],
