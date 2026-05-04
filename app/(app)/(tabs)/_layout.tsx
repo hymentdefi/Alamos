@@ -312,13 +312,11 @@ export default function TabsLayout() {
         backBehavior="none"
         screenOptions={{
           headerShown: false,
-          // Sin animación entre pantallas: el cambio de tab es
-          // instantáneo. La señal visual de "cambié" la dan la pill que
-          // se desliza + el icono que se redibuja en el nav bar — no
-          // necesitamos un shift horizontal de la pantalla entera, que
-          // pelea por frames con esas dos animaciones y hace que todo
-          // se sienta laggy. Snap-switch, estilo Robinhood/Instagram.
-          animation: "none",
+          // Shift horizontal entre tabs: la nueva pantalla entra
+          // desde el lado y empuja la actual. Coordina con la pill
+          // del nav bar que se desliza en paralelo. Si llega a
+          // sentirse laggy, el knob es bajar a 'fade' o 'none'.
+          animation: "shift",
         }}
         tabBar={() => null}
       >
