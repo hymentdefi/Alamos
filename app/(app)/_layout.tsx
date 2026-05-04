@@ -55,6 +55,18 @@ export default function AppLayout() {
         name="transfer"
         options={{ fullScreenGestureEnabled: false }}
       />
+      {/* Sub-rutas del flow de Ingresar — cada una es su propio
+          screen para que el swipe-back nativo de iOS popee
+          naturalmente al stack anterior (hub → detalle → from
+          account). */}
+      <Stack.Screen
+        name="transfer-deposit"
+        options={{ fullScreenGestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="transfer-deposit-from"
+        options={{ fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen name="settings" />
       <Stack.Screen name="security" />
       <Stack.Screen name="chat" />

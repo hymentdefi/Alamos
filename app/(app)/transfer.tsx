@@ -59,7 +59,7 @@ const RECEIVE_WIRE_US = {
 
 /** Cuentas externas vinculadas del usuario. Por ahora un mock; la idea
  *  es que el usuario pueda agregar más desde acá. */
-interface LinkedAccount {
+export interface LinkedAccount {
   id: string;
   bankName: string;
   accountType: string;
@@ -69,7 +69,7 @@ interface LinkedAccount {
   currency: "ars" | "usd";
 }
 
-const LINKED_ACCOUNTS: LinkedAccount[] = [
+export const LINKED_ACCOUNTS: LinkedAccount[] = [
   {
     id: "galicia-ars",
     bankName: "Banco Galicia",
@@ -107,73 +107,11 @@ function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // null = hub picker (4 cards). AccountId = detalle de esa moneda.
-  const [kindId, setKindId] = useState<AccountId | null>(null);
-  // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
-  const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
 
-  // Intercepción del back nativo (swipe-from-edge en iOS + hardware
-  // back en Android) para respetar los sub-steps internos. Usamos
-  // `usePreventRemove` (React Navigation v7) en vez del listener
-  // manual `beforeRemove` porque ese último NO cancela el gesto
-  // nativo de iOS — la pantalla se desmontaba antes y aparecía el
-  // warning "screen was removed natively but...". `usePreventRemove`
-  // es nativo del native-stack y revierte la animación del swipe.
-  const inSubStep = kindId !== null || depositFrom !== null;
-  usePreventRemove(inSubStep, () => {
-    if (depositFrom) {
-      setDepositFrom(null);
-    } else if (kindId) {
-      setKindId(null);
-    }
-  });
-
-  if (depositFrom) {
-    return (
-      <DepositFromAccount
-        account={depositFrom}
-        onBack={() => setDepositFrom(null)}
-      />
-    );
-  }
-
-  // Detalle de una moneda elegida — back vuelve al hub.
-  if (kindId) {
-    return (
-      <View style={[s.root, { backgroundColor: c.bg }]}>
-        <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-          <Pressable
-            style={s.iconBtn}
-            onPress={() => setKindId(null)}
-            hitSlop={12}
-          >
-            <Feather name="arrow-left" size={22} color={c.text} />
-          </Pressable>
-          <Text style={[s.headerTitle, { color: c.text }]}>
-            Ingresar {depositTitleFor(kindId)}
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {kindId === "usd-us" ? (
-            <WireDepositCard />
-          ) : kindId === "usdt-crypto" ? (
-            <CryptoDepositRedirect />
-          ) : (
-            <BankDepositCard
-              kind={kindId as "ars-ar" | "usd-ar"}
-              onPickLinked={setDepositFrom}
-            />
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // Hub picker — 4 floating cards 2×2.
+  // Hub picker — 4 floating cards 2×2. Cada card ahora pushea a una
+  // ruta separada (transfer-deposit / crypto-deposit) — así el
+  // swipe-back nativo de iOS popea naturalmente del detalle al hub
+  // sin necesidad de gesture-interception ni `usePreventRemove`.
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.headerBare, { paddingTop: insets.top + 12 }]}>
@@ -201,15 +139,14 @@ function DepositInfo() {
           mode="deposit"
           onPick={(id) => {
             Haptics.selectionAsync().catch(() => {});
-            // Crypto navega a su propia pantalla (asset + red picker)
-            // con `push` — así el back nativo regresa al hub. Antes
-            // usábamos `replace` desde un sub-componente y se
-            // perdía el hub del stack.
             if (id === "usdt-crypto") {
               router.push("/(app)/crypto-deposit");
               return;
             }
-            setKindId(id);
+            router.push({
+              pathname: "/(app)/transfer-deposit",
+              params: { currency: id },
+            });
           }}
         />
       </ScrollView>
@@ -217,23 +154,6 @@ function DepositInfo() {
   );
 }
 
-/** Mini-component: en lugar del crypto-deposit inline acá, redirige
- *  al screen dedicado (que tiene asset list + network picker). */
-function CryptoDepositRedirect() {
-  const { c } = useTheme();
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/(app)/crypto-deposit");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ color: c.textMuted, fontFamily: fontFamily[500] }}>
-        Abriendo crypto deposit…
-      </Text>
-    </View>
-  );
-}
 
 function currencyLabelOf(id: AccountId): string {
   const a = accounts.find((x) => x.id === id);
@@ -243,7 +163,7 @@ function currencyLabelOf(id: AccountId): string {
 /** Etiqueta humana de la moneda en el header del detalle de
  *  Ingresar — "pesos" / "dólares" / "crypto" en lugar del code
  *  ISO-ish (ARS/USD/USDT). */
-function depositTitleFor(id: AccountId): string {
+export function depositTitleFor(id: AccountId): string {
   switch (id) {
     case "ars-ar":
       return "pesos";
@@ -358,7 +278,7 @@ function HubCard({
 }
 
 /* ─── Card de depósito bancario en cuenta argentina (ARS / USD) ─── */
-function BankDepositCard({
+export function BankDepositCard({
   kind,
   onPickLinked,
 }: {
@@ -543,7 +463,7 @@ function DepositTabBtn({
 }
 
 /* ─── Card de wire transfer internacional (USD cuenta USA) ─── */
-function WireDepositCard() {
+export function WireDepositCard() {
   const { c } = useTheme();
   const w = RECEIVE_WIRE_US;
   return (
@@ -1207,7 +1127,7 @@ const DEPOSIT_LIMITS = {
   usd: 10_000,
 };
 
-function DepositFromAccount({
+export function DepositFromAccount({
   account,
   onBack,
 }: {
