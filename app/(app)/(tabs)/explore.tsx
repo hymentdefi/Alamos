@@ -10,7 +10,11 @@ import {
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import {
+  Feather,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
@@ -101,20 +105,17 @@ export default function ExploreScreen() {
 function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
+  const isDark = mode === "dark";
   const { isFavorite } = useFavorites();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
 
   const [query, setQuery] = useState("");
   const [activeMarketIdx, setActiveMarketIdx] = useState(0);
-  // Sub-categoría activa dentro del mercado (pills debajo de los tabs).
-  // Se vive en BaseExplore — no en MarketBody — porque las pills se
-  // renderizan en el header, integradas con el segmented de mercado.
-  const [activeCategory, setActiveCategory] = useState<
-    AssetCategory | "todo"
-  >("todo");
   const [onlyFavs, setOnlyFavs] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef<TextInput | null>(null);
   const listRef = useRef<ScrollView | null>(null);
 
   // Cargamos preferencia de "solo favoritos" + última market tab
@@ -159,9 +160,6 @@ function BaseExplore() {
   const switchMarket = useCallback((idx: number) => {
     Haptics.selectionAsync().catch(() => {});
     setActiveMarketIdx(idx);
-    // Reseteamos la categoría al cambiar de mercado para que no quede
-    // pegada una que no aplica (ej: pasar de AR/CEDEARs a EE.UU).
-    setActiveCategory("todo");
     SecureStore.setItemAsync(MARKET_TAB_KEY, MARKET_TABS[idx].id).catch(
       () => {},
     );
@@ -182,11 +180,10 @@ function BaseExplore() {
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={[s.title, { color: c.text }]}>Mercado</Text>
 
-        {/* Control jerárquico: tabs de mercado arriba, categorías
-            del mercado activo debajo. Mismo container crema (track
-            iOS-like) — la categoría sale visualmente del segmented
-            de mercado en lugar de flotar como un grupo aparte.
-            Pill activa blanca con sombra en ambos niveles. */}
+        {/* Segmented de mercado (AR / EEUU / Crypto). Sin pills de
+            categorías abajo — el filtro por categoría se eliminó.
+            La pill activa usa el mismo verde brand translúcido que la
+            tab activa del nav bar para mantener identidad visual. */}
         <View
           style={[
             s.marketControl,
@@ -205,10 +202,15 @@ function BaseExplore() {
                   rippleContained
                   style={[
                     s.marketSegBtn,
-                    active && [
-                      s.marketSegBtnActive,
-                      { backgroundColor: c.surface },
-                    ],
+                    active && {
+                      backgroundColor: isDark
+                        ? "rgba(14, 203, 129, 0.14)"
+                        : "rgba(0, 200, 5, 0.10)",
+                      borderColor: isDark
+                        ? "rgba(14, 203, 129, 0.20)"
+                        : "rgba(0, 200, 5, 0.16)",
+                      borderWidth: 1,
+                    },
                   ]}
                 >
                   <MarketGlyph market={m.id} active={active} />
@@ -230,59 +232,6 @@ function BaseExplore() {
               );
             })}
           </View>
-
-          {/* Divider sutil entre tabs y categorías — un hairline a
-              media opacidad sobre el track crema; suficiente para
-              estructurar sin agregar peso visual. */}
-          <View
-            style={[
-              s.marketControlDivider,
-              { backgroundColor: c.border },
-            ]}
-          />
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.categoryContent}
-          >
-            {market.categories.map((cat) => {
-              const active = cat.id === activeCategory;
-              return (
-                <Tap
-                  key={cat.id}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setActiveCategory(cat.id);
-                  }}
-                  haptic="selection"
-                  pressScale={0.94}
-                  rippleContained
-                  style={[
-                    s.categoryPill,
-                    active && [
-                      s.categoryPillActive,
-                      { backgroundColor: c.surface },
-                    ],
-                  ]}
-                >
-                  <Text
-                    style={[
-                      s.categoryLabel,
-                      {
-                        color: active ? c.text : c.textMuted,
-                        fontFamily: active
-                          ? fontFamily[700]
-                          : fontFamily[600],
-                      },
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-                </Tap>
-              );
-            })}
-          </ScrollView>
         </View>
 
         <View style={s.searchRow}>
@@ -292,36 +241,66 @@ function BaseExplore() {
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
-            <Feather name="search" size={16} color={c.textMuted} />
+            <MaterialCommunityIcons
+              name="magnify"
+              size={20}
+              color={c.textMuted}
+            />
             <TextInput
+              ref={searchInputRef}
               style={[s.searchInput, { color: c.text }]}
               placeholder={`Buscar en ${market.label}`}
               placeholderTextColor={c.textMuted}
               value={query}
               onChangeText={setQuery}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               autoCapitalize="characters"
+              returnKeyType="search"
             />
             {query ? (
-              <Pressable onPress={() => setQuery("")} hitSlop={10}>
-                <Feather name="x" size={16} color={c.textMuted} />
+              <Pressable
+                onPress={() => setQuery("")}
+                hitSlop={10}
+                style={[s.clearChip, { backgroundColor: c.borderStrong }]}
+              >
+                <Feather name="x" size={12} color={c.bg} />
               </Pressable>
             ) : null}
           </View>
 
-          <Tap
-            onPress={toggleFavs}
-            hitSlop={8}
-            haptic="light"
-            style={s.favBtn}
-          >
-            <FavStar filled={onlyFavs} size={22} outlineColor={c.text} />
-          </Tap>
+          {/* Cuando el input tiene foco o hay query escrita, el espacio
+              de la derecha se ocupa por un Cancelar verde (estilo iOS
+              search). Al tocarlo, limpia el query, blurea el input y
+              vuelve a mostrarse la estrella de favoritos. */}
+          {searchFocused || query.length > 0 ? (
+            <Pressable
+              onPress={() => {
+                setQuery("");
+                setSearchFocused(false);
+                searchInputRef.current?.blur();
+              }}
+              hitSlop={8}
+              style={s.cancelBtn}
+            >
+              <Text style={[s.cancelText, { color: c.brand }]}>Cancelar</Text>
+            </Pressable>
+          ) : (
+            <Tap
+              onPress={toggleFavs}
+              hitSlop={8}
+              haptic="light"
+              style={s.favBtn}
+            >
+              <FavStar filled={onlyFavs} size={22} outlineColor={c.text} />
+            </Tap>
+          )}
         </View>
       </View>
 
       <MarketBody
         market={market}
-        activeCategory={activeCategory}
+        activeCategory="todo"
         query={query}
         onlyFavs={onlyFavs}
         onOpen={openDetail}
@@ -759,12 +738,6 @@ const s = StyleSheet.create({
     paddingBottom: 4,
     marginBottom: 14,
   },
-  marketControlDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 12,
-    marginVertical: 4,
-    opacity: 0.6,
-  },
   marketSeg: {
     flexDirection: "row",
     gap: 2,
@@ -777,16 +750,6 @@ const s = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     borderRadius: radius.pill,
-  },
-  marketSegBtnActive: {
-    // Sombra sutil para que la pill activa "flote" sobre el track crema —
-    // mismo feel que el toggle Dinero/Portfolio del home y los segmented
-    // controls de iOS.
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
   },
   marketSegLabel: {
     fontSize: 13,
@@ -803,9 +766,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    /* Bordes menos redondeados (era radius.pill ≈ 999): pasa a md
+     * para que el rectángulo se sienta más estructurado, estilo iOS
+     * search. */
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   searchInput: {
     flex: 1,
@@ -814,34 +780,31 @@ const s = StyleSheet.create({
     letterSpacing: -0.15,
     padding: 0,
   },
+  /* Chip redondo gris dentro del input para limpiar el query — el
+   * tap fácil sin tener que apuntar a un ícono fino. */
+  clearChip: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   favBtn: {
     width: 44,
     height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  categoryContent: {
-    paddingHorizontal: 4,
-    gap: 4,
+  cancelBtn: {
+    paddingHorizontal: 6,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  categoryPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  categoryPillActive: {
-    // Mismo lenguaje visual que el pill activo del segmented de
-    // mercado — blanco brillante con sombra sutil para que ambos
-    // niveles del control se "lean" igual.
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  categoryLabel: {
-    fontSize: 12,
-    letterSpacing: -0.05,
+  cancelText: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   moversBlock: {
     paddingTop: 24,
