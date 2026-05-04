@@ -40,6 +40,7 @@ import {
 } from "../../../lib/data/assets";
 import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
+import { FavStar } from "../../../lib/components/FavStar";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 
@@ -311,16 +312,9 @@ function BaseExplore() {
             onPress={toggleFavs}
             hitSlop={8}
             haptic="light"
-            style={[
-              s.favBtn,
-              { backgroundColor: c.surfaceHover, borderColor: c.border },
-            ]}
+            style={s.favBtn}
           >
-            <Ionicons
-              name={onlyFavs ? "star" : "star-outline"}
-              size={18}
-              color={onlyFavs ? c.greenDark : c.text}
-            />
+            <FavStar filled={onlyFavs} size={22} outlineColor={c.text} />
           </Tap>
         </View>
       </View>
@@ -823,8 +817,6 @@ const s = StyleSheet.create({
   favBtn: {
     width: 44,
     height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
