@@ -29,6 +29,9 @@ interface TabPath {
    * propia animación.
    */
   segments: readonly Segment[];
+  /** ViewBox propio del icono. Default "0 0 24 24" si no se especifica.
+   *  Los icons del set 'navbar' del brand pack vienen en 28×28. */
+  viewBox?: string;
 }
 
 interface Props {
@@ -183,7 +186,7 @@ export function DrawingIcon({
 
   return (
     <Animated.View style={popStyle}>
-      <Svg width={size} height={size} viewBox={viewBox}>
+      <Svg width={size} height={size} viewBox={path.viewBox ?? viewBox}>
         {path.segments.map((seg, i) => (
           <DrawingSegment
             key={i}
@@ -201,61 +204,64 @@ export function DrawingIcon({
 }
 
 /* ─── Paths SVG para las tabs ─── */
+// Set 'navbar' del brand pack: viewBox 28×28, todos round-cap/join.
 // Los largos (len) son aproximados con ~5% de overshoot — no hay
 // Path.getTotalLength() en react-native-svg, así que los calculamos
 // a mano. El overshoot garantiza que el dash cubra el trazo completo.
+//
+// Las variantes 'active' del export usan el mismo path d con un fill
+// translúcido extra. La versión activa la maneja el theme-color del
+// stroke + la pill verde que vive en el _layout — el path queda igual.
 export const tabPaths = {
   home: {
+    viewBox: "0 0 28 28",
     segments: [
-      { d: "M4 21 V10 L12 3 L20 10 V21 H15 V14 H9 V21 Z", len: 76 },
+      // Casita: silueta cerrada (techo + paredes + entrada).
+      {
+        d: "M5 13 L14 5 L23 13 L23 23 L17 23 L17 17 L11 17 L11 23 L5 23 Z",
+        len: 78,
+      },
     ],
   },
   markets: {
+    viewBox: "0 0 28 28",
     segments: [
-      { d: "M3 21 V4", len: 18 },    // eje Y
-      { d: "M3 21 H21", len: 19 },   // eje X
-      { d: "M7 17 V13", len: 5 },    // barra 1
-      { d: "M12 17 V9", len: 9 },    // barra 2
-      { d: "M17 17 V11", len: 7 },   // barra 3
-      { d: "M21 17 V7", len: 11 },   // barra 4
-    ],
-  },
-  news: {
-    segments: [
-      { d: "M5 4 H18 V20 H5 Z", len: 60 },                        // rectángulo
-      { d: "M5 4 V20 A2 2 0 0 1 3 18 V11 H5", len: 30 },         // solapa
-      { d: "M8 8 H15", len: 8 },                                  // rayita 1
-      { d: "M8 12 H15", len: 8 },                                 // rayita 2
-      { d: "M8 16 H12", len: 5 },                                 // rayita 3
-    ],
-  },
-  profile: {
-    segments: [
-      { d: "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z", len: 26 },
-      { d: "M4 21 V20 A6 6 0 0 1 10 14 H14 A6 6 0 0 1 20 20 V21", len: 28 },
-    ],
-  },
-  support: {
-    segments: [
-      { d: "M5 4 H19 A2 2 0 0 1 21 6 V15 A2 2 0 0 1 19 17 H12 L7 21 V17 H5 A2 2 0 0 1 3 15 V6 A2 2 0 0 1 5 4 Z", len: 62 },
-      { d: "M8 10 H9", len: 2 },
-      { d: "M12 10 H13", len: 2 },
-      { d: "M16 10 H17", len: 2 },
-    ],
-  },
-  alamo: {
-    segments: [
-      { d: "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z", len: 56 },
+      // 4 barras verticales — bar chart minimalista, sin ejes.
+      { d: "M6 22 L6 14", len: 8.4 },
+      { d: "M11 22 L11 10", len: 12.6 },
+      { d: "M16 22 L16 16", len: 6.3 },
+      { d: "M21 22 L21 7", len: 15.75 },
     ],
   },
   portfolio: {
+    viewBox: "0 0 28 28",
     segments: [
-      // Body — maletín con esquinas redondeadas.
-      { d: "M5 8 H19 A2 2 0 0 1 21 10 V18 A2 2 0 0 1 19 20 H5 A2 2 0 0 1 3 18 V10 A2 2 0 0 1 5 8 Z", len: 60 },
-      // Handle — arquito superior.
-      { d: "M9 8 V6 A2 2 0 0 1 11 4 H13 A2 2 0 0 1 15 6 V8", len: 12 },
-      // Costura central (clasp).
-      { d: "M3 13 H21", len: 18 },
+      // Donut completo (2 semicírculos para cerrar el path).
+      { d: "M5 14 A9 9 0 1 1 23 14 A9 9 0 1 1 5 14", len: 60 },
+      // Slice de 'allocation' — arco de top a ~4 o'clock + 2 radios.
+      { d: "M14 5 A9 9 0 0 1 21.4 18.5 L14 14 Z", len: 38 },
+    ],
+  },
+  news: {
+    viewBox: "0 0 28 28",
+    segments: [
+      // Hoja principal.
+      { d: "M5 6 L19 6 L19 22 L5 22 Z", len: 63 },
+      // Solapa derecha (página doblada).
+      { d: "M19 10 L23 10 L23 22 L19 22", len: 21 },
+      // 3 rayas de texto.
+      { d: "M8 11 L16 11", len: 8.4 },
+      { d: "M8 15 L16 15", len: 8.4 },
+      { d: "M8 19 L13 19", len: 5.25 },
+    ],
+  },
+  alamo: {
+    viewBox: "0 0 28 28",
+    segments: [
+      // Isotipo Álamos — los 2 triángulos del logo, dibujados en orden
+      // (chico delante, grande detrás).
+      { d: "M11 8 L5 22 L17 22 Z", len: 45 },
+      { d: "M16 4 L9 22 L23 22 Z", len: 55 },
     ],
   },
 } as const satisfies Record<string, TabPath>;
