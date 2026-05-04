@@ -18,7 +18,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import {
+  Feather,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -987,7 +991,11 @@ function AccountRow({
             { backgroundColor: c.surfaceHover, borderColor: c.brand },
           ]}
         >
-          <Feather name="plus" size={20} color={c.brand} />
+          <MaterialCommunityIcons
+            name="plus-thick"
+            size={18}
+            color={c.brand}
+          />
         </Pressable>
       ) : (
         <View style={{ alignItems: "flex-end" }}>
@@ -1043,9 +1051,9 @@ function Investments({
           Tus inversiones
         </Text>
         <Ionicons
-          name="arrow-forward-sharp"
-          size={14}
-          color="rgba(0,200,5,0.45)"
+          name="arrow-forward"
+          size={18}
+          color="rgba(0,200,5,0.7)"
         />
       </Pressable>
 

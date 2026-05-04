@@ -189,12 +189,13 @@ function SparklineImpl({
    *   - onTouchesDown → siempre setea scrubIndex en x (feedback
    *     instantáneo al tap o al inicio del drag, antes de saber a
    *     dónde va el dedo).
-   *   - .activeOffsetX([-6,6]) → activa pan en cuanto se detectan
-   *     6px de movimiento horizontal.
-   *   - .failOffsetY([-15,15]) → si el dedo se va 15px verticales
-   *     antes de los 6px horizontales, el gesto FALLA, onFinalize
-   *     limpia el scrub, y el ScrollView padre toma el control →
-   *     scroll vertical.
+   *   - .activeOffsetX([-8,8]) → activa pan en cuanto se detectan
+   *     8px de movimiento horizontal claros.
+   *   - .failOffsetY([-4,4]) → MUY tight: con apenas 4px verticales
+   *     el gesto FALLA, scrub se limpia, y el ScrollView padre toma
+   *     el control. Esto asegura que un swipe vertical sobre el
+   *     chart se redirija al scroll de la pantalla casi siempre,
+   *     incluso si el dedo tiene un mini-jitter horizontal.
    *   - onTouchesUp / onFinalize → limpian el scrub al soltar (o
    *     cuando falla). El estado vuelve al render normal.
    */
@@ -228,8 +229,8 @@ function SparklineImpl({
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        .activeOffsetX([-6, 6])
-        .failOffsetY([-15, 15])
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-4, 4])
         .onTouchesDown((e) => {
           const t = e.changedTouches[0];
           if (t) runOnJS(updateScrubFromX)(t.x);
