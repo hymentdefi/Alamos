@@ -41,8 +41,6 @@ import {
 import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
-import { ProMarkets } from "../../../lib/components/pro/ProMarkets";
-import { useProMode } from "../../../lib/pro/context";
 import { Tap } from "../../../lib/components/Tap";
 
 interface MarketTab {
@@ -96,8 +94,6 @@ const MARKET_TABS: MarketTab[] = [
 ];
 
 export default function ExploreScreen() {
-  const { isPro } = useProMode();
-  if (isPro) return <ProMarkets />;
   return <BaseExplore />;
 }
 

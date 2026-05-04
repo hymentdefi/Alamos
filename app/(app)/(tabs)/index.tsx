@@ -61,8 +61,6 @@ import {
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
-import { ProHome } from "../../../lib/components/pro/ProHome";
-import { useProMode } from "../../../lib/pro/context";
 
 type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
@@ -83,8 +81,6 @@ const rangeChanges: Record<Range, number> = {
 };
 
 export default function HomeScreen() {
-  const { isPro } = useProMode();
-  if (isPro) return <ProHome />;
   return <BaseHome />;
 }
 

@@ -26,7 +26,6 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
-import { ProProvider } from "../lib/pro/context";
 import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
@@ -165,8 +164,7 @@ export default function RootLayout() {
         <AuthProvider>
           <LegalConsentProvider>
             <FavoritesProvider>
-              <ProProvider>
-                <PrivacyProvider>
+              <PrivacyProvider>
                   <StatusBar style={mode === "light" ? "dark" : "light"} />
                   <AuthGate />
                   {/* Confetti portal — UNA sola instancia montada en
@@ -175,7 +173,6 @@ export default function RootLayout() {
                       acá, encima de todo. */}
                   <ConfettiPortal />
                 </PrivacyProvider>
-              </ProProvider>
             </FavoritesProvider>
           </LegalConsentProvider>
         </AuthProvider>

@@ -12,12 +12,9 @@ import { useRouter, useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
-import { useProMode } from "../../../lib/pro/context";
-import { AlamosLogo } from "../../../lib/components/Logo";
 import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
 import { Tap } from "../../../lib/components/Tap";
 import { AppearanceSheet } from "../../../lib/components/AppearanceSheet";
@@ -31,7 +28,6 @@ export default function AlamoScreen() {
   const isFocused = useIsFocused();
   const { c, pref } = useTheme();
   const { user, logout } = useAuth();
-  const { isPro, requestSwitch } = useProMode();
   const scrollRef = useRef<ScrollView>(null);
 
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -57,8 +53,7 @@ export default function AlamoScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* ── Card de identidad: fija arriba. Layout vertical — perfil
-          (avatar + nombre + email) arriba, switch a Pro abajo. */}
+      {/* ── Card de identidad: avatar + nombre + email. */}
       <View
         style={[
           s.identityCard,
@@ -86,42 +81,6 @@ export default function AlamoScreen() {
             </Text>
           </View>
         </View>
-
-        {/* Separador horizontal entre el bloque de perfil y el switch Pro. */}
-        <View
-          style={[s.proDividerH, { backgroundColor: c.border }]}
-          pointerEvents="none"
-        />
-
-        <Pressable
-          onPress={() => requestSwitch()}
-          style={({ pressed }) => [
-            s.proRow,
-            {
-              opacity: pressed ? 0.7 : 1,
-            },
-          ]}
-          hitSlop={10}
-        >
-          {/* Glow casi blanco detrás del contenido — apenas se
-              insinúa una brisa más clara en diagonal, sin teñir. */}
-          <LinearGradient
-            colors={[
-              "rgba(255, 255, 255, 0)",
-              "rgba(252, 252, 250, 0.25)",
-              "rgba(255, 255, 255, 0)",
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <AlamosLogo variant="lockupShort" tone="green" size={38} />
-          {!isPro ? (
-            <Text style={[s.proBtnAccent, { color: c.greenDark }]}>Pro</Text>
-          ) : null}
-          <View style={{ flex: 1 }} />
-          <Feather name="chevron-right" size={18} color={c.textFaint} />
-        </Pressable>
       </View>
 
       <ScrollView
@@ -334,8 +293,7 @@ function Divider() {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Card de identidad: layout vertical. Arriba perfil (avatar + nombre
-     + email), abajo el switch a Pro como una row tappable full-width. */
+  /* Card de identidad: avatar + nombre + email. */
   identityCard: {
     marginHorizontal: 20,
     marginBottom: 22,
@@ -364,27 +322,6 @@ const s = StyleSheet.create({
     marginTop: 4,
     letterSpacing: -0.1,
   },
-  /* Divider horizontal entre perfil y switch Pro. */
-  proDividerH: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 12,
-    marginHorizontal: -16,
-  },
-  /* Row del switch Pro — full width abajo del perfil. */
-  proRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
-    overflow: "hidden",
-  },
-  proBtnAccent: {
-    fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.3,
-    marginLeft: -11,
-  },
-
   /* Groups + rows */
   group: {
     paddingHorizontal: 20,

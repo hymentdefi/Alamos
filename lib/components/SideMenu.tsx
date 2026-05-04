@@ -22,8 +22,6 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius, spacing } from "../theme";
 import { useAuth } from "../auth/context";
-import { useProMode } from "../pro/context";
-import { AlamosLogo } from "./Logo";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 // Panel ocupa el 100% de la pantalla — sin dejar un borde a la derecha.
@@ -48,7 +46,6 @@ export function SideMenu({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { user, logout } = useAuth();
-  const { isPro, requestSwitch } = useProMode();
 
   const [rendered, setRendered] = useState(visible);
   const tx = useRef(new Animated.Value(-PANEL_W)).current;
@@ -126,15 +123,6 @@ export function SideMenu({ visible, onClose }: Props) {
   };
 
   if (!rendered) return null;
-
-  const handleTogglePro = () => {
-    // Cerramos el menú primero y esperamos a que el Modal se desmonte
-    // completo (anim 280ms + margen). Si abrimos el Modal del Transition
-    // antes, iOS lo deja en cola hasta que se dismissea el anterior y
-    // la animación de bienvenida se pierde.
-    onClose();
-    setTimeout(() => requestSwitch(), 380);
-  };
 
   const navigateTo = (path: string) => {
     onClose();
@@ -248,29 +236,6 @@ export function SideMenu({ visible, onClose }: Props) {
             </Pressable>
           </View>
 
-          {/* ── Alamos Pro pill (toggle hacia el otro modo) ── */}
-          <Pressable
-            onPress={handleTogglePro}
-            style={({ pressed }) => [
-              s.proPill,
-              {
-                backgroundColor: c.surface,
-                borderColor: c.border,
-                opacity: pressed ? 0.7 : 1,
-                transform: [{ scale: pressed ? 0.985 : 1 }],
-              },
-            ]}
-          >
-            <AlamosLogo variant="lockupShort" tone="green" size={44} />
-            {!isPro ? (
-              <Text style={[s.proPillAccent, { color: c.greenDark }]}>
-                Pro
-              </Text>
-            ) : null}
-            <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={20} color={c.textFaint} />
-          </Pressable>
-
           {/* ── User identity ── */}
           <View style={s.identity}>
             <View style={[s.avatar, { backgroundColor: c.ink }]}>
@@ -360,38 +325,6 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-  },
-  /* Pro pill — tipo Binance: logo + ALAMOS + 'Pro' + chevron */
-  proPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 0,
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 5,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  proPillTextRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 6,
-  },
-  proPillBrand: {
-    fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  proPillAccent: {
-    fontFamily: fontFamily[800],
-    fontSize: 18,
-    letterSpacing: -0.4,
-    // El lockupShort tiene aire a la derecha del texto 'Alamos';
-    // compensamos con un margin negativo para que 'Pro' quede cerca
-    // del texto 'Alamos' del logo, con un pequeño aire de respiración.
-    marginLeft: -13,
   },
   /* Identity */
   identity: {

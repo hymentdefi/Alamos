@@ -487,7 +487,7 @@ export const assets: Asset[] = [
     held: false,
   },
 
-  // ─── Crypto Spot (solo visible en Alamos Pro) ───
+  // ─── Crypto Spot ───
   {
     ticker: "BTC/USDT",
     name: "Bitcoin",
