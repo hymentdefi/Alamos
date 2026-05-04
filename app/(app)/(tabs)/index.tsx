@@ -551,8 +551,8 @@ function BaseHome() {
             </View>
             <AmountDisplay
               value={currency === "ARS" ? arsCurrent : usdCurrent}
-              size={38}
-              weight={700}
+              size={40}
+              weight={800}
               currency={currency}
             />
             {/* Coachmark: sólo la primera vez, pill debajo de la
@@ -1358,7 +1358,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   actionLabel: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.15,
   },
@@ -1506,9 +1506,9 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   earningsTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.4,
+    fontFamily: fontFamily[800],
+    fontSize: 19,
+    letterSpacing: -0.5,
   },
   infoDot: {
     width: 18,
@@ -1525,23 +1525,23 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
   },
   earningsTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.25,
+    fontFamily: fontFamily[800],
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
   earningsName: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
   },
   earningsPrimary: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily[800],
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
   earningsSecondary: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
@@ -1800,10 +1800,10 @@ const s = StyleSheet.create({
     paddingBottom: 12,
   },
   portfolioTitle: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 38,
     lineHeight: 42,
-    letterSpacing: -1.6,
+    letterSpacing: -1.8,
     marginBottom: 4,
   },
   amountRow: {
@@ -1884,11 +1884,11 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
   },
   deltaTri: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 12,
   },
   deltaText: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
   },
