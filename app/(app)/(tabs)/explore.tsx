@@ -17,9 +17,6 @@ import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
-import { CryptoIcon } from "../../../lib/components/CryptoIcon";
-import { AmountDisplay } from "../../../lib/components/AmountDisplay";
-import { AlamosIcon } from "../../../lib/components/AlamosIcon";
 
 // Verde de acción primaria — usar `c.action` del theme. Esta constante
 // quedó como literal sólo para que no rompa style.create() — donde sí
@@ -32,7 +29,6 @@ import {
   assetIconCode,
   assetMarket,
   assetCurrency,
-  formatARS,
   formatMoney,
   formatPct,
   type Asset,
@@ -40,7 +36,7 @@ import {
   type AssetMarket,
   type AssetCurrency,
 } from "../../../lib/data/assets";
-import { accounts, convertAmount } from "../../../lib/data/accounts";
+import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { FavStar } from "../../../lib/components/FavStar";
 import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
@@ -117,22 +113,27 @@ function BaseExplore() {
   const searchInputRef = useRef<TextInput | null>(null);
   const listRef = useRef<ScrollView | null>(null);
 
-  // Total del portfolio en ARS — mismo cómputo que el home, inline acá
-  // para evitar dependencia cruzada. Va en el header del Mercado como
-  // un balance chico arriba a la derecha al lado del título.
-  const portfolioArs = useMemo(() => {
-    const held = assets.filter((a) => (a.qty ?? 0) > 0);
-    const fromHeld = held.reduce((sum, a) => {
-      const cur = assetCurrency(a);
-      const valueInOwn = a.price * (a.qty ?? 1);
-      return sum + convertAmount(valueInOwn, cur, "ARS");
-    }, 0);
-    const fromCash = accounts.reduce(
-      (sum, acc) => sum + convertAmount(acc.balance, acc.currency, "ARS"),
-      0,
-    );
-    return fromHeld + fromCash;
-  }, []);
+  // Disponible para operar en el mercado activo. Cada mercado se opera
+  // contra UNA cuenta específica (mismo modelo que AvailableFundsCard
+  // y buy.tsx → sourceAccountIdForMarket):
+  //   AR     → ars-ar
+  //   US     → usd-us
+  //   CRYPTO → usdt-crypto
+  // Se muestra en el header al lado del título 'Mercado'.
+  const operable = useMemo(() => {
+    const market = MARKET_TABS[activeMarketIdx];
+    const sourceId =
+      market.id === "US"
+        ? "usd-us"
+        : market.id === "CRYPTO"
+          ? "usdt-crypto"
+          : "ars-ar";
+    const acc = accounts.find((a) => a.id === sourceId);
+    return {
+      balance: acc?.balance ?? 0,
+      currency: market.currency,
+    };
+  }, [activeMarketIdx]);
 
   // Animación cross-fade entre la estrella de favoritos y el botón
   // 'Cancelar' cuando el input de búsqueda gana/pierde foco. Antes era
@@ -219,9 +220,14 @@ function BaseExplore() {
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
           <Text style={[s.title, { color: c.text }]}>Mercado</Text>
-          <Text style={[s.balance, { color: c.textMuted }]}>
-            {formatARS(portfolioArs)}
-          </Text>
+          <View style={s.balanceWrap}>
+            <Text style={[s.balanceLabel, { color: c.textFaint }]}>
+              Para operar
+            </Text>
+            <Text style={[s.balance, { color: c.textSecondary }]}>
+              {formatMoney(operable.balance, operable.currency)}
+            </Text>
+          </View>
         </View>
 
         {/* Segmented de mercado (AR / EEUU / Crypto). Sin pills de
@@ -408,110 +414,7 @@ const gs = StyleSheet.create({
   },
 });
 
-/* ─── Card de fondos disponibles para operar ─── */
-
-function AvailableFundsCard({ market }: { market: MarketTab }) {
-  const { c } = useTheme();
-  const router = useRouter();
-
-  // Cada mercado se opera contra UNA cuenta específica — los USD de
-  // la cuenta argentina NO sirven para operar en el mercado USA, y
-  // viceversa. Mismo modelo que en buy.tsx (sourceAccountIdForMarket).
-  //   AR     → ars-ar
-  //   US     → usd-us
-  //   CRYPTO → usdt-crypto
-  const balance = useMemo(() => {
-    const sourceId =
-      market.id === "US"
-        ? "usd-us"
-        : market.id === "CRYPTO"
-          ? "usdt-crypto"
-          : "ars-ar";
-    return accounts.find((a) => a.id === sourceId)?.balance ?? 0;
-  }, [market.id]);
-
-  return (
-    <View
-      style={[
-        fs.card,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
-    >
-      <CurrencyMark currency={market.currency} />
-      <AmountDisplay
-        value={balance}
-        size={20}
-        weight={700}
-        currency={market.currency}
-        style={fs.amount}
-      />
-      <Tap
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/transfer",
-            params: { mode: "deposit" },
-          })
-        }
-        haptic="medium"
-        pressScale={0.95}
-        style={[fs.ingresarBtn, { backgroundColor: c.action }]}
-      >
-        <AlamosIcon name="download" size={14} color="#FFFFFF" />
-        <Text style={fs.ingresarBtnText}>Ingresar</Text>
-      </Tap>
-    </View>
-  );
-}
-
-/** Logo del país (AR/US) o de Tether (USDT) que va adelante del saldo.
- *  Mismo tamaño y patrón que usa el hero del home. */
-function CurrencyMark({ currency }: { currency: AssetCurrency }) {
-  if (currency === "ARS") return <FlagIcon code="AR" size={24} />;
-  if (currency === "USD") return <FlagIcon code="US" size={24} />;
-  return (
-    <CryptoIcon
-      ticker="USDT"
-      iconText="₮"
-      bg="#26A17B"
-      fg="#FFFFFF"
-      size={24}
-    />
-  );
-}
-
-const fs = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingLeft: 8,
-    paddingRight: 6,
-    paddingVertical: 6,
-  },
-  amount: {
-    flex: 1,
-  },
-  ingresarBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    height: 32,
-    borderRadius: radius.md,
-  },
-  ingresarBtnText: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.15,
-    color: "#FFFFFF",
-  },
-});
-
-/* ─── Body: card de fondos + movers + lista de instrumentos ─── */
+/* ─── Body: movers + lista de instrumentos ─── */
 
 function MarketBody({
   market,
@@ -591,8 +494,6 @@ function MarketBody({
       contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
     >
-      <AvailableFundsCard market={market} />
-
       {showMovers && topMovers.length > 0 ? (
         <View style={s.moversBlock}>
           <View style={s.sectionHead}>
@@ -781,10 +682,11 @@ const s = StyleSheet.create({
     paddingBottom: 4,
   },
   /* Fila del título — 'Mercado' a la izq, balance compacto a la
-   * derecha, ambos sobre la misma línea base. */
+   * derecha. align-items center para que el bloque de balance
+   * (eyebrow + monto) quede vertical-centered respecto al título. */
   titleRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 14,
   },
@@ -794,8 +696,19 @@ const s = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -1.2,
   },
-  /* Balance chiquito al lado del título — pesos completos sin
-   * decimales, para que el header no se sature. */
+  /* Balance chiquito arriba a la derecha — 2 líneas: 'Para operar'
+   * (eyebrow) arriba, monto abajo. align-items right para que las
+   * dos líneas terminen alineadas a la derecha del header. */
+  balanceWrap: {
+    alignItems: "flex-end",
+  },
+  balanceLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginBottom: 1,
+  },
   balance: {
     fontFamily: fontFamily[700],
     fontSize: 14,
