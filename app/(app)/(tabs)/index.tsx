@@ -58,6 +58,10 @@ import {
   AlamosIcon,
   type AlamosIconName,
 } from "../../../lib/components/AlamosIcon";
+import {
+  ActionIcon,
+  type ActionIconName,
+} from "../../../lib/components/ActionIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
@@ -746,30 +750,17 @@ function BaseHome() {
 
 /* ─── Action button: círculo glass con label debajo (estilo Revolut) ─── */
 function ActionButton({
-  icon,
-  customIcon,
+  iconName,
   label,
   onPress,
   haptic,
 }: {
-  icon?: AlamosIconName;
-  /** Render custom del ícono — si se pasa, override el AlamosIcon
-   *  default. Útil para casos puntuales (ej: Convertir usa el mismo
-   *  swap-vertical que el ⇅ de cada cuenta de "Tu dinero"). */
-  customIcon?: React.ReactNode;
+  iconName: ActionIconName;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
 }) {
-  const { c, mode } = useTheme();
-  const isDark = mode === "dark";
-  // Surface uniforme — todos los botones se ven iguales; jerarquía
-  // por orden y label, no por color (estilo Revolut). Translúcido
-  // para acompañar el lenguaje glass del resto del home.
-  const bg = isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.78)";
-  const borderColor = isDark
-    ? "rgba(255,255,255,0.10)"
-    : "rgba(14,15,12,0.06)";
+  const { c } = useTheme();
   return (
     <Tap
       style={s.actionItem}
@@ -777,20 +768,11 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      <View
-        style={[
-          s.actionCircle,
-          {
-            backgroundColor: bg,
-            borderColor,
-            borderWidth: StyleSheet.hairlineWidth,
-          },
-        ]}
-      >
-        {customIcon ?? (
-          icon ? <AlamosIcon name={icon} size={22} color={c.text} /> : null
-        )}
-      </View>
+      {/* El ActionIcon YA es un squircle con fill brand verde y stroke
+          blanco — no necesita un wrapper de surface adicional como
+          tenía antes (la opcion 'glass' Revolut). El icono mismo
+          es el bloque visual. */}
+      <ActionIcon name={iconName} size={56} />
       <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
         {label}
       </Text>
@@ -917,12 +899,13 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — estilo Revolut: círculos verticales
-          glass, todos del mismo peso visual. La jerarquía la da el
-          orden, no el color. */}
+      {/* Acciones del home — squircle icons custom (Ingresar/Enviar/
+          Convertir) con verde brand y stroke blanco. El icono YA es
+          la surface; sin wrapper circular como en la versión
+          'Revolut glass' previa. */}
       <View style={s.actionsRow}>
         <ActionButton
-          icon="download"
+          iconName="ingresar"
           label="Ingresar"
           haptic="medium"
           onPress={() =>
@@ -933,7 +916,7 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          icon="upload"
+          iconName="enviar"
           label="Enviar"
           haptic="light"
           onPress={() =>
@@ -944,9 +927,7 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          customIcon={
-            <Ionicons name="swap-vertical" size={22} color={c.text} />
-          }
+          iconName="convertir"
           label="Convertir"
           haptic="medium"
           onPress={() => router.push("/(app)/convert")}
@@ -1349,13 +1330,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     flex: 1,
-  },
-  actionCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
   },
   actionLabel: {
     // 600 (no 700) a propósito: las labels chiquitas debajo de
