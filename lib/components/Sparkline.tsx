@@ -2,13 +2,14 @@ import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   View,
-  PanResponder,
   StyleSheet,
   Easing,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { runOnJS } from "react-native-reanimated";
 import Svg, {
   Circle,
   ClipPath,
@@ -176,58 +177,76 @@ function SparklineImpl({
     return Math.round(ratio * (series.length - 1));
   };
 
-  const panResponder = useMemo(
+  /* Scrub gesture — RN-Gesture-Handler en lugar de PanResponder.
+   *
+   * Por qué RNGH: necesitamos que el chart muestre el punto desde el
+   * touch-down (incluso sin movimiento) PERO que ceda el gesture al
+   * ScrollView vertical si el usuario arranca a deslizar para abajo.
+   * PanResponder no puede "soltar" un gesto mid-stream — una vez que
+   * captura, lo queda. RNGH sí, vía failOffsetY.
+   *
+   * Contrato:
+   *   - onTouchesDown → siempre setea scrubIndex en x (feedback
+   *     instantáneo al tap o al inicio del drag, antes de saber a
+   *     dónde va el dedo).
+   *   - .activeOffsetX([-6,6]) → activa pan en cuanto se detectan
+   *     6px de movimiento horizontal.
+   *   - .failOffsetY([-15,15]) → si el dedo se va 15px verticales
+   *     antes de los 6px horizontales, el gesto FALLA, onFinalize
+   *     limpia el scrub, y el ScrollView padre toma el control →
+   *     scroll vertical.
+   *   - onTouchesUp / onFinalize → limpian el scrub al soltar (o
+   *     cuando falla). El estado vuelve al render normal.
+   */
+  const updateScrubFromX = (x: number) => {
+    const idx = xToIndex(x);
+    if (idx !== lastIndexRef.current) {
+      const isFirst = lastIndexRef.current == null;
+      lastIndexRef.current = idx;
+      if (isFirst) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onScrubStart?.();
+      } else {
+        const now = Date.now();
+        if (now - lastHapticAtRef.current >= 55) {
+          lastHapticAtRef.current = now;
+          Haptics.selectionAsync().catch(() => {});
+        }
+      }
+      setScrubIndex(idx);
+      onScrub?.(idx, series[idx]);
+    }
+  };
+  const clearScrub = () => {
+    if (lastIndexRef.current == null) return;
+    setScrubIndex(null);
+    lastIndexRef.current = null;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onScrubEnd?.();
+  };
+
+  const pan = useMemo(
     () =>
-      PanResponder.create({
-        // No reclamamos el touch en el start — un tap o un swipe
-        // vertical tienen que poder ir al ScrollView padre.
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: () => false,
-        // Solo reclamamos el gesture cuando el movimiento es
-        // claramente horizontal (umbral chico de dx, y dx domina dy
-        // por al menos 1.4×). Si el dedo arranca yendo para abajo,
-        // el padre se lleva el gesto para hacer scroll vertical.
-        onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
-        onMoveShouldSetPanResponderCapture: (_, g) =>
-          Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: (e) => {
-          const idx = xToIndex(e.nativeEvent.locationX);
-          setScrubIndex(idx);
-          lastIndexRef.current = idx;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-          onScrubStart?.();
-          onScrub?.(idx, series[idx]);
-        },
-        onPanResponderMove: (e) => {
-          const idx = xToIndex(e.nativeEvent.locationX);
-          if (idx !== lastIndexRef.current) {
-            lastIndexRef.current = idx;
-            const now = Date.now();
-            if (now - lastHapticAtRef.current >= 55) {
-              lastHapticAtRef.current = now;
-              Haptics.selectionAsync().catch(() => {});
-            }
-            setScrubIndex(idx);
-            onScrub?.(idx, series[idx]);
-          }
-        },
-        onPanResponderRelease: () => {
-          setScrubIndex(null);
-          lastIndexRef.current = null;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-          onScrubEnd?.();
-        },
-        onPanResponderTerminate: () => {
-          setScrubIndex(null);
-          lastIndexRef.current = null;
-          onScrubEnd?.();
-        },
-      }),
-    // Incluimos los callbacks porque ahora vienen estables (useCallback
-    // del padre) — sin esto el panResponder usaba la versión vieja
-    // de los callbacks de un render anterior, bug latente.
+      Gesture.Pan()
+        .activeOffsetX([-6, 6])
+        .failOffsetY([-15, 15])
+        .onTouchesDown((e) => {
+          const t = e.changedTouches[0];
+          if (t) runOnJS(updateScrubFromX)(t.x);
+        })
+        .onUpdate((e) => {
+          runOnJS(updateScrubFromX)(e.x);
+        })
+        .onTouchesUp(() => {
+          runOnJS(clearScrub)();
+        })
+        .onFinalize(() => {
+          runOnJS(clearScrub)();
+        }),
+    // Las callbacks JS (updateScrubFromX/clearScrub) se rebuilden cada
+    // render pero el gesture es estable porque solo dependemos de los
+    // datos que cambian.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [series, layoutWidth, onScrub, onScrubStart, onScrubEnd],
   );
 
@@ -240,11 +259,11 @@ function SparklineImpl({
     scrubIndex != null && points[scrubIndex] ? points[scrubIndex] : null;
 
   return (
-    <View
-      onLayout={onLayout}
-      style={[{ height, marginHorizontal: -4 }, style]}
-      {...panResponder.panHandlers}
-    >
+    <GestureDetector gesture={pan}>
+      <View
+        onLayout={onLayout}
+        style={[{ height, marginHorizontal: -4 }, style]}
+      >
       <Svg
         width="100%"
         height="100%"
@@ -403,7 +422,8 @@ function SparklineImpl({
           />
         </Svg>
       ) : null}
-    </View>
+      </View>
+    </GestureDetector>
   );
 }
 
