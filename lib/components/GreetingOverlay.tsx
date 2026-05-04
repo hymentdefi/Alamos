@@ -40,8 +40,9 @@ const LOGO_SIZE = 140;
 /**
  * Splash post-native — apertura premium:
  *
- *   1. PANTALLA BLANCA + LOGO MIX (verde + negro) entrance (spring +
- *      fadeIn).
+ *   1. PANTALLA BLANCA + LOGO ALL-GREEN (ambos triángulos verdes
+ *      brand) entrance (spring + fadeIn). Continuo con el splash
+ *      nativo de Expo, que también muestra el isotipo green.
  *
  *   2. COVER VERDE BRAND sube desde abajo MIENTRAS el logo se va
  *      tornando BLANCO en la zona que el cover ya cubrió. Wipe
@@ -72,8 +73,8 @@ export function GreetingOverlay({ onEnd }: Props) {
   const coverProgress = useSharedValue(0);
 
   // Logo: NO hay entry animada — el splash nativo de Expo ya mostró
-  // el logo MIX estático. Arrancamos visible directamente para que
-  // la transición native→JS sea invisible.
+  // el logo all-green estático. Arrancamos visible directamente
+  // para que la transición native→JS sea invisible.
 
   // Ring.
   const ringProgress = useSharedValue(0); // 0 = invisible, 1 = cerrado
@@ -264,9 +265,12 @@ export function GreetingOverlay({ onEnd }: Props) {
                 wrapper del blanco crece de bottom→top exponiendo el
                 logo blanco píxel a píxel. */}
             <View style={s.logoStack}>
-              {/* MIX siempre visible. */}
+              {/* Capa base: logo all-green (ambos triángulos verdes
+                  brand). Es la versión "principal" de la identidad,
+                  con máximo brand recall — la usamos antes de que
+                  el cover verde suba. */}
               <View style={s.logoLayer}>
-                <AlamosLogo variant="mark" tone="light" size={LOGO_SIZE} />
+                <AlamosLogo variant="mark" tone="green" size={LOGO_SIZE} />
               </View>
 
               {/* WIPE: wrapper anclado al bottom con altura animada
