@@ -72,12 +72,31 @@ export function AmountDisplay({
 
   return (
     <View style={[{ flexDirection: "row", alignItems: "flex-start" }, style]}>
+      {/* Sign ($, US$, etc.) en su propio Text — más chico y muted
+       *  vs el integer. Es el detalle que Brubank/Revolut/N26
+       *  usan para que el primer dígito tenga TODO el peso visual,
+       *  y el símbolo sea contexto subordinado. */}
+      {sign ? (
+        <Text
+          style={{
+            fontFamily: fontFamily[weight],
+            fontSize: Math.round(size * 0.62),
+            lineHeight: size * 1.05 * stretchY,
+            letterSpacing: -size * 0.02,
+            color: dec,
+            marginTop: Math.round(size * 0.12),
+            marginRight: Math.round(size * 0.1),
+          }}
+        >
+          {sign}
+        </Text>
+      ) : null}
       <Text
         style={{
           fontFamily: fontFamily[weight],
           fontSize: size,
           lineHeight: size * 1.05 * stretchY,
-          letterSpacing: -size * 0.04,
+          letterSpacing: -size * 0.045,
           color: txt,
           // scaleY > 1 estira los dígitos hacia abajo. transformOrigin en
           // RN es 'center' por default, así que el texto se estira en
@@ -86,7 +105,6 @@ export function AmountDisplay({
           transform: stretchY === 1 ? undefined : [{ scaleY: stretchY }],
         }}
       >
-        {sign ? `${sign} ` : ""}
         {integerDisplay}
       </Text>
       <Text

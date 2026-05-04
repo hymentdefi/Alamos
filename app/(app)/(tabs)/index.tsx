@@ -1358,9 +1358,13 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   actionLabel: {
-    fontFamily: fontFamily[700],
+    // 600 (no 700) a propósito: las labels chiquitas debajo de
+    // iconos circulares se ven cramped en bold. La jerarquía de
+    // 'premium' viene del contraste display/body, no de bolduear
+    // todo. Brubank usa medium-bold en sus labels de acción.
+    fontFamily: fontFamily[600],
     fontSize: 13,
-    letterSpacing: -0.15,
+    letterSpacing: -0.2,
   },
   /* Header "Descubrí más" antes de las CTAs — sazón Alamos:
      isotipo verde + acento en "más". */
@@ -1507,8 +1511,9 @@ const s = StyleSheet.create({
   },
   earningsTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 19,
-    letterSpacing: -0.5,
+    fontSize: 21,
+    letterSpacing: -0.7,
+    lineHeight: 24,
   },
   infoDot: {
     width: 18,
@@ -1526,25 +1531,25 @@ const s = StyleSheet.create({
   },
   earningsTicker: {
     fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 17,
+    letterSpacing: -0.4,
   },
   earningsName: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
+    fontFamily: fontFamily[500],
+    fontSize: 13,
     marginTop: 2,
-    letterSpacing: -0.05,
+    letterSpacing: -0.1,
   },
   earningsPrimary: {
     fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 17,
+    letterSpacing: -0.4,
   },
   earningsSecondary: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
+    fontFamily: fontFamily[500],
+    fontSize: 13,
     marginTop: 2,
-    letterSpacing: -0.05,
+    letterSpacing: -0.1,
   },
   /* Botón "+" cuando la cuenta no tiene saldo — invita a ingresar
      plata en esa moneda. Square pill con border sutil; el row
@@ -1802,9 +1807,12 @@ const s = StyleSheet.create({
   portfolioTitle: {
     fontFamily: fontFamily[800],
     fontSize: 38,
-    lineHeight: 42,
-    letterSpacing: -1.8,
-    marginBottom: 4,
+    lineHeight: 40,
+    // Letter-spacing brutal — los displays bold de Brubank
+    // condensan los caracteres mucho más de lo que parece. Este
+    // -2.2 da el feel "headline editorial confident".
+    letterSpacing: -2.2,
+    marginBottom: 6,
   },
   amountRow: {
     flexDirection: "row",
