@@ -97,6 +97,24 @@ export default function ExploreScreen() {
   return <BaseExplore />;
 }
 
+/**
+ * Formatter para el balance de 'Disponible para operar' del header.
+ * Convención de prefix unificado: ARS '$', USD 'US$', USDT 'USDT'
+ * — todos delante del número (a diferencia del formatUSD/formatUSDT
+ * canónicos, que los ponen al final). Convención del header del
+ * Mercado solamente.
+ */
+function formatOperable(n: number, currency: AssetCurrency): string {
+  const opts =
+    currency === "ARS"
+      ? undefined
+      : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  const num = Math.abs(n).toLocaleString("es-AR", opts);
+  if (currency === "ARS") return `$ ${num}`;
+  if (currency === "USD") return `US$ ${num}`;
+  return `USDT ${num}`;
+}
+
 function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -235,10 +253,10 @@ function BaseExplore() {
           <Text style={[s.title, { color: c.text }]}>Mercado</Text>
           <View style={s.balanceWrap}>
             <Text style={[s.balanceLabel, { color: c.textFaint }]}>
-              Para operar
+              Disponible para operar
             </Text>
             <Text style={[s.balance, { color: c.textSecondary }]}>
-              {formatMoney(operable.balance, operable.currency)}
+              {formatOperable(operable.balance, operable.currency)}
             </Text>
           </View>
         </View>
@@ -412,7 +430,7 @@ function MarketGlyph({
             pointerEvents="none"
             style={[
               gs.flagTint,
-              { backgroundColor: "rgba(0, 200, 5, 0.22)" },
+              { backgroundColor: "rgba(0, 200, 5, 0.10)" },
             ]}
           />
         ) : null}
