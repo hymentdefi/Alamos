@@ -493,7 +493,7 @@ function BaseHome() {
               {
                 backgroundColor: isDark
                   ? "rgba(255,255,255,0.06)"
-                  : "rgba(255,255,255,0.78)",
+                  : "#FFFFFF",
                 borderColor: isDark
                   ? "rgba(255,255,255,0.10)"
                   : "rgba(14,15,12,0.06)",
@@ -504,7 +504,7 @@ function BaseHome() {
             hitSlop={8}
             haptic="selection"
           >
-            <Ionicons name="notifications" size={20} color={c.text} />
+            <Ionicons name="notifications-sharp" size={22} color={c.brand} />
           </Tap>
         </View>
       </View>
@@ -1035,7 +1035,7 @@ function AccountRow({
             { backgroundColor: c.surfaceHover, borderColor: c.border },
           ]}
         >
-          <Feather name="plus" size={18} color={c.text} />
+          <Feather name="plus" size={20} color={c.brand} />
         </Pressable>
       ) : (
         <View style={{ alignItems: "flex-end" }}>
