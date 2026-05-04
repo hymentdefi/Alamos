@@ -6,15 +6,12 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
+  Animated,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Feather,
-  Ionicons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
@@ -35,6 +32,7 @@ import {
   assetIconCode,
   assetMarket,
   assetCurrency,
+  formatARS,
   formatMoney,
   formatPct,
   type Asset,
@@ -42,9 +40,10 @@ import {
   type AssetMarket,
   type AssetCurrency,
 } from "../../../lib/data/assets";
-import { accounts } from "../../../lib/data/accounts";
+import { accounts, convertAmount } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { FavStar } from "../../../lib/components/FavStar";
+import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 
@@ -118,6 +117,46 @@ function BaseExplore() {
   const searchInputRef = useRef<TextInput | null>(null);
   const listRef = useRef<ScrollView | null>(null);
 
+  // Total del portfolio en ARS — mismo cómputo que el home, inline acá
+  // para evitar dependencia cruzada. Va en el header del Mercado como
+  // un balance chico arriba a la derecha al lado del título.
+  const portfolioArs = useMemo(() => {
+    const held = assets.filter((a) => (a.qty ?? 0) > 0);
+    const fromHeld = held.reduce((sum, a) => {
+      const cur = assetCurrency(a);
+      const valueInOwn = a.price * (a.qty ?? 1);
+      return sum + convertAmount(valueInOwn, cur, "ARS");
+    }, 0);
+    const fromCash = accounts.reduce(
+      (sum, acc) => sum + convertAmount(acc.balance, acc.currency, "ARS"),
+      0,
+    );
+    return fromHeld + fromCash;
+  }, []);
+
+  // Animación cross-fade entre la estrella de favoritos y el botón
+  // 'Cancelar' cuando el input de búsqueda gana/pierde foco. Antes era
+  // un swap brusco (un Pressable se desmontaba y el otro se montaba),
+  // ahora ambos viven siempre en el árbol pero su opacidad/scale se
+  // anima en useNativeDriver.
+  const showCancel = searchFocused || query.length > 0;
+  const cancelOpacity = useRef(new Animated.Value(0)).current;
+  const starOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cancelOpacity, {
+        toValue: showCancel ? 1 : 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(starOpacity, {
+        toValue: showCancel ? 0 : 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [showCancel, cancelOpacity, starOpacity]);
+
   // Cargamos preferencia de "solo favoritos" + última market tab
   // seleccionada al montar para que sobrevivan entre sesiones.
   useEffect(() => {
@@ -178,7 +217,12 @@ function BaseExplore() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+        <View style={s.titleRow}>
+          <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+          <Text style={[s.balance, { color: c.textMuted }]}>
+            {formatARS(portfolioArs)}
+          </Text>
+        </View>
 
         {/* Segmented de mercado (AR / EEUU / Crypto). Sin pills de
             categorías abajo — el filtro por categoría se eliminó.
@@ -218,9 +262,9 @@ function BaseExplore() {
                     style={[
                       s.marketSegLabel,
                       {
-                        color: active ? c.text : c.textMuted,
+                        color: active ? c.brand : c.textMuted,
                         fontFamily: active
-                          ? fontFamily[700]
+                          ? fontFamily[800]
                           : fontFamily[600],
                       },
                     ]}
@@ -241,11 +285,7 @@ function BaseExplore() {
               { backgroundColor: c.surfaceHover, borderColor: c.border },
             ]}
           >
-            <MaterialCommunityIcons
-              name="magnify"
-              size={20}
-              color={c.textMuted}
-            />
+            <MagnifyIcon size={20} color={c.textMuted} strokeWidth={3} />
             <TextInput
               ref={searchInputRef}
               style={[s.searchInput, { color: c.text }]}
@@ -269,32 +309,47 @@ function BaseExplore() {
             ) : null}
           </View>
 
-          {/* Cuando el input tiene foco o hay query escrita, el espacio
-              de la derecha se ocupa por un Cancelar verde (estilo iOS
-              search). Al tocarlo, limpia el query, blurea el input y
-              vuelve a mostrarse la estrella de favoritos. */}
-          {searchFocused || query.length > 0 ? (
-            <Pressable
-              onPress={() => {
-                setQuery("");
-                setSearchFocused(false);
-                searchInputRef.current?.blur();
-              }}
-              hitSlop={8}
-              style={s.cancelBtn}
+          {/* Slot fijo de la derecha — los dos botones (favoritos /
+              cancelar) viven simultáneamente apilados en absoluto y
+              crossfadeean por opacity. pointerEvents bloquea taps al
+              que está fading-out así no compiten. */}
+          <View style={s.rightSlot}>
+            <Animated.View
+              pointerEvents={showCancel ? "none" : "auto"}
+              style={[s.rightSlotItem, { opacity: starOpacity }]}
             >
-              <Text style={[s.cancelText, { color: c.brand }]}>Cancelar</Text>
-            </Pressable>
-          ) : (
-            <Tap
-              onPress={toggleFavs}
-              hitSlop={8}
-              haptic="light"
-              style={s.favBtn}
+              <Tap
+                onPress={toggleFavs}
+                hitSlop={8}
+                haptic="light"
+                style={s.favBtn}
+              >
+                <FavStar
+                  filled={onlyFavs}
+                  size={22}
+                  outlineColor={c.text}
+                />
+              </Tap>
+            </Animated.View>
+            <Animated.View
+              pointerEvents={showCancel ? "auto" : "none"}
+              style={[s.rightSlotItem, { opacity: cancelOpacity }]}
             >
-              <FavStar filled={onlyFavs} size={22} outlineColor={c.text} />
-            </Tap>
-          )}
+              <Pressable
+                onPress={() => {
+                  setQuery("");
+                  setSearchFocused(false);
+                  searchInputRef.current?.blur();
+                }}
+                hitSlop={8}
+                style={s.cancelBtn}
+              >
+                <Text style={[s.cancelText, { color: c.brand }]}>
+                  Cancelar
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
         </View>
       </View>
 
@@ -725,12 +780,26 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 4,
   },
+  /* Fila del título — 'Mercado' a la izq, balance compacto a la
+   * derecha, ambos sobre la misma línea base. */
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
   title: {
     fontFamily: fontFamily[700],
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -1.2,
-    marginBottom: 14,
+  },
+  /* Balance chiquito al lado del título — pesos completos sin
+   * decimales, para que el header no se sature. */
+  balance: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.3,
   },
   marketControl: {
     borderRadius: radius.lg,
@@ -794,6 +863,24 @@ const s = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  /* Container del slot de la derecha — ancho mínimo igual al ancho
+   * del Cancelar (la palabra más larga de los dos), así no hay jump
+   * de layout cuando crossfadea. Ambos hijos posicionan absolute
+   * adentro y se animan por opacity. */
+  rightSlot: {
+    minWidth: 78,
+    height: 44,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  rightSlotItem: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-end",
   },
   cancelBtn: {
     paddingHorizontal: 6,
