@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { Tabs, useRouter, useSegments } from "expo-router";
 import {
+  Dimensions,
+  Easing as RNEasing,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+
+const { width: SCREEN_W } = Dimensions.get("window");
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -312,11 +316,36 @@ export default function TabsLayout() {
         backBehavior="none"
         screenOptions={{
           headerShown: false,
-          // Shift horizontal entre tabs: la nueva pantalla entra
-          // desde el lado y empuja la actual. Coordina con la pill
-          // del nav bar que se desliza en paralelo. Si llega a
-          // sentirse laggy, el knob es bajar a 'fade' o 'none'.
+          // Transición full-screen-slide custom — el preset 'shift'
+          // de bottom-tabs solo desliza 50px y fadea (se sentía
+          // medio cheap). Override:
+          //   - slide horizontal de ANCHO COMPLETO (entrante desde
+          //     el lado, saliente al otro lado).
+          //   - duración 340ms — slow-but-clean, estilo Brubank.
+          //   - easing bezier(0.22, 1, 0.36, 1) (out-quart) — el
+          //     mismo 'premium feel' que iOS usa para Stack push.
+          // Sin opacity fade — el slide solo lleva la lectura visual
+          // sin ensuciarla con un crossfade simultáneo.
           animation: "shift",
+          transitionSpec: {
+            animation: "timing",
+            config: {
+              duration: 340,
+              easing: RNEasing.bezier(0.22, 1, 0.36, 1),
+            },
+          },
+          sceneStyleInterpolator: ({ current }) => ({
+            sceneStyle: {
+              transform: [
+                {
+                  translateX: current.progress.interpolate({
+                    inputRange: [-1, 0, 1],
+                    outputRange: [-SCREEN_W, 0, SCREEN_W],
+                  }),
+                },
+              ],
+            },
+          }),
         }}
         tabBar={() => null}
       >
