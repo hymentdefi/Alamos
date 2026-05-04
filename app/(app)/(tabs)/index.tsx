@@ -519,9 +519,15 @@ function BaseHome() {
               }}
             >
               {(["ARS", "USD"] as const).map((cur) => (
-                <View
+                <Pressable
                   key={cur}
                   style={[s.balancePage, { width: balancePageW }]}
+                  /* Tap directo sobre el saldo togglea a la OTRA moneda
+                   * — el goToCurrency anima el scroll y el onMomentumEnd
+                   * sincroniza el estado. La RN handle del Pressable
+                   * dentro del ScrollView horizontal solo dispara
+                   * onPress en taps cortos, nunca durante un swipe. */
+                  onPress={() => goToCurrency(cur === "ARS" ? "USD" : "ARS")}
                 >
                   <View style={s.flagWrap} pointerEvents="none">
                     <FlagIcon code={cur === "ARS" ? "AR" : "US"} size={26} />
@@ -540,7 +546,7 @@ function BaseHome() {
                     weight={800}
                     currency={cur}
                   />
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </View>
