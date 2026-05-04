@@ -45,7 +45,7 @@ function unitWordFor(cat: AssetCategory): string {
  *   - AR     → ars-ar (acciones AR, bonos, FCI)
  *   - US     → usd-us (acciones US — los USD en cuenta argentina NO
  *              sirven para operar en este mercado, son saldo aparte)
- *   - CRYPTO → usdt-crypto (cripto)
+ *   - CRYPTO → usdt-crypto
  */
 function sourceAccountIdForMarket(market: AssetMarket): AccountId {
   switch (market) {

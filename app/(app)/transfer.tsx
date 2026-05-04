@@ -266,14 +266,16 @@ function HubCard({
         />
       </View>
       <Text style={[s.hubCardCurrency, { color: c.text }]}>
-        {account.currency === "USDT" ? "Cripto" : account.currency}
+        {account.currency === "USDT" ? "Crypto" : account.currency}
       </Text>
-      <Text
-        style={[s.hubCardLocation, { color: c.textMuted }]}
-        numberOfLines={1}
-      >
-        {account.location}
-      </Text>
+      {account.currency === "USDT" ? null : (
+        <Text
+          style={[s.hubCardLocation, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {account.location}
+        </Text>
+      )}
       <View style={[s.hubCardDivider, { backgroundColor: c.border }]} />
       <Text style={[s.hubCardBalanceEyebrow, { color: c.textMuted }]}>
         {eyebrowLabel}
@@ -669,7 +671,7 @@ function SendFlow() {
         if (id === "usdt-crypto") {
           Alert.alert(
             "Próximamente",
-            "El envío de cripto va a estar disponible muy pronto.",
+            "El envío de crypto va a estar disponible muy pronto.",
           );
           return;
         }
