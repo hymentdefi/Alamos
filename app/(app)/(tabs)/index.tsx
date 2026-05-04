@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Modal,
   PanResponder,
   RefreshControl,
   Animated,
@@ -53,7 +52,6 @@ import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
-import { AlamosLogo } from "../../../lib/components/Logo";
 import {
   AlamosIcon,
   type AlamosIconName,
@@ -63,6 +61,7 @@ import {
   type ActionIconName,
 } from "../../../lib/components/ActionIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
+import { EarningsInfoSheet } from "../../../lib/components/EarningsInfoSheet";
 import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 
@@ -955,7 +954,7 @@ function Dinero(_: {
         ))}
       </GlassCard>
 
-      <EarningsInfoModal
+      <EarningsInfoSheet
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
       />
@@ -1054,55 +1053,6 @@ function AccountRow({
   );
 }
 
-
-function EarningsInfoModal({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-}) {
-  const { c } = useTheme();
-  if (!visible) return null;
-  return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <Pressable style={s.modalBackdrop} onPress={onClose}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={[s.modalCard, { backgroundColor: c.surface }]}
-        >
-          <View
-            style={[s.modalIconWrap, { backgroundColor: c.greenDim }]}
-          >
-            <AlamosLogo variant="mark" tone="green" size={36} />
-          </View>
-          <Text style={[s.modalTitle, { color: c.text }]}>
-            Tu saldo genera rendimientos
-          </Text>
-          <Text style={[s.modalBody, { color: c.textSecondary }]}>
-            El saldo que mantengas en tu cuenta rinde de forma
-            automática a la tasa vigente de cada moneda. Sin montos
-            mínimos, sin límites y sin comisiones. Los intereses se
-            acreditan al inicio de cada día hábil.
-          </Text>
-          <Tap
-            onPress={onClose}
-            haptic="light"
-            style={[s.modalCTA, { backgroundColor: c.ink }]}
-          >
-            <Text style={[s.modalCTAText, { color: c.bg }]}>Entendido</Text>
-          </Tap>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
 
 /* ─── Tus inversiones: lista plana de holdings (sin grupos por categoría) ─── */
 function Investments({
@@ -1710,56 +1660,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.05,
   },
   convertPickerBal: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-
-  /* Modal del info de TNA */
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
-  },
-  modalCard: {
-    width: "100%",
-    borderRadius: radius.xl,
-    padding: 24,
-    alignItems: "center",
-  },
-  modalIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-  },
-  modalTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 20,
-    letterSpacing: -0.5,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  modalBody: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  modalCTA: {
-    alignSelf: "stretch",
-    height: 48,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCTAText: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
