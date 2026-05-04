@@ -46,10 +46,11 @@ type TabRoute = {
 };
 
 const TAB_ROUTES: TabRoute[] = [
-  { name: "index",   href: "/(app)/",        title: "Inicio",  path: tabPaths.home },
-  { name: "explore", href: "/(app)/explore", title: "Mercado", path: tabPaths.markets },
-  { name: "news",    href: "/(app)/news",    title: "Noticias",path: tabPaths.news },
-  { name: "alamo",   href: "/(app)/alamo",   title: "Tu Álamo",path: tabPaths.alamo },
+  { name: "index",     href: "/(app)/",          title: "Inicio",    path: tabPaths.home },
+  { name: "explore",   href: "/(app)/explore",   title: "Mercado",   path: tabPaths.markets },
+  { name: "portfolio", href: "/(app)/portfolio", title: "Portfolio", path: tabPaths.portfolio },
+  { name: "news",      href: "/(app)/news",      title: "Noticias",  path: tabPaths.news },
+  { name: "alamo",     href: "/(app)/alamo",     title: "Tu Álamo",  path: tabPaths.alamo },
 ];
 
 /**
@@ -357,6 +358,7 @@ export default function TabsLayout() {
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="explore" />
+        <Tabs.Screen name="portfolio" />
         <Tabs.Screen name="news" />
         <Tabs.Screen name="alamo" />
       </Tabs>

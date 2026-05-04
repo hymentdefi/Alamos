@@ -1080,13 +1080,13 @@ function Investments({
     <View style={[s.sectionBlock, { marginTop: 28 }]}>
       <Pressable
         style={s.earningsHead}
-        onPress={() => router.push("/(app)/investments-detail")}
+        onPress={() => router.navigate("/(app)/portfolio")}
         hitSlop={8}
       >
         <Text style={[s.earningsTitle, { color: c.textMuted }]}>
           Tus inversiones
         </Text>
-        <Feather name="chevron-right" size={16} color={c.textFaint} />
+        <Feather name="arrow-right" size={20} color={c.brand} />
       </Pressable>
 
       <GlassCard padding={items.length > 0 ? 4 : 16}>

@@ -18,11 +18,11 @@ import {
   fontFamily,
   radius,
   type ThemeColors,
-} from "../../lib/theme";
+} from "../../../lib/theme";
 import {
   MiniSparkline,
   seriesFromSeed,
-} from "../../lib/components/Sparkline";
+} from "../../../lib/components/Sparkline";
 import {
   assets,
   assetIconCode,
@@ -41,8 +41,8 @@ import {
   type AssetCategory,
   type AssetMarket,
   type AssetCurrency,
-} from "../../lib/data/assets";
-import { convertAmount } from "../../lib/data/accounts";
+} from "../../../lib/data/assets";
+import { convertAmount } from "../../../lib/data/accounts";
 
 /* ─── Habilitamos LayoutAnimation en Android para que los acordeones
  *     se expandan/colapsen suavemente igual que en iOS. */
@@ -254,13 +254,6 @@ export default function InvestmentsDetailScreen() {
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          style={s.iconBtn}
-          onPress={() => router.back()}
-          hitSlop={12}
-        >
-          <Feather name="arrow-left" size={22} color={c.text} />
-        </Pressable>
         <Text style={[s.headerTitle, { color: c.text }]}>Tus inversiones</Text>
         <View style={s.headerActions}>
           <Pressable
@@ -303,7 +296,7 @@ export default function InvestmentsDetailScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero: rendimiento del día */}

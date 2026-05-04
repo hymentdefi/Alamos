@@ -248,4 +248,14 @@ export const tabPaths = {
       { d: "M12 2 L6 20 L11 20 L11 22 L13 22 L13 20 L18 20 Z", len: 56 },
     ],
   },
+  portfolio: {
+    segments: [
+      // Body — maletín con esquinas redondeadas.
+      { d: "M5 8 H19 A2 2 0 0 1 21 10 V18 A2 2 0 0 1 19 20 H5 A2 2 0 0 1 3 18 V10 A2 2 0 0 1 5 8 Z", len: 60 },
+      // Handle — arquito superior.
+      { d: "M9 8 V6 A2 2 0 0 1 11 4 H13 A2 2 0 0 1 15 6 V8", len: 12 },
+      // Costura central (clasp).
+      { d: "M3 13 H21", len: 18 },
+    ],
+  },
 } as const satisfies Record<string, TabPath>;
