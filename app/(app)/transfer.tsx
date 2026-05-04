@@ -188,9 +188,21 @@ function CurrencyHubCards({ mode, onPick }: HubProps) {
   // oscuro en dark. Mismo patrón que el AccountRow del home.
   const badgeBacking = isDark ? "#1F1F1E" : "#FFFFFF";
 
+  // En modo send, las cuentas sin saldo van al final (greyed). En
+  // deposit no aplica — todas son ingreso-able igual.
+  const sortedAccounts = useMemo(() => {
+    if (mode !== "send") return accounts;
+    return [...accounts].sort((a, b) => {
+      const aZero = a.balance <= 0;
+      const bZero = b.balance <= 0;
+      if (aZero === bZero) return 0;
+      return aZero ? 1 : -1;
+    });
+  }, [mode]);
+
   return (
     <View style={s.hubGrid}>
-      {accounts.map((a) => {
+      {sortedAccounts.map((a) => {
         const disabled = mode === "send" && a.balance <= 0;
         return (
           <HubCard

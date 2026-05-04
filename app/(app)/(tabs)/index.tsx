@@ -902,6 +902,19 @@ function Dinero(_: {
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
 
+  // Cuentas sin saldo van al final del listado (greyed con CTA + para
+  // ingresar). Las que tienen saldo mantienen su orden original.
+  const sortedAccounts = useMemo(
+    () =>
+      [...accounts].sort((a, b) => {
+        const aZero = a.balance <= 0;
+        const bZero = b.balance <= 0;
+        if (aZero === bZero) return 0;
+        return aZero ? 1 : -1;
+      }),
+    [],
+  );
+
   return (
     <View style={s.sectionBlock}>
       {/* Acciones del home — estilo Revolut: círculos verticales
@@ -952,7 +965,7 @@ function Dinero(_: {
       </View>
 
       <GlassCard padding={4}>
-        {accounts.map((a, i) => (
+        {sortedAccounts.map((a, i) => (
           <AccountRow
             key={a.id}
             account={a}
@@ -977,16 +990,34 @@ function AccountRow({
   withTopDivider?: boolean;
 }) {
   const { c, mode } = useTheme();
+  const router = useRouter();
   const { hideAmounts } = usePrivacy();
+  const isEmpty = account.balance <= 0;
   // Backing del badge AR (en flag usd-ar) — en light mode el beige
   // del bg cálido; en dark, un gris muy oscuro tirando al surface
   // del card glass para que el badge se sienta integrado.
   const badgeBacking = mode === "dark" ? "#1F1F1E" : "#FAFAF7";
-  // Si la cuenta no es ARS, mostramos su equivalente en pesos como secundario.
+  // Si la cuenta no es ARS, mostramos su equivalente en pesos como
+  // secundario. No aplica en empty state.
   const arsEquiv =
-    account.currency === "ARS"
+    isEmpty || account.currency === "ARS"
       ? null
       : `≈ ${formatARS(convertAmount(account.balance, account.currency, "ARS"))}`;
+
+  // Tap del botón "+" — mismo path que tappear Ingresar y elegir esa
+  // moneda en el hub. Crypto va a su screen dedicado (asset + red
+  // picker). Fiat va al detalle de la moneda elegida.
+  const onAdd = () => {
+    Haptics.selectionAsync().catch(() => {});
+    if (account.id === "usdt-crypto") {
+      router.push("/(app)/crypto-deposit");
+    } else {
+      router.push({
+        pathname: "/(app)/transfer-deposit",
+        params: { currency: account.id },
+      });
+    }
+  };
 
   return (
     <View
@@ -996,6 +1027,7 @@ function AccountRow({
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: c.border,
         },
+        isEmpty && { opacity: 0.55 },
       ]}
     >
       <AccountFlag
@@ -1014,16 +1046,29 @@ function AccountRow({
           {account.location}
         </Text>
       </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={[s.earningsPrimary, { color: c.text }]}>
-          {maskAmount(formatAccountBalance(account), hideAmounts)}
-        </Text>
-        {arsEquiv ? (
-          <Text style={[s.earningsSecondary, { color: c.textMuted }]}>
-            {maskAmount(arsEquiv, hideAmounts)}
+      {isEmpty ? (
+        <Pressable
+          onPress={onAdd}
+          hitSlop={8}
+          style={[
+            s.addBalanceBtn,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+        >
+          <Feather name="plus" size={18} color={c.text} />
+        </Pressable>
+      ) : (
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={[s.earningsPrimary, { color: c.text }]}>
+            {maskAmount(formatAccountBalance(account), hideAmounts)}
           </Text>
-        ) : null}
-      </View>
+          {arsEquiv ? (
+            <Text style={[s.earningsSecondary, { color: c.textMuted }]}>
+              {maskAmount(arsEquiv, hideAmounts)}
+            </Text>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -1500,6 +1545,17 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.05,
+  },
+  /* Botón "+" cuando la cuenta no tiene saldo — invita a ingresar
+     plata en esa moneda. Square pill con border sutil; el row
+     completo va greado vía opacity. */
+  addBalanceBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   /* ConvertSheet */
   convertBackdrop: {
