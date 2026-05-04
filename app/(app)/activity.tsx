@@ -84,7 +84,7 @@ export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { markAllRead } = useNotifications();
-  const [tab, setTab] = useState<ActivityTab>("movimientos");
+  const [tab, setTab] = useState<ActivityTab>("notificaciones");
 
   // Al entrar a la screen, marcamos las notifs como leídas — esto
   // hace desaparecer el dot rojo del icono del home.
