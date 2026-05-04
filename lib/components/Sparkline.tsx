@@ -179,8 +179,18 @@ function SparklineImpl({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
+        // No reclamamos el touch en el start — un tap o un swipe
+        // vertical tienen que poder ir al ScrollView padre.
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        // Solo reclamamos el gesture cuando el movimiento es
+        // claramente horizontal (umbral chico de dx, y dx domina dy
+        // por al menos 1.4×). Si el dedo arranca yendo para abajo,
+        // el padre se lleva el gesto para hacer scroll vertical.
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+        onMoveShouldSetPanResponderCapture: (_, g) =>
+          Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (e) => {
           const idx = xToIndex(e.nativeEvent.locationX);
