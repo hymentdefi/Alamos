@@ -164,7 +164,7 @@ function FloatingTabBar() {
   }));
 
   const onPressTab = (route: TabRoute, index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.selectionAsync().catch(() => {});
     if (index === activeIndex) return;
     router.navigate(route.href as never);
   };
@@ -330,8 +330,12 @@ export default function TabsLayout() {
           transitionSpec: {
             animation: "timing",
             config: {
-              duration: 480,
-              easing: RNEasing.bezier(0.22, 1, 0.36, 1),
+              duration: 620,
+              // out-back curve: la parte final pasa de largo el
+              // destino y vuelve, dando un mini-rebote smooth al
+              // aterrizar. Adictivo y satisfactorio sin sentirse
+              // cartoonish — el overshoot es leve (~6%).
+              easing: RNEasing.bezier(0.34, 1.4, 0.4, 1),
             },
           },
           sceneStyleInterpolator: ({ current }) => ({
