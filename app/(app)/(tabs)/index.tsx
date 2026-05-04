@@ -491,7 +491,9 @@ function BaseHome() {
             style={[
               s.topBtn,
               {
-                backgroundColor: c.textMuted,
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.08)"
+                  : "rgba(14,15,12,0.10)",
               },
             ]}
             onPress={() => router.push("/(app)/activity")}
@@ -1026,7 +1028,7 @@ function AccountRow({
           hitSlop={8}
           style={[
             s.addBalanceBtn,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
+            { backgroundColor: c.surfaceHover, borderColor: c.brand },
           ]}
         >
           <Feather name="plus" size={20} color={c.brand} />
