@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -64,6 +64,8 @@ import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { EarningsInfoSheet } from "../../../lib/components/EarningsInfoSheet";
 import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
+import { useNotifications } from "../../../lib/notifications/context";
+import { TopRightIcon } from "../../../lib/components/TopRightIcon";
 
 type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
 
@@ -94,6 +96,7 @@ function BaseHome() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
+  const { hasUnread } = useNotifications();
   // Range del chart — persistido en SecureStore para que la próxima
   // vez que el usuario abra la app vea el rango que dejó la última.
   const [range, setRange] = useState<Range>("1D");
@@ -466,16 +469,10 @@ function BaseHome() {
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={s.topActions}>
           <Animated.View
-            style={[
-              s.giftBtnWrap,
-              {
-                shadowColor: c.action,
-                transform: [{ scale: giftPulse }],
-              },
-            ]}
+            style={{ transform: [{ scale: giftPulse }] }}
           >
             <Tap
-              style={[s.giftBtn, { backgroundColor: c.action }]}
+              style={s.topIconBtn}
               onPress={() =>
                 Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success,
@@ -484,23 +481,19 @@ function BaseHome() {
               hitSlop={8}
               haptic="medium"
             >
-              <Ionicons name="gift" size={20} color="#FFFFFF" />
+              <TopRightIcon name="sorpresa" size={40} />
             </Tap>
           </Animated.View>
           <Tap
-            style={[
-              s.topBtn,
-              {
-                backgroundColor: isDark
-                  ? "rgba(255,255,255,0.08)"
-                  : "rgba(14,15,12,0.10)",
-              },
-            ]}
+            style={s.topIconBtn}
             onPress={() => router.push("/(app)/activity")}
             hitSlop={8}
             haptic="selection"
           >
-            <Ionicons name="notifications-sharp" size={22} color="#FFFFFF" />
+            <TopRightIcon
+              name={hasUnread ? "notificacion-dot" : "notificacion"}
+              size={40}
+            />
           </Tap>
         </View>
       </View>
@@ -1224,25 +1217,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  topBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  /* Wrapper que vive afuera del Tap para que el shadow no se recorte
-     y para que la animación de scale incluya el glow. */
-  giftBtnWrap: {
-    borderRadius: radius.pill,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 9,
-    elevation: 8,
-  },
-  giftBtn: {
-    width: 36,
-    height: 36,
+  /* Pill que envuelve el TopRightIcon — el ícono ya trae su propio
+     fondo (tint verde), así que el botón solo aporta hit area. */
+  topIconBtn: {
+    width: 40,
+    height: 40,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

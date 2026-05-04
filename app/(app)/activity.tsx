@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import { formatARS } from "../../lib/data/assets";
 import { Tap } from "../../lib/components/Tap";
+import { useNotifications } from "../../lib/notifications/context";
 
 type ActivityTab = "movimientos" | "notificaciones";
 
@@ -82,7 +83,14 @@ export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { markAllRead } = useNotifications();
   const [tab, setTab] = useState<ActivityTab>("movimientos");
+
+  // Al entrar a la screen, marcamos las notifs como leídas — esto
+  // hace desaparecer el dot rojo del icono del home.
+  useEffect(() => {
+    markAllRead();
+  }, [markAllRead]);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
