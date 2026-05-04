@@ -386,15 +386,21 @@ function AvailableFundsCard({ market }: { market: MarketTab }) {
   const { c } = useTheme();
   const router = useRouter();
 
-  // Sumamos todas las cuentas en la moneda del mercado activo. Para
-  // USD esto agrupa la cuenta argentina y la cuenta US.
-  const balance = useMemo(
-    () =>
-      accounts
-        .filter((a) => a.currency === market.currency)
-        .reduce((s, a) => s + a.balance, 0),
-    [market.currency],
-  );
+  // Cada mercado se opera contra UNA cuenta específica — los USD de
+  // la cuenta argentina NO sirven para operar en el mercado USA, y
+  // viceversa. Mismo modelo que en buy.tsx (sourceAccountIdForMarket).
+  //   AR     → ars-ar
+  //   US     → usd-us
+  //   CRYPTO → usdt-crypto
+  const balance = useMemo(() => {
+    const sourceId =
+      market.id === "US"
+        ? "usd-us"
+        : market.id === "CRYPTO"
+          ? "usdt-crypto"
+          : "ars-ar";
+    return accounts.find((a) => a.id === sourceId)?.balance ?? 0;
+  }, [market.id]);
 
   return (
     <View

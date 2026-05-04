@@ -868,7 +868,7 @@ export function AmountStep({
                 {k === "back" ? (
                   <Feather name="delete" size={22} color={c.text} />
                 ) : (
-                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                  <Text style={[s.keyText, { color: c.text }]}>{k === "." ? "," : k}</Text>
                 )}
               </Tap>
             ))}
@@ -1247,7 +1247,7 @@ export function DepositFromAccount({
                 {k === "back" ? (
                   <Feather name="delete" size={22} color={c.text} />
                 ) : (
-                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                  <Text style={[s.keyText, { color: c.text }]}>{k === "." ? "," : k}</Text>
                 )}
               </Tap>
             ))}

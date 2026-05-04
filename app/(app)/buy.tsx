@@ -388,7 +388,9 @@ export default function BuyScreen() {
                 {k === "back" ? (
                   <Feather name="delete" size={24} color={c.text} />
                 ) : (
-                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                  <Text style={[s.keyText, { color: c.text }]}>
+                    {k === "." ? "," : k}
+                  </Text>
                 )}
               </Tap>
             ))}

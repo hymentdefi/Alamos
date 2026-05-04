@@ -344,7 +344,9 @@ export default function ConvertScreen() {
                 {k === "back" ? (
                   <Feather name="delete" size={22} color={c.text} />
                 ) : (
-                  <Text style={[s.keyText, { color: c.text }]}>{k}</Text>
+                  <Text style={[s.keyText, { color: c.text }]}>
+                    {k === "." ? "," : k}
+                  </Text>
                 )}
               </Tap>
             ))}
@@ -690,9 +692,13 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   bigTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 32,
-    letterSpacing: -1.2,
+    // Mismo tamaño que el depositTitle/sendTitle de los hubs
+    // (transfer.tsx) — coherencia visual entre las pantallas que
+    // arrancan con una pregunta o un sello grande.
+    fontFamily: fontFamily[700],
+    fontSize: 36,
+    letterSpacing: -1.4,
+    lineHeight: 42,
     marginBottom: 10,
     alignSelf: "flex-start",
     paddingHorizontal: 4,
