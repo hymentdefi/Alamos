@@ -876,10 +876,14 @@ export function formatMoneyParts(
   if (currency === "ARS") {
     return { integer, decimals: dec, prefix: "$" };
   }
-  // USD usa el símbolo "US$" al final; las otras monedas (USDT,
-  // crypto, etc.) van con su ticker tal cual.
-  const suffix = currency === "USD" ? "US$" : currency;
-  return { integer, decimals: dec, suffix };
+  // USD también va con prefix ('US$') antes del integer — coherente
+  // con cómo se escribe el dinero en español. USDT y otros tickers
+  // siguen yendo como suffix porque son tickers, no símbolos
+  // monetarios.
+  if (currency === "USD") {
+    return { integer, decimals: dec, prefix: "US$" };
+  }
+  return { integer, decimals: dec, suffix: currency };
 }
 
 /** @deprecated Usá formatMoneyParts(n, 'ARS'). Mantenido para back-compat. */

@@ -72,10 +72,9 @@ export function AmountDisplay({
 
   return (
     <View style={[{ flexDirection: "row", alignItems: "flex-start" }, style]}>
-      {/* Sign ($, US$, etc.) en su propio Text — más chico y muted
-       *  vs el integer. Es el detalle que Brubank/Revolut/N26
-       *  usan para que el primer dígito tenga TODO el peso visual,
-       *  y el símbolo sea contexto subordinado. */}
+      {/* Sign ($, US$, etc.) en su propio Text — más chico que el
+       *  integer pero del MISMO color (full text), no muted. La
+       *  jerarquía visual la da el size, no el contraste. */}
       {sign ? (
         <Text
           style={{
@@ -83,7 +82,7 @@ export function AmountDisplay({
             fontSize: Math.round(size * 0.62),
             lineHeight: size * 1.05 * stretchY,
             letterSpacing: -size * 0.02,
-            color: dec,
+            color: txt,
             marginTop: Math.round(size * 0.12),
             marginRight: Math.round(size * 0.1),
           }}
