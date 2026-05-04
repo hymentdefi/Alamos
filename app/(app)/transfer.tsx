@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { usePreventRemove } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -105,29 +106,27 @@ export default function TransferScreen() {
 function DepositInfo() {
   const { c } = useTheme();
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   // null = hub picker (4 cards). AccountId = detalle de esa moneda.
   const [kindId, setKindId] = useState<AccountId | null>(null);
   // Sub-flow de ingresar desde una cuenta vinculada (sólo bancarias AR).
   const [depositFrom, setDepositFrom] = useState<LinkedAccount | null>(null);
 
-  // Interceptamos el back nativo (swipe-from-edge + hardware back en
-  // Android) para que respete los sub-steps internos. Sin esto, el
-  // swipe popea TODA la pantalla y vuelve a home aunque estemos en
-  // un sub-step.
-  useEffect(() => {
-    const sub = navigation.addListener("beforeRemove", (e) => {
-      if (depositFrom) {
-        e.preventDefault();
-        setDepositFrom(null);
-      } else if (kindId) {
-        e.preventDefault();
-        setKindId(null);
-      }
-    });
-    return sub;
-  }, [navigation, kindId, depositFrom]);
+  // Intercepción del back nativo (swipe-from-edge en iOS + hardware
+  // back en Android) para respetar los sub-steps internos. Usamos
+  // `usePreventRemove` (React Navigation v7) en vez del listener
+  // manual `beforeRemove` porque ese último NO cancela el gesto
+  // nativo de iOS — la pantalla se desmontaba antes y aparecía el
+  // warning "screen was removed natively but...". `usePreventRemove`
+  // es nativo del native-stack y revierte la animación del swipe.
+  const inSubStep = kindId !== null || depositFrom !== null;
+  usePreventRemove(inSubStep, () => {
+    if (depositFrom) {
+      setDepositFrom(null);
+    } else if (kindId) {
+      setKindId(null);
+    }
+  });
 
   if (depositFrom) {
     return (
@@ -726,7 +725,6 @@ function formatMoney(value: number, cur: DepositCurrency): string {
 }
 
 function SendFlow() {
-  const navigation = useNavigation();
   // Step inicial: 'currency' = picker de 4 cards. 'amount' = AmountStep
   // existente. Después destination/done.
   const [step, setStep] = useState<SendStep | "currency">("currency");
@@ -734,18 +732,16 @@ function SendFlow() {
   const [amount, setAmount] = useState("0");
   const [destination, setDestination] = useState<LinkedAccount | null>(null);
 
-  // Intercepto del back nativo (swipe-from-edge + hardware back) →
-  // navegación entre sub-steps en lugar de pop full-screen.
-  useEffect(() => {
-    const sub = navigation.addListener("beforeRemove", (e) => {
-      if (step === "currency") return;
-      e.preventDefault();
-      if (step === "amount") setStep("currency");
-      else if (step === "destination") setStep("amount");
-      else if (step === "done") setStep("destination");
-    });
-    return sub;
-  }, [navigation, step]);
+  // Intercepción del swipe-back nativo + hardware back. Mismo
+  // pattern que DepositInfo: `usePreventRemove` cancela el gesto
+  // del native-stack en sub-steps y deja pasar el pop cuando
+  // estamos en el hub.
+  const inSubStep = step !== "currency";
+  usePreventRemove(inSubStep, () => {
+    if (step === "amount") setStep("currency");
+    else if (step === "destination") setStep("amount");
+    else if (step === "done") setStep("destination");
+  });
 
   const parsed = Number.parseFloat(amount) || 0;
 
