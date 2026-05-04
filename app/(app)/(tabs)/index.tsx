@@ -717,7 +717,7 @@ function ActionButton({
           blanco — no necesita un wrapper de surface adicional como
           tenía antes (la opcion 'glass' Revolut). El icono mismo
           es el bloque visual. */}
-      <ActionIcon name={iconName} size={50} />
+      <ActionIcon name={iconName} size={58} />
       <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
       </Text>
