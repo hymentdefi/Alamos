@@ -330,7 +330,7 @@ export default function TabsLayout() {
           transitionSpec: {
             animation: "timing",
             config: {
-              duration: 340,
+              duration: 480,
               easing: RNEasing.bezier(0.22, 1, 0.36, 1),
             },
           },
