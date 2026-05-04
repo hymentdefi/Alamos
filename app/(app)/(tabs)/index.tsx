@@ -5,7 +5,7 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  PanResponder,
+  Dimensions,
   RefreshControl,
   Animated,
   Easing,
@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -114,64 +114,31 @@ function BaseHome() {
     SecureStore.setItemAsync("home:chart_range", r).catch(() => {});
   }, []);
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
-  const toggleCurrency = useCallback(() => {
-    Haptics.selectionAsync().catch(() => {});
-    setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
-  }, []);
 
-  // Coachmark: la primera vez que el user entra al Inicio, mostramos
-  // una pill debajo de la bandera explicando que es tappeable. Se
-  // auto-dismissea a los 6s, o cuando el user toca la bandera. Se
-  // persiste en SecureStore para no volver a aparecer.
-  const [currencyHintSeen, setCurrencyHintSeen] = useState(true);
-  const currencyHintOpacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    SecureStore.getItemAsync("hero:currency_hint_seen")
-      .then((v) => {
-        if (!v) setCurrencyHintSeen(false);
-      })
-      .catch(() => {});
-  }, []);
-  const markCurrencyHintSeen = useCallback(() => {
-    Animated.timing(currencyHintOpacity, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => setCurrencyHintSeen(true));
-    SecureStore.setItemAsync("hero:currency_hint_seen", "1").catch(() => {});
-  }, [currencyHintOpacity]);
-  useEffect(() => {
-    if (currencyHintSeen) return;
-    // Fade in con un pequeño delay para que no aparezca exactamente
-    // al mount.
-    const t = setTimeout(() => {
-      Animated.timing(currencyHintOpacity, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: true,
-      }).start();
-    }, 450);
-    // Auto-dismiss a los 6s.
-    const d = setTimeout(markCurrencyHintSeen, 6000);
-    return () => {
-      clearTimeout(t);
-      clearTimeout(d);
-    };
-  }, [currencyHintSeen, currencyHintOpacity, markCurrencyHintSeen]);
-  // Swipe horizontal sobre el hero para cambiar de moneda.
-  const currencyPan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
-      onPanResponderRelease: (_, g) => {
-        if (Math.abs(g.dx) > 40) {
-          Haptics.selectionAsync().catch(() => {});
-          setCurrency((p) => (p === "ARS" ? "USD" : "ARS"));
-        }
-      },
-    }),
-  ).current;
+  /* Pager horizontal del balance — el swipe entre ARS y USD se hace
+   * con un ScrollView nested. Esto resuelve dos cosas a la vez:
+   *  (1) RN/iOS le dan prioridad de gesture al scroll horizontal
+   *      interno, así que ningún paneo lateral filtra al ScrollView
+   *      vertical (no más triggers accidentales del pull-to-refresh).
+   *  (2) La transición es la animación nativa de paging-scroll, que
+   *      es exactamente el "deslizamiento lento" que pidió Santi.
+   */
+  const balancePagerRef = useRef<ScrollView | null>(null);
+  const balancePageW = Dimensions.get("window").width;
+  /* Cuando el usuario tappea uno de los dots, scrolleamos a la página
+   * correspondiente. El cambio de `currency` se sincroniza en
+   * onMomentumScrollEnd, así que no hace falta llamar setCurrency
+   * acá — el momentum se encarga. */
+  const goToCurrency = useCallback(
+    (c: "ARS" | "USD") => {
+      const idx = c === "ARS" ? 0 : 1;
+      balancePagerRef.current?.scrollTo({
+        x: idx * balancePageW,
+        animated: true,
+      });
+    },
+    [balancePageW],
+  );
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   // Callbacks estables para que el Sparkline (memoizado) no se
   // re-renderee en cada cambio de state del padre. Sin esto, cada
@@ -519,73 +486,71 @@ function BaseHome() {
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
-          <Pressable
-            style={s.amountRow}
-            onPress={() => {
-              toggleCurrency();
-              if (!currencyHintSeen) markCurrencyHintSeen();
-            }}
-            {...currencyPan.panHandlers}
-          >
-            <View style={s.flagWrap} pointerEvents="none">
-              <FlagIcon code={currency === "ARS" ? "AR" : "US"} size={26} />
-              {/* Indicador persistente — chip chiquito con icono de
-                  swap en el borde. Le avisa al ojo que la bandera es
-                  interactiva. */}
-              <View
-                style={[
-                  s.flagSwapBadge,
-                  { backgroundColor: c.ink, borderColor: c.bg },
-                ]}
-              >
-                <Feather name="repeat" size={7} color={c.bg} />
-              </View>
-            </View>
-            <AmountDisplay
-              value={currency === "ARS" ? arsCurrent : usdCurrent}
-              size={40}
-              weight={800}
-              currency={currency}
-            />
-            {/* Coachmark: sólo la primera vez, pill debajo de la
-                bandera con una flecha para arriba indicando que sea
-                tappeada. */}
-            {!currencyHintSeen ? (
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  s.currencyHintWrap,
-                  { opacity: currencyHintOpacity },
-                ]}
-              >
+          {/* Pager horizontal del balance — 2 páginas (ARS/USD), cada
+              una al ancho completo del celular. El swipe usa
+              paging-scroll nativo: animación de desplazamiento smooth
+              y, lo más importante, RN da prioridad de gesture al
+              scroll horizontal interno → ya no se cuela el dy al
+              ScrollView vertical (sin más triggers accidentales del
+              pull-to-refresh). */}
+          <View style={s.balancePagerWrap}>
+            <ScrollView
+              ref={balancePagerRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="normal"
+              directionalLockEnabled
+              alwaysBounceVertical={false}
+              bounces={false}
+              contentOffset={{
+                x: currency === "ARS" ? 0 : balancePageW,
+                y: 0,
+              }}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(
+                  e.nativeEvent.contentOffset.x / balancePageW,
+                );
+                const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
+                if (next !== currency) {
+                  Haptics.selectionAsync().catch(() => {});
+                  setCurrency(next);
+                }
+              }}
+            >
+              {(["ARS", "USD"] as const).map((cur) => (
                 <View
-                  style={[s.currencyHintArrow, { borderBottomColor: c.ink }]}
-                />
-                <View
-                  style={[s.currencyHintPill, { backgroundColor: c.ink }]}
+                  key={cur}
+                  style={[s.balancePage, { width: balancePageW }]}
                 >
-                  <Text style={[s.currencyHintText, { color: c.bg }]}>
-                    Tocá para cambiar de moneda
-                  </Text>
+                  <View style={s.flagWrap} pointerEvents="none">
+                    <FlagIcon code={cur === "ARS" ? "AR" : "US"} size={26} />
+                    <View
+                      style={[
+                        s.flagSwapBadge,
+                        { backgroundColor: c.ink, borderColor: c.bg },
+                      ]}
+                    >
+                      <Feather name="repeat" size={7} color={c.bg} />
+                    </View>
+                  </View>
+                  <AmountDisplay
+                    value={cur === "ARS" ? arsCurrent : usdCurrent}
+                    size={40}
+                    weight={800}
+                    currency={cur}
+                  />
                 </View>
-              </Animated.View>
-            ) : null}
-          </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* Indicador de moneda — dos dots abajo del saldo.
               El activo es texto-color, el inactivo es muted. Cada
               dot es tappable para saltar directo a esa moneda
               (además del tap/swipe sobre el monto que togglea). */}
           <View style={s.currencyDots}>
-            <Pressable
-              hitSlop={10}
-              onPress={() => {
-                if (currency !== "ARS") {
-                  toggleCurrency();
-                  if (!currencyHintSeen) markCurrencyHintSeen();
-                }
-              }}
-            >
+            <Pressable hitSlop={10} onPress={() => goToCurrency("ARS")}>
               <View
                 style={[
                   s.currencyDot,
@@ -598,15 +563,7 @@ function BaseHome() {
                 ]}
               />
             </Pressable>
-            <Pressable
-              hitSlop={10}
-              onPress={() => {
-                if (currency !== "USD") {
-                  toggleCurrency();
-                  if (!currencyHintSeen) markCurrencyHintSeen();
-                }
-              }}
-            >
+            <Pressable hitSlop={10} onPress={() => goToCurrency("USD")}>
               <View
                 style={[
                   s.currencyDot,
@@ -1079,7 +1036,11 @@ function Investments({
         <Text style={[s.earningsTitle, { color: c.textMuted }]}>
           Tus inversiones
         </Text>
-        <Feather name="arrow-right" size={20} color={c.brand} />
+        <Ionicons
+          name="arrow-forward-sharp"
+          size={14}
+          color="rgba(0,200,5,0.45)"
+        />
       </Pressable>
 
       <GlassCard padding={items.length > 0 ? 4 : 16}>
@@ -1234,6 +1195,11 @@ const s = StyleSheet.create({
   chartWrap: {
     position: "relative",
     overflow: "hidden",
+    /* Negativo del paddingHorizontal del heroBlock (24) — el chart
+     * rompe los rails y se extiende de borde a borde de la pantalla.
+     * El range row de abajo conserva el padding y queda alineado
+     * con el resto del hero. */
+    marginHorizontal: -24,
   },
   /* Secciones editoriales (Dinero / Inversiones) */
   sectionBlock: {
@@ -1663,12 +1629,19 @@ const s = StyleSheet.create({
     letterSpacing: -2.2,
     marginBottom: 6,
   },
-  amountRow: {
+  /* Pager del balance — el wrap rompe el padding del heroBlock con
+   * marginHorizontal: -24 para que cada página sea full screen (más
+   * área de swipe + transición visualmente más lenta). El padding
+   * vuelve a aparecer dentro de cada página. */
+  balancePagerWrap: {
+    marginHorizontal: -24,
+    marginBottom: 8,
+  },
+  balancePage: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 8,
-    position: "relative",
+    paddingHorizontal: 24,
   },
   flagWrap: {
     position: "relative",
@@ -1683,33 +1656,6 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-  },
-  currencyHintWrap: {
-    position: "absolute",
-    top: 62,
-    left: -4,
-    alignItems: "flex-start",
-    zIndex: 20,
-  },
-  currencyHintArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 6,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    marginLeft: 16,
-  },
-  currencyHintPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.md,
-  },
-  currencyHintText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
   },
   /* Indicador de moneda — dos dots horizontales abajo del saldo.
      El activo es full-color y un toque más grande (8px) que el
