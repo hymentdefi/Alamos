@@ -331,11 +331,10 @@ export default function TabsLayout() {
             animation: "timing",
             config: {
               duration: 620,
-              // out-back curve: la parte final pasa de largo el
-              // destino y vuelve, dando un mini-rebote smooth al
-              // aterrizar. Adictivo y satisfactorio sin sentirse
-              // cartoonish — el overshoot es leve (~6%).
-              easing: RNEasing.bezier(0.34, 1.4, 0.4, 1),
+              // out-quart suave, sin overshoot. La pantalla nueva
+              // arranca rápido y desacelera mucho cerca del final
+              // — feel smooth y limpio, sin rebote.
+              easing: RNEasing.bezier(0.16, 1, 0.3, 1),
             },
           },
           sceneStyleInterpolator: ({ current }) => ({
