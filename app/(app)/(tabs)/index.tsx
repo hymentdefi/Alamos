@@ -935,7 +935,7 @@ function Dinero(_: {
       </View>
 
       <View style={s.earningsHead}>
-        <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
+        <Text style={[s.earningsTitle, { color: c.textMuted }]}>Tu dinero</Text>
         <Pressable
           hitSlop={10}
           onPress={() => setInfoOpen(true)}
@@ -1137,7 +1137,7 @@ function Investments({
         onPress={() => router.push("/(app)/investments-detail")}
         hitSlop={8}
       >
-        <Text style={[s.earningsTitle, { color: c.text }]}>
+        <Text style={[s.earningsTitle, { color: c.textMuted }]}>
           Tus inversiones
         </Text>
         <Feather name="chevron-right" size={16} color={c.textFaint} />
