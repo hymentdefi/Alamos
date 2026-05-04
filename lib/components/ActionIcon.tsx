@@ -5,10 +5,10 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir).
  *
- * Set "outlined-A" del brand pack: circulo con stroke verde brand
- * y un símbolo (flecha down / up / arrows-swap) en el mismo verde
- * dentro. En light mode el círculo es blanco; en dark mode el
- * círculo es transparente (solo el anillo).
+ * Set "tint-S" del brand pack: círculo lleno con un tint suave del
+ * verde brand (10% en light, 14% en dark) y un símbolo (flecha down /
+ * up / arrows-swap) en stroke verde brand de 4px. Sin anillo —
+ * delgado en geometría, fuerte en presencia.
  *
  * Variantes fuente:
  *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
@@ -20,17 +20,21 @@ export type ActionIconName = "ingresar" | "enviar" | "convertir";
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del stroke (anillo + símbolo). Default:
-   *  brand.green canónico (#00C805 — coincide con c.brand del
-   *  theme y con el isotipo del logo). */
+  /** Override del color del stroke (símbolo) y base del tint del
+   *  círculo. Default: brand.green canónico (#00C805 — coincide con
+   *  c.brand del theme y con el isotipo del logo). */
   stroke?: string;
-  /** Override del fill del círculo. Default: blanco en light,
-   *  transparent en dark. */
+  /** Override del fill del círculo. Default: tint del stroke a 10%
+   *  en light y 14% en dark. */
   fill?: string;
 }
 
 const BRAND_GREEN = "#00C805";
-const WHITE = "#FFFFFF";
+
+/** Tint del fill cuando no se pasa override. Misma RGB que el stroke,
+ *  alpha distinto por modo. */
+const tintFor = (mode: "light" | "dark") =>
+  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
 
 export const ActionIcon = memo(function ActionIcon({
   name,
@@ -39,42 +43,35 @@ export const ActionIcon = memo(function ActionIcon({
   fill,
 }: Props) {
   const { mode } = useTheme();
-  // Light: círculo blanco. Dark: solo anillo (fill transparente).
-  const resolvedFill = fill ?? (mode === "dark" ? "transparent" : WHITE);
+  const resolvedFill = fill ?? tintFor(mode);
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle
-        cx={32}
-        cy={32}
-        r={30.5}
-        fill={resolvedFill}
-        stroke={stroke}
-        strokeWidth={2}
-      />
+      <Circle cx={32} cy={32} r={32} fill={resolvedFill} />
       <G
+        transform="translate(32 32)"
         fill="none"
         stroke={stroke}
-        strokeWidth={3}
+        strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"
       >
         {name === "ingresar" ? (
           <>
-            <Path d="M32 21 L32 41" />
-            <Path d="M23 33 L32 42 L41 33" />
+            <Path d="M0 -10 L0 10" />
+            <Path d="M-9 1 L0 10 L9 1" />
           </>
         ) : name === "enviar" ? (
           <>
-            <Path d="M32 43 L32 23" />
-            <Path d="M23 31 L32 22 L41 31" />
+            <Path d="M0 10 L0 -10" />
+            <Path d="M-9 -1 L0 -10 L9 -1" />
           </>
         ) : (
           <>
-            <Path d="M22 26 L42 26" />
-            <Path d="M36 20 L42 26 L36 32" />
-            <Path d="M42 38 L22 38" />
-            <Path d="M28 32 L22 38 L28 44" />
+            <Path d="M-10 -6 L10 -6" />
+            <Path d="M4 -12 L10 -6 L4 0" />
+            <Path d="M10 6 L-10 6" />
+            <Path d="M-4 0 L-10 6 L-4 12" />
           </>
         )}
       </G>

@@ -491,20 +491,14 @@ function BaseHome() {
             style={[
               s.topBtn,
               {
-                backgroundColor: isDark
-                  ? "rgba(255,255,255,0.06)"
-                  : "#FFFFFF",
-                borderColor: isDark
-                  ? "rgba(255,255,255,0.10)"
-                  : "rgba(14,15,12,0.06)",
-                borderWidth: StyleSheet.hairlineWidth,
+                backgroundColor: c.textMuted,
               },
             ]}
             onPress={() => router.push("/(app)/activity")}
             hitSlop={8}
             haptic="selection"
           >
-            <Ionicons name="notifications-sharp" size={22} color={c.brand} />
+            <Ionicons name="notifications-sharp" size={22} color="#FFFFFF" />
           </Tap>
         </View>
       </View>
