@@ -9,7 +9,6 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { usePreventRemove } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -90,7 +89,7 @@ export const LINKED_ACCOUNTS: LinkedAccount[] = [
   },
 ];
 
-type DepositCurrency = "ars" | "usd";
+export type DepositCurrency = "ars" | "usd";
 
 export default function TransferScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -634,7 +633,6 @@ const keys = [
   [".", "0", "back"],
 ] as const;
 
-type SendStep = "amount" | "destination" | "done";
 
 function formatMoney(value: number, cur: DepositCurrency): string {
   const num = value.toLocaleString("es-AR", {
@@ -645,80 +643,32 @@ function formatMoney(value: number, cur: DepositCurrency): string {
 }
 
 function SendFlow() {
-  // Step inicial: 'currency' = picker de 4 cards. 'amount' = AmountStep
-  // existente. Después destination/done.
-  const [step, setStep] = useState<SendStep | "currency">("currency");
-  const [cur, setCur] = useState<DepositCurrency>("ars");
-  const [amount, setAmount] = useState("0");
-  const [destination, setDestination] = useState<LinkedAccount | null>(null);
-
-  // Intercepción del swipe-back nativo + hardware back. Mismo
-  // pattern que DepositInfo: `usePreventRemove` cancela el gesto
-  // del native-stack en sub-steps y deja pasar el pop cuando
-  // estamos en el hub.
-  const inSubStep = step !== "currency";
-  usePreventRemove(inSubStep, () => {
-    if (step === "amount") setStep("currency");
-    else if (step === "destination") setStep("amount");
-    else if (step === "done") setStep("destination");
-  });
-
-  const parsed = Number.parseFloat(amount) || 0;
-
-  if (step === "done" && destination) {
-    return (
-      <SendSuccess cur={cur} amount={parsed} destination={destination} />
-    );
-  }
-
-  if (step === "destination") {
-    return (
-      <DestinationStep
-        cur={cur}
-        amount={parsed}
-        onBack={() => setStep("amount")}
-        onPick={(d) => {
-          setDestination(d);
-          setStep("done");
-        }}
-      />
-    );
-  }
-
-  if (step === "amount") {
-    return (
-      <AmountStep
-        cur={cur}
-        amount={amount}
-        onChangeAmount={setAmount}
-        onNext={() => setStep("destination")}
-        onBack={() => setStep("currency")}
-      />
-    );
-  }
-
-  // step === "currency" — hub picker.
-  return <SendCurrencyHub onPick={(id) => {
-    // Mappeo de AccountId → DepositCurrency. usd-us también es 'usd'
-    // (mismo flow del AmountStep). usdt-crypto: por ahora redirigimos
-    // a un próximamente — el send de crypto requiere otro flow (asset
-    // + red + dirección).
-    if (id === "ars-ar") {
-      setCur("ars");
-      setAmount("0");
-      setStep("amount");
-    } else if (id === "usd-ar" || id === "usd-us") {
-      setCur("usd");
-      setAmount("0");
-      setStep("amount");
-    } else {
-      // usdt-crypto — próximamente.
-      Alert.alert(
-        "Próximamente",
-        "El envío de cripto va a estar disponible muy pronto.",
-      );
-    }
-  }} />;
+  const router = useRouter();
+  // El SendFlow ahora SOLO renderea el hub. Cada sub-step (amount,
+  // destination, success) es su propia ruta — el swipe-back nativo
+  // popea naturalmente al stack anterior sin necesidad de
+  // usePreventRemove ni state local.
+  return (
+    <SendCurrencyHub
+      onPick={(id) => {
+        // Mappeo de AccountId → DepositCurrency. usd-us también es
+        // 'usd' (mismo flow del AmountStep). usdt-crypto:
+        // próximamente — requiere asset + red + dirección.
+        if (id === "usdt-crypto") {
+          Alert.alert(
+            "Próximamente",
+            "El envío de cripto va a estar disponible muy pronto.",
+          );
+          return;
+        }
+        const cur = id === "ars-ar" ? "ars" : "usd";
+        router.push({
+          pathname: "/(app)/transfer-send-amount",
+          params: { cur },
+        });
+      }}
+    />
+  );
 }
 
 /* ─── Hub picker para Send ─── */
@@ -763,7 +713,7 @@ function SendCurrencyHub({ onPick }: { onPick: (id: AccountId) => void }) {
 
 /* ─── Paso 1: monto + moneda ─── */
 
-function AmountStep({
+export function AmountStep({
   cur,
   amount,
   onChangeAmount,
@@ -963,7 +913,7 @@ function AmountStep({
 
 /* ─── Paso 2: destino ─── */
 
-function DestinationStep({
+export function DestinationStep({
   cur,
   amount,
   onBack,
@@ -1080,7 +1030,7 @@ function DestinationStep({
 
 /* ─── Paso 3: success ─── */
 
-function SendSuccess({
+export function SendSuccess({
   cur,
   amount,
   destination,

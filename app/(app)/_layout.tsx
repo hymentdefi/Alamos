@@ -67,6 +67,24 @@ export default function AppLayout() {
         name="transfer-deposit-from"
         options={{ fullScreenGestureEnabled: false }}
       />
+      {/* Sub-rutas del flow de Enviar — mismo patrón. El slider de %
+          y el keypad necesitan fullScreenGestureEnabled=false para
+          que no se confundan con el swipe-from-anywhere. */}
+      <Stack.Screen
+        name="transfer-send-amount"
+        options={{ fullScreenGestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="transfer-send-destination"
+        options={{ fullScreenGestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="transfer-send-success"
+        options={{
+          animation: "slide_from_bottom",
+          gestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="settings" />
       <Stack.Screen name="security" />
       <Stack.Screen name="chat" />
