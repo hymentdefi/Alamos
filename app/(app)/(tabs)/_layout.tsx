@@ -316,24 +316,27 @@ export default function TabsLayout() {
         backBehavior="none"
         screenOptions={{
           headerShown: false,
+          // Pre-montar TODAS las tabs al boot. Sin esto, cada tab
+          // se monta lazy en su primera visita — eso hace que el
+          // shift de transición se trabe (el screen destino tiene
+          // que reconciliar su árbol entero mientras la animación
+          // ya empezó). Con lazy: false, el shift navega entre
+          // pantallas que ya están listas en memoria → fluido.
+          lazy: false,
           // Transición full-screen-slide custom — el preset 'shift'
-          // de bottom-tabs solo desliza 50px y fadea (se sentía
-          // medio cheap). Override:
-          //   - slide horizontal de ANCHO COMPLETO (entrante desde
-          //     el lado, saliente al otro lado).
-          //   - duración 340ms — slow-but-clean, estilo Brubank.
-          //   - easing bezier(0.22, 1, 0.36, 1) (out-quart) — el
-          //     mismo 'premium feel' que iOS usa para Stack push.
-          // Sin opacity fade — el slide solo lleva la lectura visual
-          // sin ensuciarla con un crossfade simultáneo.
+          // de bottom-tabs solo desliza 50px y fadea. Override:
+          //   - slide horizontal de ANCHO COMPLETO
+          //   - duración 520ms — balance entre slow y sin jank
+          //     (con duraciones >600ms cualquier micro-stutter del
+          //      destino se nota más).
+          //   - easing out-quart: arranca rápido, desacelera mucho
+          //     hacia el final. Sin overshoot.
+          // Sin opacity fade — el slide solo lleva la lectura visual.
           animation: "shift",
           transitionSpec: {
             animation: "timing",
             config: {
-              duration: 620,
-              // out-quart suave, sin overshoot. La pantalla nueva
-              // arranca rápido y desacelera mucho cerca del final
-              // — feel smooth y limpio, sin rebote.
+              duration: 520,
               easing: RNEasing.bezier(0.16, 1, 0.3, 1),
             },
           },
