@@ -140,9 +140,17 @@ function BaseExplore() {
   // un swap brusco (un Pressable se desmontaba y el otro se montaba),
   // ahora ambos viven siempre en el árbol pero su opacidad/scale se
   // anima en useNativeDriver.
+  //
+  // Además animamos el WIDTH del slot derecho — colapsa al ancho de
+  // la estrella (44) cuando no hay foco, expande al ancho de
+  // 'Cancelar' (~86) cuando sí. Esto elimina el agujero visual entre
+  // la barra y la estrella mientras no estamos buscando. width no
+  // soporta useNativeDriver, así que esta animación corre en JS,
+  // pero 220ms es lo suficientemente corto para no sentirse pesado.
   const showCancel = searchFocused || query.length > 0;
   const cancelOpacity = useRef(new Animated.Value(0)).current;
   const starOpacity = useRef(new Animated.Value(1)).current;
+  const slotWidth = useRef(new Animated.Value(44)).current;
   useEffect(() => {
     Animated.parallel([
       Animated.timing(cancelOpacity, {
@@ -155,8 +163,13 @@ function BaseExplore() {
         duration: 220,
         useNativeDriver: true,
       }),
+      Animated.timing(slotWidth, {
+        toValue: showCancel ? 86 : 44,
+        duration: 220,
+        useNativeDriver: false,
+      }),
     ]).start();
-  }, [showCancel, cancelOpacity, starOpacity]);
+  }, [showCancel, cancelOpacity, starOpacity, slotWidth]);
 
   // Cargamos preferencia de "solo favoritos" + última market tab
   // seleccionada al montar para que sobrevivan entre sesiones.
@@ -315,11 +328,13 @@ function BaseExplore() {
             ) : null}
           </View>
 
-          {/* Slot fijo de la derecha — los dos botones (favoritos /
-              cancelar) viven simultáneamente apilados en absoluto y
-              crossfadeean por opacity. pointerEvents bloquea taps al
-              que está fading-out así no compiten. */}
-          <View style={s.rightSlot}>
+          {/* Slot derecha — los dos botones (favoritos / cancelar)
+              viven simultáneamente apilados en absoluto y crossfadeean
+              por opacity. El ancho del slot también se anima: colapsa
+              al ancho de la estrella cuando no hay foco (sin agujero
+              entre la barra y el ícono), expande al ancho de
+              'Cancelar' cuando el input está activo. */}
+          <Animated.View style={[s.rightSlot, { width: slotWidth }]}>
             <Animated.View
               pointerEvents={showCancel ? "none" : "auto"}
               style={[s.rightSlotItem, { opacity: starOpacity }]}
@@ -355,7 +370,7 @@ function BaseExplore() {
                 </Text>
               </Pressable>
             </Animated.View>
-          </View>
+          </Animated.View>
         </View>
       </View>
 
@@ -378,18 +393,35 @@ function BaseExplore() {
 
 function MarketGlyph({
   market,
+  active,
 }: {
   market: AssetMarket;
-  /** Reservado por compatibilidad — el glyph mantiene los mismos
-   *  colores en estado activo e inactivo desde que el segmented pasó
-   *  a estilo iOS (track crema + pill blanca). */
+  /** Cuando active=true, le aplicamos una capa verde sutil al glyph
+   *  para diferenciar claramente el mercado seleccionado del que no.
+   *  Para AR/US es un overlay round (pill) sobre la bandera; para
+   *  crypto, como ya es un pill verde brand, no hace falta. */
   active?: boolean;
 }) {
   const { c } = useTheme();
-  if (market === "AR") return <FlagIcon code="AR" size={18} />;
-  if (market === "US") return <FlagIcon code="US" size={18} />;
+  if (market === "AR" || market === "US") {
+    return (
+      <View style={gs.flagWrap}>
+        <FlagIcon code={market === "AR" ? "AR" : "US"} size={18} />
+        {active ? (
+          <View
+            pointerEvents="none"
+            style={[
+              gs.flagTint,
+              { backgroundColor: "rgba(0, 200, 5, 0.22)" },
+            ]}
+          />
+        ) : null}
+      </View>
+    );
+  }
   // Crypto: pill verde con ₿ — no hay bandera, así que armamos un
   // glyph que mantenga el peso visual de las dos primeras opciones.
+  // Como el bg ya es verde brand, no necesita el tint extra.
   return (
     <View
       style={[gs.cryptoBadge, { backgroundColor: c.greenDark }]}
@@ -400,6 +432,22 @@ function MarketGlyph({
 }
 
 const gs = StyleSheet.create({
+  flagWrap: {
+    width: 18,
+    height: 18,
+    position: "relative",
+  },
+  /* Overlay verde sutil sobre la bandera del mercado activo —
+   * 22% de alpha para que tinte sin tapar. Round-pill matching
+   * la bandera (que tiene borderRadius 999). */
+  flagTint: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+  },
   cryptoBadge: {
     width: 18,
     height: 18,
@@ -777,12 +825,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Container del slot de la derecha — ancho mínimo igual al ancho
-   * del Cancelar (la palabra más larga de los dos), así no hay jump
-   * de layout cuando crossfadea. Ambos hijos posicionan absolute
-   * adentro y se animan por opacity. */
+  /* Container del slot de la derecha. El width se anima desde
+   * BaseExplore (slotWidth shared value): 44 colapsado, 86 expandido.
+   * Ambos hijos posicionan absolute adentro y se animan por opacity. */
   rightSlot: {
-    minWidth: 78,
     height: 44,
     alignItems: "flex-end",
     justifyContent: "center",
