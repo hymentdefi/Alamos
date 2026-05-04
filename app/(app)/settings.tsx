@@ -2,13 +2,20 @@ import { useState } from "react";
 import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
+import {
+  useTheme,
+  fontFamily,
+  radius,
+  spacing,
+  type ThemeModePref,
+} from "../../lib/theme";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, mode, toggle } = useTheme();
+  const { c } = useTheme();
 
   const [pushOrders, setPushOrders] = useState(true);
   const [pushPrices, setPushPrices] = useState(true);
@@ -21,12 +28,8 @@ export default function SettingsScreen() {
       group: "Apariencia",
       items: [
         {
-          type: "toggle" as const,
-          icon: "moon",
-          label: "Modo oscuro",
-          hint: "Experimental · Álamos Pro",
-          value: mode === "dark",
-          onChange: () => toggle(),
+          type: "segmented" as const,
+          label: "Apariencia",
         },
         {
           type: "value" as const,
@@ -135,22 +138,21 @@ export default function SettingsScreen() {
                     },
                   ]}
                 >
-                  <View style={[s.rowIcon, { backgroundColor: c.surfaceHover }]}>
-                    <Feather
-                      name={item.icon as keyof typeof Feather.glyphMap}
-                      size={16}
-                      color={c.text}
-                    />
-                  </View>
+                  {item.type === "segmented" ? null : (
+                    <View
+                      style={[s.rowIcon, { backgroundColor: c.surfaceHover }]}
+                    >
+                      <Feather
+                        name={item.icon as keyof typeof Feather.glyphMap}
+                        size={16}
+                        color={c.text}
+                      />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text style={[s.rowLabel, { color: c.text }]}>
                       {item.label}
                     </Text>
-                    {"hint" in item && item.hint ? (
-                      <Text style={[s.rowHint, { color: c.textMuted }]}>
-                        {item.hint}
-                      </Text>
-                    ) : null}
                   </View>
                   {item.type === "toggle" ? (
                     <Switch
@@ -160,6 +162,8 @@ export default function SettingsScreen() {
                       thumbColor={c.bg}
                       ios_backgroundColor={c.surfaceSunken}
                     />
+                  ) : item.type === "segmented" ? (
+                    <ThemeSegmented />
                   ) : (
                     <View style={s.valueWrap}>
                       <Text style={[s.rowValue, { color: c.textMuted }]}>
@@ -178,6 +182,59 @@ export default function SettingsScreen() {
           </View>
         ))}
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Selector segmentado System / Light / Dark — patrón iOS-style con
+ * 3 íconos en una píldora compacta, copiando el control de Apariencia
+ * de Claude. La píldora se asienta sobre c.surfaceSunken (mismo tono
+ * que el group card pero un punto más hundido), y el activo flota con
+ * c.surface + hairline border.
+ */
+function ThemeSegmented() {
+  const { c, pref, setPref } = useTheme();
+  const opts: {
+    v: ThemeModePref;
+    icon: keyof typeof Feather.glyphMap;
+  }[] = [
+    { v: "system", icon: "smartphone" },
+    { v: "light", icon: "sun" },
+    { v: "dark", icon: "moon" },
+  ];
+  const onPick = (v: ThemeModePref) => {
+    if (v === pref) return;
+    Haptics.selectionAsync().catch(() => {});
+    setPref(v);
+  };
+  return (
+    <View
+      style={[s.segWrap, { backgroundColor: c.surfaceSunken }]}
+    >
+      {opts.map(({ v, icon }) => {
+        const active = pref === v;
+        return (
+          <Pressable
+            key={v}
+            onPress={() => onPick(v)}
+            hitSlop={6}
+            style={[
+              s.segBtn,
+              active && {
+                backgroundColor: c.surface,
+                borderColor: c.border,
+              },
+            ]}
+          >
+            <Feather
+              name={icon}
+              size={15}
+              color={active ? c.text : c.textMuted}
+            />
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -237,12 +294,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  rowHint: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: -0.1,
-  },
   valueWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -252,5 +303,22 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.15,
+  },
+
+  /* Segmented control de tema (System / Light / Dark) */
+  segWrap: {
+    flexDirection: "row",
+    borderRadius: radius.md,
+    padding: 3,
+    gap: 2,
+  },
+  segBtn: {
+    width: 36,
+    height: 30,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "transparent",
   },
 });
