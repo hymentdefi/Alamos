@@ -515,7 +515,11 @@ function MarketBody({
   // Cuando hay query o onlyFavs, mostramos resultados planos.
   // Cuando no, mostramos la lista de categorías como navegación
   // principal (cada row drilling a /(app)/market-category).
-  const isCategoryView = !query.trim() && !onlyFavs;
+  // Excepción: el mercado Crypto tiene una sola categoría — no
+  // tiene sentido obligar al user a tappear una pseudo-list de 1
+  // ítem; mostramos los assets directo.
+  const isCategoryView =
+    !query.trim() && !onlyFavs && market.id !== "CRYPTO";
 
   const visible = useMemo(() => {
     if (isCategoryView) return [];
@@ -566,7 +570,9 @@ function MarketBody({
     ? `Tus favoritos en ${market.short}`
     : isTrendingView
     ? "Destacados del día"
-    : `Categorías · ${market.label}`;
+    : isCategoryView
+    ? `Categorías · ${market.label}`
+    : `Instrumentos · ${market.label}`;
 
   return (
     <ScrollView

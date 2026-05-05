@@ -566,7 +566,7 @@ function BaseHome() {
                   s.currencyDot,
                   {
                     backgroundColor:
-                      currency === "ARS" ? c.text : c.textFaint,
+                      currency === "ARS" ? chartColor : c.textFaint,
                     width: currency === "ARS" ? 8 : 6,
                     height: currency === "ARS" ? 8 : 6,
                   },
@@ -579,7 +579,7 @@ function BaseHome() {
                   s.currencyDot,
                   {
                     backgroundColor:
-                      currency === "USD" ? c.text : c.textFaint,
+                      currency === "USD" ? chartColor : c.textFaint,
                     width: currency === "USD" ? 8 : 6,
                     height: currency === "USD" ? 8 : 6,
                   },
