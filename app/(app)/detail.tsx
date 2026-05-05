@@ -7,6 +7,12 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
+import Animated, {
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import Svg, {
   Circle,
   ClipPath,
@@ -119,6 +125,36 @@ export default function DetailScreen() {
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
   const [tradeSelectorOpen, setTradeSelectorOpen] = useState(false);
 
+  /* ─── Sticky header — scroll detection ──────────────────────────
+   *
+   * El topBar tiene back / [center vacío] / alert / favStar. Cuando el
+   * user scrollea pasado el hero, llenamos el center con:
+   *   precio (línea superior, peso 500)
+   *   ticker · variación%  (línea inferior, variación con color
+   *                          contextual del sistema cromático)
+   *
+   * Reanimated useSharedValue + scroll handler en UI thread → 60fps
+   * en gama media. Crossfade en 80px de scroll, calibrado para que
+   * el sticky aparezca cuando el precio del hero sale de cuadro. */
+  const stickyScrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      stickyScrollY.value = e.contentOffset.y;
+    },
+  });
+
+  const STICKY_START = 160;
+  const STICKY_FULL = 240;
+
+  const stickyOpacityStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      stickyScrollY.value,
+      [STICKY_START, STICKY_FULL],
+      [0, 1],
+      "clamp",
+    ),
+  }));
+
   // IMPORTANT: todos los hooks se corren ANTES del early return para
   // respetar las reglas de React (mismo orden cada render). Si el
   // ticker todavía no está resuelto, 'asset' es undefined y los hooks
@@ -176,7 +212,32 @@ export default function DetailScreen() {
         >
           <Feather name="arrow-left" size={24} color={c.text} />
         </Tap>
-        <View style={{ flex: 1 }} />
+        {/* Center: vacío hasta que el user scrollea pasado el hero;
+            ahí aparece sticky con precio + ticker · variación%.
+            absoluteFill dentro del flex:1 wrapper para que no
+            empuje el layout horizontal del topBar. */}
+        <View style={s.stickyCenter}>
+          <Animated.View
+            style={[s.stickyBlock, stickyOpacityStyle]}
+            pointerEvents="none"
+          >
+            <Text
+              style={[s.stickyPrice, { color: c.text }]}
+              numberOfLines={1}
+            >
+              {formatMoney(asset.price, cur)}
+            </Text>
+            <View style={s.stickyRow}>
+              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+                {asset.ticker}
+              </Text>
+              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+              <Text style={[s.stickyPct, { color }]}>
+                {formatPct(displayPct)}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
         <PriceAlertButton
           ticker={asset.ticker}
           onPress={() => setAlertSheetOpen(true)}
@@ -191,9 +252,11 @@ export default function DetailScreen() {
         </Tap>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         <View style={s.heroBlock}>
           <Text style={[s.heroTicker, { color: c.textMuted }]}>
@@ -302,7 +365,7 @@ export default function DetailScreen() {
           implica riesgo de pérdida de capital. Álamos opera bajo Manteca
           ALyC, regulada por la CNV.
         </Text>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <TradeBottomBar
         asset={asset}
@@ -1732,6 +1795,44 @@ const s = StyleSheet.create({
   topCenter: {
     flex: 1,
     alignItems: "center",
+  },
+  /* Sticky header — el center del topBar arranca vacío y, al
+   * scrollear pasado el hero, fade-in de precio (peso 500) +
+   * ticker · variación%. */
+  stickyCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 38,
+  },
+  stickyBlock: {
+    alignItems: "center",
+  },
+  stickyPrice: {
+    fontFamily: fontFamily[500],
+    fontSize: 18,
+    letterSpacing: -0.4,
+  },
+  stickyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 1,
+  },
+  stickyTicker: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
+  stickyDot: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  stickyPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.05,
   },
   topTicker: {
     fontFamily: fontFamily[700],
