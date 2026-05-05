@@ -1206,12 +1206,9 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
   const { width: screenWidth } = useWindowDimensions();
   const chartW = screenWidth - 48;
   const chartH = 150;
-  // yAxisLabelX = 28: Y-axis labels alineadas con stats labels arriba
-  // (mismo borde izquierdo). padX = 72 (+8pt vs antes): primer dot
-  // un poco más a la derecha. padXRight = 56 (+16pt): más respiro al
-  // borde derecho. Ambos cambios reducen xStep (de ~80 a ~72) →
-  // dots más juntos entre sí, todo el cluster shifteado un cachito a
-  // la derecha.
+  // padX = 72: primer dot con respiro del Y-axis label area.
+  // padXRight = 56: gap del último dot al borde derecho.
+  // (Volví al estado "perfecto, estamos bien" del usuario.)
   const yAxisLabelX = 28;
   const padX = 72;
   const padXRight = 56;
@@ -1408,7 +1405,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
             próximo earning. Con hold: ambos columns muestran los
             valores del trimestre tocado, con el label del trimestre
             explícito al lado de "Esperado · Q3 FY25". */}
-        <View style={[s.earningsInfo, { borderTopColor: c.border }]}>
+        <View style={s.earningsInfo}>
           <View style={s.earningsInfoCol}>
             <View style={s.earningsInfoHeader}>
               <View
@@ -2102,7 +2099,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     marginTop: 16,
     paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingLeft: 6,
     gap: 16,
   },
   earningsInfoCol: {
