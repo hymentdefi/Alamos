@@ -48,6 +48,8 @@ import {
 } from "../../lib/market/hours";
 import { MarketClosedSheet } from "../../lib/components/MarketClosedSheet";
 import { AssetColorProvider } from "../../lib/asset-color/context";
+import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
+import { AlertSheet } from "../../lib/components/AlertSheet";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -115,6 +117,7 @@ export default function DetailScreen() {
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [closedSheetOpen, setClosedSheetOpen] = useState(false);
+  const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
   // IMPORTANT: todos los hooks se corren ANTES del early return para
   // respetar las reglas de React (mismo orden cada render). Si el
@@ -174,6 +177,10 @@ export default function DetailScreen() {
           <Feather name="arrow-left" size={24} color={c.text} />
         </Tap>
         <View style={{ flex: 1 }} />
+        <PriceAlertButton
+          ticker={asset.ticker}
+          onPress={() => setAlertSheetOpen(true)}
+        />
         <Tap
           style={s.iconBtn}
           hitSlop={12}
@@ -339,6 +346,16 @@ export default function DetailScreen() {
         instrumentLabel={marketSessionFor(asset).instrumentLabel}
         session={marketSessionFor(asset)}
         onClose={() => setClosedSheetOpen(false)}
+      />
+
+      {/* AlertSheet — key={ticker} fuerza remount cuando se navega
+          entre activos sin desmontar el screen, así el form arranca
+          en estado limpio para cada activo. */}
+      <AlertSheet
+        key={`alert-${asset.ticker}`}
+        visible={alertSheetOpen}
+        asset={asset}
+        onClose={() => setAlertSheetOpen(false)}
       />
     </View>
     </AssetColorProvider>

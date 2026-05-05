@@ -31,6 +31,7 @@ import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { NotificationsProvider } from "../lib/notifications/context";
 import { ToastProvider } from "../lib/toast/context";
+import { AlertsProvider } from "../lib/alerts/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
 import { ConfettiPortal } from "../lib/hooks/useConfetti";
 import { SoundManager } from "../lib/sounds/SoundManager";
@@ -172,19 +173,21 @@ export default function RootLayout() {
             <ToastProvider>
               <FavoritesProvider>
                 <WatchlistProvider>
-                  <PrivacyProvider>
-                    <NotificationsProvider>
-                      <StatusBar
-                        style={mode === "light" ? "dark" : "light"}
-                      />
-                      <AuthGate />
-                      {/* Confetti portal — UNA sola instancia montada
-                          en el root. Cualquier pantalla puede llamar
-                          `useConfetti().burst()` y la animación
-                          renderea acá, encima de todo. */}
-                      <ConfettiPortal />
-                    </NotificationsProvider>
-                  </PrivacyProvider>
+                  <AlertsProvider>
+                    <PrivacyProvider>
+                      <NotificationsProvider>
+                        <StatusBar
+                          style={mode === "light" ? "dark" : "light"}
+                        />
+                        <AuthGate />
+                        {/* Confetti portal — UNA sola instancia
+                            montada en el root. Cualquier pantalla
+                            puede llamar `useConfetti().burst()` y la
+                            animación renderea acá, encima de todo. */}
+                        <ConfettiPortal />
+                      </NotificationsProvider>
+                    </PrivacyProvider>
+                  </AlertsProvider>
                 </WatchlistProvider>
               </FavoritesProvider>
             </ToastProvider>

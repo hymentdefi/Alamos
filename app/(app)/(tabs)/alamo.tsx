@@ -103,6 +103,11 @@ export default function AlamoScreen() {
             label="Transferencias y CBU"
             onPress={() => router.push("/(app)/transfer")}
           />
+          <Row
+            icon="bell"
+            label="Mis alertas"
+            onPress={() => router.push("/(app)/alerts")}
+          />
         </View>
 
         <Divider />

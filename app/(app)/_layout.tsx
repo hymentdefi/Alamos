@@ -42,6 +42,7 @@ export default function AppLayout() {
       />
       <Stack.Screen name="activity" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="alerts" />
       {/* Convert: misma protección que transfer — el slider/keypad
           puede confundirse con un swipe-from-anywhere. */}
       <Stack.Screen
