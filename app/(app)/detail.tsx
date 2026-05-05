@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { Tap } from "../../lib/components/Tap";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useTheme, fontFamily, radius, spacing } from "../../lib/theme";
 import {
   assets,
@@ -16,6 +16,7 @@ import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { useFavorites } from "../../lib/favorites/context";
+import { FavStar } from "../../lib/components/FavStar";
 import {
   isMarketOpen,
   marketClosedMessage,
@@ -121,16 +122,12 @@ export default function DetailScreen() {
           </Text>
         </View>
         <Tap
-          style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.iconBtn}
           hitSlop={12}
           haptic="light"
           onPress={() => toggleFav(asset.ticker)}
         >
-          <Ionicons
-            name={fav ? "star" : "star-outline"}
-            size={18}
-            color={fav ? c.greenDark : c.text}
-          />
+          <FavStar filled={fav} size={22} outlineColor={c.text} />
         </Tap>
       </View>
 

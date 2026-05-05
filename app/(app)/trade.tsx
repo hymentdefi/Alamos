@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../lib/theme";
 import {
@@ -19,6 +19,7 @@ import {
 } from "../../lib/data/assets";
 import { Sparkline, seriesFromSeed } from "../../lib/components/Sparkline";
 import { useFavorites } from "../../lib/favorites/context";
+import { FavStar } from "../../lib/components/FavStar";
 
 type TimeFrame = "1m" | "5m" | "15m" | "1h" | "4h" | "1D";
 type OrderType = "limit" | "market" | "stop";
@@ -156,15 +157,11 @@ export default function TradeScreen() {
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
-            style={[s.iconBtn, { backgroundColor: c.surfaceHover }]}
+            style={s.iconBtn}
             onPress={() => toggleFav(asset.ticker)}
             hitSlop={10}
           >
-            <Ionicons
-              name={fav ? "star" : "star-outline"}
-              size={18}
-              color={fav ? c.greenDark : c.text}
-            />
+            <FavStar filled={fav} size={22} outlineColor={c.text} />
           </Pressable>
         </View>
       </View>
