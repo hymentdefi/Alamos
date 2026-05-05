@@ -144,14 +144,38 @@ export const TradeBottomBar = memo(function TradeBottomBar({
 
   const [expanded, setExpanded] = useState(false);
 
+  const ctaBottom = insets.bottom + 8;
+  /* Altura del bar (paddingBottom + content + paddingTop). La uso
+   * para tilear los 2 dims y para anclar las pills arriba del bar
+   * con un gap visible (sin pisar el top edge del rectángulo). */
+  const barHeight = insets.bottom + 8 + PILL_HEIGHT + 14;
+
   /* Offsets verticales relativos al CTA (donde está el X cuando
-   * expanded). Cuando NO hay posición, Vender no se renderea y los
-   * de arriba bajan una fila. */
-  const sellOffset = PILL_HEIGHT + PILL_GAP; // 1 row above CTA
+   * expanded).
+   *
+   * IMPORTANTE: el bar tiene paddingTop:14 entre el top de la barra
+   * y el top del CTA. Si tomamos PILL_HEIGHT+PILL_GAP como offset
+   * de la primera pill, esa pill termina dentro del paddingTop del
+   * bar (visualmente solapada con el rectángulo de abajo). El user
+   * lo señaló: 'el vender está compitiendo con la parte de abajo
+   * blanca'. La spec real (Robinhood) tiene Sell justo arriba del
+   * rectángulo, con gap visible.
+   *
+   * Fix: la pill más cercana al bar (Vender si hasPosition, Comprar
+   * si no) se ancla al BORDE SUPERIOR del bar + PILL_GAP — no a la
+   * top del CTA. Esto le da el gap visual que falta.
+   *
+   * aboveBarBase = (barHeight - ctaBottom) + PILL_GAP
+   *              = paddingTop(14) + PILL_HEIGHT(48) + PILL_GAP(8)
+   *              = 70 — la primera pill queda 70px arriba del CTA
+   *              bottom, lo que la pone exactamente PILL_GAP por
+   *              encima del top edge del bar. */
+  const aboveBarBase = barHeight - ctaBottom + PILL_GAP;
+  const sellOffset = aboveBarBase;
   const buyOffset =
-    (hasPosition ? 2 : 1) * (PILL_HEIGHT + PILL_GAP);
+    aboveBarBase + (hasPosition ? 1 : 0) * (PILL_HEIGHT + PILL_GAP);
   const optionsOffset =
-    (hasPosition ? 3 : 2) * (PILL_HEIGHT + PILL_GAP);
+    aboveBarBase + (hasPosition ? 2 : 1) * (PILL_HEIGHT + PILL_GAP);
 
   /* Progreso individual por pill (0 = at CTA position, 1 = at final
    * position). Stagger: la más cercana al CTA arranca primero. */
@@ -286,11 +310,6 @@ export const TradeBottomBar = memo(function TradeBottomBar({
     });
   };
 
-  const ctaBottom = insets.bottom + 8;
-  /* Altura del bar (paddingBottom + content + paddingTop). La uso
-   * para tilear los 2 dims: strong de top:0 hasta bar.top, weak
-   * justo sobre el bar. */
-  const barHeight = insets.bottom + 8 + PILL_HEIGHT + 14;
 
   return (
     /* Z-order (orden de render = orden visual):
