@@ -108,6 +108,11 @@ export default function AlamoScreen() {
             label="Mis alertas"
             onPress={() => router.push("/(app)/alerts")}
           />
+          <Row
+            icon="clock"
+            label="Órdenes pendientes"
+            onPress={() => router.push("/(app)/queued-orders")}
+          />
         </View>
 
         <Divider />

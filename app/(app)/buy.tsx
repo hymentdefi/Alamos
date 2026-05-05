@@ -20,6 +20,14 @@ import {
 import { accounts, type AccountId } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
 import { PercentSlider } from "../../lib/components/PercentSlider";
+import {
+  closedReasonFor,
+  deferredCtaLabel,
+  deferredOrderDisclaimerFor,
+  nextOpenFor,
+} from "../../lib/market/hours";
+import { useQueuedOrders } from "../../lib/queued-orders/context";
+import { useToast } from "../../lib/toast/context";
 
 function unitWordFor(cat: AssetCategory): string {
   switch (cat) {
@@ -98,6 +106,9 @@ export default function BuyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { create: createQueued } = useQueuedOrders();
+  const { show: showToast } = useToast();
+  const [submittingDeferred, setSubmittingDeferred] = useState(false);
 
   const asset = assets.find((a) => a.ticker === ticker);
   const isSell = mode === "sell";
@@ -223,8 +234,61 @@ export default function BuyScreen() {
     router.push({ pathname: "/(app)/confirm", params });
   };
 
+  /* ─── Mercado cerrado: orden diferida ────────────────────────
+   *
+   * Si el mercado del activo está cerrado al momento de operar, el
+   * flow cambia: en lugar de routear a /confirm (ejecuta inmediato),
+   * encolamos una market order que el backend procesa en la próxima
+   * apertura. La spec lo pide explícitamente para v1: SOLO market
+   * orders, NO limit. El precio de referencia es el último cierre.
+   */
+  const closedReason = useMemo(
+    () => closedReasonFor(asset),
+    [asset],
+  );
+  const isDeferred =
+    closedReason.kind !== "open" && closedReason.kind !== "notApplicable";
+
+  const queueOrder = async () => {
+    if (!hasInput || exceeds || submittingDeferred) return;
+    setSubmittingDeferred(true);
+    try {
+      const next = nextOpenFor(asset);
+      await createQueued({
+        assetId: asset.ticker,
+        side: isSell ? "sell" : "buy",
+        quantity: qtyAmount,
+        currency: nativeCurrency,
+        estimatedExecutionAt: next.toISOString(),
+      });
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
+      showToast(
+        isSell ? "Venta programada" : "Compra programada",
+        { variant: "success" },
+      );
+      // Volvemos al detail; el user ya recibió confirmación por
+      // toast. Si quiere ver la orden, va a "Órdenes pendientes"
+      // desde el perfil.
+      router.back();
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "No pudimos programar la orden. Reintentá.";
+      showToast(msg, { variant: "error" });
+    } finally {
+      setSubmittingDeferred(false);
+    }
+  };
+
   const onContinue = () => {
     if (!hasInput || exceeds) return;
+    if (isDeferred) {
+      queueOrder();
+      return;
+    }
     goToConfirm();
   };
 
@@ -287,6 +351,26 @@ export default function BuyScreen() {
         </View>
         <View style={{ width: 36 }} />
       </View>
+
+      {/* Banner de mercado cerrado — sólo cuando aplica. La copy se
+          adapta al mercado del activo (AR / US). El flow encola la
+          orden en lugar de ejecutar inmediato. */}
+      {isDeferred ? (
+        <View
+          style={[
+            s.deferredBanner,
+            { backgroundColor: c.surfaceHover, borderColor: c.border },
+          ]}
+        >
+          <Feather name="clock" size={16} color={c.textSecondary} />
+          <Text
+            style={[s.deferredText, { color: c.textSecondary }]}
+            numberOfLines={4}
+          >
+            {deferredOrderDisclaimerFor(asset)}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Toggle Monto / Cantidad: va debajo del header, NO centrado con
           el contenido. */}
@@ -452,7 +536,9 @@ export default function BuyScreen() {
               },
             ]}
           >
-            Revisar orden
+            {isDeferred
+              ? deferredCtaLabel(isSell ? "sell" : "buy")
+              : "Revisar orden"}
           </Text>
           <Feather
             name="arrow-right"
@@ -487,6 +573,24 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 16,
     letterSpacing: -0.25,
+  },
+  deferredBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  deferredText: {
+    flex: 1,
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
   modeRow: {
     paddingHorizontal: 20,

@@ -45,6 +45,7 @@ import {
   isMarketOpen,
   marketClosedMessage,
   marketSessionFor,
+  closedHeroMessageFor,
 } from "../../lib/market/hours";
 import { MarketClosedSheet } from "../../lib/components/MarketClosedSheet";
 import { AssetColorProvider } from "../../lib/asset-color/context";
@@ -217,6 +218,18 @@ export default function DetailScreen() {
               {timeLabel}
             </Text>
           </View>
+
+          {/* Indicador de mercado cerrado: copy específico por escenario
+              (after-hours / fin de semana / feriado AR / feriado US).
+              Crypto y FCI no muestran nada (24/7 / horario continuo). */}
+          {(() => {
+            const closedMsg = closedHeroMessageFor(asset);
+            return closedMsg ? (
+              <Text style={[s.heroClosedHint, { color: c.textMuted }]}>
+                {closedMsg}
+              </Text>
+            ) : null;
+          })()}
 
           <Sparkline
             series={series}
@@ -1795,6 +1808,12 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 15,
     letterSpacing: -0.2,
+  },
+  heroClosedHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 6,
   },
   rangeRow: {
     flexDirection: "row",
