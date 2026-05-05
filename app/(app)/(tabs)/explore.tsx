@@ -15,7 +15,6 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
-import { AutoMarquee } from "../../../lib/components/AutoMarquee";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 
 // Verde de acción primaria — usar `c.action` del theme. Esta constante
@@ -398,6 +397,7 @@ function BaseExplore() {
         market={market}
         query={query}
         onlyFavs={onlyFavs}
+        searchFocused={searchFocused}
         onOpen={openDetail}
         isFavorite={isFavorite}
         listRef={(r) => {
@@ -487,6 +487,7 @@ function MarketBody({
   market,
   query,
   onlyFavs,
+  searchFocused,
   onOpen,
   isFavorite,
   listRef,
@@ -494,6 +495,7 @@ function MarketBody({
   market: MarketTab;
   query: string;
   onlyFavs: boolean;
+  searchFocused: boolean;
   onOpen: (a: Asset) => void;
   isFavorite: (t: string) => boolean;
   listRef: (ref: ScrollView | null) => void;
@@ -551,10 +553,19 @@ function MarketBody({
     return out;
   }, [categories, inMarket]);
 
+  // Vista de "Destacados del día" (estilo Robinhood Trending Lists):
+  // grilla 2-col de pills con icon + ticker. Solo aparece cuando el
+  // user tappea la barra de búsqueda y todavía no escribió nada
+  // — gamificación del onboarding-to-search.
+  const isTrendingView =
+    searchFocused && !query.trim() && !onlyFavs;
+
   const eyebrowLabel = query
     ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
     : onlyFavs
     ? `Tus favoritos en ${market.short}`
+    : isTrendingView
+    ? "Destacados del día"
     : `Categorías · ${market.label}`;
 
   return (
@@ -562,18 +573,8 @@ function MarketBody({
       ref={listRef}
       contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
-      {isCategoryView && topMovers.length > 0 ? (
-        <View style={s.moversBlock}>
-          <View style={s.sectionHead}>
-            <Text style={[s.eyebrow, { color: c.textMuted }]}>
-              Destacados del día
-            </Text>
-          </View>
-          <MoversMarquee movers={topMovers} onOpen={onOpen} />
-        </View>
-      ) : null}
-
       <View style={s.listBlock}>
         <View style={s.sectionHead}>
           <Text style={[s.eyebrow, { color: c.textMuted }]}>
@@ -581,7 +582,80 @@ function MarketBody({
           </Text>
         </View>
 
-        {isCategoryView ? (
+        {isTrendingView ? (
+          /* Grilla 2-col de destacados — pills con icon redondo +
+             ticker + delta pequeñito. Tappear lleva al detalle del
+             activo igual que cualquier row. keyboardShouldPersistTaps
+             en el ScrollView padre asegura que el primer tap sobre
+             una pill registre como onPress (no solo dismiss del
+             keyboard). */
+          <View style={s.trendingGrid}>
+            {topMovers.map((asset) => {
+              const up = asset.change >= 0;
+              return (
+                <Pressable
+                  key={asset.ticker}
+                  onPress={() => onOpen(asset)}
+                  style={({ pressed }) => [
+                    s.trendingCard,
+                    {
+                      backgroundColor: c.surface,
+                      borderColor: c.border,
+                      transform: [{ scale: pressed ? 0.97 : 1 }],
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      s.trendingIcon,
+                      {
+                        backgroundColor:
+                          asset.iconTone === "dark"
+                            ? c.ink
+                            : asset.iconTone === "accent"
+                              ? c.green
+                              : c.surfaceSunken,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.trendingIconText,
+                        {
+                          color:
+                            asset.iconTone === "dark"
+                              ? c.bg
+                              : asset.iconTone === "accent"
+                                ? c.ink
+                                : c.textSecondary,
+                        },
+                      ]}
+                    >
+                      {assetIconCode(asset)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[s.trendingTicker, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      {asset.ticker}
+                    </Text>
+                    <Text
+                      style={[
+                        s.trendingDelta,
+                        { color: up ? c.positive : c.red },
+                      ]}
+                    >
+                      {up ? "▲ " : "▼ "}
+                      {formatPct(asset.change, false)}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : isCategoryView ? (
           /* Lista de categorías — cada una drilling a la pantalla
              /market-category con el slug en los params. */
           categories.map((cat, i) => (
@@ -733,61 +807,6 @@ function MarketBody({
 
 /* ─── Carrusel horizontal de destacados ─── */
 
-const CARD_W = 160;
-const GAP = 12;
-
-function MoversMarquee({
-  movers,
-  onOpen,
-}: {
-  movers: Asset[];
-  onOpen: (a: Asset) => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <View style={s.marqueeWrap}>
-      <AutoMarquee speed={32} contentStyle={s.marqueeTrack}>
-        {movers.map((asset) => {
-          const up = asset.change >= 0;
-          const currency = assetCurrency(asset);
-          return (
-            <Pressable
-              key={asset.ticker}
-              onPress={() => onOpen(asset)}
-              style={[
-                s.moverCard,
-                { backgroundColor: c.surface, borderColor: c.border },
-              ]}
-            >
-              <Text style={[s.moverTicker, { color: c.text }]}>
-                {asset.ticker}
-              </Text>
-              <Text
-                style={[s.moverSub, { color: c.textMuted }]}
-                numberOfLines={1}
-              >
-                {asset.name}
-              </Text>
-              <Text style={[s.moverPrice, { color: c.text }]}>
-                {formatMoney(asset.price, currency)}
-              </Text>
-              <Text
-                style={[
-                  s.moverChange,
-                  { color: up ? c.positive : c.red },
-                ]}
-              >
-                {up ? "▲ " : "▼ "}
-                {formatPct(asset.change, false)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </AutoMarquee>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
@@ -917,9 +936,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  moversBlock: {
-    paddingTop: 24,
-  },
   sectionHead: {
     paddingHorizontal: 20,
     marginBottom: 10,
@@ -929,42 +945,6 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: "uppercase",
-  },
-  marqueeWrap: {
-    overflow: "hidden",
-    paddingVertical: 4,
-  },
-  marqueeTrack: {
-    flexDirection: "row",
-    gap: GAP,
-    paddingHorizontal: 20,
-  },
-  moverCard: {
-    width: CARD_W,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: 14,
-    gap: 2,
-  },
-  moverTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  moverSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  moverPrice: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  moverChange: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    marginTop: 2,
   },
   listBlock: {
     paddingTop: 24,
@@ -977,6 +957,50 @@ const s = StyleSheet.create({
     gap: 14,
   },
   /* Row de categoría — icon + label/hint + count + chevron. */
+  /* Grilla 'Destacados del día' (Robinhood-style trending lists):
+     2 columnas de pills con icon redondo + ticker + delta. Cada
+     pill ocupa ~48% del ancho con un gap de 10. */
+  trendingGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+  },
+  trendingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    width: "48.5%",
+    flexGrow: 1,
+    flexBasis: "48.5%",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  trendingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trendingIconText: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    letterSpacing: -0.1,
+  },
+  trendingTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  trendingDelta: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
   categoryRow: {
     flexDirection: "row",
     alignItems: "center",
