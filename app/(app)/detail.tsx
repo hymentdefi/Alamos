@@ -47,6 +47,7 @@ import {
   marketSessionFor,
 } from "../../lib/market/hours";
 import { MarketClosedSheet } from "../../lib/components/MarketClosedSheet";
+import { AssetColorProvider } from "../../lib/asset-color/context";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -161,6 +162,7 @@ export default function DetailScreen() {
   const pos = useMemo(() => mockPosition(asset), [asset]);
 
   return (
+    <AssetColorProvider up={rangeUp}>
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Tap
@@ -339,6 +341,7 @@ export default function DetailScreen() {
         onClose={() => setClosedSheetOpen(false)}
       />
     </View>
+    </AssetColorProvider>
   );
 }
 

@@ -59,10 +59,12 @@ const light = {
   greenDark: "#00A304",
   greenDim: "rgba(0,163,4,0.14)",
 
-  // Rojo brand: vivo y saturado para emparejar la "viveza" visual del
-  // verde-action (#5ac43e). Antes era #C83B3B — apagado y opaco.
-  red: "#EF3939",
-  redDim: "rgba(239,57,57,0.12)",
+  // Asset state DOWN — naranja cálido en lugar de rojo puro para
+  // matchear el feel "trading premium" (Robinhood / Public usan
+  // naranja-rojo, no rojo bandera). Reusamos el name `red` para no
+  // romper código pre-existente; el VALOR es naranja saturado.
+  red: "#EB5D2A",
+  redDim: "rgba(235,93,42,0.12)",
   ink: brand.ink,
 } as const;
 
@@ -95,8 +97,10 @@ const dark = {
   greenDark: "#02A05C",
   greenDim: "rgba(2,160,92,0.16)",
 
-  red: "#F6465D",
-  redDim: "rgba(246,70,93,0.14)",
+  // Asset state DOWN — naranja cálido (mismo valor en light y dark
+   // para coherencia de marca; sólo cambia el dim alpha).
+  red: "#EB5D2A",
+  redDim: "rgba(235,93,42,0.16)",
   ink: "#000000",
 } as const;
 
