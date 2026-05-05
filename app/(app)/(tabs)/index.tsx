@@ -66,6 +66,11 @@ import {
 } from "../../../lib/components/ActionIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { EarningsInfoSheet } from "../../../lib/components/EarningsInfoSheet";
+import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
+import {
+  categorizeAsset,
+  findCategoryBySlug,
+} from "../../../lib/data/marketCategories";
 import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
@@ -408,16 +413,6 @@ function BaseHome() {
     });
   }, [held]);
 
-  const openDetail = (asset: Asset) => {
-    if (asset.category === "efectivo") {
-      router.push("/(app)/transfer");
-      return;
-    }
-    router.push({
-      pathname: "/(app)/detail",
-      params: { ticker: asset.ticker },
-    });
-  };
 
   const isDark = mode === "dark";
   // Backdrop sutil estilo Revolut — warm top, neutral mid, cool
@@ -681,7 +676,7 @@ function BaseHome() {
 
         <Dinero byCategory={byCategory} />
 
-        <Investments byCategory={byCategory} onOpen={openDetail} />
+        <Investments byCategory={byCategory} />
 
       </ScrollView>
 
@@ -1014,30 +1009,55 @@ function AccountRow({
 }
 
 
-/* ─── Tus inversiones: lista plana de holdings (sin grupos por categoría) ─── */
+/* ─── Tus inversiones: lista por categorías del brand pack ─── */
+/**
+ * Agrupa los holdings del usuario por categoría de Mercado y los
+ * muestra como rows clickeables (mismo lenguaje visual que Mercado:
+ * CategoryGlyph + label + total tenido + chevron). Tap → drilling
+ * al detalle de la categoría en /(app)/market-category.
+ *
+ * Sólo aparecen las categorías donde el usuario tiene posiciones >0.
+ * Los holdings que no calzan en ninguna categoría visible (efectivo,
+ * placeholders sin mock) se descartan silenciosamente.
+ */
 function Investments({
   byCategory,
-  onOpen,
 }: {
   byCategory: [AssetCategory, { total: number; items: Asset[] }][];
-  onOpen: (a: Asset) => void;
 }) {
   const { c } = useTheme();
   const router = useRouter();
 
-  // Aplanamos todos los held no-cash y ordenamos por valor de tenencia
-  // (la posición más grande primero), así el orden no depende de la
-  // categoría.
-  const items = useMemo(() => {
-    const all = byCategory
-      .filter(([cat]) => cat !== "efectivo")
-      .flatMap(([, data]) => data.items);
-    return all
-      .slice()
-      .sort(
-        (a, b) =>
-          b.price * (b.qty ?? 1) - a.price * (a.qty ?? 1),
-      );
+  // Para cada slug visible: total tenido (en ARS, equiv) + cantidad
+  // de instrumentos. Un Map preserva el orden de insertion = orden
+  // en el que aparecieron los assets en byCategory.
+  const grouped = useMemo(() => {
+    const map = new Map<
+      string,
+      { totalArs: number; count: number }
+    >();
+    for (const [, { items }] of byCategory) {
+      for (const asset of items) {
+        if (asset.category === "efectivo") continue;
+        const slug = categorizeAsset(asset);
+        if (!slug) continue;
+        const value = convertAmount(
+          asset.price * (asset.qty ?? 1),
+          assetCurrency(asset),
+          "ARS",
+        );
+        const prev = map.get(slug) ?? { totalArs: 0, count: 0 };
+        map.set(slug, {
+          totalArs: prev.totalArs + value,
+          count: prev.count + 1,
+        });
+      }
+    }
+    // Ordenamos por valor descendente — el grupo con más plata
+    // adentro va primero.
+    return [...map.entries()].sort(
+      ([, a], [, b]) => b.totalArs - a.totalArs,
+    );
   }, [byCategory]);
 
   return (
@@ -1057,16 +1077,64 @@ function Investments({
         />
       </Pressable>
 
-      <GlassCard padding={items.length > 0 ? 4 : 16}>
-        {items.length > 0 ? (
-          items.map((asset, i) => (
-            <AssetRow
-              key={asset.ticker}
-              asset={asset}
-              first={i === 0}
-              onPress={() => onOpen(asset)}
-            />
-          ))
+      <GlassCard padding={grouped.length > 0 ? 4 : 16}>
+        {grouped.length > 0 ? (
+          grouped.map(([slug, data], i) => {
+            const lookup = findCategoryBySlug(slug);
+            if (!lookup) return null;
+            const { category } = lookup;
+            return (
+              <Pressable
+                key={slug}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/market-category",
+                    params: { slug },
+                  })
+                }
+                style={[
+                  s.invRow,
+                  i > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: c.border,
+                  },
+                ]}
+              >
+                <CategoryGlyph
+                  slug={category.slug}
+                  size={36}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[s.invRowLabel, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {category.label}
+                  </Text>
+                  <Text
+                    style={[s.invRowSub, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {data.count} instrumento
+                    {data.count === 1 ? "" : "s"}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text
+                    style={[s.invRowValue, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {formatARS(data.totalArs)}
+                  </Text>
+                </View>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={c.textFaint}
+                />
+              </Pressable>
+            );
+          })
         ) : (
           <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
             Todavía no tenés inversiones. Entrá a Mercado para empezar.
@@ -1077,104 +1145,6 @@ function Investments({
   );
 }
 
-
-function AssetRow({
-  asset,
-  first,
-  onPress,
-}: {
-  asset: Asset;
-  first?: boolean;
-  onPress: () => void;
-}) {
-  const { c } = useTheme();
-  const isCash = asset.category === "efectivo";
-  const isUSD = asset.ticker === "USD";
-  const qty = asset.qty ?? 0;
-
-  const cur = assetCurrency(asset);
-  const primaryValue = isCash
-    ? isUSD
-      ? `${qty.toLocaleString("es-AR")} US$`
-      : formatARS(qty)
-    : formatMoney(asset.price * (asset.qty ?? 1), cur);
-  const secondaryValue = isCash && isUSD ? formatARS(asset.price * qty) : null;
-
-  const up = asset.change >= 0;
-
-  const bg =
-    asset.iconTone === "dark"
-      ? c.ink
-      : asset.iconTone === "accent"
-      ? c.green
-      : c.surfaceSunken;
-  const fg =
-    asset.iconTone === "dark"
-      ? c.bg
-      : asset.iconTone === "accent"
-      ? c.ink
-      : c.textSecondary;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        s.row,
-        !first && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-        },
-      ]}
-    >
-      {isCash && (asset.ticker === "ARS" || asset.ticker === "USD") ? (
-        <MoneyIcon
-          variant={asset.ticker === "ARS" ? "ars" : "usd"}
-          size={40}
-        />
-      ) : (
-        <View style={[s.rowIcon, { backgroundColor: bg }]}>
-          <Text style={[s.rowIconText, { color: fg }]}>
-            {assetIconCode(asset)}
-          </Text>
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={[s.rowTicker, { color: c.text }]}>
-          {isCash ? asset.name : asset.ticker}
-        </Text>
-        <Text style={[s.rowSub, { color: c.textMuted }]}>
-          {isCash
-            ? asset.subLabel
-            : `${asset.qty} ${asset.qty === 1 ? "unidad" : "unidades"} · ${formatMoney(asset.price, cur)}`}
-        </Text>
-      </View>
-      {!isCash ? (
-        <View style={s.rowChart}>
-          <MiniSparkline
-            series={seriesFromSeed(
-              asset.ticker,
-              28,
-              asset.change >= 0 ? "up" : "down",
-            )}
-            color={asset.change >= 0 ? c.greenDark : c.red}
-          />
-        </View>
-      ) : null}
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={[s.rowPrice, { color: c.text }]}>{primaryValue}</Text>
-        {secondaryValue ? (
-          <Text style={[s.rowChange, { color: c.textMuted }]}>
-            ≈ {secondaryValue}
-          </Text>
-        ) : !isCash ? (
-          <Text style={[s.rowChange, { color: up ? c.greenDark : c.red }]}>
-            {formatPct(asset.change)}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
 
 
 const s = StyleSheet.create({
@@ -1620,6 +1590,31 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
+  /* Row del listado por categoría de 'Tus inversiones' — icon
+   * (CategoryGlyph) + label/count + total ARS + chevron. */
+  invRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  invRowLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  invRowSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+  invRowValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
   emptyPortfolio: {
     fontFamily: fontFamily[500],
     fontSize: 14,

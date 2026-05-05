@@ -181,3 +181,45 @@ export function findCategoryBySlug(
   }
   return null;
 }
+
+/** Mapea un asset a la categoría visible del brand pack.
+ *
+ *  - Crypto → cr-crypto (incluye spot + futuros perpetuos)
+ *  - US acciones → us-acciones (US ETFs/T-Bills/etc no están en
+ *    el catálogo todavía, devolvemos null)
+ *  - AR: mapeamos por category + currency (los bonos AR se splitean
+ *    USD vs ARS porque las categorías del brand pack los separan).
+ *
+ *  Los assets que no calzan en ninguna categoría visible (ej:
+ *  efectivo) devuelven null y los descarta el caller. */
+export function categorizeAsset(a: Asset): CategorySlug | null {
+  const market = assetMarket(a);
+  if (market === "CRYPTO") return "cr-crypto";
+  if (market === "US") {
+    if (a.category === "acciones") return "us-acciones";
+    return null;
+  }
+  // AR
+  switch (a.category) {
+    case "acciones":
+      return "ar-acciones";
+    case "cedears":
+      return "ar-cedears";
+    case "bonos":
+      return assetCurrency(a) === "USD" ? "ar-bonos-usd" : "ar-bonos-ars";
+    case "letras":
+      return "ar-letras";
+    case "obligaciones":
+      return "ar-ons";
+    case "fci":
+      return "ar-fci";
+    case "caucion":
+      return "ar-cauciones";
+    case "futuros":
+      return "ar-futuros";
+    case "opciones":
+      return "ar-opciones";
+    default:
+      return null;
+  }
+}
