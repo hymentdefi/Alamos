@@ -207,37 +207,47 @@ export default function DetailScreen() {
         >
           <Feather name="arrow-left" size={24} color={c.text} />
         </Tap>
-        {/* Center: vacío hasta que el user scrollea pasado el hero;
-            ahí aparece sticky con precio + ticker · variación%.
-            absoluteFill dentro del flex:1 wrapper para que no
-            empuje el layout horizontal del topBar. */}
-        <View style={s.stickyCenter}>
-          <Animated.View
-            style={[s.stickyBlock, stickyOpacityStyle]}
-            pointerEvents="none"
-          >
-            <Text
-              style={[s.stickyPrice, { color: c.text }]}
-              numberOfLines={1}
-            >
-              {formatMoney(asset.price, cur)}
-            </Text>
-            <View style={s.stickyRow}>
-              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
-                {asset.ticker}
-              </Text>
-              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
-              <Text style={[s.stickyPct, { color }]}>
-                {formatPct(displayPct)}
-              </Text>
-            </View>
-          </Animated.View>
-        </View>
+        {/* Spacer puro entre back y los íconos derechos. El bloque
+            sticky vive como overlay absoluto centrado SOBRE LA
+            PANTALLA (no entre íconos), independiente del ancho de
+            cada lado. */}
+        <View style={{ flex: 1 }} />
         <PriceAlertButton
           ticker={asset.ticker}
           onPress={() => setAlertSheetOpen(true)}
         />
         <WatchlistButton ticker={asset.ticker} size={36} />
+
+        {/* Sticky overlay — absolute, centrado sobre el topBar
+            entero (left:0, right:0). Así NO depende del ancho de
+            los íconos: precio + ticker · variación% quedan en el
+            centro real de la pantalla, exactamente como en el
+            objetivo de la captura de referencia. pointerEvents
+            none para no comer taps de los íconos al desvanecerse. */}
+        <Animated.View
+          style={[
+            s.stickyOverlay,
+            { top: insets.top + 12 },
+            stickyOpacityStyle,
+          ]}
+          pointerEvents="none"
+        >
+          <Text
+            style={[s.stickyPrice, { color: c.text }]}
+            numberOfLines={1}
+          >
+            {formatMoney(asset.price, cur)}
+          </Text>
+          <View style={s.stickyRow}>
+            <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+              {asset.ticker}
+            </Text>
+            <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+            <Text style={[s.stickyPct, { color }]}>
+              {formatPct(displayPct)}
+            </Text>
+          </View>
+        </Animated.View>
       </View>
 
       <Animated.ScrollView
@@ -1777,23 +1787,16 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: "center",
   },
-  /* Sticky header — el center del topBar arranca vacío y, al
-   * scrollear pasado el hero, fade-in de precio (peso 500) +
-   * ticker · variación%. */
-  stickyCenter: {
-    flex: 1,
-    height: 38,
-    /* No alignItems / justifyContent — el stickyBlock es absolute
-     * fill dentro de este spacer, así no toma espacio en flujo
-     * (importante para que precios largos no empujen los íconos
-     * laterales en pantallas chicas como iPhone SE). */
-  },
-  stickyBlock: {
+  /* Sticky overlay — absolute, span left:0 right:0 → centro real
+   * de la pantalla. Independiente del ancho de los íconos
+   * laterales (back izquierda, alert+watchlist derecha). El
+   * `top` lo seteo inline desde insets.top + paddingTop del bar
+   * para alinear vertically con la fila de íconos. */
+  stickyOverlay: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
     left: 0,
     right: 0,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
   },
