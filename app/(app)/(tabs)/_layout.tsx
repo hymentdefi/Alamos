@@ -337,7 +337,11 @@ export default function TabsLayout() {
           transitionSpec: {
             animation: "timing",
             config: {
-              duration: 520,
+              // 720ms (era 520) — desaceleración un toque más larga
+              // sin perder fluidez. El easing sigue siendo el mismo
+              // out-quart, así que la transición arranca rápido y
+              // se "asienta" con calma.
+              duration: 720,
               easing: RNEasing.bezier(0.16, 1, 0.3, 1),
             },
           },

@@ -11,7 +11,11 @@ import {
 import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import {
+  Feather,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
@@ -151,8 +155,25 @@ function BaseExplore() {
     return {
       balance: acc?.balance ?? 0,
       currency: market.currency,
+      sourceId,
     };
   }, [activeMarketIdx]);
+
+  /* Tap del + del header — lleva al ingreso de saldo en la moneda
+   * del mercado activo. Crypto va directo al screen de addresses
+   * USDT; ARS/USD van al floating card de transferencia bancaria
+   * (mismo path que el botón '+' de las cuentas vacías del home). */
+  const onAddBalance = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    if (operable.sourceId === "usdt-crypto") {
+      router.push("/(app)/crypto-deposit");
+    } else {
+      router.push({
+        pathname: "/(app)/transfer-deposit",
+        params: { currency: operable.sourceId },
+      });
+    }
+  }, [operable.sourceId, router]);
 
   // Animación cross-fade entre la estrella de favoritos y el botón
   // 'Cancelar' cuando el input de búsqueda gana/pierde foco. Antes era
@@ -256,9 +277,28 @@ function BaseExplore() {
             <Text style={[s.balanceLabel, { color: c.textFaint }]}>
               Disponible para operar
             </Text>
-            <Text style={[s.balance, { color: c.textSecondary }]}>
-              {formatOperable(operable.balance, operable.currency)}
-            </Text>
+            <View style={s.balanceAmountRow}>
+              <Text style={[s.balance, { color: c.textSecondary }]}>
+                {formatOperable(operable.balance, operable.currency)}
+              </Text>
+              <Pressable
+                onPress={onAddBalance}
+                hitSlop={10}
+                style={({ pressed }) => [
+                  s.addBalanceBtn,
+                  {
+                    backgroundColor: c.brandDim,
+                    transform: [{ scale: pressed ? 0.92 : 1 }],
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="plus-thick"
+                  size={12}
+                  color={c.brand}
+                />
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -851,6 +891,23 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.3,
+  },
+  /* Fila monto + botón '+' — alineados al baseline para que el
+   * botón flote a la derecha del último dígito. */
+  balanceAmountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  /* Botón '+' alamos-style — pill chiquita con tint verde brand
+   * (c.brandDim) y un plus-thick adentro en c.brand. Mismo
+   * lenguaje que los acentos verdes del resto de la app. */
+  addBalanceBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   marketControl: {
     borderRadius: radius.lg,
