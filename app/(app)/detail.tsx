@@ -1801,28 +1801,37 @@ const s = StyleSheet.create({
    * ticker · variación%. */
   stickyCenter: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 38,
+    height: 38,
+    /* No alignItems / justifyContent — el stickyBlock es absolute
+     * fill dentro de este spacer, así no toma espacio en flujo
+     * (importante para que precios largos no empujen los íconos
+     * laterales en pantallas chicas como iPhone SE). */
   },
   stickyBlock: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
+    justifyContent: "center",
   },
   stickyPrice: {
     fontFamily: fontFamily[500],
-    fontSize: 18,
-    letterSpacing: -0.4,
+    fontSize: 17,
+    letterSpacing: -0.3,
+    lineHeight: 20,
   },
   stickyRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    alignItems: "baseline",
+    gap: 5,
     marginTop: 1,
   },
   stickyTicker: {
     fontFamily: fontFamily[600],
     fontSize: 11,
-    letterSpacing: -0.05,
+    letterSpacing: 0,
   },
   stickyDot: {
     fontFamily: fontFamily[500],
