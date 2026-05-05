@@ -43,14 +43,13 @@ import { useFavorites } from "../../lib/favorites/context";
 import { FavStar } from "../../lib/components/FavStar";
 import {
   isMarketOpen,
-  marketClosedMessage,
-  marketSessionFor,
   closedHeroMessageFor,
 } from "../../lib/market/hours";
-import { MarketClosedSheet } from "../../lib/components/MarketClosedSheet";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { AlertSheet } from "../../lib/components/AlertSheet";
+import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
+import { TradeSelectorSheet } from "../../lib/components/TradeSelectorSheet";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -117,8 +116,8 @@ export default function DetailScreen() {
   const { isFavorite, toggle: toggleFav } = useFavorites();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
-  const [closedSheetOpen, setClosedSheetOpen] = useState(false);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+  const [tradeSelectorOpen, setTradeSelectorOpen] = useState(false);
 
   // IMPORTANT: todos los hooks se corren ANTES del early return para
   // respetar las reglas de React (mismo orden cada render). Si el
@@ -305,60 +304,11 @@ export default function DetailScreen() {
         </Text>
       </ScrollView>
 
-      <View
-        style={[
-          s.bottomBar,
-          {
-            backgroundColor: c.surface,
-            borderTopColor: c.border,
-            shadowColor: c.ink,
-            paddingBottom: insets.bottom + 6,
-          },
-        ]}
-      >
-        <Tap
-          style={[s.btn, { backgroundColor: rangeUp ? c.greenDark : c.red }]}
-          haptic="medium"
-          onPress={() => {
-            const session = marketSessionFor(asset);
-            if (!session.open) {
-              setClosedSheetOpen(true);
-              return;
-            }
-            router.push({
-              pathname: "/(app)/buy",
-              params: { ticker: asset.ticker, mode: "buy" },
-            });
-          }}
-        >
-          <Text style={[s.btnText, { color: "#FFFFFF" }]}>Comprar</Text>
-        </Tap>
-        {position > 0 ? (
-          <Tap
-            style={[s.btn, { backgroundColor: c.surfaceHover }]}
-            haptic="light"
-            onPress={() => {
-              const session = marketSessionFor(asset);
-              if (!session.open) {
-                setClosedSheetOpen(true);
-                return;
-              }
-              router.push({
-                pathname: "/(app)/buy",
-                params: { ticker: asset.ticker, mode: "sell" },
-              });
-            }}
-          >
-            <Text style={[s.btnText, { color: c.text }]}>Vender</Text>
-          </Tap>
-        ) : null}
-      </View>
-
-      <MarketClosedSheet
-        visible={closedSheetOpen}
-        instrumentLabel={marketSessionFor(asset).instrumentLabel}
-        session={marketSessionFor(asset)}
-        onClose={() => setClosedSheetOpen(false)}
+      <TradeBottomBar
+        asset={asset}
+        hasPosition={position > 0}
+        onOperar={() => setTradeSelectorOpen(true)}
+        onConvert={() => router.push("/(app)/convert")}
       />
 
       {/* AlertSheet — key={ticker} fuerza remount cuando se navega
@@ -369,6 +319,23 @@ export default function DetailScreen() {
         visible={alertSheetOpen}
         asset={asset}
         onClose={() => setAlertSheetOpen(false)}
+      />
+
+      <TradeSelectorSheet
+        key={`trade-${asset.ticker}`}
+        visible={tradeSelectorOpen}
+        asset={asset}
+        hasPosition={position > 0}
+        onClose={() => setTradeSelectorOpen(false)}
+        onSelect={(mode) => {
+          // En mercado abierto: routea al flow de compra/venta
+          // existente (buy.tsx). En mercado cerrado: buy.tsx detecta
+          // y muta a flow de orden diferida (banner + CTA Programar).
+          router.push({
+            pathname: "/(app)/buy",
+            params: { ticker: asset.ticker, mode },
+          });
+        }}
       />
     </View>
     </AssetColorProvider>
@@ -1918,35 +1885,6 @@ const s = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: -0.15,
   },
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 16,
-  },
-  btn: {
-    flex: 1,
-    height: 58,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnText: {
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-  },
-
   /* ─── Sección full-width (sin chrome de card) ─── */
   card: {
     paddingHorizontal: 24,

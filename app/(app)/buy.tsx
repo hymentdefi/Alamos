@@ -10,14 +10,13 @@ import {
   assetIconCode,
   assetCurrency,
   assetMarket,
-  formatARS,
   formatMoney,
   formatQty,
   type AssetCategory,
   type AssetCurrency,
   type AssetMarket,
 } from "../../lib/data/assets";
-import { accounts, type AccountId } from "../../lib/data/accounts";
+import { nativeBalanceFor } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import {
@@ -46,31 +45,6 @@ function unitWordFor(cat: AssetCategory): string {
     default:
       return "unidades";
   }
-}
-
-/**
- * Cada mercado se opera contra UNA cuenta específica:
- *   - AR     → ars-ar (acciones AR, bonos, FCI)
- *   - US     → usd-us (acciones US — los USD en cuenta argentina NO
- *              sirven para operar en este mercado, son saldo aparte)
- *   - CRYPTO → usdt-crypto
- */
-function sourceAccountIdForMarket(market: AssetMarket): AccountId {
-  switch (market) {
-    case "US":
-      return "usd-us";
-    case "CRYPTO":
-      return "usdt-crypto";
-    case "AR":
-    default:
-      return "ars-ar";
-  }
-}
-
-/** Saldo disponible para operar en el mercado del asset. */
-function nativeBalanceFor(market: AssetMarket): number {
-  const id = sourceAccountIdForMarket(market);
-  return accounts.find((a) => a.id === id)?.balance ?? 0;
 }
 
 /**

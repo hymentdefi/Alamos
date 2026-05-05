@@ -5,7 +5,7 @@
  * (USD argentino vs USD USA) pero son cuentas distintas.
  */
 
-import { formatMoney } from "./assets";
+import { formatMoney, type AssetMarket } from "./assets";
 
 export type AccountId = "ars-ar" | "usd-ar" | "usd-us" | "usdt-crypto";
 
@@ -254,4 +254,57 @@ export function formatAccountBalance(a: Account): string {
     return "$ " + Math.round(a.balance).toLocaleString("es-AR");
   }
   return formatMoney(a.balance, a.currency);
+}
+
+/* ─── Mapping market → cuenta source ──────────────────────────────
+ *
+ * Cada mercado se opera contra UNA cuenta específica:
+ *   - AR     → ars-ar (acciones AR, bonos, FCI)
+ *   - US     → usd-us (acciones US — los USD en cuenta argentina NO
+ *              sirven para operar en este mercado, son saldo aparte)
+ *   - CRYPTO → usdt-crypto
+ *
+ * Helpers extraídos de buy.tsx para que múltiples consumers
+ * (TradeBottomBar, buy.tsx, etc.) usen la misma fuente de verdad.
+ */
+export function sourceAccountIdForMarket(market: AssetMarket): AccountId {
+  switch (market) {
+    case "US":
+      return "usd-us";
+    case "CRYPTO":
+      return "usdt-crypto";
+    case "AR":
+    default:
+      return "ars-ar";
+  }
+}
+
+export function sourceAccountForMarket(
+  market: AssetMarket,
+  available: Account[] = accounts,
+): Account | undefined {
+  const id = sourceAccountIdForMarket(market);
+  return available.find((a) => a.id === id);
+}
+
+/** Saldo disponible para operar en el mercado del asset, en la
+ *  moneda nativa de la cuenta source. */
+export function nativeBalanceFor(
+  market: AssetMarket,
+  available: Account[] = accounts,
+): number {
+  return sourceAccountForMarket(market, available)?.balance ?? 0;
+}
+
+/** Moneda nativa de la cuenta source para un mercado. */
+export function nativeCurrencyFor(market: AssetMarket): AccountCurrency {
+  switch (market) {
+    case "US":
+      return "USD";
+    case "CRYPTO":
+      return "USDT";
+    case "AR":
+    default:
+      return "ARS";
+  }
 }
