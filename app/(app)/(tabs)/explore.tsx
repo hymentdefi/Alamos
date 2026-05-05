@@ -40,6 +40,8 @@ import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { FavStar } from "../../../lib/components/FavStar";
 import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
+import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
+import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 
@@ -394,7 +396,6 @@ function BaseExplore() {
 
       <MarketBody
         market={market}
-        activeCategory="todo"
         query={query}
         onlyFavs={onlyFavs}
         onOpen={openDetail}
@@ -484,7 +485,6 @@ const gs = StyleSheet.create({
 
 function MarketBody({
   market,
-  activeCategory,
   query,
   onlyFavs,
   onOpen,
@@ -492,7 +492,6 @@ function MarketBody({
   listRef,
 }: {
   market: MarketTab;
-  activeCategory: AssetCategory | "todo";
   query: string;
   onlyFavs: boolean;
   onOpen: (a: Asset) => void;
@@ -500,6 +499,7 @@ function MarketBody({
   listRef: (ref: ScrollView | null) => void;
 }) {
   const { c } = useTheme();
+  const router = useRouter();
 
   const inMarket = useMemo(
     () =>
@@ -510,19 +510,15 @@ function MarketBody({
     [market.id],
   );
 
-  // Filtramos primero por categoría dentro del mercado, después por
-  // search/onlyFavs. Los movers también respetan la categoría activa.
-  const inCategory = useMemo(
-    () =>
-      activeCategory === "todo"
-        ? inMarket
-        : inMarket.filter((a) => a.category === activeCategory),
-    [inMarket, activeCategory],
-  );
+  // Cuando hay query o onlyFavs, mostramos resultados planos.
+  // Cuando no, mostramos la lista de categorías como navegación
+  // principal (cada row drilling a /(app)/market-category).
+  const isCategoryView = !query.trim() && !onlyFavs;
 
   const visible = useMemo(() => {
+    if (isCategoryView) return [];
     const q = query.trim().toLowerCase();
-    return inCategory.filter((a) => {
+    return inMarket.filter((a) => {
       if (onlyFavs && !isFavorite(a.ticker)) return false;
       if (!q) return true;
       return (
@@ -530,29 +526,36 @@ function MarketBody({
         a.name.toLowerCase().includes(q)
       );
     });
-  }, [query, onlyFavs, isFavorite, inCategory]);
+  }, [isCategoryView, query, onlyFavs, isFavorite, inMarket]);
 
   const topMovers = useMemo(
     () =>
-      [...inCategory]
+      [...inMarket]
         .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
         .slice(0, 8),
-    [inCategory],
+    [inMarket],
   );
 
-  const activeCategoryLabel =
-    market.categories.find((cat) => cat.id === activeCategory)?.label ??
-    "Todo";
+  const categories = CATEGORIES_BY_MARKET[market.id];
+
+  // Pre-cómputo de cuántos assets matchea cada categoría — usamos
+  // este número como display del row si la categoría no trae un
+  // count hardcoded del brand.
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const cat of categories) {
+      out[cat.slug] = cat.filter
+        ? inMarket.filter(cat.filter).length
+        : 0;
+    }
+    return out;
+  }, [categories, inMarket]);
 
   const eyebrowLabel = query
     ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
     : onlyFavs
     ? `Tus favoritos en ${market.short}`
-    : activeCategory === "todo"
-    ? `Instrumentos · ${market.label}`
-    : `${activeCategoryLabel} · ${market.short}`;
-
-  const showMovers = !query && !onlyFavs && activeCategory === "todo";
+    : `Categorías · ${market.label}`;
 
   return (
     <ScrollView
@@ -560,7 +563,7 @@ function MarketBody({
       contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
     >
-      {showMovers && topMovers.length > 0 ? (
+      {isCategoryView && topMovers.length > 0 ? (
         <View style={s.moversBlock}>
           <View style={s.sectionHead}>
             <Text style={[s.eyebrow, { color: c.textMuted }]}>
@@ -578,21 +581,65 @@ function MarketBody({
           </Text>
         </View>
 
-        {visible.length === 0 ? (
+        {isCategoryView ? (
+          /* Lista de categorías — cada una drilling a la pantalla
+             /market-category con el slug en los params. */
+          categories.map((cat, i) => (
+            <Pressable
+              key={cat.slug}
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/market-category",
+                  params: { slug: cat.slug },
+                })
+              }
+              style={[
+                s.categoryRow,
+                i > 0 && {
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: c.border,
+                },
+              ]}
+            >
+              <CategoryGlyph slug={cat.slug} size={36} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.categoryRowLabel, { color: c.text }]}>
+                  {cat.label}
+                </Text>
+                {cat.hint ? (
+                  <Text
+                    style={[s.categoryRowHint, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {cat.hint}
+                  </Text>
+                ) : null}
+              </View>
+              {cat.count || counts[cat.slug] > 0 ? (
+                <Text
+                  style={[s.categoryRowCount, { color: c.textMuted }]}
+                >
+                  {cat.count ?? `${counts[cat.slug]}`}
+                </Text>
+              ) : null}
+              <Feather
+                name="chevron-right"
+                size={18}
+                color={c.textFaint}
+              />
+            </Pressable>
+          ))
+        ) : visible.length === 0 ? (
           <View style={s.empty}>
             <Text style={[s.emptyTitle, { color: c.text }]}>
               {onlyFavs
                 ? "Aún no tenés favoritos"
-                : query
-                ? "Sin resultados"
-                : `Todavía no hay instrumentos en ${market.label}`}
+                : "Sin resultados"}
             </Text>
             <Text style={[s.emptySub, { color: c.textMuted }]}>
               {onlyFavs
                 ? "Entrá a un activo y tocá la estrella arriba a la derecha para guardarlo."
-                : query
-                ? "Probá con otro ticker o nombre."
-                : "Pronto vamos a sumar más opciones."}
+                : "Probá con otro ticker o nombre."}
             </Text>
           </View>
         ) : (
@@ -928,6 +975,29 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.lg,
     gap: 14,
+  },
+  /* Row de categoría — icon + label/hint + count + chevron. */
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 14,
+  },
+  categoryRowLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  categoryRowHint: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+  categoryRowCount: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
   icon: {
     width: 40,
