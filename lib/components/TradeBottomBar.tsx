@@ -277,33 +277,19 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const ctaBottom = insets.bottom + 8;
 
   return (
-    /* Z-order CRÍTICO (orden de render = orden visual):
-     *   1. Dim overlay  → bottom (cubre el screen menos el bar)
-     *   2. Bar          → mid    (siempre visible con su CTA / X)
-     *   3. Pills        → top    (FLOAT por encima del bar para que
-     *                              Vender/Comprar/Opciones no queden
-     *                              tapadas por el shadow / paddingTop
-     *                              del bar)
-     *
-     * Antes las pills se renderizaban ANTES del bar y el bar (con su
-     * paddingTop de 14px y shadow) tapaba la parte inferior de la
-     * pill más cercana al CTA (Vender). Mover las pills al FINAL del
-     * fragmento las pone arriba del bar en z-order. */
+    /* Z-order (orden de render = orden visual):
+     *   1. Bar                 → bottom (siempre visible; cuando
+     *                                    expanded queda DEBAJO del
+     *                                    dim así también se difumina,
+     *                                    el foco va 100% a las pills)
+     *   2. Dim overlay         → mid    (cubre todo incluyendo el bar)
+     *   3. X pill (floating)   → top    (re-renderizada por encima
+     *                                    del dim, mismo lugar visual
+     *                                    donde estaba el CTA)
+     *   4. Action pills        → top    (Comprar/Vender/Opciones,
+     *                                    también por encima del dim) */
     <>
-      {/* 1) Dim overlay debajo del bar. */}
-      {expanded ? (
-        <Animated.View
-          style={[s.dimOverlay, { backgroundColor: c.ink }, dimStyle]}
-        >
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => collapse()}
-            accessibilityLabel="Cerrar opciones"
-          />
-        </Animated.View>
-      ) : null}
-
-      {/* 2) Bar — siempre visible, NO dimeada. */}
+      {/* 1) Bar — debajo del dim cuando expanded. */}
       <View
         style={[
           s.bar,
@@ -336,22 +322,12 @@ export const TradeBottomBar = memo(function TradeBottomBar({
           ) : null}
         </View>
 
-        {/* Right: CTA Operar (collapsed) o pill X (expanded). Mismo
-            tamaño/posición — el X reemplaza al CTA in-place. */}
+        {/* Slot derecho: si collapsed, CTA Operar. Si expanded, un
+            placeholder vacío del mismo tamaño para que el layout del
+            bar no salte (la X real se renderea como float arriba del
+            dim, en este mismo slot pero por z-order). */}
         {expanded ? (
-          <Tap
-            style={[
-              s.ctaSlot,
-              s.closePill,
-              { borderColor: accent, backgroundColor: c.surface },
-            ]}
-            onPress={() => collapse()}
-            haptic="selection"
-            accessibilityLabel="Cerrar opciones"
-            accessibilityRole="button"
-          >
-            <Feather name="x" size={22} color={accent} />
-          </Tap>
+          <View style={s.ctaSlot} />
         ) : (
           <Tap
             style={[s.ctaSlot, { backgroundColor: accent }]}
@@ -370,8 +346,46 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         )}
       </View>
 
-      {/* 3) Pills FLOAT arriba del bar — se renderizan después del bar
-            así quedan en z-order por encima. */}
+      {/* 2) Dim overlay — cubre TODO (incluido el bar). El user pidió
+            que 'fondos disponibles' también se ponga gris, así toda
+            la atención va a las pills. */}
+      {expanded ? (
+        <Animated.View
+          style={[s.dimOverlay, { backgroundColor: c.ink }, dimStyle]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => collapse()}
+            accessibilityLabel="Cerrar opciones"
+          />
+        </Animated.View>
+      ) : null}
+
+      {/* 3) X pill float — encima del dim, en el slot donde estaba
+            el CTA (right:20, bottom:insets.bottom+8). */}
+      {expanded ? (
+        <Tap
+          style={[
+            s.xPillFloat,
+            s.closePill,
+            {
+              right: 20,
+              bottom: ctaBottom,
+              borderColor: accent,
+              backgroundColor: c.surface,
+            },
+          ]}
+          onPress={() => collapse()}
+          haptic="selection"
+          accessibilityLabel="Cerrar opciones"
+          accessibilityRole="button"
+        >
+          <Feather name="x" size={22} color={accent} />
+        </Tap>
+      ) : null}
+
+      {/* 4) Action pills — Vender, Comprar, Opciones — por encima del
+            dim. Se animan emergiendo desde la posición del CTA. */}
       {expanded && hasPosition ? (
         <Animated.View
           pointerEvents="box-none"
@@ -477,6 +491,18 @@ const s = StyleSheet.create({
   },
   pillFloating: {
     position: "absolute",
+  },
+  /* X pill flotante — re-renderizada arriba del dim, en el mismo
+   * lugar visual donde está el slot del CTA en el bar (right:20,
+   * bottom: insets.bottom+8). Mismo tamaño que las action pills. */
+  xPillFloat: {
+    position: "absolute",
+    width: PILL_WIDTH,
+    height: PILL_HEIGHT,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionPill: {
     flex: 1,
