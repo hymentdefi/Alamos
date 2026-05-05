@@ -113,7 +113,12 @@ const DUR = 280;
  * El feedback explícito del user fue: "todo se pone gris pero lo
  * del bottom que dice fondos disponibles y operar menos". */
 const DIM_OPACITY_STRONG = 0.55;
-const DIM_OPACITY_WEAK = 0.05;
+/* Bar queda visualmente intacto cuando expanded (Robinhood-style:
+ * superficie inferior 100% limpia, foco va a las pills flotantes
+ * con shadow). El layer del weak dim sigue rendereándose con opacity
+ * 0 — invisible pero su Pressable atrapa taps sobre 'Fondos
+ * disponibles' para cerrar el menú (UX consistente con tap-fuera). */
+const DIM_OPACITY_WEAK = 0;
 
 export const TradeBottomBar = memo(function TradeBottomBar({
   asset,
