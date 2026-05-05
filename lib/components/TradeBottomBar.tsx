@@ -31,46 +31,56 @@ import {
 } from "../data/accounts";
 import { useAssetColorOptional } from "../asset-color/context";
 import { closedReasonFor } from "../market/hours";
+import { useToast } from "../toast/context";
 
 /**
  * Bottom bar fija de la pantalla de detalle.
  *
- * Estado inicial — bar visible:
+ * Estado collapsed — bar visible:
  *   ┌──────────────────────────────────────────────────────────┐
- *   │  Disponibles                              ┌────────────┐ │
- *   │  $ 342.180                                │  Operar    │ │
+ *   │  Fondos disponibles para                  ┌────────────┐ │
+ *   │  operar en este mercado                   │  Operar    │ │
+ *   │  $ 342.180                                │            │ │
  *   │                                           └────────────┘ │
  *   └──────────────────────────────────────────────────────────┘
  *
- * Al tappear Operar — pills desplegadas verticalmente desde el CTA:
+ * Estado expanded — pills desplegadas estilo Robinhood:
+ *
+ *                                              ┌────────────────┐
+ *                                              │ Operar opciones│
+ *                                              └────────────────┘
+ *                                              ┌────────────────┐
+ *                                              │   Comprar      │
+ *                                              └────────────────┘
+ *                                              ┌────────────────┐
+ *                                              │   Vender       │
+ *                                              └────────────────┘
  *   ┌──────────────────────────────────────────────────────────┐
- *   │  (dim)                                    ┌────────────┐ │
- *   │  (dim)                                    │  Comprar   │ │
- *   │  (dim)                                    └────────────┘ │
- *   │  (dim)                                    ┌────────────┐ │
- *   │  (dim)                                    │  Vender    │ │
- *   │  (dim)                                    └────────────┘ │
- *   ├──────────────────────────────────────────────────────────│
- *   │  Disponibles                              ┌────────────┐ │
- *   │  $ 342.180                                │     X      │ │
+ *   │  Fondos disponibles para                  ┌────────────┐ │
+ *   │  operar en este mercado                   │     X      │ │
+ *   │  $ 342.180                                │  (outline) │ │
  *   │                                           └────────────┘ │
  *   └──────────────────────────────────────────────────────────┘
  *
- * - El "Disponibles" sigue visible siempre (NO está dimeado — la
- *   spec dice "el resto de la pantalla" = arriba del bar).
- * - El X pill reemplaza al CTA Operar in-place (mismo ancho, alto,
- *   posición). Treatment visual distinto: borde color cromático,
- *   fondo transparente.
- * - Comprar y Vender aparecen ABOVE the bar with stagger animation
- *   (cada una 50ms después de la anterior, 280ms ease-out).
- * - Tap en X o tap en el dim cierra y vuelve al estado inicial.
+ * Pills:
+ *   - Operar Opciones (top) — placeholder, options trading no
+ *     existe en Álamos v1 (tap → toast "Próximamente").
+ *   - Comprar — routea a /(app)/buy?mode=buy
+ *   - Vender — routea a /(app)/buy?mode=sell, sólo si hasPosition.
+ *   - X (bottom, en el slot del CTA) — outline color cromático,
+ *     fondo c.surface, ícono X. Cierra el menú.
  *
- * Mercado cerrado: las pills cambian copy a "Programar compra" /
- * "Programar venta". El flow internamente (buy.tsx) detecta el
- * cierre y encola en lugar de ejecutar inmediato.
+ * Animación:
+ *   - Dim overlay fade-in 200ms, opacity 0 → 0.55
+ *   - Pills emergen desde la posición del CTA (translateY positivo)
+ *     hacia su posición final (translateY 0), con stagger bottom-up
+ *     50ms entre cada una.
+ *   - Collapse: animación inversa.
  *
- * Vender se oculta si !hasPosition (no se puede vender lo que no
- * tenés).
+ * Mercado cerrado: Comprar/Vender cambian a "Programar compra/venta".
+ *
+ * 'Disponibles' del bar SIEMPRE visible (NO dimeada — la spec dice
+ * "el resto de la pantalla" = arriba del bar).
  */
 
 interface Props {
@@ -85,11 +95,12 @@ interface Props {
   onConvert?: () => void;
 }
 
-const PILL_WIDTH = 160;
+const PILL_WIDTH = 200;
 const PILL_HEIGHT = 52;
 const PILL_GAP = 8;
 const STAGGER_MS = 50;
 const DUR = 280;
+const DIM_OPACITY = 0.55;
 
 export const TradeBottomBar = memo(function TradeBottomBar({
   asset,
@@ -100,6 +111,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const assetColor = useAssetColorOptional();
+  const { show: showToast } = useToast();
 
   const market = useMemo(() => assetMarket(asset), [asset]);
   const balance = useMemo(() => nativeBalanceFor(market), [market]);
@@ -109,8 +121,6 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const accent = assetColor ? assetColor.color : c.text;
   const ctaTextColor = "#FFFFFF";
 
-  // Mercado cerrado → pills cambian a "Programar compra/venta". El
-  // flow del buy.tsx detecta el cierre y encola la orden.
   const isMarketClosed = useMemo(() => {
     const reason = closedReasonFor(asset);
     return reason.kind !== "open" && reason.kind !== "notApplicable";
@@ -121,49 +131,74 @@ export const TradeBottomBar = memo(function TradeBottomBar({
 
   const [expanded, setExpanded] = useState(false);
 
-  // Progreso por pill (Comprar=top, Vender=middle, X=bottom). El X
-  // siempre es 1 cuando expanded (no se anima), las otras tienen
-  // stagger desde abajo hacia arriba.
-  const buyProgress = useSharedValue(0);
+  /* Offsets verticales relativos al CTA (donde está el X cuando
+   * expanded). Cuando NO hay posición, Vender no se renderea y los
+   * de arriba bajan una fila. */
+  const sellOffset = PILL_HEIGHT + PILL_GAP; // 1 row above CTA
+  const buyOffset =
+    (hasPosition ? 2 : 1) * (PILL_HEIGHT + PILL_GAP);
+  const optionsOffset =
+    (hasPosition ? 3 : 2) * (PILL_HEIGHT + PILL_GAP);
+
+  /* Progreso individual por pill (0 = at CTA position, 1 = at final
+   * position). Stagger: la más cercana al CTA arranca primero. */
   const sellProgress = useSharedValue(0);
+  const buyProgress = useSharedValue(0);
+  const optionsProgress = useSharedValue(0);
   const dimProgress = useSharedValue(0);
 
   const expand = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setExpanded(true);
-    // Bottom-up stagger: Vender primero (más cerca del CTA), Comprar
-    // después. El X aparece instant (es la transformación visual del CTA).
     dimProgress.value = withTiming(1, {
       duration: 200,
       easing: Easing.out(Easing.cubic),
     });
-    sellProgress.value = withTiming(1, {
-      duration: DUR,
-      easing: Easing.out(Easing.cubic),
-    });
-    buyProgress.value = withDelay(
-      STAGGER_MS,
-      withTiming(1, {
+    // Bottom-up stagger: la pill más cercana al CTA aparece primero.
+    if (hasPosition) {
+      sellProgress.value = withTiming(1, {
         duration: DUR,
         easing: Easing.out(Easing.cubic),
-      }),
-    );
+      });
+      buyProgress.value = withDelay(
+        STAGGER_MS,
+        withTiming(1, { duration: DUR, easing: Easing.out(Easing.cubic) }),
+      );
+      optionsProgress.value = withDelay(
+        STAGGER_MS * 2,
+        withTiming(1, { duration: DUR, easing: Easing.out(Easing.cubic) }),
+      );
+    } else {
+      buyProgress.value = withTiming(1, {
+        duration: DUR,
+        easing: Easing.out(Easing.cubic),
+      });
+      optionsProgress.value = withDelay(
+        STAGGER_MS,
+        withTiming(1, { duration: DUR, easing: Easing.out(Easing.cubic) }),
+      );
+    }
   };
 
   const collapse = (cb?: () => void) => {
     Haptics.selectionAsync().catch(() => {});
-    // Reverse animation: las pills colapsan hacia donde estaba el CTA.
-    buyProgress.value = withTiming(0, {
-      duration: 220,
+    /* Reverse animation: la más lejana del CTA colapsa primero
+     * (top-down) para que se "doblen" hacia el origen como un
+     * stack de cartas que cae. */
+    optionsProgress.value = withTiming(0, {
+      duration: 200,
       easing: Easing.in(Easing.cubic),
     });
-    sellProgress.value = withDelay(
+    buyProgress.value = withDelay(
       STAGGER_MS,
-      withTiming(0, {
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-      }),
+      withTiming(0, { duration: 200, easing: Easing.in(Easing.cubic) }),
     );
+    if (hasPosition) {
+      sellProgress.value = withDelay(
+        STAGGER_MS * 2,
+        withTiming(0, { duration: 200, easing: Easing.in(Easing.cubic) }),
+      );
+    }
     dimProgress.value = withTiming(
       0,
       { duration: 240, easing: Easing.in(Easing.cubic) },
@@ -177,32 +212,18 @@ export const TradeBottomBar = memo(function TradeBottomBar({
     );
   };
 
-  // Si el padre cambia onSelect/asset durante la animación, los
-  // shared values quedan en estado stale. Cleanup al unmount.
   useEffect(() => {
     return () => {
-      buyProgress.value = 0;
       sellProgress.value = 0;
+      buyProgress.value = 0;
+      optionsProgress.value = 0;
       dimProgress.value = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ─── Estilos animados ─── */
+  /* ─── Animated styles ─── */
 
-  // Distancia desde la posición CTA hasta la posición final de cada pill.
-  // Vender está 1 fila arriba, Comprar está 2 filas arriba.
-  const sellOffset = PILL_HEIGHT + PILL_GAP;
-  const buyOffset = 2 * (PILL_HEIGHT + PILL_GAP);
-
-  const buyPillStyle = useAnimatedStyle(() => ({
-    opacity: buyProgress.value,
-    transform: [
-      {
-        translateY: interpolate(buyProgress.value, [0, 1], [buyOffset, 0]),
-      },
-    ],
-  }));
   const sellPillStyle = useAnimatedStyle(() => ({
     opacity: sellProgress.value,
     transform: [
@@ -211,29 +232,54 @@ export const TradeBottomBar = memo(function TradeBottomBar({
       },
     ],
   }));
+  const buyPillStyle = useAnimatedStyle(() => ({
+    opacity: buyProgress.value,
+    transform: [
+      {
+        translateY: interpolate(buyProgress.value, [0, 1], [buyOffset, 0]),
+      },
+    ],
+  }));
+  const optionsPillStyle = useAnimatedStyle(() => ({
+    opacity: optionsProgress.value,
+    transform: [
+      {
+        translateY: interpolate(
+          optionsProgress.value,
+          [0, 1],
+          [optionsOffset, 0],
+        ),
+      },
+    ],
+  }));
   const dimStyle = useAnimatedStyle(() => ({
-    opacity: dimProgress.value * 0.38,
+    opacity: dimProgress.value * DIM_OPACITY,
   }));
 
+  /* ─── Handlers ─── */
+
   const handleSelect = (mode: "buy" | "sell") => {
-    // Cerramos primero (animación de salida) y disparamos el callback
-    // DESPUÉS — así el push de navigate corre con las pills ya fuera
-    // de pantalla y se ve más limpio.
     collapse(() => onSelect(mode));
   };
+  const handleSelectOptions = () => {
+    collapse(() => {
+      // TODO(options): Álamos no opera options en v1. Cuando se
+      // sume el flow de options, routear a /(app)/options-buy o
+      // similar. Por ahora toast de "Próximamente".
+      showToast("Operar opciones — próximamente", { variant: "neutral" });
+    });
+  };
+
+  const ctaBottom = insets.bottom + 8;
 
   return (
     <>
-      {/* Dim overlay encima del resto del screen, BAJO el bar (orden
-          de render: dim primero, bar después). pointerEvents auto
-          sólo cuando expanded para que el tap-out funcione. */}
+      {/* Dim overlay encima del resto del screen, BAJO el bar.
+          pointerEvents auto sólo cuando expanded para que el
+          tap-out funcione. */}
       {expanded ? (
         <Animated.View
-          style={[
-            s.dimOverlay,
-            { backgroundColor: c.ink },
-            dimStyle,
-          ]}
+          style={[s.dimOverlay, { backgroundColor: c.ink }, dimStyle]}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -243,8 +289,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         </Animated.View>
       ) : null}
 
-      {/* Vender + Comprar pills, posicionados absolutos arriba del bar.
-          Render fuera del bar para no estar afectados por su layout. */}
+      {/* Vender pill — sólo si hasPosition. */}
       {expanded && hasPosition ? (
         <Animated.View
           pointerEvents="box-none"
@@ -252,7 +297,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
             s.pillFloating,
             {
               right: 20,
-              bottom: insets.bottom + 8 + sellOffset,
+              bottom: ctaBottom + sellOffset,
               width: PILL_WIDTH,
               height: PILL_HEIGHT,
             },
@@ -267,6 +312,8 @@ export const TradeBottomBar = memo(function TradeBottomBar({
           />
         </Animated.View>
       ) : null}
+
+      {/* Comprar pill. */}
       {expanded ? (
         <Animated.View
           pointerEvents="box-none"
@@ -274,8 +321,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
             s.pillFloating,
             {
               right: 20,
-              bottom:
-                insets.bottom + 8 + (hasPosition ? buyOffset : sellOffset),
+              bottom: ctaBottom + buyOffset,
               width: PILL_WIDTH,
               height: PILL_HEIGHT,
             },
@@ -287,6 +333,30 @@ export const TradeBottomBar = memo(function TradeBottomBar({
             bg={accent}
             textColor={ctaTextColor}
             onPress={() => handleSelect("buy")}
+          />
+        </Animated.View>
+      ) : null}
+
+      {/* Operar Opciones pill — top de la columna. */}
+      {expanded ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            s.pillFloating,
+            {
+              right: 20,
+              bottom: ctaBottom + optionsOffset,
+              width: PILL_WIDTH,
+              height: PILL_HEIGHT,
+            },
+            optionsPillStyle,
+          ]}
+        >
+          <ActionPill
+            label="Operar opciones"
+            bg={accent}
+            textColor={ctaTextColor}
+            onPress={handleSelectOptions}
           />
         </Animated.View>
       ) : null}
@@ -304,8 +374,13 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         ]}
       >
         <View style={s.left}>
-          <Text style={[s.eyebrow, { color: c.textMuted }]}>
-            Disponibles
+          {/* Eyebrow extendido — la spec lo pide explícitamente.
+           * Wrap en 2 líneas, font 10px para no dominar el balance. */}
+          <Text
+            style={[s.eyebrow, { color: c.textMuted }]}
+            numberOfLines={2}
+          >
+            FONDOS DISPONIBLES PARA{"\n"}OPERAR EN ESTE MERCADO
           </Text>
           <Text style={[s.balance, { color: c.text }]} numberOfLines={1}>
             {formatMoney(balance, currency)}
@@ -358,7 +433,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   );
 });
 
-/* ─── Pill de acción (Comprar / Vender) ─── */
+/* ─── Pill de acción (Comprar / Vender / Operar Opciones) ─── */
 
 interface ActionPillProps {
   label: string;
@@ -440,15 +515,15 @@ const s = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: 0.5,
   },
   balance: {
     fontFamily: fontFamily[700],
     fontSize: 18,
     letterSpacing: -0.4,
-    marginTop: 2,
+    marginTop: 4,
   },
   convertLink: {
     fontFamily: fontFamily[600],
