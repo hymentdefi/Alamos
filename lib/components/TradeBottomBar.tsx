@@ -96,7 +96,11 @@ interface Props {
 }
 
 const PILL_WIDTH = 200;
-const PILL_HEIGHT = 52;
+/* Pills más slim — height 48 + radius pill (999) → forma de píldora
+ * real (rounded ends), no rectángulo redondeado. Matchea el estilo
+ * de la captura de Robinhood: chatas, finas, elegantes (no gordas
+ * y cuadradas como estaban con height 52 + radius 18). */
+const PILL_HEIGHT = 48;
 const PILL_GAP = 8;
 const STAGGER_MS = 50;
 const DUR = 280;
@@ -273,10 +277,20 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const ctaBottom = insets.bottom + 8;
 
   return (
+    /* Z-order CRÍTICO (orden de render = orden visual):
+     *   1. Dim overlay  → bottom (cubre el screen menos el bar)
+     *   2. Bar          → mid    (siempre visible con su CTA / X)
+     *   3. Pills        → top    (FLOAT por encima del bar para que
+     *                              Vender/Comprar/Opciones no queden
+     *                              tapadas por el shadow / paddingTop
+     *                              del bar)
+     *
+     * Antes las pills se renderizaban ANTES del bar y el bar (con su
+     * paddingTop de 14px y shadow) tapaba la parte inferior de la
+     * pill más cercana al CTA (Vender). Mover las pills al FINAL del
+     * fragmento las pone arriba del bar en z-order. */
     <>
-      {/* Dim overlay encima del resto del screen, BAJO el bar.
-          pointerEvents auto sólo cuando expanded para que el
-          tap-out funcione. */}
+      {/* 1) Dim overlay debajo del bar. */}
       {expanded ? (
         <Animated.View
           style={[s.dimOverlay, { backgroundColor: c.ink }, dimStyle]}
@@ -289,79 +303,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         </Animated.View>
       ) : null}
 
-      {/* Vender pill — sólo si hasPosition. */}
-      {expanded && hasPosition ? (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            s.pillFloating,
-            {
-              right: 20,
-              bottom: ctaBottom + sellOffset,
-              width: PILL_WIDTH,
-              height: PILL_HEIGHT,
-            },
-            sellPillStyle,
-          ]}
-        >
-          <ActionPill
-            label={sellLabel}
-            bg={accent}
-            textColor={ctaTextColor}
-            onPress={() => handleSelect("sell")}
-          />
-        </Animated.View>
-      ) : null}
-
-      {/* Comprar pill. */}
-      {expanded ? (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            s.pillFloating,
-            {
-              right: 20,
-              bottom: ctaBottom + buyOffset,
-              width: PILL_WIDTH,
-              height: PILL_HEIGHT,
-            },
-            buyPillStyle,
-          ]}
-        >
-          <ActionPill
-            label={buyLabel}
-            bg={accent}
-            textColor={ctaTextColor}
-            onPress={() => handleSelect("buy")}
-          />
-        </Animated.View>
-      ) : null}
-
-      {/* Operar Opciones pill — top de la columna. */}
-      {expanded ? (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            s.pillFloating,
-            {
-              right: 20,
-              bottom: ctaBottom + optionsOffset,
-              width: PILL_WIDTH,
-              height: PILL_HEIGHT,
-            },
-            optionsPillStyle,
-          ]}
-        >
-          <ActionPill
-            label="Operar opciones"
-            bg={accent}
-            textColor={ctaTextColor}
-            onPress={handleSelectOptions}
-          />
-        </Animated.View>
-      ) : null}
-
-      {/* Bar — siempre visible, NO dimeada. */}
+      {/* 2) Bar — siempre visible, NO dimeada. */}
       <View
         style={[
           s.bar,
@@ -374,13 +316,11 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         ]}
       >
         <View style={s.left}>
-          {/* Eyebrow extendido — la spec lo pide explícitamente.
-           * Wrap en 2 líneas, font 10px para no dominar el balance. */}
           <Text
             style={[s.eyebrow, { color: c.textMuted }]}
-            numberOfLines={2}
+            numberOfLines={1}
           >
-            FONDOS DISPONIBLES PARA{"\n"}OPERAR EN ESTE MERCADO
+            Fondos disponibles
           </Text>
           <Text style={[s.balance, { color: c.text }]} numberOfLines={1}>
             {formatMoney(balance, currency)}
@@ -429,6 +369,77 @@ export const TradeBottomBar = memo(function TradeBottomBar({
           </Tap>
         )}
       </View>
+
+      {/* 3) Pills FLOAT arriba del bar — se renderizan después del bar
+            así quedan en z-order por encima. */}
+      {expanded && hasPosition ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            s.pillFloating,
+            {
+              right: 20,
+              bottom: ctaBottom + sellOffset,
+              width: PILL_WIDTH,
+              height: PILL_HEIGHT,
+            },
+            sellPillStyle,
+          ]}
+        >
+          <ActionPill
+            label={sellLabel}
+            bg={accent}
+            textColor={ctaTextColor}
+            onPress={() => handleSelect("sell")}
+          />
+        </Animated.View>
+      ) : null}
+
+      {expanded ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            s.pillFloating,
+            {
+              right: 20,
+              bottom: ctaBottom + buyOffset,
+              width: PILL_WIDTH,
+              height: PILL_HEIGHT,
+            },
+            buyPillStyle,
+          ]}
+        >
+          <ActionPill
+            label={buyLabel}
+            bg={accent}
+            textColor={ctaTextColor}
+            onPress={() => handleSelect("buy")}
+          />
+        </Animated.View>
+      ) : null}
+
+      {expanded ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            s.pillFloating,
+            {
+              right: 20,
+              bottom: ctaBottom + optionsOffset,
+              width: PILL_WIDTH,
+              height: PILL_HEIGHT,
+            },
+            optionsPillStyle,
+          ]}
+        >
+          <ActionPill
+            label="Operar opciones"
+            bg={accent}
+            textColor={ctaTextColor}
+            onPress={handleSelectOptions}
+          />
+        </Animated.View>
+      ) : null}
     </>
   );
 });
@@ -472,18 +483,22 @@ const s = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderCurve: "continuous",
-    borderRadius: radius.btn,
+    /* Full pill (radius 999) — forma de píldora real con extremos
+     * completamente redondeados. La spec se basó en la captura de
+     * Robinhood donde las pills son chatas y elegantes, NO rectángulos
+     * redondeados como estaba antes con radius.btn (18). */
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
       },
       android: {
-        elevation: 6,
+        elevation: 8,
       },
     }),
   },
@@ -515,9 +530,9 @@ const s = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fontFamily[600],
-    fontSize: 10,
-    lineHeight: 12,
-    letterSpacing: 0.5,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   balance: {
     fontFamily: fontFamily[700],
@@ -532,26 +547,29 @@ const s = StyleSheet.create({
     marginTop: 2,
     textDecorationLine: "underline",
   },
-  /* Slot del CTA / X — mismo tamaño y radio para que la swap
-   * Operar ↔ X sea visualmente in-place. */
+  /* Slot del CTA / X — full pill matcheando las pills de acción
+   * para consistencia visual cuando la swap Operar ↔ X ocurre. */
   ctaSlot: {
     width: PILL_WIDTH,
     height: PILL_HEIGHT,
     borderCurve: "continuous",
-    borderRadius: radius.btn,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
   closePill: {
     /* Treatment visual distinto del CTA y de las pills de acción:
-     * borde color del sistema cromático, fondo transparente/superficie,
-     * ícono X centrado en color cromático. La spec lo pide explícito. */
+     * borde color del sistema cromático, fondo c.surface, ícono X
+     * centrado en color cromático. La spec lo pide explícito. */
     borderWidth: 1.6,
   },
   ctaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.2,
+    /* Weight 600 (semi-bold) en vez de 700 — el bold se sentía
+     * tosco. 15px en vez de 16. Más cerca de la elegancia del
+     * mockup de referencia. */
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.15,
   },
 });
 
