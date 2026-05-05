@@ -21,6 +21,10 @@ import {
 import { findCategoryBySlug } from "../../lib/data/marketCategories";
 import { CategoryGlyph } from "../../lib/components/CategoryGlyph";
 import {
+  FloatingTabBar,
+  useFloatingTabBarHeight,
+} from "../../lib/components/FloatingTabBar";
+import {
   MiniSparkline,
   seriesFromSeed,
 } from "../../lib/components/Sparkline";
@@ -37,6 +41,7 @@ import { useFavorites } from "../../lib/favorites/context";
 export default function MarketCategoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useFloatingTabBarHeight();
   const { c } = useTheme();
   const { isFavorite } = useFavorites();
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -101,7 +106,9 @@ export default function MarketCategoryScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{
+          paddingBottom: tabBarHeight + 24,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero del header de categoría — icon grande + label + hint. */}
@@ -230,6 +237,12 @@ export default function MarketCategoryScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* FloatingTabBar siempre visible — el user pidió que el nav
+          no desaparezca cuando entra a una categoría desde Mercado.
+          contextTab 'explore' marca Mercado como la pestaña de
+          origen / contexto. */}
+      <FloatingTabBar contextTab="explore" />
     </View>
   );
 }

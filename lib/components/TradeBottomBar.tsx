@@ -93,6 +93,14 @@ interface Props {
   /** Tap en el bloque de fondos cuando el saldo es 0 — debe
    *  navegar a /(app)/convert. */
   onConvert?: () => void;
+  /** Distancia (px) desde el bottom del screen hasta donde queremos
+   *  que asiente el bar. Default 0 (pegado al bottom + safe area).
+   *  Cuando coexiste con un FloatingTabBar abajo, pasamos la altura
+   *  del tab bar acá para que el TradeBottomBar suba justo arriba.
+   *  El padding de safe area se redistribuye automáticamente: si
+   *  bottomOffset > 0 asumimos que el componente de abajo (tab bar)
+   *  ya consume el insets.bottom y no lo agregamos de vuelta. */
+  bottomOffset?: number;
 }
 
 const PILL_WIDTH = 200;
@@ -125,6 +133,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   hasPosition,
   onSelect,
   onConvert,
+  bottomOffset = 0,
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -149,11 +158,16 @@ export const TradeBottomBar = memo(function TradeBottomBar({
 
   const [expanded, setExpanded] = useState(false);
 
-  const ctaBottom = insets.bottom + 8;
+  /* Si hay un componente abajo (FloatingTabBar) que ya consume el
+   * insets.bottom, evitamos duplicarlo en el paddingBottom del bar.
+   * Si no, el bar está pegado al bottom y necesita su propio safe
+   * area padding. */
+  const safeBottomPadding = bottomOffset > 0 ? 8 : insets.bottom + 8;
+  const ctaBottom = bottomOffset + safeBottomPadding;
   /* Altura del bar (paddingBottom + content + paddingTop). La uso
    * para tilear los 2 dims y para anclar las pills arriba del bar
    * con un gap visible (sin pisar el top edge del rectángulo). */
-  const barHeight = insets.bottom + 8 + PILL_HEIGHT + 14;
+  const barHeight = safeBottomPadding + PILL_HEIGHT + 14;
 
   /* Offsets verticales relativos al CTA (donde está el X cuando
    * expanded).
@@ -329,14 +343,16 @@ export const TradeBottomBar = memo(function TradeBottomBar({
      *   4. Action pills        → top    (Comprar/Vender/Opciones,
      *                                    también por encima del dim) */
     <>
-      {/* 1) Bar — debajo del dim cuando expanded. */}
+      {/* 1) Bar — debajo del dim cuando expanded. Bottom = bottomOffset
+            para subirlo arriba del FloatingTabBar cuando hay uno. */}
       <View
         style={[
           s.bar,
           {
             backgroundColor: c.surface,
             borderTopColor: c.border,
-            paddingBottom: insets.bottom + 8,
+            paddingBottom: safeBottomPadding,
+            bottom: bottomOffset,
             shadowColor: c.ink,
           },
         ]}
@@ -387,12 +403,17 @@ export const TradeBottomBar = memo(function TradeBottomBar({
       </View>
 
       {/* 2a) Strong dim — cubre arriba del bar (la mayoría del screen).
-             Foco va a las pills. */}
+             Foco va a las pills. bottom = bottomOffset + barHeight
+             para que el dim termine exacto en el top edge del bar
+             cuando coexiste con un FloatingTabBar abajo. */}
       {expanded ? (
         <Animated.View
           style={[
             s.dimOverlay,
-            { backgroundColor: c.ink, bottom: barHeight },
+            {
+              backgroundColor: c.ink,
+              bottom: bottomOffset + barHeight,
+            },
             strongDimStyle,
           ]}
         >
@@ -415,6 +436,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
             {
               backgroundColor: c.ink,
               top: undefined,
+              bottom: bottomOffset,
               height: barHeight,
             },
             weakDimStyle,

@@ -54,6 +54,10 @@ import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
+import {
+  FloatingTabBar,
+  useFloatingTabBarHeight,
+} from "../../lib/components/FloatingTabBar";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -116,6 +120,7 @@ export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useFloatingTabBarHeight();
   const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
@@ -251,7 +256,7 @@ export default function DetailScreen() {
       </View>
 
       <Animated.ScrollView
-        contentContainerStyle={{ paddingBottom: 160 }}
+        contentContainerStyle={{ paddingBottom: 160 + tabBarHeight }}
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -368,6 +373,7 @@ export default function DetailScreen() {
       <TradeBottomBar
         asset={asset}
         hasPosition={position > 0}
+        bottomOffset={tabBarHeight}
         onSelect={(mode) => {
           // En mercado abierto: routea al flow de compra/venta
           // existente (buy.tsx). En mercado cerrado: buy.tsx detecta
@@ -381,6 +387,12 @@ export default function DetailScreen() {
         }}
         onConvert={() => router.push("/(app)/convert")}
       />
+
+      {/* FloatingTabBar siempre visible — el user pidió que el nav
+          no desaparezca cuando entra a una acción. contextTab
+          'explore' marca Mercado como pestaña de origen (la entrada
+          típica al detalle de activo). */}
+      <FloatingTabBar contextTab="explore" />
 
       {/* AlertSheet — key={ticker} fuerza remount cuando se navega
           entre activos sin desmontar el screen, así el form arranca
