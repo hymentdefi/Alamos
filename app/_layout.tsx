@@ -26,6 +26,7 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider, useAuth } from "../lib/auth/context";
 import { FavoritesProvider } from "../lib/favorites/context";
+import { WatchlistProvider } from "../lib/watchlist/context";
 import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { NotificationsProvider } from "../lib/notifications/context";
@@ -165,6 +166,7 @@ export default function RootLayout() {
         <AuthProvider>
           <LegalConsentProvider>
             <FavoritesProvider>
+              <WatchlistProvider>
               <PrivacyProvider>
                 <NotificationsProvider>
                   <StatusBar style={mode === "light" ? "dark" : "light"} />
@@ -176,6 +178,7 @@ export default function RootLayout() {
                   <ConfettiPortal />
                 </NotificationsProvider>
                 </PrivacyProvider>
+              </WatchlistProvider>
             </FavoritesProvider>
           </LegalConsentProvider>
         </AuthProvider>
