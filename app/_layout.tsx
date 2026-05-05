@@ -30,6 +30,7 @@ import { WatchlistProvider } from "../lib/watchlist/context";
 import { PrivacyProvider } from "../lib/privacy/context";
 import { LegalConsentProvider } from "../lib/legal/context";
 import { NotificationsProvider } from "../lib/notifications/context";
+import { ToastProvider } from "../lib/toast/context";
 import { GreetingOverlay } from "../lib/components/GreetingOverlay";
 import { ConfettiPortal } from "../lib/hooks/useConfetti";
 import { SoundManager } from "../lib/sounds/SoundManager";
@@ -165,21 +166,28 @@ export default function RootLayout() {
       <ThemeContext.Provider value={themeValue}>
         <AuthProvider>
           <LegalConsentProvider>
-            <FavoritesProvider>
-              <WatchlistProvider>
-              <PrivacyProvider>
-                <NotificationsProvider>
-                  <StatusBar style={mode === "light" ? "dark" : "light"} />
-                  <AuthGate />
-                  {/* Confetti portal — UNA sola instancia montada en
-                      el root. Cualquier pantalla puede llamar
-                      `useConfetti().burst()` y la animación renderea
-                      acá, encima de todo. */}
-                  <ConfettiPortal />
-                </NotificationsProvider>
-                </PrivacyProvider>
-              </WatchlistProvider>
-            </FavoritesProvider>
+            {/* ToastProvider arriba de Watchlist/Alerts/QueuedOrders
+                porque varios providers disparan toasts (ej: confirmación
+                de alerta creada, error de red en watchlist). */}
+            <ToastProvider>
+              <FavoritesProvider>
+                <WatchlistProvider>
+                  <PrivacyProvider>
+                    <NotificationsProvider>
+                      <StatusBar
+                        style={mode === "light" ? "dark" : "light"}
+                      />
+                      <AuthGate />
+                      {/* Confetti portal — UNA sola instancia montada
+                          en el root. Cualquier pantalla puede llamar
+                          `useConfetti().burst()` y la animación
+                          renderea acá, encima de todo. */}
+                      <ConfettiPortal />
+                    </NotificationsProvider>
+                  </PrivacyProvider>
+                </WatchlistProvider>
+              </FavoritesProvider>
+            </ToastProvider>
           </LegalConsentProvider>
         </AuthProvider>
       </ThemeContext.Provider>
