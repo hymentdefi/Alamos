@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
   login as apiLogin,
@@ -43,9 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = async (p: LoginPayload) => { const { user, tokens } = await apiLogin(p); await storeTokens(tokens); setUser(user); };
-  const register = async (p: RegisterPayload) => { const { user, tokens } = await apiRegister(p); await storeTokens(tokens); setUser(user); };
-  const logout = async () => { await clearTokens(); setUser(null); };
+  const login = useCallback(async (p: LoginPayload) => { const { user, tokens } = await apiLogin(p); await storeTokens(tokens); setUser(user); }, []);
+  const register = useCallback(async (p: RegisterPayload) => { const { user, tokens } = await apiRegister(p); await storeTokens(tokens); setUser(user); }, []);
+  const logout = useCallback(async () => { await clearTokens(); setUser(null); }, []);
 
   const markFirstTrade = useCallback(async () => {
     // Idempotente: si ya estaba marcado, no hago nada.
@@ -62,21 +62,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        markFirstTrade,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      register,
+      logout,
+      markFirstTrade,
+    }),
+    [user, isLoading, login, register, logout, markFirstTrade],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

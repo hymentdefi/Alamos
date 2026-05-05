@@ -213,6 +213,7 @@ const s = StyleSheet.create({
   handle: {
     width: 44,
     height: 4,
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   title: {
@@ -230,6 +231,7 @@ const s = StyleSheet.create({
   iconWrap: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -248,6 +250,7 @@ const s = StyleSheet.create({
   radio: {
     width: 22,
     height: 22,
+    borderCurve: "continuous",
     borderRadius: 11,
     borderWidth: 1.5,
     alignItems: "center",

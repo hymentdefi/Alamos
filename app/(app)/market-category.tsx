@@ -186,7 +186,7 @@ export default function MarketCategoryScreen() {
                     <MiniSparkline
                       series={seriesFromSeed(
                         asset.ticker,
-                        28,
+                        60,
                         asset.change >= 0 ? "up" : "down",
                       )}
                       color={asset.change >= 0 ? c.greenDark : c.red}
@@ -246,6 +246,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -296,6 +297,7 @@ const s = StyleSheet.create({
   rowIcon: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",

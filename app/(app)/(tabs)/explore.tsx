@@ -487,11 +487,13 @@ const gs = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    borderCurve: "continuous",
     borderRadius: 999,
   },
   cryptoBadge: {
     width: 18,
     height: 18,
+    borderCurve: "continuous",
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
@@ -795,7 +797,7 @@ function MarketBody({
                   <MiniSparkline
                     series={seriesFromSeed(
                       asset.ticker,
-                      28,
+                      60,
                       asset.change >= 0 ? "up" : "down",
                     )}
                     color={asset.change >= 0 ? c.greenDark : c.red}
@@ -887,11 +889,13 @@ const s = StyleSheet.create({
   addBalanceBtn: {
     width: 22,
     height: 22,
+    borderCurve: "continuous",
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   marketControl: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     paddingTop: 4,
     paddingBottom: 4,
@@ -908,6 +912,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 10,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   marketSegLabel: {
@@ -928,6 +933,7 @@ const s = StyleSheet.create({
     /* Bordes menos redondeados (era radius.pill ≈ 999): pasa a md
      * para que el rectángulo se sienta más estructurado, estilo iOS
      * search. */
+    borderCurve: "continuous",
     borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -944,6 +950,7 @@ const s = StyleSheet.create({
   clearChip: {
     width: 18,
     height: 18,
+    borderCurve: "continuous",
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
@@ -1020,12 +1027,14 @@ const s = StyleSheet.create({
     flexBasis: "48.5%",
     paddingHorizontal: 10,
     paddingVertical: 10,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
   trendingIcon: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -1071,6 +1080,7 @@ const s = StyleSheet.create({
   icon: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",

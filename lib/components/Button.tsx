@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { useTheme, fontFamily, radius } from "../theme";
 import { Tap } from "./Tap";
+import { Squircle } from "./Squircle";
 
 type Variant = "primary" | "secondary" | "accent" | "ghost";
 type Size = "md" | "lg";
@@ -48,7 +49,8 @@ export default function Button({
       : variant === "ghost"
       ? c.text
       : c.ink;
-  const border = variant === "secondary" ? c.border : "transparent";
+  const hasBorder = variant === "secondary";
+  const border = hasBorder ? c.border : undefined;
 
   const height = size === "lg" ? 52 : 44;
   const padH = size === "lg" ? 22 : 18;
@@ -63,13 +65,18 @@ export default function Button({
         {
           height,
           paddingHorizontal: padH,
-          backgroundColor: bg,
-          borderColor: border,
           opacity: disabled ? 0.45 : 1,
         },
         style,
       ]}
     >
+      <Squircle
+        style={StyleSheet.absoluteFill}
+        radius={radius.btn}
+        backgroundColor={bg}
+        borderColor={border}
+        borderWidth={hasBorder ? 1 : undefined}
+      />
       {left ? <View style={{ marginRight: 8 }}>{left}</View> : null}
       <Text style={[s.text, { color: fg }]}>{title}</Text>
       {right ? <View style={{ marginLeft: 8 }}>{right}</View> : null}
@@ -79,8 +86,6 @@ export default function Button({
 
 const s = StyleSheet.create({
   base: {
-    borderRadius: radius.btn,
-    borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

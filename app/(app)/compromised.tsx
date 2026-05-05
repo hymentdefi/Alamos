@@ -364,6 +364,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -383,6 +384,7 @@ const s = StyleSheet.create({
   heroIcon: {
     width: 52,
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -418,6 +420,7 @@ const s = StyleSheet.create({
   },
   card: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -449,11 +452,13 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
   },
   bankLogo: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -477,6 +482,7 @@ const s = StyleSheet.create({
   radio: {
     width: 22,
     height: 22,
+    borderCurve: "continuous",
     borderRadius: 11,
     borderWidth: 1.5,
     alignItems: "center",
@@ -489,6 +495,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     borderStyle: "dashed",
@@ -505,6 +512,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 56,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     flexDirection: "row",
     alignItems: "center",

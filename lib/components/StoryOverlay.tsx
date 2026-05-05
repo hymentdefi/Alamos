@@ -207,12 +207,14 @@ const s = StyleSheet.create({
   progressTrack: {
     flex: 1,
     height: 3,
+    borderCurve: "continuous",
     borderRadius: 2,
     backgroundColor: "rgba(255, 255, 255, 0.25)",
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   closeBtn: {
@@ -220,6 +222,7 @@ const s = StyleSheet.create({
     right: 16,
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",

@@ -249,6 +249,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -288,6 +289,7 @@ const s = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -303,6 +305,7 @@ const s = StyleSheet.create({
   articleCard: {
     width: 240,
     padding: 16,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
@@ -311,6 +314,7 @@ const s = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   articleTagText: {
@@ -349,6 +353,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 16,
     paddingHorizontal: 16,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     marginBottom: 10,
   },
@@ -359,6 +364,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 16,
     paddingHorizontal: 16,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
   },
@@ -371,6 +377,7 @@ const s = StyleSheet.create({
   chatCtaIcon: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

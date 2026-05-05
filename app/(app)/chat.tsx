@@ -491,6 +491,7 @@ const s = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -507,6 +508,7 @@ const s = StyleSheet.create({
   headerAvatar: {
     width: 38,
     height: 38,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -522,6 +524,7 @@ const s = StyleSheet.create({
     bottom: -1,
     width: 11,
     height: 11,
+    borderCurve: "continuous",
     borderRadius: 6,
     borderWidth: 2,
   },
@@ -542,6 +545,7 @@ const s = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 5,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   urgentPillText: {
@@ -567,6 +571,7 @@ const s = StyleSheet.create({
   },
   bubble: {
     maxWidth: "78%",
+    borderCurve: "continuous",
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -594,6 +599,7 @@ const s = StyleSheet.create({
   typingDot: {
     width: 7,
     height: 7,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
 
@@ -623,6 +629,7 @@ const s = StyleSheet.create({
     flex: 1,
     minHeight: 44,
     maxHeight: 120,
+    borderCurve: "continuous",
     borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 14,
@@ -639,6 +646,7 @@ const s = StyleSheet.create({
   sendBtn: {
     width: 44,
     height: 44,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

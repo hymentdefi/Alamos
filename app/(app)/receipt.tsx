@@ -267,6 +267,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -280,6 +281,7 @@ const s = StyleSheet.create({
   sheet: {
     marginHorizontal: 20,
     marginTop: 8,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 24,
@@ -421,6 +423,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
   },
   shareBtnText: {

@@ -1326,6 +1326,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -1372,6 +1373,7 @@ const s = StyleSheet.create({
     width: "47%",
     flexGrow: 1,
     flexBasis: "47%",
+    borderCurve: "continuous",
     borderRadius: radius.xl,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -1431,6 +1433,7 @@ const s = StyleSheet.create({
   tabGroup: {
     flexDirection: "row",
     padding: 4,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     gap: 4,
   },
@@ -1439,6 +1442,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   tabActive: {
@@ -1455,6 +1459,7 @@ const s = StyleSheet.create({
 
   depositCard: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -1494,6 +1499,7 @@ const s = StyleSheet.create({
   copyBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -1516,6 +1522,7 @@ const s = StyleSheet.create({
   linkedIcon: {
     width: 38,
     height: 38,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -1525,6 +1532,7 @@ const s = StyleSheet.create({
   linkedArrow: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -1567,6 +1575,7 @@ const s = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 14,
     paddingVertical: 14,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     borderWidth: 1,
   },
@@ -1583,6 +1592,7 @@ const s = StyleSheet.create({
     gap: 10,
     marginHorizontal: 20,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
   },
@@ -1680,6 +1690,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
@@ -1699,6 +1710,7 @@ const s = StyleSheet.create({
   checkCircle: {
     width: 72,
     height: 72,
+    borderCurve: "continuous",
     borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",

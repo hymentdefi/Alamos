@@ -34,9 +34,16 @@ interface Props {
   withFill?: boolean;
   /** Grosor del trazo. Default 2.4. */
   strokeWidth?: number;
-  /** Suavizado con cubic bezier. Default true. En false usa L — picos
-   * filosos estilo Robinhood. */
+  /** Suavizado con cubic bezier. Default true. En false usa step.
+   *  Para el feel jagged "trading-grade" usar `mode="line"` directo. */
   smooth?: boolean;
+  /** Modo de dibujo del path. Si se pasa, sobrescribe `smooth`.
+   *  - "curve": cubic bezier suave (smoothest).
+   *  - "step":  horizontal-vertical, tipo candle.
+   *  - "line":  polyline raw — un L por punto, jagged como precio
+   *             real. Es el feel "Robinhood-grade" cuando la densidad
+   *             de puntos es alta (>200). */
+  mode?: "curve" | "step" | "line";
   /** Reflejo animado debajo de la línea — barre horizontalmente.
    * Clippeado al área bajo la curva, sutil. */
   sheen?: boolean;
@@ -78,6 +85,7 @@ function SparklineImpl({
   withFill = true,
   strokeWidth = 2.4,
   smooth = true,
+  mode,
   sheen = false,
   live = false,
   referenceLine = false,
@@ -96,9 +104,11 @@ function SparklineImpl({
   // denso para que se sienta táctil pero sin sobrecargar.
   const lastHapticAtRef = useRef(0);
 
+  const effectiveMode: "curve" | "step" | "line" =
+    mode ?? (smooth ? "curve" : "step");
   const { points, d, fillD } = useMemo(
-    () => computePath(series, smooth),
-    [series, smooth],
+    () => computePath(series, effectiveMode),
+    [series, effectiveMode],
   );
 
   /* ─── Live dot pulse — halo crece y desvanece en loop. ───
@@ -349,10 +359,10 @@ function SparklineImpl({
             x2={VB_W}
             y1={points[0].y}
             y2={points[0].y}
-            stroke="#A3A3A3"
-            strokeWidth={0.6}
-            strokeDasharray="2,3"
-            strokeOpacity={0.7}
+            stroke="#9A9A9A"
+            strokeWidth={0.5}
+            strokeDasharray="1.5,3"
+            strokeOpacity={0.45}
           />
         ) : null}
         <Path
@@ -437,7 +447,7 @@ export const Sparkline = memo(SparklineImpl);
 
 function computePath(
   series: number[],
-  smooth = true,
+  mode: "curve" | "step" | "line" = "curve",
 ): {
   points: { x: number; y: number }[];
   d: string;
@@ -458,7 +468,7 @@ function computePath(
   });
 
   let d = `M${points[0].x},${points[0].y}`;
-  if (smooth) {
+  if (mode === "curve") {
     // Smooth cubic through midpoints for natural curve.
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
@@ -466,14 +476,21 @@ function computePath(
       const cx = (prev.x + curr.x) / 2;
       d += ` C${cx},${prev.y} ${cx},${curr.y} ${curr.x},${curr.y}`;
     }
-  } else {
-    // Step function estilo Robinhood: horizontal hasta el siguiente
-    // tick, después vertical. Sin diagonales — cada precio se mantiene
-    // hasta el próximo dato.
+  } else if (mode === "step") {
+    // Step function — horizontal hasta el siguiente tick, después
+    // vertical. Sin diagonales — cada precio se mantiene hasta el
+    // próximo dato.
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
       d += ` L${curr.x},${prev.y} L${curr.x},${curr.y}`;
+    }
+  } else {
+    // Polyline raw — diagonal directa entre cada par de puntos.
+    // Cuando la serie tiene >200 puntos da el feel jagged "tick por
+    // tick" característico de un chart de trading real.
+    for (let i = 1; i < points.length; i++) {
+      d += ` L${points[i].x},${points[i].y}`;
     }
   }
 
@@ -487,6 +504,9 @@ interface MiniProps {
   width?: number;
   height?: number;
   strokeWidth?: number;
+  /** Modo de dibujo. Default "line" — polyline raw, da el feel jagged
+   *  trading-grade cuando la serie tiene 40+ puntos. */
+  mode?: "curve" | "step" | "line";
 }
 
 /**
@@ -498,9 +518,10 @@ export function MiniSparkline({
   color,
   width = 56,
   height = 24,
-  strokeWidth = 1.6,
+  strokeWidth = 1.4,
+  mode = "line",
 }: MiniProps) {
-  const d = useMemo(() => computePath(series).d, [series]);
+  const d = useMemo(() => computePath(series, mode).d, [series, mode]);
   return (
     <Svg width={width} height={height} viewBox={`0 0 ${VB_W} ${VB_H}`}>
       <Path

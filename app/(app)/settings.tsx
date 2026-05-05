@@ -251,6 +251,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -271,6 +272,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   groupCard: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
@@ -285,6 +287,7 @@ const s = StyleSheet.create({
   rowIcon: {
     width: 34,
     height: 34,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -308,6 +311,7 @@ const s = StyleSheet.create({
   /* Segmented control de tema (System / Light / Dark) */
   segWrap: {
     flexDirection: "row",
+    borderCurve: "continuous",
     borderRadius: radius.md,
     padding: 3,
     gap: 2,
@@ -315,6 +319,7 @@ const s = StyleSheet.create({
   segBtn: {
     width: 36,
     height: 30,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",

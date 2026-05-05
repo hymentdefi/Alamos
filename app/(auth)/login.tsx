@@ -204,6 +204,7 @@ const s = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -231,6 +232,7 @@ const s = StyleSheet.create({
   },
   field: {
     borderWidth: 1,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -273,6 +275,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     flexDirection: "row",
     alignItems: "center",

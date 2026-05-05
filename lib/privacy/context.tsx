@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -51,8 +52,13 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const value = useMemo<PrivacyContextValue>(
+    () => ({ hideAmounts, toggle, set }),
+    [hideAmounts, toggle, set],
+  );
+
   return (
-    <PrivacyContext.Provider value={{ hideAmounts, toggle, set }}>
+    <PrivacyContext.Provider value={value}>
       {children}
     </PrivacyContext.Provider>
   );

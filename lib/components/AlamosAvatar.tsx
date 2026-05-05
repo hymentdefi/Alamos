@@ -225,6 +225,7 @@ export function AlamosAvatar({
         {
           width: size,
           height: size,
+          borderCurve: "continuous",
           borderRadius: size / 2,
           backgroundColor: bg,
           transform: [{ scale }, { rotate: rot }],

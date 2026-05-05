@@ -159,7 +159,7 @@ export default function CryptoDetailScreen() {
                 </View>
                 <View style={s.chartCol}>
                   <MiniSparkline
-                    series={seriesFromSeed(a.id, 28, "up")}
+                    series={seriesFromSeed(a.id, 60, "up")}
                     color={c.greenDark}
                   />
                 </View>
@@ -239,6 +239,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -283,6 +284,7 @@ const s = StyleSheet.create({
   },
   card: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -338,6 +340,7 @@ const s = StyleSheet.create({
   yieldBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   yieldText: {
@@ -370,6 +373,7 @@ const s = StyleSheet.create({
     gap: 10,
     marginHorizontal: 20,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
   },

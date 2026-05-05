@@ -179,6 +179,7 @@ const s = StyleSheet.create({
   iconBlock: {
     width: 72,
     height: 72,
+    borderCurve: "continuous",
     borderRadius: radius.xl,
     alignItems: "center",
     justifyContent: "center",
@@ -215,6 +216,7 @@ const s = StyleSheet.create({
   },
   dot: {
     height: 8,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
   bottom: {
@@ -222,6 +224,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     flexDirection: "row",
     alignItems: "center",

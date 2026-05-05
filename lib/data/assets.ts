@@ -763,13 +763,14 @@ export function formatVolume(n: number): string {
 /**
  * Convención de formato de moneda en la app:
  *   - ARS: "$ 342.180"           — peso argentino con SÍMBOLO antes
- *   - USD: "850,00 US$"          — símbolo de dólar al FINAL (no "USD")
- *   - USDT: "580,00 USDT"        — ticker al final (no tiene símbolo)
+ *   - USD: "850,00 US$"          — símbolo de dólar al FINAL
+ *   - USDT: "580,00 USDT"        — ticker al final
  *   - cualquier crypto (BTC, ETH, etc.): número + " " + ticker
  *
- * El peso argentino es el único con símbolo ANTES. El dólar se
- * representa con el símbolo "US$" pero ubicado DESPUÉS del monto.
- * Las demás monedas (sin símbolo asociado) van con su ticker después.
+ * El peso argentino es el único con símbolo ANTES. Las monedas
+ * extranjeras y cryptos van con código/ticker DESPUÉS del monto —
+ * es como se lee en español hablado ("tengo 4000 dólares") y matchea
+ * la convención de tickers en mercados (480 USDT, 0,5 BTC).
  *
  * Separadores: argentino (es-AR) — punto para miles, coma para decimal.
  */
@@ -778,25 +779,23 @@ export function formatARS(n: number): string {
   return "$ " + Math.abs(n).toLocaleString("es-AR");
 }
 
-/** "US$ 850,00" — siempre con dos decimales, símbolo al frente. */
+/** "850,00 US$" — siempre con dos decimales, símbolo al final. */
 export function formatUSD(n: number): string {
   return (
-    "US$ " +
     Math.abs(n).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })
+    }) + " US$"
   );
 }
 
-/** "USDT 580,00" — para crypto stablecoin, ticker al frente. */
+/** "580,00 USDT" — stablecoin con ticker al final. */
 export function formatUSDT(n: number): string {
   return (
-    "USDT " +
     Math.abs(n).toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })
+    }) + " USDT"
   );
 }
 
@@ -878,16 +877,10 @@ export function formatMoneyParts(
   if (currency === "ARS") {
     return { integer, decimals: dec, prefix: "$" };
   }
-  // Convención unificada: TODAS las monedas van con prefix delante
-  // del integer. USD = 'US$', USDT = 'USDT'. Antes USDT iba como
-  // suffix por ser ticker, pero la convención de la app pasa a ser
-  // siempre prefix para que el ojo encuentre la moneda primero
-  // (coherente con cómo se escribe el dinero en español-AR y con
-  // los formatters globales formatUSD/formatUSDT).
   if (currency === "USD") {
-    return { integer, decimals: dec, prefix: "US$" };
+    return { integer, decimals: dec, suffix: "US$" };
   }
-  return { integer, decimals: dec, prefix: currency };
+  return { integer, decimals: dec, suffix: currency };
 }
 
 /** @deprecated Usá formatMoneyParts(n, 'ARS'). Mantenido para back-compat. */

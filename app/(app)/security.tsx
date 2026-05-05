@@ -297,6 +297,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -309,6 +310,7 @@ const s = StyleSheet.create({
   scoreCard: {
     marginHorizontal: 20,
     padding: 18,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
   },
@@ -321,6 +323,7 @@ const s = StyleSheet.create({
   scoreIcon: {
     width: 38,
     height: 38,
+    borderCurve: "continuous",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -338,11 +341,13 @@ const s = StyleSheet.create({
   },
   progressBg: {
     height: 6,
+    borderCurve: "continuous",
     borderRadius: 3,
     overflow: "hidden",
   },
   progressFg: {
     height: "100%",
+    borderCurve: "continuous",
     borderRadius: 3,
   },
   group: {
@@ -356,6 +361,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   groupCard: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
@@ -370,6 +376,7 @@ const s = StyleSheet.create({
   rowIcon: {
     width: 34,
     height: 34,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -394,6 +401,7 @@ const s = StyleSheet.create({
   sessionIcon: {
     width: 34,
     height: 34,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -411,6 +419,7 @@ const s = StyleSheet.create({
   currentBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   currentBadgeText: {
@@ -440,6 +449,7 @@ const s = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 16,
     paddingVertical: 16,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",

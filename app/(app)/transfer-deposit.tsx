@@ -81,6 +81,7 @@ const s = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

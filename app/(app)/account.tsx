@@ -146,6 +146,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -158,6 +159,7 @@ const s = StyleSheet.create({
   kycCard: {
     marginHorizontal: 20,
     padding: 16,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
   },
@@ -170,6 +172,7 @@ const s = StyleSheet.create({
   kycIcon: {
     width: 28,
     height: 28,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -196,6 +199,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   groupCard: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",

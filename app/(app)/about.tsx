@@ -145,6 +145,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -176,6 +177,7 @@ const s = StyleSheet.create({
   },
   factsCard: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 18,
@@ -208,6 +210,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   linksCard: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",

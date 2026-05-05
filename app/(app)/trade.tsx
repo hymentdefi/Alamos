@@ -63,7 +63,7 @@ export default function TradeScreen() {
   const trendColor = up ? c.green : c.red;
 
   const series = useMemo(
-    () => seriesFromSeed(`trade-${asset.ticker}-${tf}`, 50, up ? "up" : "down"),
+    () => seriesFromSeed(`trade-${asset.ticker}-${tf}`, 260, up ? "up" : "down"),
     [asset.ticker, tf, up],
   );
 
@@ -250,6 +250,10 @@ export default function TradeScreen() {
           series={series}
           color={trendColor}
           height={180}
+          mode="line"
+          strokeWidth={1.5}
+          withFill={false}
+          referenceLine
           onScrub={(i) => setScrubIdx(i)}
           onScrubEnd={() => setScrubIdx(null)}
           style={{ marginTop: 8 }}
@@ -621,6 +625,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -638,6 +643,7 @@ const s = StyleSheet.create({
   perpBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
   perpBadgeText: {
@@ -750,6 +756,7 @@ const s = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   bookPrice: {
@@ -815,6 +822,7 @@ const s = StyleSheet.create({
   },
   sideToggle: {
     flexDirection: "row",
+    borderCurve: "continuous",
     borderRadius: radius.sm,
     padding: 3,
     gap: 3,
@@ -824,6 +832,7 @@ const s = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     alignItems: "center",
+    borderCurve: "continuous",
     borderRadius: 6,
   },
   sideBtnText: {
@@ -846,6 +855,7 @@ const s = StyleSheet.create({
   },
   levRow: {
     padding: 10,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
     borderWidth: 1,
     marginBottom: 12,
@@ -863,6 +873,7 @@ const s = StyleSheet.create({
   levPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderCurve: "continuous",
     borderRadius: 4,
     borderWidth: 1,
   },
@@ -876,6 +887,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
     borderWidth: 1,
     marginBottom: 8,
@@ -908,6 +920,7 @@ const s = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     alignItems: "center",
+    borderCurve: "continuous",
     borderRadius: 4,
     borderWidth: 1,
   },
@@ -934,6 +947,7 @@ const s = StyleSheet.create({
   submitBtn: {
     marginTop: 14,
     height: 48,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",

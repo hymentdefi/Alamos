@@ -66,6 +66,7 @@ const s = StyleSheet.create({
   loginPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -85,6 +86,7 @@ const s = StyleSheet.create({
     alignSelf: "flex-start",
     paddingVertical: 6,
     paddingHorizontal: 12,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
     gap: 8,
@@ -93,6 +95,7 @@ const s = StyleSheet.create({
   eyebrowDot: {
     width: 8,
     height: 8,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
   eyebrowText: {

@@ -384,6 +384,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     justifyContent: "space-between",
     paddingHorizontal: 4,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
     // overflow:"hidden" es clave con BlurView — sin esto los bordes
@@ -405,6 +406,7 @@ const styles = StyleSheet.create({
   slidingPill: {
     position: "absolute",
     left: 0,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },

@@ -199,6 +199,7 @@ const s = StyleSheet.create({
   grabberPill: {
     width: 40,
     height: 4,
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   content: {

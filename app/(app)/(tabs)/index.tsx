@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -628,8 +628,8 @@ function BaseHome() {
               sheen
               live={range === "live"}
               referenceLine={referenceLine}
-              strokeWidth={1.4}
-              smooth={smoothChart}
+              strokeWidth={1.5}
+              mode={smoothChart ? "line" : "step"}
               onScrub={onScrub}
               onScrubEnd={onScrubEnd}
             />
@@ -734,7 +734,10 @@ function ActionButton({
 
 /** Genera una serie realista: va desde (total / (1 + pct/100)) hasta total, con ruido. */
 function generateSeries(total: number, pct: number, seed: string): number[] {
-  const length = 40;
+  // 280 puntos: densidad necesaria para que el modo "line" del Sparkline
+  // se vea jagged tipo chart real de trading. Con 40 quedaba demasiado
+  // smooth y no se notaba la textura.
+  const length = 280;
   const startValue = total / (1 + pct / 100);
   const noise = seriesFromSeed(seed, length, "flat");
   // Escalamos el ruido proporcional a la magnitud del movimiento del
@@ -913,7 +916,7 @@ function Dinero(_: {
   );
 }
 
-function AccountRow({
+const AccountRow = memo(function AccountRow({
   account,
   withTopDivider,
 }: {
@@ -1006,7 +1009,7 @@ function AccountRow({
       )}
     </View>
   );
-}
+});
 
 
 /* ─── Tus inversiones: lista por categorías del brand pack ─── */
@@ -1167,6 +1170,7 @@ const s = StyleSheet.create({
   topIconBtn: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -1243,6 +1247,7 @@ const s = StyleSheet.create({
     flexBasis: "48%",
     flexGrow: 1,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     gap: 14,
@@ -1302,6 +1307,7 @@ const s = StyleSheet.create({
   usCard: {
     width: 150,
     padding: 12,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
@@ -1314,6 +1320,7 @@ const s = StyleSheet.create({
   usCardIcon: {
     width: 32,
     height: 32,
+    borderCurve: "continuous",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -1367,6 +1374,7 @@ const s = StyleSheet.create({
   infoDot: {
     width: 18,
     height: 18,
+    borderCurve: "continuous",
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
@@ -1406,6 +1414,7 @@ const s = StyleSheet.create({
   addBalanceBtn: {
     width: 32,
     height: 32,
+    borderCurve: "continuous",
     borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
@@ -1431,6 +1440,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 5,
     backgroundColor: "rgba(128,128,128,0.35)",
+    borderCurve: "continuous",
     borderRadius: 3,
     alignSelf: "center",
     marginBottom: 14,
@@ -1458,6 +1468,7 @@ const s = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
   },
@@ -1484,6 +1495,7 @@ const s = StyleSheet.create({
   convertSwap: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -1495,6 +1507,7 @@ const s = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
   },
@@ -1513,6 +1526,7 @@ const s = StyleSheet.create({
   convertMaxBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   convertMaxText: {
@@ -1553,6 +1567,7 @@ const s = StyleSheet.create({
   },
   convertCTA: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
@@ -1661,6 +1676,7 @@ const s = StyleSheet.create({
     right: -4,
     width: 13,
     height: 13,
+    borderCurve: "continuous",
     borderRadius: 7,
     borderWidth: 1.5,
     alignItems: "center",
@@ -1679,6 +1695,7 @@ const s = StyleSheet.create({
     paddingVertical: 4,
   },
   currencyDot: {
+    borderCurve: "continuous",
     borderRadius: 999,
   },
   balance: {
@@ -1725,6 +1742,7 @@ const s = StyleSheet.create({
     paddingVertical: 6,
     /* radius.md (12) en vez de radius.pill (999) — menos cápsula,
      * más editorial. Las pills 100% redondeadas se sentían genéricas. */
+    borderCurve: "continuous",
     borderRadius: radius.md,
   },
   rangeSettingsBtn: {
@@ -1743,6 +1761,7 @@ const s = StyleSheet.create({
   liveDot: {
     width: 6,
     height: 6,
+    borderCurve: "continuous",
     borderRadius: 3,
   },
   liveLabelInline: {
@@ -1766,6 +1785,7 @@ const s = StyleSheet.create({
   rowIcon: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",

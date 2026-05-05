@@ -93,6 +93,7 @@ export function GlassCard({ children, style, padding = 16, raised }: Props) {
 
 const styles = StyleSheet.create({
   card: {
+    borderCurve: "continuous",
     borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",

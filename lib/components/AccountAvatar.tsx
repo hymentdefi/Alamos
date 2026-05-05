@@ -40,6 +40,7 @@ export function AccountAvatar({ account, size = 40 }: Props) {
             {
               width: pinOuter,
               height: pinOuter,
+              borderCurve: "continuous",
               borderRadius: pinOuter / 2,
             },
           ]}

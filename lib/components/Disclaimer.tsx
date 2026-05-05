@@ -287,6 +287,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     backgroundColor: "rgba(128,128,128,0.35)",
+    borderCurve: "continuous",
     borderRadius: 3,
     alignSelf: "center",
     marginTop: 10,
@@ -307,6 +308,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 34,
     height: 34,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -345,6 +347,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
     marginTop: 10,
@@ -353,6 +356,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
+    borderCurve: "continuous",
     borderRadius: 6,
     borderWidth: 1.5,
     alignItems: "center",
@@ -365,6 +369,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",

@@ -200,6 +200,7 @@ const s = StyleSheet.create({
     right: 0,
     top: (THUMB_SIZE - TRACK_H) / 2,
     height: TRACK_H,
+    borderCurve: "continuous",
     borderRadius: TRACK_H,
   },
   fillLine: {
@@ -207,6 +208,7 @@ const s = StyleSheet.create({
     left: 0,
     top: (THUMB_SIZE - TRACK_H) / 2,
     height: TRACK_H,
+    borderCurve: "continuous",
     borderRadius: TRACK_H,
   },
   tick: {
@@ -214,6 +216,7 @@ const s = StyleSheet.create({
     top: (THUMB_SIZE - TICK_SIZE) / 2,
     width: TICK_SIZE,
     height: TICK_SIZE,
+    borderCurve: "continuous",
     borderRadius: TICK_SIZE / 2,
     borderWidth: 1.5,
     marginLeft: -TICK_SIZE / 2,
@@ -223,6 +226,7 @@ const s = StyleSheet.create({
     top: 0,
     width: THUMB_SIZE,
     height: THUMB_SIZE,
+    borderCurve: "continuous",
     borderRadius: THUMB_SIZE / 2,
     borderWidth: 3,
     marginLeft: -THUMB_SIZE / 2,
@@ -243,6 +247,7 @@ const s = StyleSheet.create({
   tooltipPill: {
     paddingHorizontal: 10,
     paddingVertical: 3,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   tooltipText: {

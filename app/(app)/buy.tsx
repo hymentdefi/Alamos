@@ -477,6 +477,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -496,6 +497,7 @@ const s = StyleSheet.create({
   modeToggle: {
     flexDirection: "row",
     borderWidth: 1,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     padding: 3,
     gap: 2,
@@ -503,6 +505,7 @@ const s = StyleSheet.create({
   modeBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   modeBtnText: {
@@ -574,6 +577,7 @@ const s = StyleSheet.create({
   stripIcon: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -599,6 +603,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 56,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     flexDirection: "row",
     alignItems: "center",

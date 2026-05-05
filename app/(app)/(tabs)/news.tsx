@@ -907,6 +907,7 @@ const s = StyleSheet.create({
   catPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -942,6 +943,7 @@ const card = StyleSheet.create({
   },
   imageAnim: {
     flex: 1,
+    borderCurve: "continuous",
     borderRadius: 24,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.22,
@@ -951,6 +953,7 @@ const card = StyleSheet.create({
   image: {
     flex: 1,
     width: "100%",
+    borderCurve: "continuous",
     borderRadius: 24,
   },
   bottom: {
@@ -986,6 +989,7 @@ const card = StyleSheet.create({
   tickerPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   tickerText: {
@@ -1000,6 +1004,7 @@ const card = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
   },
   readBtnText: {
@@ -1022,6 +1027,7 @@ const hint = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     paddingHorizontal: 16,
     paddingVertical: 9,
@@ -1061,6 +1067,7 @@ const sheet = StyleSheet.create({
     width: 44,
     height: 5,
     backgroundColor: "rgba(14,15,12,0.25)",
+    borderCurve: "continuous",
     borderRadius: 3,
   },
   image: {
@@ -1076,6 +1083,7 @@ const sheet = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 12,
     paddingVertical: 5,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     marginBottom: 14,
   },
@@ -1127,6 +1135,7 @@ const sheet = StyleSheet.create({
     backgroundColor: "rgba(14,15,12,0.08)",
     paddingHorizontal: 10,
     paddingVertical: 5,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   tickerText: {

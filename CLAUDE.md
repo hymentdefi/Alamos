@@ -120,6 +120,59 @@ Regla: el verde de marca es `#00C805` (constante `brand.green` en `lib/theme/ind
 - Componentes compartidos en `lib/components/`
 - Servicios de API en `lib/api/` (cuando se cree)
 
+### Esquinas redondeadas — siempre continuous (squircle)
+
+La app usa **continuous corners** (squircle estilo Figma/iOS) para todo
+elemento con esquinas redondeadas — nunca el border-radius circular
+estándar. Hay dos caminos según el tipo de elemento:
+
+**1. Default — `borderCurve: "continuous"` + `borderRadius`**
+
+Para todo lo "no-hero" (chips, badges, tiles, inputs, list items, cards
+internas) en cualquier `StyleSheet.create({})`:
+
+```ts
+{
+  borderCurve: "continuous",
+  borderRadius: radius.lg,
+  ...
+}
+```
+
+En iOS toma el squircle nativo de Apple gratis. En Android queda como
+border-radius normal pero la consistencia con iOS y la simplicidad
+ganan. Cero dependencias, cero overhead. **Esto va siempre, sin
+excepción** — no agregues `borderRadius` solo, siempre con
+`borderCurve: "continuous"`.
+
+**2. Hero components — `<Squircle>` cross-platform**
+
+Para componentes de alto impacto visual (Button principal, cards
+destacadas, modales hero) donde queremos que el squircle se vea igual
+en iOS y Android, usar el wrapper `<Squircle>` de
+[lib/components/Squircle.tsx](lib/components/Squircle.tsx) que
+encapsula `react-native-figma-squircle`:
+
+```tsx
+<Squircle
+  radius={radius.btn}
+  backgroundColor={c.ink}
+  borderColor={c.border}
+  borderWidth={1}
+  style={StyleSheet.absoluteFill}
+/>
+```
+
+Patrón típico: outer touchable/View con dimensiones + padding,
+`<Squircle>` como `absoluteFill` para el bg/border, children encima.
+
+**Limitaciones del wrapper:**
+- Sombras (`shadow*`/`elevation`) y ripple Android siguen siendo
+  rectangulares — el wrapper no las clipea al squircle.
+- Los children NO se clipean al squircle. Si el componente tiene
+  overlays absoluteFill (ej: gradient highlight), considerar dejarlo
+  con border-radius común + `borderCurve: continuous`.
+
 ## Cómo correr
 
 ```bash

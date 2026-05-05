@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -250,7 +250,7 @@ export default function ActivityScreen() {
   );
 }
 
-function TabButton({
+const TabButton = memo(function TabButton({
   label,
   active,
   onPress,
@@ -278,7 +278,7 @@ function TabButton({
       </Text>
     </Pressable>
   );
-}
+});
 
 const s = StyleSheet.create({
   root: { flex: 1 },
@@ -292,6 +292,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -313,6 +314,7 @@ const s = StyleSheet.create({
   tabGroup: {
     flexDirection: "row",
     padding: 4,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     gap: 4,
   },
@@ -321,6 +323,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   tabActive: {
@@ -339,6 +342,7 @@ const s = StyleSheet.create({
   card: {
     marginHorizontal: 20,
     marginTop: 12,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
@@ -354,6 +358,7 @@ const s = StyleSheet.create({
   iconWrap: {
     width: 38,
     height: 38,
+    borderCurve: "continuous",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -396,6 +401,7 @@ const s = StyleSheet.create({
   unreadDot: {
     width: 8,
     height: 8,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
   notifBody: {

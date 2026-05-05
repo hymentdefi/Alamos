@@ -535,6 +535,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -551,6 +552,7 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 11,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -571,6 +573,7 @@ const s = StyleSheet.create({
   },
   card: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -582,6 +585,7 @@ const s = StyleSheet.create({
   },
   emptyCard: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingVertical: 22,
@@ -664,6 +668,7 @@ const s = StyleSheet.create({
   networkProtoBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
+    borderCurve: "continuous",
     borderRadius: radius.sm,
   },
   networkProtoText: {
@@ -703,6 +708,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 12,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     borderWidth: 1,
   },
@@ -740,6 +746,7 @@ const s = StyleSheet.create({
     gap: 10,
     marginHorizontal: 20,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
   },

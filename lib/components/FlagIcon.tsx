@@ -127,6 +127,7 @@ function UsaFlag({ size }: { size: number }) {
 
 const s = StyleSheet.create({
   wrap: {
+    borderCurve: "continuous",
     borderRadius: 999,
     overflow: "hidden",
   },

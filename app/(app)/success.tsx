@@ -417,6 +417,7 @@ const s = StyleSheet.create({
   checkCircle: {
     width: 72,
     height: 72,
+    borderCurve: "continuous",
     borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",
@@ -450,6 +451,7 @@ const s = StyleSheet.create({
   },
   card: {
     marginHorizontal: 20,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 18,
@@ -474,6 +476,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",

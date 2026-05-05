@@ -235,6 +235,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -255,6 +256,7 @@ const s = StyleSheet.create({
   filterPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -291,6 +293,7 @@ const s = StyleSheet.create({
   itemIcon: {
     width: 38,
     height: 38,
+    borderCurve: "continuous",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -309,6 +312,7 @@ const s = StyleSheet.create({
   unreadDot: {
     width: 7,
     height: 7,
+    borderCurve: "continuous",
     borderRadius: 4,
   },
   itemBody: {

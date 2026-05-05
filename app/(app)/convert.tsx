@@ -709,6 +709,7 @@ const s = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
     alignSelf: "flex-start",
@@ -727,6 +728,7 @@ const s = StyleSheet.create({
     position: "relative",
   },
   card: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     paddingHorizontal: 18,
     paddingVertical: 16,
@@ -779,6 +781,7 @@ const s = StyleSheet.create({
   swapBtn: {
     width: 44,
     height: 44,
+    borderCurve: "continuous",
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
@@ -805,6 +808,7 @@ const s = StyleSheet.create({
   },
   cta: {
     height: 52,
+    borderCurve: "continuous",
     borderRadius: radius.btn,
     alignItems: "center",
     justifyContent: "center",
@@ -838,6 +842,7 @@ const s = StyleSheet.create({
   sheetGrabberPill: {
     width: 40,
     height: 4,
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   sheetTitle: {

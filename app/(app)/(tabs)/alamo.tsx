@@ -299,6 +299,7 @@ const s = StyleSheet.create({
     marginBottom: 22,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
   },
@@ -340,6 +341,7 @@ const s = StyleSheet.create({
   iconWrap: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

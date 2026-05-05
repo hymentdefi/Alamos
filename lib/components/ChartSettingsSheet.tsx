@@ -387,6 +387,7 @@ const s = StyleSheet.create({
   grabberPill: {
     width: 40,
     height: 4,
+    borderCurve: "continuous",
     borderRadius: 2,
   },
   hero: {
@@ -412,6 +413,7 @@ const s = StyleSheet.create({
     gap: 10,
   },
   toggleList: {
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 14,
@@ -422,6 +424,7 @@ const cs = StyleSheet.create({
   card: {
     flex: 1,
     padding: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
   },
   previewWrap: {
@@ -444,6 +447,7 @@ const cs = StyleSheet.create({
   checkBubble: {
     width: 18,
     height: 18,
+    borderCurve: "continuous",
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",

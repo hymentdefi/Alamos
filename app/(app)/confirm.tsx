@@ -1129,6 +1129,7 @@ const s = StyleSheet.create({
   backBtn: {
     width: 40,
     height: 40,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -1184,6 +1185,7 @@ const s = StyleSheet.create({
   },
   bridgeBlock: {
     marginTop: 18,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
@@ -1205,6 +1207,7 @@ const s = StyleSheet.create({
   t1Pill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   t1PillText: {
@@ -1312,6 +1315,7 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     paddingVertical: 16,
     paddingHorizontal: 48,
+    borderCurve: "continuous",
     borderRadius: 12,
   },
   errorBtnText: {

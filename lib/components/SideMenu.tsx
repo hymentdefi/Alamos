@@ -322,6 +322,7 @@ const s = StyleSheet.create({
   closeBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -338,6 +339,7 @@ const s = StyleSheet.create({
   avatar: {
     width: 44,
     height: 44,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -378,6 +380,7 @@ const s = StyleSheet.create({
   rowIcon: {
     width: 32,
     height: 32,
+    borderCurve: "continuous",
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -398,6 +401,7 @@ const s = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 24,
     paddingVertical: 14,
+    borderCurve: "continuous",
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
