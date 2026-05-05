@@ -104,7 +104,16 @@ const PILL_HEIGHT = 48;
 const PILL_GAP = 8;
 const STAGGER_MS = 50;
 const DUR = 280;
-const DIM_OPACITY = 0.55;
+/* Dim en 2 niveles:
+ *   - STRONG (arriba del bar) → 0.55 — el resto de la pantalla
+ *     se difumina fuerte, foco va a las pills.
+ *   - WEAK (sobre el bar)     → 0.22 — 'Fondos disponibles' +
+ *     balance se ven mateados pero todavía legibles. Le da al user
+ *     una glance de cuánto tiene mientras decide la acción.
+ * El feedback explícito del user fue: "todo se pone gris pero lo
+ * del bottom que dice fondos disponibles y operar menos". */
+const DIM_OPACITY_STRONG = 0.55;
+const DIM_OPACITY_WEAK = 0.22;
 
 export const TradeBottomBar = memo(function TradeBottomBar({
   asset,
@@ -256,8 +265,11 @@ export const TradeBottomBar = memo(function TradeBottomBar({
       },
     ],
   }));
-  const dimStyle = useAnimatedStyle(() => ({
-    opacity: dimProgress.value * DIM_OPACITY,
+  const strongDimStyle = useAnimatedStyle(() => ({
+    opacity: dimProgress.value * DIM_OPACITY_STRONG,
+  }));
+  const weakDimStyle = useAnimatedStyle(() => ({
+    opacity: dimProgress.value * DIM_OPACITY_WEAK,
   }));
 
   /* ─── Handlers ─── */
@@ -275,6 +287,10 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   };
 
   const ctaBottom = insets.bottom + 8;
+  /* Altura del bar (paddingBottom + content + paddingTop). La uso
+   * para tilear los 2 dims: strong de top:0 hasta bar.top, weak
+   * justo sobre el bar. */
+  const barHeight = insets.bottom + 8 + PILL_HEIGHT + 14;
 
   return (
     /* Z-order (orden de render = orden visual):
@@ -346,12 +362,39 @@ export const TradeBottomBar = memo(function TradeBottomBar({
         )}
       </View>
 
-      {/* 2) Dim overlay — cubre TODO (incluido el bar). El user pidió
-            que 'fondos disponibles' también se ponga gris, así toda
-            la atención va a las pills. */}
+      {/* 2a) Strong dim — cubre arriba del bar (la mayoría del screen).
+             Foco va a las pills. */}
       {expanded ? (
         <Animated.View
-          style={[s.dimOverlay, { backgroundColor: c.ink }, dimStyle]}
+          style={[
+            s.dimOverlay,
+            { backgroundColor: c.ink, bottom: barHeight },
+            strongDimStyle,
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => collapse()}
+            accessibilityLabel="Cerrar opciones"
+          />
+        </Animated.View>
+      ) : null}
+
+      {/* 2b) Weak dim — cubre solo el bar. Mateado pero legible:
+             'Fondos disponibles' + balance se ven más sutiles que
+             el resto de la pantalla pero el user todavía puede leer
+             cuánto tiene mientras decide qué pill tocar. */}
+      {expanded ? (
+        <Animated.View
+          style={[
+            s.dimOverlay,
+            {
+              backgroundColor: c.ink,
+              top: undefined,
+              height: barHeight,
+            },
+            weakDimStyle,
+          ]}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
