@@ -113,7 +113,7 @@ const DUR = 280;
  * El feedback explícito del user fue: "todo se pone gris pero lo
  * del bottom que dice fondos disponibles y operar menos". */
 const DIM_OPACITY_STRONG = 0.55;
-const DIM_OPACITY_WEAK = 0.22;
+const DIM_OPACITY_WEAK = 0.05;
 
 export const TradeBottomBar = memo(function TradeBottomBar({
   asset,
