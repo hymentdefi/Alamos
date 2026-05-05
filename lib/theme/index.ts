@@ -59,10 +59,14 @@ const light = {
   greenDark: "#00A304",
   greenDim: "rgba(0,163,4,0.14)",
 
-  // Rojo brand: vivo y saturado para emparejar la "viveza" visual del
-  // verde-action (#5ac43e). Antes era #C83B3B — apagado y opaco.
-  red: "#EF3939",
-  redDim: "rgba(239,57,57,0.12)",
+  // Token "down" para activos: naranja cálido #EB5D2A en vez de rojo
+  // puro. El rojo cargado se leía como error/warning en una pantalla
+  // donde el down es un estado normal del activo. El naranja suaviza
+  // la sensación cuando el portfolio o el activo están en negativo
+  // sin perder contraste con el verde brand. Mantengo el nombre del
+  // token (`red`) para no romper consumers — es un alias semántico.
+  red: "#EB5D2A",
+  redDim: "rgba(235,93,42,0.12)",
   ink: brand.ink,
 } as const;
 
@@ -95,8 +99,10 @@ const dark = {
   greenDark: "#02A05C",
   greenDim: "rgba(2,160,92,0.16)",
 
-  red: "#F6465D",
-  redDim: "rgba(246,70,93,0.14)",
+  // Naranja "down" en dark — un toque más saturado que en light
+  // para mantener legibilidad sobre fondo OLED.
+  red: "#F26A3D",
+  redDim: "rgba(242,106,61,0.16)",
   ink: "#000000",
 } as const;
 
