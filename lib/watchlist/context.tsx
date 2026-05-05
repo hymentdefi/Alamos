@@ -14,6 +14,7 @@ import {
   removeFromWatchlist,
 } from "./api";
 import { useAuth } from "../auth/context";
+import { useToast } from "../toast/context";
 
 interface WatchlistContextValue {
   /** Set de assetIds que el usuario tiene en su watchlist. */
@@ -30,6 +31,7 @@ const Ctx = createContext<WatchlistContextValue | null>(null);
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
+  const { show: showToast } = useToast();
   const [items, setItems] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
@@ -84,6 +86,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       try {
         if (wasWatched) await removeFromWatchlist(user.id, assetId);
         else await addToWatchlist(user.id, assetId);
+        // Toast de confirmación — la spec lo pide explícitamente
+        // ("Toast confirmando: 'Agregado a watchlist' / 'Removido
+        // de watchlist'"). Variant neutral porque no es éxito de
+        // transacción, sólo confirmación de un toggle.
+        showToast(
+          wasWatched ? "Removido de favoritos" : "Agregado a favoritos",
+          { variant: "neutral" },
+        );
       } catch {
         // Revertir optimistic update si falla.
         setItems((prev) => {
@@ -92,9 +102,12 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
           else next.delete(assetId);
           return next;
         });
+        showToast("No pudimos guardar el cambio. Reintentá.", {
+          variant: "error",
+        });
       }
     },
-    [items, user],
+    [items, user, showToast],
   );
 
   const value = useMemo<WatchlistContextValue>(

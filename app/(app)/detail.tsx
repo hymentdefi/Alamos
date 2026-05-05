@@ -45,8 +45,7 @@ import {
 } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { AlamosIcon } from "../../lib/components/AlamosIcon";
-import { useFavorites } from "../../lib/favorites/context";
-import { FavStar } from "../../lib/components/FavStar";
+import { WatchlistButton } from "../../lib/components/WatchlistButton";
 import {
   isMarketOpen,
   closedHeroMessageFor,
@@ -119,7 +118,6 @@ export default function DetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { isFavorite, toggle: toggleFav } = useFavorites();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
@@ -176,7 +174,6 @@ export default function DetailScreen() {
   // Si AAPL.US es USD, el precio del hero, el delta, los stats, tu
   // posición, los movimientos, todo va en US$. No mezclamos con peso.
   const cur = assetCurrency(asset);
-  const fav = isFavorite(asset.ticker);
   const rangeUp = pctForRange >= 0;
   const color = rangeUp ? c.greenDark : c.red;
 
@@ -242,14 +239,7 @@ export default function DetailScreen() {
           ticker={asset.ticker}
           onPress={() => setAlertSheetOpen(true)}
         />
-        <Tap
-          style={s.iconBtn}
-          hitSlop={12}
-          haptic="light"
-          onPress={() => toggleFav(asset.ticker)}
-        >
-          <FavStar filled={fav} size={22} outlineColor={c.text} />
-        </Tap>
+        <WatchlistButton ticker={asset.ticker} size={36} />
       </View>
 
       <Animated.ScrollView
