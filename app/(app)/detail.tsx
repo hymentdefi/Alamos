@@ -216,7 +216,7 @@ export default function DetailScreen() {
           ticker={asset.ticker}
           onPress={() => setAlertSheetOpen(true)}
         />
-        <WatchlistButton ticker={asset.ticker} size={36} />
+        <WatchlistButton ticker={asset.ticker} />
 
         {/* Sticky overlay — absolute, centrado sobre el topBar
             entero (left:0, right:0). Así NO depende del ancho de

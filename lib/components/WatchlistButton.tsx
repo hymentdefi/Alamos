@@ -26,7 +26,7 @@ interface Props {
  * del ícono"). NO se anima al primer mount — sólo cuando cruza
  * watched ↔ no-watched.
  */
-export function WatchlistButton({ ticker, size = 36 }: Props) {
+export function WatchlistButton({ ticker, size = 30 }: Props) {
   const { c } = useTheme();
   const { isWatched, toggle } = useWatchlist();
   const chromatic = useAssetColorOptional();
@@ -68,7 +68,10 @@ export function WatchlistButton({ ticker, size = 36 }: Props) {
       <Animated.View style={{ transform: [{ scale }] }}>
         <Feather
           name={watched ? "check" : "plus"}
-          size={Math.round(size * 0.5)}
+          /* Ratio 0.55 (en vez de 0.5) — el "+" se sentía pesado a
+           * 0.5 con borde 1.4. Con 0.55 + borde 1.2 el ícono respira
+           * mejor y matchea visualmente al peso del bell de alerts. */
+          size={Math.round(size * 0.55)}
           color={tint}
         />
       </Animated.View>
@@ -80,7 +83,10 @@ const s = StyleSheet.create({
   btn: {
     borderCurve: "continuous",
     borderRadius: 999,
-    borderWidth: 1.4,
+    /* Borde 1.2 en vez de 1.4 — el feedback del usuario fue que el
+     * círculo se veía "tosco" comparado al bell de alertas. Stroke
+     * más fino + tamaño 30 (default antes 36) afina la estética. */
+    borderWidth: 1.2,
     alignItems: "center",
     justifyContent: "center",
   },
