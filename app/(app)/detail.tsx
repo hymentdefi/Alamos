@@ -54,7 +54,6 @@ import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
-import { TradeSelectorSheet } from "../../lib/components/TradeSelectorSheet";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -121,7 +120,6 @@ export default function DetailScreen() {
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
-  const [tradeSelectorOpen, setTradeSelectorOpen] = useState(false);
 
   /* ─── Sticky header — scroll detection ──────────────────────────
    *
@@ -360,7 +358,17 @@ export default function DetailScreen() {
       <TradeBottomBar
         asset={asset}
         hasPosition={position > 0}
-        onOperar={() => setTradeSelectorOpen(true)}
+        onSelect={(mode) => {
+          // En mercado abierto: routea al flow de compra/venta
+          // existente (buy.tsx). En mercado cerrado: buy.tsx detecta
+          // y muta a flow de orden diferida (banner + CTA Programar).
+          // Las pills ya muestran "Programar compra/venta" cuando
+          // corresponde — el copy se mantiene consistente.
+          router.push({
+            pathname: "/(app)/buy",
+            params: { ticker: asset.ticker, mode },
+          });
+        }}
         onConvert={() => router.push("/(app)/convert")}
       />
 
@@ -372,23 +380,6 @@ export default function DetailScreen() {
         visible={alertSheetOpen}
         asset={asset}
         onClose={() => setAlertSheetOpen(false)}
-      />
-
-      <TradeSelectorSheet
-        key={`trade-${asset.ticker}`}
-        visible={tradeSelectorOpen}
-        asset={asset}
-        hasPosition={position > 0}
-        onClose={() => setTradeSelectorOpen(false)}
-        onSelect={(mode) => {
-          // En mercado abierto: routea al flow de compra/venta
-          // existente (buy.tsx). En mercado cerrado: buy.tsx detecta
-          // y muta a flow de orden diferida (banner + CTA Programar).
-          router.push({
-            pathname: "/(app)/buy",
-            params: { ticker: asset.ticker, mode },
-          });
-        }}
       />
     </View>
     </AssetColorProvider>
