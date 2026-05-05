@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSegments } from "expo-router";
 import {
-  Dimensions,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -16,22 +14,15 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
-import MaskedView from "@react-native-masked-view/masked-view";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-void SCREEN_W;
-
-export const ISLAND_HEIGHT = 64;
-export const ISLAND_SIDE_GAP = 16;
-const BACKDROP_TOP_FADE = 14;
+const BAR_CONTENT_HEIGHT = 60;
 const ACTIVE_COLOR = "#5ac43e";
-const PILL_INSET_X = 4;
+const PILL_INSET_X = 6;
 const PILL_INSET_Y = 6;
+const ROW_PADDING_X = 6;
 
 type TabRoute = {
   name: string;
@@ -49,42 +40,29 @@ const TAB_ROUTES: TabRoute[] = [
 ];
 
 /**
- * Helper para calcular la altura visible del nav bar — útil cuando
- * un screen no-tab quiere reservar espacio en su scroll/bottomBar
- * para no quedar tapado por la pill flotante.
+ * Helper para reservar espacio al final del scroll en screens que
+ * coexisten con el nav bar (ej: detail, market-category) — devuelve
+ * altura del contenido + safe-area inset bottom.
  */
 export function useFloatingTabBarHeight(): number {
   const insets = useSafeAreaInsets();
-  const bottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
-  return ISLAND_HEIGHT + bottomGap;
+  return BAR_CONTENT_HEIGHT + insets.bottom;
 }
 
 interface Props {
   /**
-   * Tab "contextual" para resaltar cuando el FloatingTabBar se
-   * monta fuera del (tabs) layout (ej: detail, market-category).
-   * Como segments[2] no devuelve nombre de tab en esos casos, el
-   * segmento se cae al default — sin override, siempre se prendía
-   * Inicio. Acá indicamos cuál tab "originó" el flow para que el
-   * pill marque la procedencia (ej: 'explore' para market-category
-   * y detail, que casi siempre vienen desde Mercado).
+   * Tab "contextual" para resaltar cuando el nav se monta fuera del
+   * (tabs) layout (ej: detail, market-category). Como segments[2] no
+   * devuelve nombre de tab en esos casos, sin override siempre se
+   * prendía Inicio. Acá indicamos cuál tab "originó" el flow.
    */
   contextTab?: string;
 }
 
 /**
- * Nav bar flotante glassmorphism con backdrop blur extendido.
- *
- * Diseño preservado del (tabs)/_layout original:
- *
- *   1. Backdrop blur — cubre desde el top del nav hasta el bottom
- *      del teléfono. Mini-fade en el borde superior (LinearGradient
- *      como mask) para que el inicio del blur no sea brusco.
- *   2. Floating island — la pill propia con su propio blur (más
- *      intenso) y los tab items adentro.
- *   3. Sliding pill — un único elemento que se desliza entre tabs
- *      (estilo Zoho Mail), con squash & stretch en X/Y durante el
- *      viaje para feel rubber-band.
+ * Bottom nav pegado al piso — edge-to-edge, fondo sólido del theme,
+ * hairline arriba, safe-area inset adentro. Mantiene la sliding pill
+ * animada para el tab activo (squash & stretch en el viaje).
  *
  * Reusable en cualquier screen — basta con renderearlo como sibling
  * del contenido principal. El navigate usa router.navigate(href) que
@@ -103,9 +81,8 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
   const { mode, c } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = mode === "dark";
-  const bottomGap = Math.max(Platform.OS === "ios" ? 24 : 14, insets.bottom);
 
-  const [islandWidth, setIslandWidth] = useState(0);
+  const [rowWidth, setRowWidth] = useState(0);
 
   const pillIndex = useSharedValue(activeIndex);
   const pillScaleX = useSharedValue(1);
@@ -146,15 +123,15 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
   }, [activeIndex, pillIndex, pillScaleX, pillScaleY]);
 
   const itemWidth =
-    islandWidth > 0 ? (islandWidth - PILL_INSET_X * 2) / TAB_ROUTES.length : 0;
+    rowWidth > 0 ? (rowWidth - ROW_PADDING_X * 2) / TAB_ROUTES.length : 0;
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: PILL_INSET_X + pillIndex.value * itemWidth },
+      { translateX: ROW_PADDING_X + PILL_INSET_X + pillIndex.value * itemWidth },
       { scaleX: pillScaleX.value },
       { scaleY: pillScaleY.value },
     ],
-    width: itemWidth,
+    width: Math.max(0, itemWidth - PILL_INSET_X * 2),
   }));
 
   const onPressTab = (route: TabRoute, index: number) => {
@@ -163,97 +140,51 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
     router.navigate(route.href as never);
   };
 
-  const totalBackdropHeight = ISLAND_HEIGHT + bottomGap;
-
   return (
-    <View pointerEvents="box-none" style={styles.container}>
-      <MaskedView
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: totalBackdropHeight,
-        }}
-        maskElement={
-          <LinearGradient
-            colors={["transparent", "black"]}
-            locations={[0, BACKDROP_TOP_FADE / totalBackdropHeight]}
-            style={{ flex: 1 }}
-          />
-        }
-      >
-        <BlurView
-          tint={isDark ? "dark" : "light"}
-          intensity={Platform.OS === "ios" ? 28 : 50}
-          style={{
-            flex: 1,
-            backgroundColor: isDark
-              ? "rgba(0, 0, 0, 0.20)"
-              : "rgba(255, 255, 255, 0.25)",
-          }}
-        />
-      </MaskedView>
-
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.container,
+        {
+          backgroundColor: c.bg,
+          borderTopColor: c.border,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+    >
       <View
-        style={{
-          position: "absolute",
-          bottom: bottomGap,
-          left: ISLAND_SIDE_GAP,
-          right: ISLAND_SIDE_GAP,
-        }}
-        onLayout={(e) => setIslandWidth(e.nativeEvent.layout.width)}
+        style={[styles.row, { height: BAR_CONTENT_HEIGHT }]}
+        onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
       >
-        <BlurView
-          tint={isDark ? "dark" : "light"}
-          intensity={Platform.OS === "ios" ? 60 : 90}
-          style={[
-            styles.island,
-            {
-              height: ISLAND_HEIGHT,
-              backgroundColor: isDark
-                ? "rgba(18, 18, 18, 0.70)"
-                : "rgba(250, 250, 250, 0.78)",
-              borderColor: isDark
-                ? "rgba(255, 255, 255, 0.06)"
-                : "rgba(0, 0, 0, 0.06)",
-            },
-          ]}
-        >
-          {itemWidth > 0 ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.slidingPill,
-                {
-                  top: PILL_INSET_Y,
-                  bottom: PILL_INSET_Y,
-                  backgroundColor: isDark
-                    ? "rgba(14, 203, 129, 0.14)"
-                    : "rgba(0, 200, 5, 0.10)",
-                  borderColor: isDark
-                    ? "rgba(14, 203, 129, 0.20)"
-                    : "rgba(0, 200, 5, 0.16)",
-                },
-                pillStyle,
-              ]}
-            />
-          ) : null}
+        {itemWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.slidingPill,
+              {
+                top: PILL_INSET_Y,
+                bottom: PILL_INSET_Y,
+                backgroundColor: isDark
+                  ? "rgba(14, 203, 129, 0.14)"
+                  : "rgba(0, 200, 5, 0.10)",
+              },
+              pillStyle,
+            ]}
+          />
+        ) : null}
 
-          {TAB_ROUTES.map((route, index) => {
-            const focused = index === activeIndex;
-            return (
-              <TabItem
-                key={route.name}
-                route={route}
-                focused={focused}
-                inactiveColor={c.textSecondary}
-                onPress={() => onPressTab(route, index)}
-              />
-            );
-          })}
-        </BlurView>
+        {TAB_ROUTES.map((route, index) => {
+          const focused = index === activeIndex;
+          return (
+            <TabItem
+              key={route.name}
+              route={route}
+              focused={focused}
+              inactiveColor={c.textSecondary}
+              onPress={() => onPressTab(route, index)}
+            />
+          );
+        })}
       </View>
     </View>
   );
@@ -291,21 +222,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  island: {
+  row: {
     flexDirection: "row",
     alignItems: "stretch",
     justifyContent: "space-between",
-    paddingHorizontal: 4,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 14,
+    paddingHorizontal: ROW_PADDING_X,
   },
   tabItem: {
     flex: 1,
@@ -318,8 +241,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     borderCurve: "continuous",
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    borderRadius: radius.lg,
   },
   label: {
     fontFamily: fontFamily[700],
