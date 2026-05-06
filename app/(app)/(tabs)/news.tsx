@@ -347,12 +347,14 @@ export default function NewsScreen() {
   }, [navigation, isFocused, activeTab]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* Header sticky con título Noticias + tabs */}
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+      {/* Header sticky con título Noticias + tabs — bg cálido para
+          que la página entera respire en gris (mismo lenguaje de
+          Cocos / Robinhood) y los cards blancos resaltan adentro. */}
       <View
         style={[
           s.header,
-          { backgroundColor: c.bg, borderBottomColor: c.border },
+          { backgroundColor: c.bgWarm, borderBottomColor: c.border },
         ]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
@@ -586,28 +588,38 @@ function NewsCard({
   });
 
   return (
-    <View style={{ height, paddingTop: topPad, backgroundColor: c.bg }}>
-      {/* Imagen que ocupa todo el espacio entre header y contenido */}
-      <Pressable style={card.imageWrap} onPress={onOpenDetail}>
-        <Animated.View
-          style={[
-            card.imageAnim,
-            {
-              transform: [{ translateY }],
-              shadowColor: c.ink,
-            },
-          ]}
-        >
-          <Image
-            source={{ uri: item.image }}
-            style={card.image}
-            resizeMode="cover"
-          />
-        </Animated.View>
-      </Pressable>
+    <View
+      style={{ height, paddingTop: topPad, backgroundColor: c.bgWarm }}
+    >
+      {/* Frame blanco que enmarca image + bottom — la página es
+          gris cálido (c.bgWarm) y la noticia se ve "encartonada"
+          adentro de este frame, mismo lenguaje que las cards de
+          Cocos / Robinhood. Shadow sutil para que despegue del
+          fondo sin gritar. */}
+      <View
+        style={[
+          card.frame,
+          { backgroundColor: c.surface, shadowColor: c.ink },
+        ]}
+      >
+        {/* Imagen que ocupa todo el espacio entre header y contenido */}
+        <Pressable style={card.imageWrap} onPress={onOpenDetail}>
+          <Animated.View
+            style={[
+              card.imageAnim,
+              { transform: [{ translateY }] },
+            ]}
+          >
+            <Image
+              source={{ uri: item.image }}
+              style={card.image}
+              resizeMode="cover"
+            />
+          </Animated.View>
+        </Pressable>
 
-      {/* Contenido debajo — todo tappable para abrir la noticia */}
-      <Pressable style={card.bottom} onPress={onOpenDetail}>
+        {/* Contenido debajo — todo tappable para abrir la noticia */}
+        <Pressable style={card.bottom} onPress={onOpenDetail}>
         <Text style={[card.source, { color: c.textMuted }]}>
           {item.source} · {item.time}
         </Text>
@@ -625,10 +637,28 @@ function NewsCard({
               const change = TICKER_CHANGE.get(t) ?? null;
               const tone =
                 change == null ? c.text : change >= 0 ? c.brand : c.red;
+              // Mismo lenguaje que las pills de categoría: outline
+              // 1.5px del tone + tint 6% adentro. El chip entero
+              // comunica el estado del activo (verde si up, rojo
+              // si down) sin ser un bloque solid.
+              const tint =
+                change == null
+                  ? "transparent"
+                  : change >= 0
+                  ? "rgba(0,200,5,0.06)"
+                  : "rgba(235,93,42,0.06)";
               return (
                 <View
                   key={t}
-                  style={[card.tickerPill, { borderColor: c.border }]}
+                  style={[
+                    card.tickerPill,
+                    {
+                      backgroundColor: tint,
+                      borderColor:
+                        change == null ? c.border : tone,
+                      borderWidth: 1.5,
+                    },
+                  ]}
                 >
                   <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
                   {change != null ? (
@@ -643,11 +673,12 @@ function NewsCard({
           </View>
         ) : null}
 
-        <View style={[card.readBtn, { backgroundColor: c.ink }]}>
-          <Feather name="chevron-up" size={16} color={c.bg} />
-          <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
-        </View>
-      </Pressable>
+          <View style={[card.readBtn, { backgroundColor: c.ink }]}>
+            <Feather name="chevron-up" size={16} color={c.bg} />
+            <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
+          </View>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -738,10 +769,13 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Tint gris ink muy leve sobre transparente — el texto
-            // y el chevron en verde brand cargan el peso cromático,
-            // el fondo gris define el frame sin competir.
-            backgroundColor: "rgba(14,15,12,0.08)",
+            // Mismo lenguaje que las pills de categoría y los
+            // chips de ticker: outline brand 1.5px + tint 6%
+            // adentro + texto/chevron en c.brand. El frame queda
+            // coherente con el resto del header de Noticias.
+            backgroundColor: "rgba(0,200,5,0.06)",
+            borderColor: c.brand,
+            borderWidth: 1.5,
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -989,30 +1023,44 @@ const s = StyleSheet.create({
 });
 
 const card = StyleSheet.create({
+  /* Frame blanco que enmarca toda la noticia (image + texto). El
+   * page bg es gris cálido (c.bgWarm) y este frame se siente como
+   * un card de Cocos / Robinhood — borderRadius 24, sombra liviana,
+   * margenes laterales para que se vea el gris alrededor. */
+  frame: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderCurve: "continuous",
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+  },
   imageWrap: {
     flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   imageAnim: {
     flex: 1,
     borderCurve: "continuous",
-    borderRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    elevation: 12,
+    borderRadius: 18,
+    overflow: "hidden",
   },
   image: {
     flex: 1,
     width: "100%",
     borderCurve: "continuous",
-    borderRadius: 24,
+    borderRadius: 18,
   },
   bottom: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   source: {
     fontFamily: fontFamily[600],
@@ -1044,11 +1092,10 @@ const card = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
     borderCurve: "continuous",
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.pill,
   },
   tickerText: {
     fontFamily: fontFamily[700],
