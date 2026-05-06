@@ -741,11 +741,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Ink bg — alto contraste contra cualquier hero image
-            // (clara u oscura), con el contenido en brand verde
-            // adentro. Premium, distinctivo, lenguaje de logo
-            // (verde sobre ink es la base del brand kit).
-            backgroundColor: c.ink,
+            // Tint brand verde muy leve sobre transparente — el
+            // texto y el chevron en verde brand cargan el peso
+            // visual, el fondo apenas insinúa el frame.
+            backgroundColor: "rgba(0,200,5,0.08)",
             transform: [
               { translateY: bounce },
               { scale: pulse },
