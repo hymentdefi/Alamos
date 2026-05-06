@@ -48,10 +48,6 @@ import {
   DisclaimerShort,
 } from "../../../lib/components/Disclaimer";
 import { assets, formatPct } from "../../../lib/data/assets";
-import {
-  MiniSparkline,
-  seriesFromSeed,
-} from "../../../lib/components/Sparkline";
 import { useLegalConsent } from "../../../lib/legal/context";
 import {
   HorizontalPager,
@@ -615,7 +611,7 @@ function NewsCard({
             {item.tickers.map((t) => {
               const change = TICKER_CHANGE.get(t) ?? null;
               const tone =
-                change == null ? c.text : change >= 0 ? c.positive : c.red;
+                change == null ? c.text : change >= 0 ? c.brand : c.red;
               return (
                 <View
                   key={t}
@@ -623,22 +619,10 @@ function NewsCard({
                 >
                   <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
                   {change != null ? (
-                    <>
-                      <Text style={[card.tickerChange, { color: tone }]}>
-                        {formatPct(change)}
-                      </Text>
-                      <MiniSparkline
-                        series={seriesFromSeed(
-                          t,
-                          24,
-                          change >= 0 ? "up" : "down",
-                        )}
-                        color={tone}
-                        width={28}
-                        height={12}
-                        strokeWidth={1.4}
-                      />
-                    </>
+                    <Text style={[card.tickerChange, { color: tone }]}>
+                      {change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(change, false)}
+                    </Text>
                   ) : null}
                 </View>
               );
@@ -741,10 +725,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Tint brand verde muy leve sobre transparente — el
-            // texto y el chevron en verde brand cargan el peso
-            // visual, el fondo apenas insinúa el frame.
-            backgroundColor: "rgba(0,200,5,0.04)",
+            // Tint gris ink muy leve sobre transparente — el texto
+            // y el chevron en verde brand cargan el peso cromático,
+            // el fondo gris define el frame sin competir.
+            backgroundColor: "rgba(14,15,12,0.08)",
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -908,32 +892,20 @@ function DetailSheet({
                         change == null
                           ? "#0E0F0C"
                           : change >= 0
-                          ? "#00A304"
-                          : "#C83B3B";
+                          ? "#00C805"
+                          : "#EB5D2A";
                       return (
                         <View key={t} style={sheet.tickerPill}>
                           <Text style={[sheet.tickerText, { color: tone }]}>
                             {t}
                           </Text>
                           {change != null ? (
-                            <>
-                              <Text
-                                style={[sheet.tickerChange, { color: tone }]}
-                              >
-                                {formatPct(change)}
-                              </Text>
-                              <MiniSparkline
-                                series={seriesFromSeed(
-                                  t,
-                                  28,
-                                  change >= 0 ? "up" : "down",
-                                )}
-                                color={tone}
-                                width={34}
-                                height={14}
-                                strokeWidth={1.4}
-                              />
-                            </>
+                            <Text
+                              style={[sheet.tickerChange, { color: tone }]}
+                            >
+                              {change >= 0 ? "▲ " : "▼ "}
+                              {formatPct(change, false)}
+                            </Text>
                           ) : null}
                         </View>
                       );

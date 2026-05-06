@@ -569,6 +569,7 @@ function BaseHome() {
               referenceLine={referenceLine}
               strokeWidth={1}
               mode={smoothChart ? "line" : "step"}
+              live={range === "LIVE"}
               onScrub={onScrub}
               onScrubEnd={onScrubEnd}
             />
