@@ -756,10 +756,21 @@ function AllocationBrick({
         {activeBlock && containerW > 0 ? (
           <Animated.View
             key={`tip-${activeIdx}`}
-            entering={FadeInDown.duration(140).springify().damping(18)}
-            exiting={FadeOutUp.duration(110)}
+            entering={FadeInDown.duration(120)}
+            exiting={FadeOutUp.duration(100)}
             pointerEvents="none"
-            style={[s.tooltipAnchor, { left: tooltipLeftPx }]}
+            style={[
+              s.tooltipAnchor,
+              {
+                left: tooltipLeftPx,
+                // Anchor desde el bottom del brickWrap para que la
+                // punta del caret quede JUSTO arriba del front face
+                // del ladrillo (yTop). Así el dedo, que está sobre
+                // el bloque, nunca tapa la pill.
+                bottom:
+                  ((H - yTop) * containerW) / W + 6,
+              },
+            ]}
           >
             <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
               <View style={s.tooltipHeader}>
@@ -801,7 +812,8 @@ function AllocationBrick({
                         },
                       ]}
                     >
-                      {formatPct(activeBlock.rows[0].change)}
+                      {activeBlock.rows[0].change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(activeBlock.rows[0].change, false)}
                     </Text>
                   </View>
                 </>
@@ -829,7 +841,8 @@ function AllocationBrick({
                           { color: r.change >= 0 ? c.brand : "#FF6E5C" },
                         ]}
                       >
-                        {formatPct(r.change)}
+                        {r.change >= 0 ? "▲ " : "▼ "}
+                        {formatPct(r.change, false)}
                       </Text>
                     </View>
                   ))}
@@ -1080,11 +1093,11 @@ const s = StyleSheet.create({
     overflow: "visible",
   },
   /* Tooltip — anchor con width 0 + alignItems center centra el
-   * children en el punto `left` que pasamos. Patrón clásico de RN
-   * para evitar tener que medir el width del tooltip. */
+   * children en el punto `left` que pasamos. `bottom` se setea
+   * inline para que el caret termine justo arriba del front
+   * face del ladrillo (la pill crece hacia arriba). */
   tooltipAnchor: {
     position: "absolute",
-    top: 0,
     width: 0,
     alignItems: "center",
     zIndex: 5,
