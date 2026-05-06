@@ -698,53 +698,54 @@ function MarketBody({
             })}
           </View>
         ) : isCategoryView ? (
-          /* Lista de categorías — cada una drilling a la pantalla
-             /market-category con el slug en los params. */
-          categories.map((cat, i) => (
-            <Pressable
-              key={cat.slug}
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/market-category",
-                  params: { slug: cat.slug },
-                })
-              }
-              style={[
-                s.categoryRow,
-                i > 0 && {
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: c.border,
-                },
-              ]}
-            >
-              <CategoryGlyph slug={cat.slug} size={36} />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.categoryRowLabel, { color: c.text }]}>
+          /* Grilla 2-col de categorías — cards con glyph arriba +
+             label bold + descripción larga muteada. Tap drilea a
+             /market-category con el slug. Estilo inspirado en el
+             selector "¿En qué querés invertir?" de IOL. */
+          <View style={s.categoryGrid}>
+            {categories.map((cat) => (
+              <Pressable
+                key={cat.slug}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/market-category",
+                    params: { slug: cat.slug },
+                  })
+                }
+                style={({ pressed }) => [
+                  s.categoryCard,
+                  {
+                    backgroundColor: c.surface,
+                    borderColor: c.border,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+              >
+                <CategoryGlyph slug={cat.slug} size={44} />
+                <Text
+                  style={[s.categoryCardLabel, { color: c.text }]}
+                  numberOfLines={2}
+                >
                   {cat.label}
                 </Text>
                 {cat.hint ? (
                   <Text
-                    style={[s.categoryRowHint, { color: c.textMuted }]}
-                    numberOfLines={1}
+                    style={[s.categoryCardHint, { color: c.textMuted }]}
+                    numberOfLines={3}
                   >
                     {cat.hint}
                   </Text>
                 ) : null}
-              </View>
-              {cat.count || counts[cat.slug] > 0 ? (
-                <Text
-                  style={[s.categoryRowCount, { color: c.textMuted }]}
-                >
-                  {cat.count ?? `${counts[cat.slug]}`}
-                </Text>
-              ) : null}
-              <Feather
-                name="chevron-right"
-                size={18}
-                color={c.textFaint}
-              />
-            </Pressable>
-          ))
+                {cat.count || counts[cat.slug] > 0 ? (
+                  <Text
+                    style={[s.categoryCardCount, { color: c.textFaint }]}
+                  >
+                    {cat.count ?? `${counts[cat.slug]} activos`}
+                  </Text>
+                ) : null}
+              </Pressable>
+            ))}
+          </View>
         ) : visible.length === 0 ? (
           <View style={s.empty}>
             <Text style={[s.emptyTitle, { color: c.text }]}>
@@ -1077,27 +1078,44 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 2,
   },
-  categoryRow: {
+  /* Grilla 2-col de cards (estilo selector "En qué invertir" de IOL).
+   * Cada card tiene glyph + label + hint + count opcional, todo
+   * stack vertical. */
+  categoryGrid: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+  },
+  categoryCard: {
+    width: "48.5%",
+    flexGrow: 1,
+    flexBasis: "48.5%",
+    paddingHorizontal: 14,
     paddingVertical: 14,
-    gap: 14,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 4,
   },
-  categoryRowLabel: {
+  categoryCardLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontSize: 16,
+    letterSpacing: -0.3,
+    marginTop: 10,
   },
-  categoryRowHint: {
+  categoryCardHint: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
+    fontSize: 12.5,
+    lineHeight: 17,
     letterSpacing: -0.1,
     marginTop: 2,
   },
-  categoryRowCount: {
+  categoryCardCount: {
     fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 6,
   },
   icon: {
     width: 40,
