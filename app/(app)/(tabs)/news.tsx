@@ -744,7 +744,7 @@ function SwipeHint({ visible }: { visible: boolean }) {
             // Tint brand verde muy leve sobre transparente — el
             // texto y el chevron en verde brand cargan el peso
             // visual, el fondo apenas insinúa el frame.
-            backgroundColor: "rgba(0,200,5,0.08)",
+            backgroundColor: "rgba(0,200,5,0.04)",
             transform: [
               { translateY: bounce },
               { scale: pulse },
