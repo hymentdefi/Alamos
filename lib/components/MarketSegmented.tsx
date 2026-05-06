@@ -121,26 +121,29 @@ function MarketGlyph({
       </View>
     );
   }
-  // "all" — isotipo Alamos (los 2 polígonos del brand-kit). Tinte
-  // duo: triángulo trasero en brand green, delantero en ink (c.text)
-  // para respetar dark/light mode automáticamente.
+  // "all" — flag redondo con fondo verde brand y los 2 triángulos del
+  // isotipo Alamos en blanco. Mismo formato circle que las flags AR/US
+  // y el badge de Crypto. Variante "alamos-iso-blanco sobre verde" del
+  // brand-kit.
   return (
-    <Svg width={18} height={18} viewBox="0 0 100 100">
-      <Polygon
-        points="38,26 16,86 60,86"
-        stroke={c.brand}
-        strokeWidth={8}
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <Polygon
-        points="56,12 29,86 83,86"
-        stroke={c.text}
-        strokeWidth={8}
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </Svg>
+    <View style={[gs.allBadge, { backgroundColor: c.brand }]}>
+      <Svg width={14} height={14} viewBox="0 0 100 100">
+        <Polygon
+          points="38,26 16,86 60,86"
+          stroke="#FFFFFF"
+          strokeWidth={10}
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Polygon
+          points="56,12 29,86 83,86"
+          stroke="#FFFFFF"
+          strokeWidth={10}
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
+    </View>
   );
 }
 
@@ -199,5 +202,16 @@ const gs = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 11,
     lineHeight: 13,
+  },
+  /* Flag del tab "Todo" — circle de 18 con fondo brand green y los
+   * triángulos blancos adentro. Mismo tamaño que las flags AR/US y
+   * el badge de Crypto. */
+  allBadge: {
+    width: 18,
+    height: 18,
+    borderCurve: "continuous",
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
