@@ -170,7 +170,7 @@ export function MarketClosedSheet({
               .
             </Text>
             <Text style={[s.scheduledNote, { color: c.textMuted }]}>
-              Igual podés mandar tus{" "}
+              Podés enviar{" "}
               <Text style={[s.subtitleBold, { color: c.text }]}>
                 órdenes de compra y venta
               </Text>
@@ -178,7 +178,7 @@ export function MarketClosedSheet({
               <Text style={[s.subtitleBold, { color: c.text }]}>
                 programadas
               </Text>{" "}
-              y se ejecutan apenas abra el mercado.
+              y se ejecutan al abrir el mercado.
             </Text>
           </View>
         </Animated.View>
