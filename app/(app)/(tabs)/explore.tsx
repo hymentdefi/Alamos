@@ -288,7 +288,7 @@ function BaseExplore() {
                   },
                 ]}
               >
-                <Feather name="plus" size={13} color={c.brand} />
+                <Feather name="plus" size={11} color={c.brand} />
               </Pressable>
             </View>
           </View>
@@ -786,16 +786,15 @@ const s = StyleSheet.create({
     gap: 8,
   },
   /* Botón '+' al estilo del WatchlistButton del stock detail —
-   * círculo outline con un Feather "plus" en brand green. Sin fill.
-   * Tamaño compacto (18) para que no compita visualmente con el
-   * monto de fondos disponibles, y borde 1.5 para un poco más de
-   * presencia (feel "bolder" sin cambiar la family del icono). */
+   * círculo outline con un Feather "plus" en brand green. Sin fill,
+   * border 1.4 fino. Compacto (15) para que sea un acento al lado del
+   * monto de fondos disponibles, no un botón protagónico. */
   addBalanceBtn: {
-    width: 18,
-    height: 18,
+    width: 15,
+    height: 15,
     borderCurve: "continuous",
     borderRadius: 999,
-    borderWidth: 1.5,
+    borderWidth: 1.4,
     alignItems: "center",
     justifyContent: "center",
   },
