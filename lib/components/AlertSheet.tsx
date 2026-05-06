@@ -226,10 +226,10 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
 
   /* ─── Render ─── */
 
-  // Selector de monedas: las 3 fijas pero la default es la nativa
-  // del activo. La spec lo permite (puede ser util alertar en USD
-  // sobre una crypto, por ej.).
-  const allCurrencies: AssetCurrency[] = ["ARS", "USD", "USDT"];
+  // Selector de monedas: solo la moneda nativa del activo. ARS para
+  // mercado argentino, USD para US, USDT para crypto. Se renderiza
+  // como una sola pill siempre seleccionada — sin opción de cambiar.
+  const allCurrencies: AssetCurrency[] = [assetCurrency(asset)];
 
   return (
     <Modal
