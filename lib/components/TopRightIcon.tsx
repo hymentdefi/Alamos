@@ -4,20 +4,14 @@ import { useTheme } from "../theme";
 
 /**
  * Iconos del top-right del Home: Sorpresa (regalo) y Notificación
- * (campanita). Misma família visual que ActionIcon (set tint-S):
- * círculo lleno con tint del verde brand (10% light / 14% dark) y
- * el dibujo en stroke verde brand de 4px.
- *
- * El icono YA incluye su propio "fondo" — la pill verde tint —
- * así que el contenedor Pressable que lo envuelve no debería
- * agregar otro background.
+ * (campanita). Stroke verde brand de 4px sobre transparente — el
+ * fondo tint que usaban antes se sacó por feedback (se sentía muy
+ * genérico). Solo se renderea el dibujo limpio.
  *
  * Variante 'notificacion-dot': mismo bell con un dot rojo en la
  * esquina sup-derecha, indicando notificaciones nuevas. El stroke
  * del dot usa c.bg para punchear limpio sobre el button en ambos
  * modos.
- *
- * Sources del brand pack en assets/icons/topright/{light,dark}/.
  */
 
 export type TopRightIconName =
@@ -30,19 +24,15 @@ interface Props {
   size?: number;
 }
 
-const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
-
 export const TopRightIcon = memo(function TopRightIcon({
   name,
   size = 40,
 }: Props) {
-  const { c, mode } = useTheme();
+  const { c } = useTheme();
   const isBell = name === "notificacion" || name === "notificacion-dot";
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle cx={32} cy={32} r={32} fill={tintFor(mode)} />
       <G
         transform="translate(32 32)"
         fill="none"
