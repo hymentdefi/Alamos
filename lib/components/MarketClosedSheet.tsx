@@ -13,10 +13,13 @@ import {
   GestureDetector,
 } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -55,6 +58,13 @@ export function MarketClosedSheet({
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
 
+  /* Pan + shake del candado — declarados acá arriba porque el
+   * useEffect de abajo los toca al abrir el sheet (reset + trigger
+   * del shake). El gesture en sí se construye después. */
+  const lockTX = useSharedValue(0);
+  const lockTY = useSharedValue(0);
+  const lockShake = useSharedValue(0);
+
   useEffect(() => {
     if (visible) {
       translateY.value = withTiming(0, {
@@ -65,6 +75,29 @@ export function MarketClosedSheet({
         duration: 280,
         easing: Easing.out(Easing.cubic),
       });
+      // Reset por si en una apertura previa el user dejó el candado
+      // movido y el sheet se cerró antes del spring back.
+      lockTX.value = 0;
+      lockTY.value = 0;
+      lockShake.value = 0;
+      // Shake "como si lo intentaran abrir" — oscilación lateral que
+      // decae. Delay de 220ms para que arranque cuando el sheet ya
+      // entró visualmente (no antes, sino se ve raro). Después queda
+      // en 0 y el user puede agarrarlo y moverlo libremente.
+      lockShake.value = withDelay(
+        220,
+        withSequence(
+          withTiming(12, { duration: 70, easing: Easing.out(Easing.quad) }),
+          withTiming(-12, { duration: 100, easing: Easing.inOut(Easing.quad) }),
+          withTiming(10, { duration: 90, easing: Easing.inOut(Easing.quad) }),
+          withTiming(-10, { duration: 90, easing: Easing.inOut(Easing.quad) }),
+          withTiming(7, { duration: 85, easing: Easing.inOut(Easing.quad) }),
+          withTiming(-7, { duration: 85, easing: Easing.inOut(Easing.quad) }),
+          withTiming(4, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+          withTiming(-4, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 110, easing: Easing.out(Easing.cubic) }),
+        ),
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -127,13 +160,19 @@ export function MarketClosedSheet({
    *
    * Drag con el dedo y vuelve a su lugar con spring rebotón al soltar.
    * Una rotación sutil ligada a translationX da feel "candado
-   * balanceándose" — divertido y sirve para que el user se quede unos
-   * segundos jugando antes de dismiss-ear el sheet. La gesture es
-   * propia de la ilustración; el swipe-down de dismiss del sheet sigue
-   * andando en el resto del área. */
-  const lockTX = useSharedValue(0);
-  const lockTY = useSharedValue(0);
+   * balanceándose" — combinada con el shake de bienvenida (lockShake)
+   * hace que el candado se sienta vivo. La gesture es propia de la
+   * ilustración; el swipe-down de dismiss del sheet sigue andando en
+   * el resto del área.
+   *
+   * onBegin cancela el shake si todavía está corriendo, así el user
+   * que agarra durante el wiggle toma el control inmediato. */
   const lockPan = Gesture.Pan()
+    .onBegin(() => {
+      "worklet";
+      cancelAnimation(lockShake);
+      lockShake.value = 0;
+    })
     .onUpdate((e) => {
       "worklet";
       lockTX.value = e.translationX;
@@ -149,8 +188,9 @@ export function MarketClosedSheet({
     transform: [
       { translateX: lockTX.value },
       { translateY: lockTY.value },
-      // 0.06 deg por px de drag → drag de 80px ≈ 5 deg. Tilt sutil.
-      { rotate: `${lockTX.value * 0.06}deg` },
+      // Rotación = (drag * 0.06) + shake. Drag de 80px ≈ 5 deg; el
+      // shake aporta hasta 12 deg al inicio y va decayendo a 0.
+      { rotate: `${lockTX.value * 0.06 + lockShake.value}deg` },
     ],
   }));
 
