@@ -152,9 +152,9 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
             </Text>
 
             <Text style={[s.body, { color: c.textSecondary }]}>
-              Sumamos todas tus tenencias en una sola moneda. La
-              parte en dólares y crypto convierte al dólar oficial
-              vendedor.
+              Mostramos todas tus tenencias en la moneda que elijas.
+              Lo que está en otra moneda se convierte al dólar
+              oficial vendedor.
             </Text>
           </View>
         </Animated.View>
