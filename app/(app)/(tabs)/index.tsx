@@ -77,15 +77,18 @@ import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
 
-type Range = "1D" | "1S" | "1M" | "3M" | "1A" | "MAX";
+type Range = "LIVE" | "1D" | "1S" | "1M" | "3M" | "1A" | "MAX";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
 
-const ranges: Range[] = ["1D", "1S", "1M", "3M", "1A", "MAX"];
+const ranges: Range[] = ["LIVE", "1D", "1S", "1M", "3M", "1A", "MAX"];
 
-/** Variación % por rango — determina el trend y color del chart. */
+/** Variación % por rango — determina el trend y color del chart.
+ *  LIVE muestra el movimiento intraday inmediato (últimos minutos),
+ *  por eso el delta es chico — sería raro ver +5% en 60 segundos. */
 const rangeChanges: Record<Range, number> = {
+  LIVE: 0.12,
   "1D": 1.96,
   "1S": 3.24,
   "1M": -2.1,
@@ -697,6 +700,8 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
 
 function rangeSubtitle(r: Range): string {
   switch (r) {
+    case "LIVE":
+      return "en vivo";
     case "1D":
       return "hoy";
     case "1S":
@@ -715,6 +720,13 @@ function rangeSubtitle(r: Range): string {
 function indexLabel(r: Range, index: number, length: number): string {
   const t = 1 - index / (length - 1);
   switch (r) {
+    case "LIVE": {
+      // LIVE = última hora aprox; resolución por minuto.
+      const m = Math.round(t * 60);
+      if (m === 0) return "ahora";
+      if (m === 1) return "hace 1 min";
+      return `hace ${m} min`;
+    }
     case "1D": {
       const h = Math.round(t * 24);
       if (h === 0) return "ahora";
