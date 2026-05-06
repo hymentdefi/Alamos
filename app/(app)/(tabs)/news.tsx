@@ -975,8 +975,9 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: fontFamily[700],
-    fontSize: 28,
-    letterSpacing: -1,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
   },
   catRow: {
     paddingHorizontal: 20,

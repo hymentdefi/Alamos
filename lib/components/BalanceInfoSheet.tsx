@@ -17,6 +17,8 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
@@ -49,6 +51,13 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
 
+  /* Shake "como si la pila de billetes vibrara" — misma curva que
+   * el candado de MarketClosedSheet (lateral oscilando que decae).
+   * Delay de 220ms para que arranque cuando el sheet ya entró
+   * visualmente. La ilustración acá no es draggeable, sólo
+   * decorativa. */
+  const heroShake = useSharedValue(0);
+
   useEffect(() => {
     if (visible) {
       translateY.value = withTiming(0, {
@@ -59,6 +68,48 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
         duration: 280,
         easing: Easing.out(Easing.cubic),
       });
+      heroShake.value = 0;
+      heroShake.value = withDelay(
+        220,
+        withSequence(
+          withTiming(12, {
+            duration: 70,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(-12, {
+            duration: 100,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(10, {
+            duration: 90,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(-10, {
+            duration: 90,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(7, {
+            duration: 85,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(-7, {
+            duration: 85,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(4, {
+            duration: 80,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(-4, {
+            duration: 80,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          withTiming(0, {
+            duration: 110,
+            easing: Easing.out(Easing.cubic),
+          }),
+        ),
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -116,6 +167,9 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
+  const heroStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: heroShake.value }],
+  }));
 
   return (
     <Modal
@@ -148,9 +202,9 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
-            <View style={s.heroWrap}>
+            <Animated.View style={[s.heroWrap, heroStyle]}>
               <AlamosBalanceIllustration size={172} />
-            </View>
+            </Animated.View>
 
             <Text style={[s.title, { color: c.text }]}>
               Balance unificado

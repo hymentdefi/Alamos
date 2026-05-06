@@ -95,16 +95,6 @@ export default function PortfolioScreen() {
     [holdingsSorted],
   );
 
-  const todayDeltaArs = useMemo(() => {
-    let acc = 0;
-    for (const a of holdings) {
-      const dayDelta = a.price * (a.qty ?? 0) * (a.change / 100);
-      acc += convertAmount(dayDelta, assetCurrency(a), "ARS");
-    }
-    return acc;
-  }, [holdings]);
-
-  const todayPct = totalArs > 0 ? (todayDeltaArs / totalArs) * 100 : 0;
 
   /* Holdings agrupados por categoría de Mercado — mismo lenguaje
    * que 'Tus inversiones' del Home: una row por categoría, total
@@ -263,38 +253,6 @@ export default function PortfolioScreen() {
           )}
         </View>
 
-        <View style={[s.sectionBlock, { marginTop: 28 }]}>
-          <View
-            style={[
-              s.resultCard,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-          >
-            <Text style={[s.resultLabel, { color: c.textMuted }]}>
-              Resultado del día
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-              <Text
-                style={[
-                  s.resultAmount,
-                  { color: todayDeltaArs >= 0 ? c.greenDark : c.red },
-                ]}
-              >
-                {todayDeltaArs >= 0 ? "+" : "−"}
-                {formatARS(Math.abs(todayDeltaArs))}
-              </Text>
-              <Text
-                style={[
-                  s.resultPct,
-                  { color: todayDeltaArs >= 0 ? c.greenDark : c.red },
-                ]}
-              >
-                {" "}
-                ({formatPct(todayPct)})
-              </Text>
-            </View>
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
@@ -370,7 +328,7 @@ function AllocationBrick({
     setCurrency(defaultCurrency);
     if (containerW > 0) {
       pagerRef.current?.scrollTo({
-        x: defaultCurrency === "ARS" ? 0 : containerW,
+        x: defaultCurrency === "ARS" ? 0 : containerW - 38,
         y: 0,
         animated: false,
       });
@@ -534,95 +492,93 @@ function AllocationBrick({
       <View
         onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
       >
-        <Text style={[s.allocEyebrow, { color: c.textMuted }]}>
-          DISTRIBUCIÓN
-        </Text>
+        {/* Layout horizontal: pager (que swipea horizontalmente
+            entre ARS/USD) + info icon FIJO a la derecha. El info
+            icon vive afuera del ScrollView así no se desliza junto
+            con las páginas — la idea es que sea un botón siempre
+            disponible, no parte del contenido swipeable. */}
+        <View style={s.allocPagerRow}>
+          <View style={{ flex: 1 }}>
+            {containerW > 0 ? (
+              <ScrollView
+                ref={pagerRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="normal"
+                directionalLockEnabled
+                alwaysBounceVertical={false}
+                bounces={false}
+                contentOffset={{
+                  x: currency === "ARS" ? 0 : containerW - 38,
+                  y: 0,
+                }}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(
+                    e.nativeEvent.contentOffset.x / (containerW - 38),
+                  );
+                  const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
+                  if (next !== currency) {
+                    Haptics.selectionAsync().catch(() => {});
+                    setCurrency(next);
+                  }
+                }}
+                style={s.allocPager}
+              >
+                {(["ARS", "USD"] as const).map((cur) => {
+                  const value =
+                    cur === "ARS"
+                      ? totalArs
+                      : convertAmount(totalArs, "ARS", "USD");
+                  return (
+                    <View
+                      key={cur}
+                      style={[
+                        s.allocPagerPage,
+                        { width: containerW - 38 },
+                      ]}
+                    >
+                      {/* Mismo formato del balance del Home: integer
+                          grande + decimales chicos arriba a la derecha
+                          (estilo Robinhood). Sin flag — no aplica acá,
+                          es el portfolio total agregado. */}
+                      <AmountDisplay
+                        value={value}
+                        size={36}
+                        weight={800}
+                        currency={cur}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <AmountDisplay
+                value={totalArs}
+                size={36}
+                weight={800}
+                currency="ARS"
+              />
+            )}
+          </View>
 
-        {/* Pager horizontal del total — 2 páginas (ARS / USD), cada
-            una al ancho del card content. Mismo lenguaje que el
-            balance del Home: paging-scroll nativo da prioridad al
-            gesture horizontal sobre el ScrollView vertical, y los
-            dots abajo indican qué página estás mirando. */}
-        {containerW > 0 ? (
-          <ScrollView
-            ref={pagerRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="normal"
-            directionalLockEnabled
-            alwaysBounceVertical={false}
-            bounces={false}
-            contentOffset={{
-              x: currency === "ARS" ? 0 : containerW,
-              y: 0,
+          {/* Info icon — abre el bottom sheet con el detalle de
+              cómo se calcula el saldo unificado. Fuera del pager
+              para que no se desplace con el swipe. */}
+          <Pressable
+            hitSlop={10}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              setInfoOpen(true);
             }}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(
-                e.nativeEvent.contentOffset.x / containerW,
-              );
-              const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
-              if (next !== currency) {
-                Haptics.selectionAsync().catch(() => {});
-                setCurrency(next);
-              }
-            }}
-            style={s.allocPager}
+            style={[
+              s.allocInfoDot,
+              { backgroundColor: c.surfaceHover },
+            ]}
           >
-            {(["ARS", "USD"] as const).map((cur) => {
-              const value =
-                cur === "ARS"
-                  ? totalArs
-                  : convertAmount(totalArs, "ARS", "USD");
-              return (
-                <View
-                  key={cur}
-                  style={[s.allocPagerPage, { width: containerW }]}
-                >
-                  {/* Mismo formato del balance del Home: integer
-                      grande + decimales chicos arriba a la derecha
-                      (estilo Robinhood). Sin flag — no aplica acá,
-                      es el portfolio total agregado. */}
-                  <View style={{ flex: 1 }}>
-                    <AmountDisplay
-                      value={value}
-                      size={28}
-                      weight={800}
-                      currency={cur}
-                    />
-                  </View>
-                  {/* Info icon — abre el bottom sheet con el detalle
-                      de cómo se calcula el saldo unificado. Mismo
-                      patrón que el infoDot del Home (Earnings). */}
-                  <Pressable
-                    hitSlop={10}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setInfoOpen(true);
-                    }}
-                    style={[
-                      s.allocInfoDot,
-                      { backgroundColor: c.surfaceHover },
-                    ]}
-                  >
-                    <Feather
-                      name="info"
-                      size={12}
-                      color={c.textSecondary}
-                    />
-                  </Pressable>
-                </View>
-              );
-            })}
-          </ScrollView>
-        ) : (
-          <AmountDisplay
-            value={totalArs}
-            size={28}
-            weight={800}
-            currency="ARS"
-          />
-        )}
+            <Feather name="info" size={12} color={c.textSecondary} />
+          </Pressable>
+        </View>
 
         {/* Dots indicator — cada uno tappable para saltar a esa
             moneda directo, sin tener que swipear. */}
@@ -638,7 +594,7 @@ function AllocationBrick({
                   Haptics.selectionAsync().catch(() => {});
                   setCurrency(cur);
                   pagerRef.current?.scrollTo({
-                    x: cur === "ARS" ? 0 : containerW,
+                    x: cur === "ARS" ? 0 : containerW - 38,
                     y: 0,
                     animated: true,
                   });
@@ -1071,27 +1027,24 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  allocEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-    marginBottom: 6,
+  /* Row del header del card — pager (saldo) + info icon fijo a
+   * la derecha. El info icon está afuera del ScrollView para que
+   * no se desplace con el swipe horizontal. */
+  allocPagerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   /* Pager horizontal de moneda — ScrollView pagingEnabled, dos
-   * páginas (ARS / USD) cada una al ancho del card content. */
+   * páginas (ARS / USD) cada una al ancho del wrapper menos el
+   * info icon a la derecha. */
   allocPager: {
     flexGrow: 0,
   },
   allocPagerPage: {
-    /* width se setea inline (containerW). Layout horizontal para
-     * que el saldo y el info dot queden inline; el saldo ocupa
-     * todo el espacio sobrante (flex: 1) y el dot queda anclado
-     * a la derecha. */
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    /* width se setea inline (containerW - 38). Centrado vertical
+     * para que el AmountDisplay flote bien dentro del card. */
+    justifyContent: "center",
   },
   allocInfoDot: {
     width: 22,
@@ -1222,33 +1175,6 @@ const s = StyleSheet.create({
   allocLegendPct: {
     fontFamily: fontFamily[800],
     fontSize: 12,
-    letterSpacing: -0.1,
-  },
-
-  /* Resultado del día — card simple, mismos paddings que las cards
-   * del detail. */
-  resultCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  resultLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginBottom: 6,
-  },
-  resultAmount: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
-  },
-  resultPct: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
     letterSpacing: -0.1,
   },
 });
