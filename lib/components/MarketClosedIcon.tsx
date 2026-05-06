@@ -22,17 +22,20 @@ interface Props {
 }
 
 /**
- * Icono "mercado cerrado" — reloj con un dot ámbar de aviso. Pequeño
- * (22 px default), pensado para inline al lado de un título o nombre
- * de activo. Tap → abre el bottom sheet `MarketClosedSheet` con la
- * ilustración de Alamos + candado y el horario del mercado.
+ * Icono "mercado cerrado" — reloj con un dot de aviso en la esquina
+ * sup-derecha. Pequeño (22 px default), pensado para inline al lado
+ * de un título o nombre de activo. Tap → abre el bottom sheet
+ * `MarketClosedSheet` con la ilustración de Alamos + candado y el
+ * horario del mercado.
  *
- * Geometría 1:1 con assets/iconos-acciones/exports-disclaimer/{light,dark}/
- * mercado-cerrado.svg (viewBox 26×26, stroke 2, dot ámbar 7×7 con
- * borde de contraste según modo).
+ * El dot es el mismo color/forma que el dot del icono de
+ * notificaciones del Home — rojo `#FF5C5C` con stroke `c.bg` para
+ * punchear limpio sobre el botón en ambos modos. Coherencia visual
+ * a través de la app: "punto rojo arriba a la derecha = algo
+ * requiere atención".
  */
 
-const ALERT_DOT = "#F59E0B";
+const ALERT_DOT = "#FF5C5C";
 
 export function MarketClosedIcon({
   session,
@@ -40,12 +43,11 @@ export function MarketClosedIcon({
   size = 22,
   color,
 }: Props) {
-  const { mode } = useTheme();
+  const { c } = useTheme();
   const [open, setOpen] = useState(false);
 
   if (session.open) return null;
 
-  const dotBorder = mode === "dark" ? "#0E0F0C" : "#FFFFFF";
   const stroke = color ?? brand.green;
 
   return (
@@ -76,8 +78,8 @@ export function MarketClosedIcon({
             cy={4}
             r={3.5}
             fill={ALERT_DOT}
-            stroke={dotBorder}
-            strokeWidth={1.5}
+            stroke={c.bg}
+            strokeWidth={2}
           />
         </Svg>
       </Pressable>
