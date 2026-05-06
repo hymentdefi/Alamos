@@ -200,12 +200,12 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
   content: {
-    paddingTop: 6,
+    paddingTop: 24,
     paddingHorizontal: 6,
     alignItems: "center",
   },
   heroWrap: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   title: {
     fontFamily: fontFamily[800],
