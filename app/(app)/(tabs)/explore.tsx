@@ -320,11 +320,11 @@ function BaseExplore() {
                     s.marketSegBtn,
                     active && {
                       backgroundColor: isDark
-                        ? "rgba(14, 203, 129, 0.14)"
-                        : "rgba(0, 200, 5, 0.10)",
+                        ? "rgba(14, 203, 129, 0.07)"
+                        : "rgba(0, 200, 5, 0.05)",
                       borderColor: isDark
-                        ? "rgba(14, 203, 129, 0.20)"
-                        : "rgba(0, 200, 5, 0.16)",
+                        ? "rgba(14, 203, 129, 0.12)"
+                        : "rgba(0, 200, 5, 0.10)",
                       borderWidth: 1,
                     },
                   ]}
@@ -465,7 +465,7 @@ function MarketGlyph({
             pointerEvents="none"
             style={[
               gs.flagTint,
-              { backgroundColor: "rgba(0, 200, 5, 0.10)" },
+              { backgroundColor: "rgba(0, 200, 5, 0.04)" },
             ]}
           />
         ) : null}
@@ -490,9 +490,10 @@ const gs = StyleSheet.create({
     height: 18,
     position: "relative",
   },
-  /* Overlay verde sutil sobre la bandera del mercado activo —
-   * 22% de alpha para que tinte sin tapar. Round-pill matching
-   * la bandera (que tiene borderRadius 999). */
+  /* Overlay verde MUY sutil sobre la bandera del mercado activo —
+   * 4% de alpha para apenas dar señal sin saturar el verde acumulado
+   * con el bg del pill y el label en brand. Round-pill matching la
+   * bandera (que tiene borderRadius 999). */
   flagTint: {
     position: "absolute",
     top: 0,
