@@ -1,0 +1,273 @@
+import { useEffect } from "react";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { fontFamily, radius, useTheme } from "../theme";
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const DISMISS_TRANSLATE = 110;
+const DISMISS_VELOCITY = 600;
+
+/**
+ * Bottom sheet "Balance del portfolio". Mismo patrón que
+ * MarketClosedSheet / EarningsInfoSheet — sin botones de cerrar,
+ * se cierra deslizando hacia abajo (swipe smooth en UI thread).
+ *
+ * Explica cómo Álamos calcula el saldo unificado del portfolio:
+ * suma todas las tenencias en su moneda nativa y las convierte a
+ * la moneda elegida (ARS o USD) usando tipos de cambio puntuales
+ * — dólar oficial vendedor para USD/ARS, paridad spot para
+ * USDT/USD, y al cierre del mercado para los activos en USD.
+ */
+export function BalanceInfoSheet({ visible, onClose }: Props) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
+
+  const translateY = useSharedValue(windowH);
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      backdropOpacity.value = withTiming(1, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      windowH,
+      { duration: 240, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+        backdropOpacity.value = Math.max(
+          0,
+          1 - e.translationY / windowH,
+        );
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss =
+        e.translationY > DISMISS_TRANSLATE ||
+        e.velocityY > DISMISS_VELOCITY;
+      if (shouldDismiss) {
+        translateY.value = withTiming(
+          windowH,
+          { duration: 240, easing: Easing.in(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={dismiss}
+    >
+      <Animated.View style={[s.backdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Animated.View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              backgroundColor: c.bg,
+              borderColor: c.border,
+              paddingBottom: insets.bottom + 24,
+            },
+            sheetStyle,
+          ]}
+        >
+          <View style={s.grabber}>
+            <View
+              style={[s.grabberPill, { backgroundColor: c.borderStrong }]}
+            />
+          </View>
+
+          <View style={s.content}>
+            <Text style={[s.title, { color: c.text }]}>
+              Balance unificado
+            </Text>
+
+            <Text style={[s.body, { color: c.textSecondary }]}>
+              Sumamos todas tus tenencias y las llevamos a una sola
+              moneda para que veas el portfolio completo de un vistazo.
+            </Text>
+
+            <View style={s.rules}>
+              <Rule
+                pair="ARS"
+                desc="todo lo que ya está en pesos suma directo."
+              />
+              <Rule
+                pair="USD"
+                desc="dólares cash, FCI USD y acciones USA convierten al dólar oficial vendedor."
+              />
+              <Rule
+                pair="USDT"
+                desc="stablecoins y crypto pasan por paridad USDT/USD y después al oficial."
+              />
+            </View>
+
+            <Text style={[s.footnote, { color: c.textMuted }]}>
+              Podés alternar entre pesos y dólares deslizando el saldo
+              o tappeando los dots de abajo. La distribución del
+              ladrillo se mantiene igual — los porcentajes son los
+              mismos en cualquier moneda.
+            </Text>
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </Modal>
+  );
+}
+
+function Rule({ pair, desc }: { pair: string; desc: string }) {
+  const { c } = useTheme();
+  return (
+    <View style={s.rule}>
+      <Text style={[s.ruleLabel, { color: c.text }]}>{pair}.</Text>
+      <Text style={[s.ruleDesc, { color: c.textSecondary }]}> {desc}</Text>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  grabber: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  grabberPill: {
+    width: 40,
+    height: 4,
+    borderCurve: "continuous",
+    borderRadius: 2,
+  },
+  content: {
+    paddingTop: 18,
+    paddingHorizontal: 6,
+  },
+  title: {
+    fontFamily: fontFamily[800],
+    fontSize: 26,
+    letterSpacing: -1,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  body: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.15,
+    textAlign: "center",
+    paddingHorizontal: 8,
+    marginBottom: 20,
+  },
+  rules: {
+    gap: 10,
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  rule: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  ruleLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 14.5,
+    lineHeight: 21,
+    letterSpacing: -0.2,
+  },
+  ruleDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 14.5,
+    lineHeight: 21,
+    letterSpacing: -0.15,
+    flexShrink: 1,
+  },
+  footnote: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 19,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+});

@@ -44,10 +44,12 @@ import {
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { GlassCard } from "../../../lib/components/GlassCard";
+import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import {
   MarketSegmented,
   type MarketSegmentedValue,
 } from "../../../lib/components/MarketSegmented";
+import { Feather } from "@expo/vector-icons";
 
 /**
  * Tab 'Portfolio' — vista enfocada en tus tenencias.
@@ -149,11 +151,6 @@ export default function PortfolioScreen() {
       >
         {holdingsSorted.length > 0 && totalArs > 0 ? (
           <View style={[s.sectionBlock, { marginBottom: 28 }]}>
-            <View style={s.sectionHead}>
-              <Text style={[s.sectionTitle, { color: c.textMuted }]}>
-                Distribución
-              </Text>
-            </View>
             <AllocationBrick
               holdings={holdingsSorted}
               totalArs={totalArs}
@@ -383,6 +380,7 @@ function AllocationBrick({
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const [infoOpen, setInfoOpen] = useState(false);
   const pagerRef = useRef<ScrollView | null>(null);
 
   // Geometría del viewBox — clavada al mockup. El viewBox total es
@@ -407,31 +405,39 @@ function AllocationBrick({
   // contribución descendente.
   //
   // En groupBy="ticker" cada bloque ES un ticker — el grouping
-  // colapsa la lista de holdings tal cual.
-  type Row = { ticker: string; change: number; ars: number };
+  // colapsa la lista de holdings tal cual. Arrastramos el `name`
+  // (full name del activo, ej. "Bitcoin") y el `shortTicker`
+  // ("BTC" en lugar de "BTC/USDT") para mostrarlos en el tooltip
+  // y la legend en lugar del par cripto que se siente técnico.
+  type Row = { ticker: string; shortTicker: string; change: number; ars: number };
   const blocks = useMemo(() => {
-    const byKey = new Map<string, { ars: number; rows: Row[]; cat: AssetCategory }>();
+    const byKey = new Map<
+      string,
+      { ars: number; rows: Row[]; cat: AssetCategory; name: string }
+    >();
     for (const h of holdings) {
       const key =
         groupBy === "ticker" ? h.asset.ticker : h.asset.category;
-      const entry =
-        byKey.get(key) ?? { ars: 0, rows: [], cat: h.asset.category };
+      const entry = byKey.get(key) ?? {
+        ars: 0,
+        rows: [],
+        cat: h.asset.category,
+        name: h.asset.name,
+      };
       entry.ars += h.ars;
       entry.rows.push({
         ticker: h.asset.ticker,
+        shortTicker: shortCryptoTicker(h.asset.ticker),
         change: h.asset.change,
         ars: h.ars,
       });
       byKey.set(key, entry);
     }
     const sorted = Array.from(byKey.entries())
-      .map(([key, { ars, rows, cat }]) => ({
+      .map(([key, { ars, rows, cat, name }]) => ({
         key,
         cat,
-        label:
-          groupBy === "ticker"
-            ? key
-            : categoryLabels[cat],
+        label: groupBy === "ticker" ? name : categoryLabels[cat],
         ars,
         pct: (ars / totalArs) * 100,
         rows: rows.sort((a, b) => b.ars - a.ars),
@@ -597,6 +603,26 @@ function AllocationBrick({
                   >
                     {cur === "ARS" ? formatARS(value) : formatUSD(value)}
                   </Text>
+                  {/* Info icon — abre el bottom sheet con el detalle
+                      de cómo se calcula el saldo unificado. Mismo
+                      patrón que el infoDot del Home (Earnings). */}
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setInfoOpen(true);
+                    }}
+                    style={[
+                      s.allocInfoDot,
+                      { backgroundColor: c.surfaceHover },
+                    ]}
+                  >
+                    <Feather
+                      name="info"
+                      size={12}
+                      color={c.textSecondary}
+                    />
+                  </Pressable>
                 </View>
               );
             })}
@@ -799,7 +825,7 @@ function AllocationBrick({
                     <Text
                       style={[s.tooltipTicker, { color: "rgba(255,255,255,0.65)" }]}
                     >
-                      Variación
+                      {activeBlock.rows[0].shortTicker}
                     </Text>
                     <Text
                       style={[
@@ -877,6 +903,11 @@ function AllocationBrick({
           </View>
         ))}
       </View>
+
+      <BalanceInfoSheet
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
@@ -905,6 +936,19 @@ function shadeHex(hex: string, amt: number): string {
 /** Texto blanco sobre fondos oscuros, ink sobre claros. */
 function textOnHex(color: string): string {
   return color === "#0E0F0C" || color === "#000000" ? "#FAFAF7" : "#0E0F0C";
+}
+
+/** Devuelve el ticker corto de un par crypto.
+ *  "BTC/USDT" → "BTC", "BTCUSDT.P" → "BTC.P", el resto se devuelve
+ *  tal cual (acciones / cedears etc no se tocan). En la pared 3D
+ *  los pares completos se sienten técnicos y restan al lenguaje
+ *  retail — preferimos mostrar el nombre full ("Bitcoin") con el
+ *  short ticker como sub-label. */
+function shortCryptoTicker(ticker: string): string {
+  if (ticker.includes("/USDT")) return ticker.replace("/USDT", "");
+  if (ticker.endsWith("USDT.P"))
+    return ticker.replace("USDT.P", "") + ".P";
+  return ticker;
 }
 
 /** Pct para el tooltip — un decimal siempre, con coma. */
@@ -1066,11 +1110,25 @@ const s = StyleSheet.create({
     flexGrow: 0,
   },
   allocPagerPage: {
-    /* width se setea inline (containerW), aquí sólo alineamos el
-     * contenido al baseline izquierdo. */
+    /* width se setea inline (containerW). Layout horizontal para
+     * que el saldo y el info dot queden inline; el saldo ocupa
+     * todo el espacio sobrante (flex: 1) y el dot queda anclado
+     * a la derecha. */
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  allocInfoDot: {
+    width: 22,
+    height: 22,
+    borderCurve: "continuous",
+    borderRadius: 11,
+    alignItems: "center",
     justifyContent: "center",
   },
   allocTotal: {
+    flex: 1,
     fontFamily: fontFamily[800],
     fontSize: 28,
     lineHeight: 32,
