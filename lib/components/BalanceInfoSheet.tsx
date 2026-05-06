@@ -152,45 +152,14 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
             </Text>
 
             <Text style={[s.body, { color: c.textSecondary }]}>
-              Sumamos todas tus tenencias y las llevamos a una sola
-              moneda para que veas el portfolio completo de un vistazo.
-            </Text>
-
-            <View style={s.rules}>
-              <Rule
-                pair="ARS"
-                desc="todo lo que ya está en pesos suma directo."
-              />
-              <Rule
-                pair="USD"
-                desc="dólares cash, FCI USD y acciones USA convierten al dólar oficial vendedor."
-              />
-              <Rule
-                pair="USDT"
-                desc="stablecoins y crypto pasan por paridad USDT/USD y después al oficial."
-              />
-            </View>
-
-            <Text style={[s.footnote, { color: c.textMuted }]}>
-              Podés alternar entre pesos y dólares deslizando el saldo
-              o tappeando los dots de abajo. La distribución del
-              ladrillo se mantiene igual — los porcentajes son los
-              mismos en cualquier moneda.
+              Sumamos todas tus tenencias en una sola moneda. La
+              parte en dólares y crypto convierte al dólar oficial
+              vendedor.
             </Text>
           </View>
         </Animated.View>
       </GestureDetector>
     </Modal>
-  );
-}
-
-function Rule({ pair, desc }: { pair: string; desc: string }) {
-  const { c } = useTheme();
-  return (
-    <View style={s.rule}>
-      <Text style={[s.ruleLabel, { color: c.text }]}>{pair}.</Text>
-      <Text style={[s.ruleDesc, { color: c.textSecondary }]}> {desc}</Text>
-    </View>
   );
 }
 
@@ -236,37 +205,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     letterSpacing: -0.15,
-    textAlign: "center",
-    paddingHorizontal: 8,
-    marginBottom: 20,
-  },
-  rules: {
-    gap: 10,
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  rule: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  ruleLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 14.5,
-    lineHeight: 21,
-    letterSpacing: -0.2,
-  },
-  ruleDesc: {
-    fontFamily: fontFamily[500],
-    fontSize: 14.5,
-    lineHeight: 21,
-    letterSpacing: -0.15,
-    flexShrink: 1,
-  },
-  footnote: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 19,
-    letterSpacing: -0.1,
     textAlign: "center",
     paddingHorizontal: 8,
   },
