@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Svg, { Circle as SvgCircle } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -16,11 +17,13 @@ import {
   assetCurrency,
   assetIconCode,
   assetMarket,
+  categoryLabels,
   formatARS,
   formatMoney,
   formatPct,
   formatQty,
   type Asset,
+  type AssetCategory,
 } from "../../../lib/data/assets";
 import { convertAmount } from "../../../lib/data/accounts";
 import {
@@ -131,6 +134,20 @@ export default function PortfolioScreen() {
           />
         }
       >
+        {holdingsSorted.length > 0 && totalArs > 0 ? (
+          <View style={[s.sectionBlock, { marginBottom: 28 }]}>
+            <View style={s.sectionHead}>
+              <Text style={[s.sectionTitle, { color: c.textMuted }]}>
+                Distribución
+              </Text>
+            </View>
+            <AllocationChart
+              holdings={holdingsSorted}
+              totalArs={totalArs}
+            />
+          </View>
+        ) : null}
+
         <View style={s.sectionBlock}>
           <View style={s.sectionHead}>
             <Text style={[s.sectionTitle, { color: c.textMuted }]}>
@@ -299,6 +316,181 @@ function HoldingRow({
   );
 }
 
+/* ─── Donut de distribución ─────────────────────────────────────
+ *
+ * Donut chart 1:1 con el ADN de Alamos: paleta monocromática
+ * dominada por el verde brand, sin colores random tipo "AI dashboard".
+ * El slice más grande SIEMPRE va en `c.brand` (#00C805) — pop
+ * inmediato. El resto desciende por una rampa tonal: ink → action
+ * → positive → grises del theme. La idea es que la distribución se
+ * lea como una sola escena, no como una bolsa de skittles.
+ *
+ * Implementación: un único `Circle` por slice con `strokeDasharray`
+ * — la técnica clásica de donuts en SVG, sin paths arc trigonometric.
+ * Pequeño gap visual entre slices (sólo si hay 2+) para que el ojo
+ * separe los segmentos sin necesidad de bordes.
+ *
+ * En el centro mostramos el total ARS compacto + el conteo de
+ * categorías como label inferior. La leyenda va a la derecha,
+ * limitada a los top 5 (suficiente — si la cartera tiene más
+ * categorías minúsculas se agrupan visualmente igual sin saturar).
+ */
+
+interface AllocationChartProps {
+  holdings: { asset: Asset; native: number; ars: number }[];
+  totalArs: number;
+}
+
+function AllocationChart({ holdings, totalArs }: AllocationChartProps) {
+  const { c } = useTheme();
+
+  const allocations = useMemo(() => {
+    const byCategory = new Map<AssetCategory, number>();
+    for (const h of holdings) {
+      byCategory.set(
+        h.asset.category,
+        (byCategory.get(h.asset.category) ?? 0) + h.ars,
+      );
+    }
+    return Array.from(byCategory.entries())
+      .map(([cat, ars]) => ({ cat, ars, pct: ars / totalArs }))
+      .sort((a, b) => b.ars - a.ars);
+  }, [holdings, totalArs]);
+
+  // Rampa tonal — el primer slice (más grande) usa brand, después
+  // bajamos por tonos del theme. Repetimos la rampa si hay más de
+  // 7 categorías (caso muy excepcional).
+  const palette = [
+    c.brand,
+    c.text,
+    c.action,
+    c.positive,
+    c.textSecondary,
+    c.textMuted,
+    c.textFaint,
+  ];
+
+  const SIZE = 132;
+  const STROKE = 18;
+  const R = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * R;
+  // Gap visual entre slices (en unidades de circunferencia). 2 px
+  // se siente justo — separa sin abrir huecos negros.
+  const GAP = 2;
+
+  let offset = 0;
+  const showGap = allocations.length > 1;
+
+  const legend = allocations.slice(0, 5);
+
+  return (
+    <View
+      style={[
+        s.allocCard,
+        { backgroundColor: c.surface, borderColor: c.border },
+      ]}
+    >
+      <View style={s.allocChartWrap}>
+        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          {/* Track de fondo — anillo sunken para que un slice del 99%
+              no se confunda con un círculo sólido. */}
+          <SvgCircle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            stroke={c.surfaceSunken}
+            strokeWidth={STROKE}
+          />
+          {allocations.map((a, i) => {
+            const sliceLen = a.pct * CIRC;
+            // Para slices muy chicos no hace falta gap (evita
+            // que el dasharray se vuelva negativo o desaparezca).
+            const len =
+              showGap && sliceLen > GAP * 2 ? sliceLen - GAP : sliceLen;
+            const dash = `${Math.max(0, len)} ${CIRC}`;
+            const slice = (
+              <SvgCircle
+                key={a.cat}
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={R}
+                fill="none"
+                stroke={palette[i % palette.length]}
+                strokeWidth={STROKE}
+                strokeDasharray={dash}
+                strokeDashoffset={-offset}
+                strokeLinecap="butt"
+                transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+              />
+            );
+            offset += sliceLen;
+            return slice;
+          })}
+        </Svg>
+        {/* Center label — total compacto. pointerEvents none para
+            que no robe taps al chart si más adelante lo hacemos
+            interactivo (drill-down por slice, por ejemplo). */}
+        <View style={s.allocCenter} pointerEvents="none">
+          <Text style={[s.allocCenterValue, { color: c.text }]}>
+            {formatArsCompact(totalArs)}
+          </Text>
+          <Text style={[s.allocCenterLabel, { color: c.textMuted }]}>
+            Total
+          </Text>
+        </View>
+      </View>
+
+      <View style={s.allocLegend}>
+        {legend.map((a, i) => (
+          <View key={a.cat} style={s.allocLegendRow}>
+            <View
+              style={[
+                s.allocLegendDot,
+                { backgroundColor: palette[i % palette.length] },
+              ]}
+            />
+            <Text
+              style={[s.allocLegendLabel, { color: c.text }]}
+              numberOfLines={1}
+            >
+              {categoryLabels[a.cat]}
+            </Text>
+            <Text style={[s.allocLegendPct, { color: c.textMuted }]}>
+              {formatAllocationPct(a.pct)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** "$ 12,4M" / "$ 850K" / "$ 420" — compacto para el centro del
+ *  donut. Para ARS principalmente, donde los millones son moneda
+ *  corriente. */
+function formatArsCompact(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000)
+    return "$ " + (n / 1_000_000_000).toFixed(1).replace(".", ",") + "B";
+  if (abs >= 1_000_000)
+    return "$ " + (n / 1_000_000).toFixed(1).replace(".", ",") + "M";
+  if (abs >= 10_000)
+    return "$ " + Math.round(n / 1_000).toString() + "K";
+  if (abs >= 1_000)
+    return "$ " + (n / 1_000).toFixed(1).replace(".", ",") + "K";
+  return formatARS(n);
+}
+
+/** Pct sin signo, máximo un decimal cuando es chico (< 10%) — en
+ *  legend queremos que las cifras dominantes se vean limpias y las
+ *  pequeñas no caigan a 0%. */
+function formatAllocationPct(p: number): string {
+  const v = p * 100;
+  if (v >= 10) return Math.round(v).toString() + "%";
+  return v.toFixed(1).replace(".", ",") + "%";
+}
+
 /* Unidad de tenencia según categoría — coincide con el qtyLabel del
  * detail.tsx pero plural simple para la subline. */
 function qtyUnit(asset: Asset): string {
@@ -419,6 +611,68 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.1,
     marginTop: 2,
+  },
+
+  /* Donut de distribución — card con donut a la izquierda + leyenda
+   * a la derecha. Layout side-by-side, gap 18, alineado al centro
+   * vertical para que la leyenda no se sienta despegada del chart. */
+  allocCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  allocChartWrap: {
+    width: 132,
+    height: 132,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  allocCenter: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  allocCenterValue: {
+    fontFamily: fontFamily[800],
+    fontSize: 18,
+    letterSpacing: -0.6,
+  },
+  allocCenterLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  allocLegend: {
+    flex: 1,
+    gap: 10,
+  },
+  allocLegendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  allocLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  allocLegendLabel: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  allocLegendPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
 
   /* Resultado del día — card simple, mismos paddings que las cards
