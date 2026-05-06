@@ -351,14 +351,14 @@ export default function NewsScreen() {
   }, [activeTab]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
       {/* Header sticky con título Noticias + tabs — bg cálido para
           que la página entera respire en gris (mismo lenguaje de
           Cocos / Robinhood) y los cards blancos resaltan adentro. */}
       <View
         style={[
           s.header,
-          { backgroundColor: c.bgWarm, borderBottomColor: c.border },
+          { backgroundColor: c.surfaceSunken, borderBottomColor: c.border },
         ]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
@@ -593,7 +593,7 @@ function NewsCard({
 
   return (
     <View
-      style={{ height, paddingTop: topPad, backgroundColor: c.bgWarm }}
+      style={{ height, paddingTop: topPad, backgroundColor: c.surfaceSunken }}
     >
       {/* Frame blanco que enmarca image + bottom — la página es
           gris cálido (c.bgWarm) y la noticia se ve "encartonada"

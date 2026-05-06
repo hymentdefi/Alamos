@@ -51,12 +51,12 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
 
-  /* Shake "como si la pila de billetes vibrara" — misma curva que
-   * el candado de MarketClosedSheet (lateral oscilando que decae).
-   * Delay de 220ms para que arranque cuando el sheet ya entró
-   * visualmente. La ilustración acá no es draggeable, sólo
-   * decorativa. */
-  const heroShake = useSharedValue(0);
+  /* Bump pulse de la pila — un "subí, bajé, asentate". La pila
+   * crece a 1.12, vuelve a 0.96 (overshoot leve hacia abajo) y
+   * settles en 1. Da feel de billetes "respirando" / cayendo
+   * sobre la mesa. Delay de 220ms para que arranque cuando el
+   * sheet ya entró visualmente. */
+  const heroScale = useSharedValue(1);
 
   useEffect(() => {
     if (visible) {
@@ -68,44 +68,24 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
         duration: 280,
         easing: Easing.out(Easing.cubic),
       });
-      heroShake.value = 0;
-      heroShake.value = withDelay(
+      heroScale.value = 1;
+      heroScale.value = withDelay(
         220,
         withSequence(
-          withTiming(12, {
-            duration: 70,
-            easing: Easing.out(Easing.quad),
+          withTiming(1.12, {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
           }),
-          withTiming(-12, {
-            duration: 100,
-            easing: Easing.inOut(Easing.quad),
+          withTiming(0.96, {
+            duration: 180,
+            easing: Easing.inOut(Easing.cubic),
           }),
-          withTiming(10, {
-            duration: 90,
-            easing: Easing.inOut(Easing.quad),
+          withTiming(1.04, {
+            duration: 160,
+            easing: Easing.inOut(Easing.cubic),
           }),
-          withTiming(-10, {
-            duration: 90,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(7, {
-            duration: 85,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(-7, {
-            duration: 85,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(4, {
-            duration: 80,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(-4, {
-            duration: 80,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(0, {
-            duration: 110,
+          withTiming(1, {
+            duration: 220,
             easing: Easing.out(Easing.cubic),
           }),
         ),
@@ -168,7 +148,7 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
     opacity: backdropOpacity.value,
   }));
   const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: heroShake.value }],
+    transform: [{ scale: heroScale.value }],
   }));
 
   return (

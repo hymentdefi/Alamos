@@ -19,7 +19,6 @@ import {
   type Asset,
 } from "../../lib/data/assets";
 import { findCategoryBySlug } from "../../lib/data/marketCategories";
-import { CategoryGlyph } from "../../lib/components/CategoryGlyph";
 import { useFloatingTabBarHeight } from "../../lib/components/FloatingTabBar";
 import {
   MiniSparkline,
@@ -108,9 +107,8 @@ export default function MarketCategoryScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero del header de categoría — icon grande + label + hint. */}
+        {/* Hero del header de categoría — label + hint. */}
         <View style={s.hero}>
-          <CategoryGlyph slug={category.slug} size={64} />
           <Text style={[s.heroLabel, { color: c.text }]}>
             {category.label}
           </Text>

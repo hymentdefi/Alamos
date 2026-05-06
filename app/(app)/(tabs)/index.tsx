@@ -68,7 +68,6 @@ import {
 } from "../../../lib/components/ActionIcon";
 import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { EarningsInfoSheet } from "../../../lib/components/EarningsInfoSheet";
-import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import {
   categorizeAsset,
   findCategoryBySlug,
@@ -381,7 +380,7 @@ function BaseHome() {
     : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
 
   return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
       <LinearGradient
         pointerEvents="none"
         colors={bgGradient}
@@ -974,8 +973,8 @@ const AccountRow = memo(function AccountRow({
 /* ─── Tus inversiones: lista por categorías del brand pack ─── */
 /**
  * Agrupa los holdings del usuario por categoría de Mercado y los
- * muestra como rows clickeables (mismo lenguaje visual que Mercado:
- * CategoryGlyph + label + total tenido + chevron). Tap → drilling
+ * muestra como rows clickeables (label + total tenido + chevron).
+ * Tap → drilling
  * al detalle de la categoría en /(app)/market-category.
  *
  * Sólo aparecen las categorías donde el usuario tiene posiciones >0.
@@ -1062,10 +1061,6 @@ function Investments({
                   },
                 ]}
               >
-                <CategoryGlyph
-                  slug={category.slug}
-                  size={36}
-                />
                 <View style={{ flex: 1 }}>
                   <Text
                     style={[s.invRowLabel, { color: c.text }]}
@@ -1577,8 +1572,8 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Row del listado por categoría de 'Tus inversiones' — icon
-   * (CategoryGlyph) + label/count + total ARS + chevron. */
+  /* Row del listado por categoría de 'Tus inversiones' —
+   * label / count + total ARS + chevron. */
   invRow: {
     flexDirection: "row",
     alignItems: "center",

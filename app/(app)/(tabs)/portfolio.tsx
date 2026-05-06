@@ -37,7 +37,6 @@ import { GlassCard } from "../../../lib/components/GlassCard";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
-import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import {
   categorizeAsset,
   findCategoryBySlug,
@@ -157,7 +156,7 @@ export default function PortfolioScreen() {
   /* ─── Render ────────────────────────────────────────────────── */
 
   return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
       {/* Header fijo — clavado a la altura del header de Mercado para
           que el MarketSegmented quede en el mismo Y de pantalla. */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
@@ -238,7 +237,6 @@ export default function PortfolioScreen() {
                       },
                     ]}
                   >
-                    <CategoryGlyph slug={category.slug} size={36} />
                     <View style={{ flex: 1 }}>
                       <Text
                         style={[s.invRowLabel, { color: c.text }]}
@@ -357,7 +355,7 @@ function AllocationBrick({
     setCurrency(defaultCurrency);
     if (containerW > 0) {
       pagerRef.current?.scrollTo({
-        x: defaultCurrency === "ARS" ? 0 : containerW - 38,
+        x: defaultCurrency === "ARS" ? 0 : containerW - 32,
         y: 0,
         animated: false,
       });
@@ -539,12 +537,12 @@ function AllocationBrick({
                 alwaysBounceVertical={false}
                 bounces={false}
                 contentOffset={{
-                  x: currency === "ARS" ? 0 : containerW - 38,
+                  x: currency === "ARS" ? 0 : containerW - 32,
                   y: 0,
                 }}
                 onMomentumScrollEnd={(e) => {
                   const idx = Math.round(
-                    e.nativeEvent.contentOffset.x / (containerW - 38),
+                    e.nativeEvent.contentOffset.x / (containerW - 32),
                   );
                   const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
                   if (next !== currency) {
@@ -564,7 +562,7 @@ function AllocationBrick({
                       key={cur}
                       style={[
                         s.allocPagerPage,
-                        { width: containerW - 38 },
+                        { width: containerW - 32 },
                       ]}
                     >
                       {/* Mismo formato del balance del Home: integer
@@ -623,7 +621,7 @@ function AllocationBrick({
                   Haptics.selectionAsync().catch(() => {});
                   setCurrency(cur);
                   pagerRef.current?.scrollTo({
-                    x: cur === "ARS" ? 0 : containerW - 38,
+                    x: cur === "ARS" ? 0 : containerW - 32,
                     y: 0,
                     animated: true,
                   });
@@ -1019,8 +1017,8 @@ const s = StyleSheet.create({
 
   /* Row del listado por categoría — copia de Inicio para que las
    * dos vistas (Home 'Tus inversiones' y Portfolio 'Tus posiciones')
-   * se sientan exactamente iguales: CategoryGlyph + label / count
-   * + total ARS + chevron. Tap → drilldown a market-category. */
+   * se sientan exactamente iguales: label / count + total ARS +
+   * chevron. Tap → drilldown a market-category. */
   invRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1071,9 +1069,13 @@ const s = StyleSheet.create({
     flexGrow: 0,
   },
   allocPagerPage: {
-    /* width se setea inline (containerW - 38). Centrado vertical
-     * para que el AmountDisplay flote bien dentro del card. */
+    /* width se setea inline (containerW - 32 = ancho de la
+     * ScrollView, así pagingEnabled snapea exacto y no se ve
+     * peek de la página siguiente). overflow:hidden evita que
+     * un saldo muy ancho (12 millones+) se desborde por la
+     * derecha hacia el info icon. */
     justifyContent: "center",
+    overflow: "hidden",
   },
   allocInfoDot: {
     width: 22,

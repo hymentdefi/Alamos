@@ -3,7 +3,34 @@ import type {
   AssetCategory,
   AssetMarket,
 } from "./assets";
-import type { CategorySlug } from "../components/CategoryGlyph";
+
+/**
+ * Slug identifier de cada categoría visible en /Mercado. Sirve
+ * como key estable para deep-links (ej: /market-category?slug=X)
+ * y aggregations cross-screen.
+ */
+export type CategorySlug =
+  | "ar-acciones"
+  | "ar-cedears"
+  | "ar-bonos-usd"
+  | "ar-bonos-ars"
+  | "ar-letras"
+  | "ar-ons"
+  | "ar-opciones"
+  | "ar-futuros"
+  | "ar-fci"
+  | "ar-cauciones"
+  | "ar-mep"
+  | "ar-ccl"
+  | "us-acciones"
+  | "us-etfs"
+  | "us-opciones"
+  | "us-tbills"
+  | "us-bonos-corp"
+  | "us-short"
+  | "us-cash"
+  | "us-fpsl"
+  | "cr-crypto";
 
 /**
  * Categorías visibles en el listado de cada mercado en /Mercado.

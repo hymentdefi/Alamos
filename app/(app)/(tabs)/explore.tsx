@@ -43,7 +43,6 @@ import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { FavStar } from "../../../lib/components/FavStar";
 import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
-import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
@@ -275,7 +274,7 @@ function BaseExplore() {
   }, [refreshing, onRefresh]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
           <View style={s.titleWithBadge}>
@@ -640,7 +639,6 @@ function MarketBody({
                   },
                 ]}
               >
-                <CategoryGlyph slug={cat.slug} size={44} />
                 <Text
                   style={[s.categoryCardLabel, { color: c.text }]}
                   numberOfLines={2}
