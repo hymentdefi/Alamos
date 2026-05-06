@@ -169,6 +169,17 @@ export function MarketClosedSheet({
               </Text>
               .
             </Text>
+            <Text style={[s.scheduledNote, { color: c.textMuted }]}>
+              Podés mandar tus{" "}
+              <Text style={[s.subtitleBold, { color: c.text }]}>
+                órdenes de compra y venta
+              </Text>{" "}
+              ahora — quedan{" "}
+              <Text style={[s.subtitleBold, { color: c.text }]}>
+                programadas
+              </Text>{" "}
+              y se ejecutan apenas abra el mercado.
+            </Text>
           </View>
         </Animated.View>
       </GestureDetector>
@@ -232,5 +243,18 @@ const s = StyleSheet.create({
   subtitleMono: {
     fontFamily: fontMono[700],
     letterSpacing: 0,
+  },
+  /* Nota tranquilizadora — las órdenes durante mercado cerrado no
+   * se rechazan, se schedulean. La separamos del subtitle con un
+   * marginTop para dar respiro entre el "horario" (info dura) y el
+   * "podés operar igual" (acción del usuario). */
+  scheduledNote: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.1,
+    textAlign: "center",
+    paddingHorizontal: 16,
+    marginTop: 14,
   },
 });
