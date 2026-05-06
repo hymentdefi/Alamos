@@ -156,7 +156,7 @@ export default function PortfolioScreen() {
   /* ─── Render ────────────────────────────────────────────────── */
 
   return (
-    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
       {/* Header fijo — clavado a la altura del header de Mercado para
           que el MarketSegmented quede en el mismo Y de pantalla. */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>

@@ -274,7 +274,7 @@ function BaseExplore() {
   }, [refreshing, onRefresh]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.surfaceSunken }]}>
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
           <View style={s.titleWithBadge}>
@@ -322,7 +322,7 @@ function BaseExplore() {
 
         <View style={s.searchRow}>
           <View
-            style={[s.searchBox, { backgroundColor: c.surfaceSunken }]}
+            style={[s.searchBox, { backgroundColor: c.bgWarm }]}
           >
             <MagnifyIcon size={18} color={c.textMuted} strokeWidth={2.4} />
             <TextInput
