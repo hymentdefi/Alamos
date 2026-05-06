@@ -14,13 +14,13 @@ const OPEN_MINUTE = 30;
 const CLOSE_HOUR = 17;
 const CLOSE_MINUTE = 0;
 
-// US market en horario ART — NYSE/NASDAQ 11:30 a 18:00 (sin DST,
-// equivale a 9:30–16:00 ET). La spec habla de 9:30 ET en el copy
-// del banner — usamos esa hora local en los mensajes y la convertida
-// a ART internamente para el cálculo de open/close.
-const US_OPEN_HOUR = 11;
+// US market — usamos las mismas 10:30 a 17:00 ART que AR para
+// simplificar el copy del usuario (no hace falta mostrar (ART) ni
+// referenciar 9:30 ET). Operativamente el broker pisa la orden cuando
+// abre la NYSE igual; la UX prefiere consistencia entre mercados.
+const US_OPEN_HOUR = 10;
 const US_OPEN_MINUTE = 30;
-const US_CLOSE_HOUR = 18;
+const US_CLOSE_HOUR = 17;
 const US_CLOSE_MINUTE = 0;
 
 /** Devuelve la hora actual en Argentina (UTC-3) sin DST. */
@@ -132,7 +132,7 @@ export function marketSessionFor(
   if (assetMarket(asset) === "US") {
     return {
       open: !isWeekend && mins >= US_OPEN_MINS && mins < US_CLOSE_MINS,
-      hours: "11:30 a 18:00 hs (ART)",
+      hours: "10:30 a 17:00 hs",
       days: "lunes a viernes",
       instrumentLabel,
     };
@@ -171,7 +171,7 @@ export function marketSessionByMarket(
   if (market === "US") {
     return {
       open: !isWeekend && mins >= US_OPEN_MINS && mins < US_CLOSE_MINS,
-      hours: "11:30 a 18:00 hs (ART)",
+      hours: "10:30 a 17:00 hs",
       days: "lunes a viernes",
       instrumentLabel: "Mercado estadounidense",
     };
@@ -349,7 +349,7 @@ function setArgentinaTime(date: Date, hour: number, minute: number): void {
  *   - Cerrado mismo día:   "Cerrado · 17:00 hs"
  *   - Fin de semana:       "Cerrado · Abre lunes 11:00 hs"
  *   - Feriado AR:          "Cerrado por feriado · Abre [día] 11:00 hs"
- *   - Feriado US:          "Cerrado por feriado estadounidense · Abre [día] 9:30 hs ET"
+ *   - Feriado US:          "Cerrado por feriado estadounidense · Abre [día] 10:30 hs"
  *   - Crypto:              nunca mostrar
  */
 const DAYS_ES_LOWER = [
@@ -367,13 +367,11 @@ function dayNameOfNextOpen(date: Date): string {
   return DAYS_ES_LOWER[day];
 }
 
-function openTimeLabel(market: "AR" | "US"): string {
-  if (market === "US") return "9:30 hs ET";
+function openTimeLabel(_market: "AR" | "US"): string {
   return "10:30 hs";
 }
 
-function closeTimeLabel(market: "AR" | "US"): string {
-  if (market === "US") return "16:00 hs ET";
+function closeTimeLabel(_market: "AR" | "US"): string {
   return "17:00 hs";
 }
 
