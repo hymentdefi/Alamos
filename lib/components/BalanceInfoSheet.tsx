@@ -51,12 +51,12 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
 
-  /* Bump pulse de la pila — un "subí, bajé, asentate". La pila
-   * crece a 1.12, vuelve a 0.96 (overshoot leve hacia abajo) y
-   * settles en 1. Da feel de billetes "respirando" / cayendo
-   * sobre la mesa. Delay de 220ms para que arranque cuando el
-   * sheet ya entró visualmente. */
-  const heroScale = useSharedValue(1);
+  /* Salto de la pila — translateY que sube fuerte, cae con
+   * gravedad (overshoot leve abajo, simulando el impacto contra
+   * la mesa), y un pequeño re-bote chiquito antes de settle.
+   * Delay de 220ms para que arranque cuando el sheet ya entró
+   * visualmente. Feel "saltó la pila de billetes". */
+  const heroJumpY = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
@@ -68,24 +68,34 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
         duration: 280,
         easing: Easing.out(Easing.cubic),
       });
-      heroScale.value = 1;
-      heroScale.value = withDelay(
+      heroJumpY.value = 0;
+      heroJumpY.value = withDelay(
         220,
         withSequence(
-          withTiming(1.12, {
+          // Salto principal: sube rápido (cuadratic out → siente
+          // la fuerza inicial del salto).
+          withTiming(-26, {
             duration: 220,
-            easing: Easing.out(Easing.cubic),
+            easing: Easing.out(Easing.quad),
           }),
-          withTiming(0.96, {
-            duration: 180,
-            easing: Easing.inOut(Easing.cubic),
+          // Caída con gravedad (cuadratic in) y overshoot leve
+          // hacia abajo simulando el impacto.
+          withTiming(8, {
+            duration: 280,
+            easing: Easing.in(Easing.quad),
           }),
-          withTiming(1.04, {
+          // Re-bote chiquito.
+          withTiming(-6, {
             duration: 160,
-            easing: Easing.inOut(Easing.cubic),
+            easing: Easing.out(Easing.quad),
           }),
-          withTiming(1, {
-            duration: 220,
+          withTiming(2, {
+            duration: 140,
+            easing: Easing.in(Easing.quad),
+          }),
+          // Settle final.
+          withTiming(0, {
+            duration: 130,
             easing: Easing.out(Easing.cubic),
           }),
         ),
@@ -148,7 +158,7 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
     opacity: backdropOpacity.value,
   }));
   const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: heroScale.value }],
+    transform: [{ translateY: heroJumpY.value }],
   }));
 
   return (
