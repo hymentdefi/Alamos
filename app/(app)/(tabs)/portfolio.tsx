@@ -34,7 +34,6 @@ import {
   formatMoney,
   formatPct,
   formatQty,
-  formatUSD,
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
@@ -44,6 +43,7 @@ import {
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { GlassCard } from "../../../lib/components/GlassCard";
+import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import {
   MarketSegmented,
@@ -603,14 +603,18 @@ function AllocationBrick({
                   key={cur}
                   style={[s.allocPagerPage, { width: containerW }]}
                 >
-                  <Text
-                    style={[s.allocTotal, { color: c.text }]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.6}
-                  >
-                    {cur === "ARS" ? formatARS(value) : formatUSD(value)}
-                  </Text>
+                  {/* Mismo formato del balance del Home: integer
+                      grande + decimales chicos arriba a la derecha
+                      (estilo Robinhood). Sin flag — no aplica acá,
+                      es el portfolio total agregado. */}
+                  <View style={{ flex: 1 }}>
+                    <AmountDisplay
+                      value={value}
+                      size={28}
+                      weight={800}
+                      currency={cur}
+                    />
+                  </View>
                   {/* Info icon — abre el bottom sheet con el detalle
                       de cómo se calcula el saldo unificado. Mismo
                       patrón que el infoDot del Home (Earnings). */}
@@ -636,9 +640,12 @@ function AllocationBrick({
             })}
           </ScrollView>
         ) : (
-          <Text style={[s.allocTotal, { color: c.text }]}>
-            {formatARS(totalArs)}
-          </Text>
+          <AmountDisplay
+            value={totalArs}
+            size={28}
+            weight={800}
+            currency="ARS"
+          />
         )}
 
         {/* Dots indicator — cada uno tappable para saltar a esa
@@ -1134,13 +1141,6 @@ const s = StyleSheet.create({
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-  },
-  allocTotal: {
-    flex: 1,
-    fontFamily: fontFamily[800],
-    fontSize: 28,
-    lineHeight: 32,
-    letterSpacing: -1,
   },
   allocCurrencyDots: {
     flexDirection: "row",
