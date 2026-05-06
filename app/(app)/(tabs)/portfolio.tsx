@@ -34,6 +34,7 @@ import {
   formatMoney,
   formatPct,
   formatQty,
+  formatUSD,
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
@@ -156,6 +157,7 @@ export default function PortfolioScreen() {
             <AllocationBrick
               holdings={holdingsSorted}
               totalArs={totalArs}
+              groupBy={marketFilter === "CRYPTO" ? "ticker" : "category"}
             />
           </View>
         ) : null}
@@ -366,50 +368,70 @@ const BRICK_PALETTE = [
 interface AllocationBrickProps {
   holdings: { asset: Asset; native: number; ars: number }[];
   totalArs: number;
+  /** Granularidad del grouping. "category" para AR/EE.UU/Todo,
+   *  "ticker" para Crypto (donde la categoría sería siempre 100%
+   *  y no aporta información). */
+  groupBy: "category" | "ticker";
 }
 
-function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
+function AllocationBrick({
+  holdings,
+  totalArs,
+  groupBy,
+}: AllocationBrickProps) {
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const pagerRef = useRef<ScrollView | null>(null);
 
-  // Geometría del viewBox — clavada al mockup.
+  // Geometría del viewBox — clavada al mockup. El viewBox total es
+  // 340×180; la "pared" es 280 ancho × 100 alto, y suma 32 px de
+  // depth en el plano superior y la cara derecha del último
+  // bloque. xL se computa para CENTRAR la composición visible
+  // (wall + depth) dentro del viewBox — antes el wall arrancaba
+  // a 30 y se sentía corrido a la derecha por el bulge del depth.
   const W = 340;
   const H = 180;
   const wallW = 280;
   const wallH = 100;
   const depth = 32;
-  const xL = (W - wallW) / 2;
+  const xL = (W - (wallW + depth)) / 2;
   const yTop = 36;
   const yBot = yTop + wallH;
   const topShift = depth * 0.55; // cuánto sube el plano superior
 
-  // Para el tooltip necesitamos no sólo el % de la categoría sino
-  // también los tickers individuales que la componen + su variación
-  // del día. Aprovechamos la pasada de aggregation para arrastrar
-  // las rows ordenadas por contribución descendente.
+  // Para el tooltip necesitamos no sólo el % del grupo sino los
+  // tickers individuales + su variación del día. Aprovechamos la
+  // pasada de aggregation para arrastrar las rows ordenadas por
+  // contribución descendente.
+  //
+  // En groupBy="ticker" cada bloque ES un ticker — el grouping
+  // colapsa la lista de holdings tal cual.
   type Row = { ticker: string; change: number; ars: number };
   const blocks = useMemo(() => {
-    const byCategory = new Map<
-      AssetCategory,
-      { ars: number; rows: Row[] }
-    >();
+    const byKey = new Map<string, { ars: number; rows: Row[]; cat: AssetCategory }>();
     for (const h of holdings) {
-      const entry = byCategory.get(h.asset.category) ?? {
-        ars: 0,
-        rows: [],
-      };
+      const key =
+        groupBy === "ticker" ? h.asset.ticker : h.asset.category;
+      const entry =
+        byKey.get(key) ?? { ars: 0, rows: [], cat: h.asset.category };
       entry.ars += h.ars;
       entry.rows.push({
         ticker: h.asset.ticker,
         change: h.asset.change,
         ars: h.ars,
       });
-      byCategory.set(h.asset.category, entry);
+      byKey.set(key, entry);
     }
-    const sorted = Array.from(byCategory.entries())
-      .map(([cat, { ars, rows }]) => ({
+    const sorted = Array.from(byKey.entries())
+      .map(([key, { ars, rows, cat }]) => ({
+        key,
         cat,
+        label:
+          groupBy === "ticker"
+            ? key
+            : categoryLabels[cat],
         ars,
         pct: (ars / totalArs) * 100,
         rows: rows.sort((a, b) => b.ars - a.ars),
@@ -429,7 +451,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
         color: BRICK_PALETTE[i % BRICK_PALETTE.length],
       };
     });
-  }, [holdings, totalArs]);
+  }, [holdings, totalArs, groupBy, xL, wallW]);
 
   // El gesture object SE CONSTRUYE UNA SOLA VEZ — si el handleTouch
   // dependiera de state que cambia mid-press (activeIdx, blocks,
@@ -519,19 +541,109 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
         { backgroundColor: c.surface, borderColor: c.border },
       ]}
     >
-      <View style={s.allocHeader}>
+      <View
+        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+      >
         <Text style={[s.allocEyebrow, { color: c.textMuted }]}>
           DISTRIBUCIÓN
         </Text>
-        <Text style={[s.allocTotal, { color: c.text }]}>
-          {formatArsCompact(totalArs)}
-        </Text>
+
+        {/* Pager horizontal del total — 2 páginas (ARS / USD), cada
+            una al ancho del card content. Mismo lenguaje que el
+            balance del Home: paging-scroll nativo da prioridad al
+            gesture horizontal sobre el ScrollView vertical, y los
+            dots abajo indican qué página estás mirando. */}
+        {containerW > 0 ? (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="normal"
+            directionalLockEnabled
+            alwaysBounceVertical={false}
+            bounces={false}
+            contentOffset={{
+              x: currency === "ARS" ? 0 : containerW,
+              y: 0,
+            }}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(
+                e.nativeEvent.contentOffset.x / containerW,
+              );
+              const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
+              if (next !== currency) {
+                Haptics.selectionAsync().catch(() => {});
+                setCurrency(next);
+              }
+            }}
+            style={s.allocPager}
+          >
+            {(["ARS", "USD"] as const).map((cur) => {
+              const value =
+                cur === "ARS"
+                  ? totalArs
+                  : convertAmount(totalArs, "ARS", "USD");
+              return (
+                <View
+                  key={cur}
+                  style={[s.allocPagerPage, { width: containerW }]}
+                >
+                  <Text
+                    style={[s.allocTotal, { color: c.text }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                  >
+                    {cur === "ARS" ? formatARS(value) : formatUSD(value)}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <Text style={[s.allocTotal, { color: c.text }]}>
+            {formatARS(totalArs)}
+          </Text>
+        )}
+
+        {/* Dots indicator — cada uno tappable para saltar a esa
+            moneda directo, sin tener que swipear. */}
+        <View style={s.allocCurrencyDots}>
+          {(["ARS", "USD"] as const).map((cur) => {
+            const active = cur === currency;
+            return (
+              <Pressable
+                key={cur}
+                hitSlop={10}
+                onPress={() => {
+                  if (cur === currency) return;
+                  Haptics.selectionAsync().catch(() => {});
+                  setCurrency(cur);
+                  pagerRef.current?.scrollTo({
+                    x: cur === "ARS" ? 0 : containerW,
+                    y: 0,
+                    animated: true,
+                  });
+                }}
+              >
+                <View
+                  style={[
+                    s.allocCurrencyDot,
+                    {
+                      backgroundColor: active ? c.text : c.textFaint,
+                      width: active ? 7 : 5,
+                      height: active ? 7 : 5,
+                    },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <View
-        style={s.brickWrap}
-        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
-      >
+      <View style={s.brickWrap}>
         <GestureDetector gesture={panGesture}>
           <View>
             <Svg
@@ -540,9 +652,10 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
               height={containerW > 0 ? (containerW * H) / W : undefined}
               preserveAspectRatio="xMidYMid meet"
             >
-              {/* Sombra del piso. */}
+              {/* Sombra del piso — centrada en el punto medio
+                  visible (xL + (wallW + depth)/2). */}
               <Ellipse
-                cx={W / 2 + depth / 2}
+                cx={xL + (wallW + depth) / 2}
                 cy={yBot + 14}
                 rx={wallW / 2 + 14}
                 ry={7}
@@ -557,7 +670,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
                 const labelW = blk.x1 - blk.x0;
                 const showLabel = labelW > 38 && !dimmed;
                 return (
-                  <G key={String(blk.cat)}>
+                  <G key={blk.key}>
                     {/* Front face */}
                     <Polygon
                       points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1},${yBot} ${blk.x0},${yBot}`}
@@ -613,7 +726,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
                 fill="none"
               >
                 {blocks.slice(0, -1).map((blk) => (
-                  <G key={`div-${String(blk.cat)}`}>
+                  <G key={`div-${blk.key}`}>
                     <Line x1={blk.x1} y1={yTop} x2={blk.x1} y2={yBot} />
                     <Line
                       x1={blk.x1}
@@ -651,43 +764,82 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
             <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
               <View style={s.tooltipHeader}>
                 <Text style={[s.tooltipLabel, { color: c.bg }]}>
-                  {categoryLabels[activeBlock.cat]}
+                  {activeBlock.label}
                 </Text>
                 <Text style={[s.tooltipPct, { color: c.brand }]}>
                   {formatTooltipPct(activeBlock.pct)}
                 </Text>
               </View>
-              {activeBlock.rows.length > 0 ? (
-                <View
-                  style={[
-                    s.tooltipDivider,
-                    { backgroundColor: "rgba(255,255,255,0.12)" },
-                  ]}
-                />
-              ) : null}
-              {activeBlock.rows.slice(0, 5).map((r) => (
-                <View key={r.ticker} style={s.tooltipRow}>
-                  <Text
-                    style={[s.tooltipTicker, { color: c.bg }]}
-                    numberOfLines={1}
-                  >
-                    {r.ticker}
-                  </Text>
-                  <Text
+              {/* En groupBy="ticker" cada bloque ya ES un ticker —
+                  el header lo muestra y la lista de rows debajo
+                  sería redundante. Mostramos sólo la variación
+                  del día inline en su propia row.
+                  En groupBy="category" el header es la categoría
+                  y las rows son los tickers que la componen. */}
+              {groupBy === "ticker" && activeBlock.rows.length === 1 ? (
+                <>
+                  <View
                     style={[
-                      s.tooltipChange,
-                      { color: r.change >= 0 ? c.brand : "#FF6E5C" },
+                      s.tooltipDivider,
+                      { backgroundColor: "rgba(255,255,255,0.12)" },
                     ]}
-                  >
-                    {formatPct(r.change)}
-                  </Text>
-                </View>
-              ))}
-              {activeBlock.rows.length > 5 ? (
-                <Text style={[s.tooltipMore, { color: "rgba(255,255,255,0.45)" }]}>
-                  +{activeBlock.rows.length - 5} más
-                </Text>
-              ) : null}
+                  />
+                  <View style={s.tooltipRow}>
+                    <Text
+                      style={[s.tooltipTicker, { color: "rgba(255,255,255,0.65)" }]}
+                    >
+                      Variación
+                    </Text>
+                    <Text
+                      style={[
+                        s.tooltipChange,
+                        {
+                          color:
+                            activeBlock.rows[0].change >= 0
+                              ? c.brand
+                              : "#FF6E5C",
+                        },
+                      ]}
+                    >
+                      {formatPct(activeBlock.rows[0].change)}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {activeBlock.rows.length > 0 ? (
+                    <View
+                      style={[
+                        s.tooltipDivider,
+                        { backgroundColor: "rgba(255,255,255,0.12)" },
+                      ]}
+                    />
+                  ) : null}
+                  {activeBlock.rows.slice(0, 5).map((r) => (
+                    <View key={r.ticker} style={s.tooltipRow}>
+                      <Text
+                        style={[s.tooltipTicker, { color: c.bg }]}
+                        numberOfLines={1}
+                      >
+                        {r.ticker}
+                      </Text>
+                      <Text
+                        style={[
+                          s.tooltipChange,
+                          { color: r.change >= 0 ? c.brand : "#FF6E5C" },
+                        ]}
+                      >
+                        {formatPct(r.change)}
+                      </Text>
+                    </View>
+                  ))}
+                  {activeBlock.rows.length > 5 ? (
+                    <Text style={[s.tooltipMore, { color: "rgba(255,255,255,0.45)" }]}>
+                      +{activeBlock.rows.length - 5} más
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </View>
             <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
           </Animated.View>
@@ -696,7 +848,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
 
       <View style={s.allocLegendGrid}>
         {blocks.map((b) => (
-          <View key={String(b.cat)} style={s.allocLegendRowGrid}>
+          <View key={b.key} style={s.allocLegendRowGrid}>
             <View
               style={[s.allocLegendDot, { backgroundColor: b.color }]}
             />
@@ -704,7 +856,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
               style={[s.allocLegendLabel, { color: c.text }]}
               numberOfLines={1}
             >
-              {categoryLabels[b.cat]}
+              {b.label}
             </Text>
             <Text style={[s.allocLegendPct, { color: c.text }]}>
               {formatAllocationPct(b.pct / 100)}
@@ -745,22 +897,6 @@ function textOnHex(color: string): string {
 /** Pct para el tooltip — un decimal siempre, con coma. */
 function formatTooltipPct(p: number): string {
   return p.toFixed(1).replace(".", ",") + "%";
-}
-
-/** "$ 12,4M" / "$ 850K" / "$ 420" — compacto para el centro del
- *  donut. Para ARS principalmente, donde los millones son moneda
- *  corriente. */
-function formatArsCompact(n: number): string {
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000_000)
-    return "$ " + (n / 1_000_000_000).toFixed(1).replace(".", ",") + "B";
-  if (abs >= 1_000_000)
-    return "$ " + (n / 1_000_000).toFixed(1).replace(".", ",") + "M";
-  if (abs >= 10_000)
-    return "$ " + Math.round(n / 1_000).toString() + "K";
-  if (abs >= 1_000)
-    return "$ " + (n / 1_000).toFixed(1).replace(".", ",") + "K";
-  return formatARS(n);
 }
 
 /** Pct sin signo, máximo un decimal cuando es chico (< 10%) — en
@@ -904,22 +1040,40 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  allocHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: 12,
-  },
   allocEyebrow: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 1.4,
     textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  /* Pager horizontal de moneda — ScrollView pagingEnabled, dos
+   * páginas (ARS / USD) cada una al ancho del card content. */
+  allocPager: {
+    flexGrow: 0,
+  },
+  allocPagerPage: {
+    /* width se setea inline (containerW), aquí sólo alineamos el
+     * contenido al baseline izquierdo. */
+    justifyContent: "center",
   },
   allocTotal: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.7,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -1,
+  },
+  allocCurrencyDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 6,
+    paddingVertical: 2,
+  },
+  allocCurrencyDot: {
+    borderCurve: "continuous",
+    borderRadius: 999,
   },
   brickWrap: {
     position: "relative",
