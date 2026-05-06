@@ -25,24 +25,22 @@ import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
   assets,
   assetCurrency,
-  assetIconCode,
   assetMarket,
   categoryLabels,
   formatARS,
-  formatMoney,
   formatPct,
-  formatQty,
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
 import { convertAmount } from "../../../lib/data/accounts";
-import {
-  MiniSparkline,
-  seriesFromSeed,
-} from "../../../lib/components/Sparkline";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
+import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
+import {
+  categorizeAsset,
+  findCategoryBySlug,
+} from "../../../lib/data/marketCategories";
 import {
   MarketSegmented,
   type MarketSegmentedValue,
@@ -107,6 +105,31 @@ export default function PortfolioScreen() {
   }, [holdings]);
 
   const todayPct = totalArs > 0 ? (todayDeltaArs / totalArs) * 100 : 0;
+
+  /* Holdings agrupados por categoría de Mercado — mismo lenguaje
+   * que 'Tus inversiones' del Home: una row por categoría, total
+   * tenido en ARS, count de instrumentos, drilldown a
+   * /(app)/market-category. Sólo aparecen las categorías con
+   * posiciones >0; ordenadas por valor descendente.
+   */
+  const groupedByCategory = useMemo(() => {
+    const map = new Map<
+      string,
+      { totalArs: number; count: number }
+    >();
+    for (const { asset, ars } of holdingsSorted) {
+      const slug = categorizeAsset(asset);
+      if (!slug) continue;
+      const prev = map.get(slug) ?? { totalArs: 0, count: 0 };
+      map.set(slug, {
+        totalArs: prev.totalArs + ars,
+        count: prev.count + 1,
+      });
+    }
+    return [...map.entries()].sort(
+      ([, a], [, b]) => b.totalArs - a.totalArs,
+    );
+  }, [holdingsSorted]);
 
   /* ─── Handlers ──────────────────────────────────────────────── */
 
@@ -173,22 +196,61 @@ export default function PortfolioScreen() {
             </Text>
           </View>
 
-          {holdingsSorted.length > 0 ? (
+          {groupedByCategory.length > 0 ? (
             <GlassCard padding={4}>
-              {holdingsSorted.map(({ asset, native }, i) => (
-                <HoldingRow
-                  key={asset.ticker}
-                  asset={asset}
-                  marketValueNative={native}
-                  withTopDivider={i > 0}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(app)/detail",
-                      params: { ticker: asset.ticker },
-                    })
-                  }
-                />
-              ))}
+              {groupedByCategory.map(([slug, data], i) => {
+                const lookup = findCategoryBySlug(slug);
+                if (!lookup) return null;
+                const { category } = lookup;
+                return (
+                  <Pressable
+                    key={slug}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(app)/market-category",
+                        params: { slug },
+                      })
+                    }
+                    style={[
+                      s.invRow,
+                      i > 0 && {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: c.border,
+                      },
+                    ]}
+                  >
+                    <CategoryGlyph slug={category.slug} size={36} />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[s.invRowLabel, { color: c.text }]}
+                        numberOfLines={1}
+                      >
+                        {category.label}
+                      </Text>
+                      <Text
+                        style={[s.invRowSub, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {data.count} instrumento
+                        {data.count === 1 ? "" : "s"}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text
+                        style={[s.invRowValue, { color: c.text }]}
+                        numberOfLines={1}
+                      >
+                        {formatARS(data.totalArs)}
+                      </Text>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={18}
+                      color={c.textFaint}
+                    />
+                  </Pressable>
+                );
+              })}
             </GlassCard>
           ) : (
             <GlassCard padding={16}>
@@ -235,98 +297,6 @@ export default function PortfolioScreen() {
         </View>
       </ScrollView>
     </View>
-  );
-}
-
-/* ─── Holding row ───────────────────────────────────────────────
- *
- * Layout copiado de la fila de market-category.tsx pero con dos
- * cambios:
- *   - El precio principal es el VALOR DE TU TENENCIA (qty × price)
- *     en moneda nativa, no el precio de mercado individual.
- *   - Bajo el ticker: la cantidad de unidades + unit suffix
- *     ("unidades", "VN", "cuotapartes", el ticker para crypto).
- */
-interface HoldingRowProps {
-  asset: Asset;
-  marketValueNative: number;
-  withTopDivider: boolean;
-  onPress: () => void;
-}
-
-function HoldingRow({
-  asset,
-  marketValueNative,
-  withTopDivider,
-  onPress,
-}: HoldingRowProps) {
-  const { c } = useTheme();
-  const cur = assetCurrency(asset);
-  const up = asset.change >= 0;
-  const series = useMemo(
-    () => seriesFromSeed(asset.ticker, 60, up ? "up" : "down"),
-    [asset.ticker, up],
-  );
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        s.row,
-        withTopDivider && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-        },
-        { transform: [{ scale: pressed ? 0.99 : 1 }] },
-      ]}
-    >
-      <View
-        style={[
-          s.rowIcon,
-          {
-            backgroundColor:
-              asset.iconTone === "dark" ? c.ink : c.surfaceSunken,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            s.rowIconText,
-            {
-              color:
-                asset.iconTone === "dark" ? c.bg : c.textSecondary,
-            },
-          ]}
-        >
-          {assetIconCode(asset)}
-        </Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[s.rowTicker, { color: c.text }]}>{asset.ticker}</Text>
-        <Text
-          style={[s.rowSub, { color: c.textMuted }]}
-          numberOfLines={1}
-        >
-          {formatQty(asset.qty ?? 0)} {qtyUnit(asset)}
-        </Text>
-      </View>
-      <View style={s.rowChart}>
-        <MiniSparkline series={series} color={up ? c.greenDark : c.red} />
-      </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={[s.rowValue, { color: c.text }]} numberOfLines={1}>
-          {formatMoney(marketValueNative, cur)}
-        </Text>
-        <Text
-          style={[
-            s.rowDelta,
-            { color: up ? c.positive : c.red },
-          ]}
-        >
-          {formatPct(asset.change)}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -1009,26 +979,6 @@ function formatAllocationPct(p: number): string {
   return v.toFixed(1).replace(".", ",") + "%";
 }
 
-/* Unidad de tenencia según categoría — coincide con el qtyLabel del
- * detail.tsx pero plural simple para la subline. */
-function qtyUnit(asset: Asset): string {
-  switch (asset.category) {
-    case "cedears":
-    case "acciones":
-      return "unidades";
-    case "bonos":
-    case "obligaciones":
-    case "letras":
-      return "VN";
-    case "fci":
-      return "cuotapartes";
-    case "crypto":
-      return asset.ticker;
-    default:
-      return "unidades";
-  }
-}
-
 const s = StyleSheet.create({
   root: { flex: 1 },
 
@@ -1082,54 +1032,34 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  /* Holding row — copia del market-category.tsx con price→valor. */
-  row: {
+  /* Row del listado por categoría — copia de Inicio para que las
+   * dos vistas (Home 'Tus inversiones' y Portfolio 'Tus posiciones')
+   * se sientan exactamente iguales: CategoryGlyph + label / count
+   * + total ARS + chevron. Tap → drilldown a market-category. */
+  invRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
   },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderCurve: "continuous",
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowIconText: {
-    fontFamily: fontFamily[800],
-    fontSize: 13,
-    letterSpacing: 0.4,
-  },
-  rowTicker: {
+  invRowLabel: {
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  rowSub: {
+  invRowSub: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.1,
     marginTop: 2,
   },
-  rowChart: {
-    width: 60,
-    height: 28,
-    marginRight: 4,
-  },
-  rowValue: {
+  invRowValue: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
   },
-  rowDelta: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 2,
-  },
+
 
   /* Pared 3D de distribución — card vertical: header (eyebrow +
    * total) → SVG con la pared → legend en grid 2 columnas. */
