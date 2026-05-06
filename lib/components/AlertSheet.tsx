@@ -76,9 +76,10 @@ const KEYS = [
 ] as const;
 
 // Shortcuts de variación porcentual respecto al precio actual del
-// activo. Tap → setea threshold = price * (1 + pct/100) y autoflip
-// de dirección según signo (subir si +, bajar si -).
-const QUICK_PCTS = [-25, -10, 10, 25] as const;
+// activo. Tap → setea threshold = price * (1 + pct/100). La dirección
+// (subir/bajar) se infiere del threshold vs precio actual al crear,
+// no la elige el usuario explícitamente.
+const QUICK_PCTS = [-25, -10, -5, 5, 10, 25] as const;
 
 export function AlertSheet({ visible, asset, onClose }: Props) {
   const { c } = useTheme();
@@ -98,7 +99,6 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
   // Form state — se resetea cada vez que se abre la sheet con un
   // activo nuevo (key={asset.ticker} en el padre asegura remount).
   const [threshold, setThreshold] = useState("");
-  const [direction, setDirection] = useState<AlertDirection>("above");
   const [currency, setCurrency] = useState<AssetCurrency>(
     () => assetCurrency(asset),
   );
@@ -110,7 +110,6 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
   useEffect(() => {
     if (visible) {
       setThreshold("");
-      setDirection("above");
       setCurrency(assetCurrency(asset));
       setErrorMsg(null);
     }
@@ -195,6 +194,9 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
       setErrorMsg("Ingresá un precio válido mayor a 0.");
       return;
     }
+    // Dirección derivada del threshold vs precio actual — sin
+    // segmented selector. Empate → 'above' por convención.
+    const direction: AlertDirection = value >= asset.price ? "above" : "below";
     setSubmitting(true);
     try {
       await create({
@@ -269,9 +271,25 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
     if (!isFinite(target) || target <= 0) return;
     const decimals = currency === "USDT" ? 4 : 2;
     setThreshold(target.toFixed(decimals));
-    setDirection(pct >= 0 ? "above" : "below");
     Haptics.selectionAsync().catch(() => {});
   };
+
+  // Splitea el threshold en parte entera (con separador de miles
+  // estilo es-AR) y decimales — para renderear los decimales en
+  // chico/gris al estilo del precio del stock detail.
+  const thresholdParts = (() => {
+    if (!threshold) return { integer: "0", decimals: null as string | null };
+    if (threshold.includes(".")) {
+      const [intRaw, decRaw = ""] = threshold.split(".");
+      const intDisplay =
+        intRaw === "" ? "0" : Number(intRaw).toLocaleString("es-AR");
+      return { integer: intDisplay, decimals: decRaw };
+    }
+    return {
+      integer: Number(threshold).toLocaleString("es-AR"),
+      decimals: null,
+    };
+  })();
 
   /* ─── Render ─── */
 
@@ -356,44 +374,6 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
                 Nueva alerta
               </Text>
 
-              {/* Direction selector */}
-              <View
-                style={[
-                  s.segmented,
-                  { backgroundColor: c.surfaceSunken },
-                ]}
-              >
-                {(["above", "below"] as const).map((d) => {
-                  const active = d === direction;
-                  const label =
-                    d === "above" ? "Cuando suba a" : "Cuando baje a";
-                  return (
-                    <Tap
-                      key={d}
-                      style={[
-                        s.segItem,
-                        active && {
-                          backgroundColor: c.surface,
-                          borderColor: c.border,
-                          borderWidth: StyleSheet.hairlineWidth,
-                        },
-                      ]}
-                      haptic="selection"
-                      onPress={() => setDirection(d)}
-                    >
-                      <Text
-                        style={[
-                          s.segText,
-                          { color: active ? c.text : c.textMuted },
-                        ]}
-                      >
-                        {label}
-                      </Text>
-                    </Tap>
-                  );
-                })}
-              </View>
-
               {/* Display del precio — read-only, alimentado por el
                   keypad in-app de abajo. La pill de moneda queda
                   fija (única opción según mercado del activo). */}
@@ -429,17 +409,29 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
                     ))}
                   </View>
                 </View>
-                <Text
-                  style={[
-                    s.fieldDisplay,
-                    {
-                      color: threshold ? c.text : c.textFaint,
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {threshold ? threshold.replace(".", ",") : "0"}
-                </Text>
+                <View style={s.fieldDisplayRow}>
+                  <Text
+                    style={[
+                      s.fieldDisplayInteger,
+                      {
+                        color: threshold ? c.text : c.textFaint,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {thresholdParts.integer}
+                  </Text>
+                  {thresholdParts.decimals !== null ? (
+                    <Text
+                      style={[
+                        s.fieldDisplayDecimals,
+                        { color: c.textMuted },
+                      ]}
+                    >
+                      ,{thresholdParts.decimals}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
 
               {/* Quick % chips — aplican price * (1 + pct/100) y
@@ -602,23 +594,6 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: "uppercase",
   },
-  segmented: {
-    flexDirection: "row",
-    padding: 4,
-    borderRadius: radius.md,
-    gap: 4,
-  },
-  segItem: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: radius.sm,
-  },
-  segText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
   field: {
     borderWidth: 1,
     borderRadius: radius.md,
@@ -638,10 +613,23 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  fieldDisplay: {
+  fieldDisplayRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  fieldDisplayInteger: {
     fontFamily: fontFamily[700],
     fontSize: 28,
     letterSpacing: -0.6,
+    lineHeight: 30,
+  },
+  fieldDisplayDecimals: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+    lineHeight: 16,
+    marginTop: 4,
+    marginLeft: 1,
   },
   currencyRow: {
     flexDirection: "row",
@@ -649,18 +637,19 @@ const s = StyleSheet.create({
   },
   quickRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
   quickChip: {
     flex: 1,
     paddingVertical: 9,
+    paddingHorizontal: 4,
     alignItems: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
   },
   quickText: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
+    fontSize: 12,
     letterSpacing: -0.1,
   },
   keypad: {
