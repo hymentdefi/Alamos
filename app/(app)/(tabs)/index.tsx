@@ -654,10 +654,9 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* El ActionIcon YA es un squircle con fill brand verde y stroke
-          blanco — no necesita un wrapper de surface adicional como
-          tenía antes (la opcion 'glass' Revolut). El icono mismo
-          es el bloque visual. */}
+      {/* ActionIcon sin fondo — sólo el símbolo en stroke brand verde.
+          Misma lógica que sacar la pill del nav bar: el color y la
+          forma alcanzan, el background se sentía pesado. */}
       <ActionIcon name={iconName} size={51} />
       <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
@@ -776,10 +775,9 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — squircle icons custom (Ingresar/Enviar/
-          Convertir) con verde brand y stroke blanco. El icono YA es
-          la surface; sin wrapper circular como en la versión
-          'Revolut glass' previa. */}
+      {/* Acciones del home — sólo símbolo en stroke verde brand,
+          sin fondo. Coherente con el resto del lenguaje (icons del
+          top-right, dot del reloj, etc.). */}
       <View style={s.actionsRow}>
         <ActionButton
           iconName="ingresar"

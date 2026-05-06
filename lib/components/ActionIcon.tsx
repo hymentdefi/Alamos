@@ -1,14 +1,11 @@
 import { memo } from "react";
-import Svg, { Circle, G, Path } from "react-native-svg";
-import { useTheme } from "../theme";
+import Svg, { G, Path } from "react-native-svg";
 
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir).
  *
- * Set "tint-S" del brand pack: círculo lleno con un tint suave del
- * verde brand (10% en light, 14% en dark) y un símbolo (flecha down /
- * up / arrows-swap) en stroke verde brand de 4px. Sin anillo —
- * delgado en geometría, fuerte en presencia.
+ * Sólo el símbolo en stroke verde brand de 4px sobre transparente —
+ * sin anillo ni fondo tint. Geometría delgada, presencia limpia.
  *
  * Variantes fuente:
  *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
@@ -20,34 +17,21 @@ export type ActionIconName = "ingresar" | "enviar" | "convertir";
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del stroke (símbolo) y base del tint del
-   *  círculo. Default: brand.green canónico (#00C805 — coincide con
-   *  c.brand del theme y con el isotipo del logo). */
+  /** Override del color del stroke. Default: brand.green canónico
+   *  (#00C805 — coincide con c.brand del theme y con el isotipo del
+   *  logo). */
   stroke?: string;
-  /** Override del fill del círculo. Default: tint del stroke a 10%
-   *  en light y 14% en dark. */
-  fill?: string;
 }
 
 const BRAND_GREEN = "#00C805";
-
-/** Tint del fill cuando no se pasa override. Misma RGB que el stroke,
- *  alpha distinto por modo. */
-const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
 
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
   stroke = BRAND_GREEN,
-  fill,
 }: Props) {
-  const { mode } = useTheme();
-  const resolvedFill = fill ?? tintFor(mode);
-
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle cx={32} cy={32} r={32} fill={resolvedFill} />
       <G
         transform="translate(32 32)"
         fill="none"
