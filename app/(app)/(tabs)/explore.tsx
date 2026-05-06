@@ -485,7 +485,7 @@ function MarketBody({
     : isTrendingView
     ? "Destacados del día"
     : isCategoryView
-    ? `Categorías · ${market.label}`
+    ? "Categorías"
     : `Instrumentos · ${market.label}`;
 
   return (
@@ -808,11 +808,12 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    /* Pill estilo Instagram — fully rounded, sin border, fondo gris
-     * sunken un toque más oscuro que el bg para que se distinga sin
-     * necesidad de stroke. Padding vertical compacto. */
+    /* Border-radius alineado con el container del segmented (radius.lg)
+     * para que ambos elementos del header se sientan parte del mismo
+     * sistema visual. Sin border, fondo gris sunken un toque más
+     * oscuro que el bg para que se distinga. Padding vertical compacto. */
     borderCurve: "continuous",
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
