@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,30 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
 import {
   DISCLAIMER_LONG,
   DISCLAIMER_SHORT,
   ALYC,
 } from "../legal/disclaimers";
+
+const DISMISS_TRANSLATE = 110;
+const DISMISS_VELOCITY = 600;
 
 // Mismo verde que usa la pill activa del nav bar (ver app/(app)/(tabs)/_layout.tsx).
 const BRAND_GREEN = "#5ac43e";
@@ -66,6 +81,13 @@ export function DisclaimerFooter({
 
 /* ─── Modal completo accesible desde el ⓘ ─── */
 
+/**
+ * Bottom sheet "Información legal" — mismo patrón que
+ * MarketClosedSheet / EarningsInfoSheet / BalanceInfoSheet:
+ * sin botón de cerrar, se cierra deslizando hacia abajo o
+ * tappeando el backdrop. Animación con Reanimated + GestureDetector
+ * en UI thread (smooth, no JS jank).
+ */
 export function DisclaimerModal({
   visible,
   onClose,
@@ -75,36 +97,115 @@ export function DisclaimerModal({
 }) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { height: windowH } = useWindowDimensions();
+
+  const translateY = useSharedValue(windowH);
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+      });
+      backdropOpacity.value = withTiming(1, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      windowH,
+      { duration: 240, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        "worklet";
+        if (finished) runOnJS(onClose)();
+      },
+    );
+    backdropOpacity.value = withTiming(0, { duration: 240 });
+  };
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+        backdropOpacity.value = Math.max(
+          0,
+          1 - e.translationY / windowH,
+        );
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDismiss =
+        e.translationY > DISMISS_TRANSLATE ||
+        e.velocityY > DISMISS_VELOCITY;
+      if (shouldDismiss) {
+        translateY.value = withTiming(
+          windowH,
+          { duration: 240, easing: Easing.in(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(onClose)();
+          },
+        );
+        backdropOpacity.value = withTiming(0, { duration: 240 });
+      } else {
+        translateY.value = withTiming(0, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+        });
+        backdropOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
       statusBarTranslucent
+      onRequestClose={dismiss}
     >
-      <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View
+      <Animated.View style={[styles.modalBackdrop, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Animated.View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
           style={[
-            styles.modalBody,
-            { backgroundColor: c.bg, paddingBottom: insets.bottom + 20 },
+            styles.sheet,
+            {
+              backgroundColor: c.bg,
+              borderColor: c.border,
+              paddingBottom: insets.bottom + 20,
+            },
+            sheetStyle,
           ]}
         >
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHead}>
-            <Text style={[styles.modalTitle, { color: c.text }]}>
-              Información legal
-            </Text>
-            <Pressable
-              onPress={onClose}
-              hitSlop={10}
-              style={[styles.closeBtn, { backgroundColor: c.surfaceHover }]}
-            >
-              <Feather name="x" size={18} color={c.text} />
-            </Pressable>
+          <View style={styles.grabber}>
+            <View
+              style={[
+                styles.grabberPill,
+                { backgroundColor: c.borderStrong },
+              ]}
+            />
           </View>
+
+          <Text style={[styles.modalTitle, { color: c.text }]}>
+            Información legal
+          </Text>
 
           <ScrollView
             contentContainerStyle={styles.modalContent}
@@ -119,8 +220,8 @@ export function DisclaimerModal({
               {ALYC.name} · Matrícula CNV {ALYC.matricula}
             </Text>
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </GestureDetector>
     </Modal>
   );
 }
@@ -263,18 +364,43 @@ const styles = StyleSheet.create({
     letterSpacing: -0.05,
   },
 
-  /* ── Modal compartido ── */
+  /* ── Sheet shared (DisclaimerModal + DisclaimerOnboarding) ── */
   modalRoot: {
     flex: 1,
     justifyContent: "flex-end",
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   modalBackdropSolid: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.82)",
+  },
+  /* Sheet — mismo geometry que MarketClosedSheet /
+   * EarningsInfoSheet / BalanceInfoSheet. Anclado a bottom,
+   * borderRadius xxl arriba, hairline border. */
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    maxHeight: "88%",
+  },
+  grabber: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  grabberPill: {
+    width: 40,
+    height: 4,
+    borderCurve: "continuous",
+    borderRadius: 2,
   },
   modalBody: {
     borderTopLeftRadius: 24,
@@ -292,29 +418,15 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginTop: 10,
   },
-  modalHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 18,
-    marginBottom: 10,
-  },
   modalTitle: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.6,
-    flex: 1,
-  },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
+    marginTop: 4,
+    marginBottom: 12,
   },
   modalContent: {
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   bodyP: {
     fontFamily: fontFamily[500],
