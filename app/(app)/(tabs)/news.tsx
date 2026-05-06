@@ -616,21 +616,10 @@ function NewsCard({
               const change = TICKER_CHANGE.get(t) ?? null;
               const tone =
                 change == null ? c.text : change >= 0 ? c.positive : c.red;
-              // Bg tinted del mismo tono que el texto pero a 8% — el
-              // chip entero comunica el estado (verde si up, rojo si
-              // down), con el contenido en el mismo hue saturado.
-              // Coherente con cómo el AlertSheet trabaja la
-              // direccionalidad cromática.
-              const pillBg =
-                change == null
-                  ? c.surfaceHover
-                  : change >= 0
-                  ? c.positiveDim
-                  : c.redDim;
               return (
                 <View
                   key={t}
-                  style={[card.tickerPill, { backgroundColor: pillBg }]}
+                  style={[card.tickerPill, { borderColor: c.border }]}
                 >
                   <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
                   {change != null ? (
@@ -752,12 +741,11 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Tint brand verde más denso que los ActionIcon del Home
-            // (~18% vs 5%) — la pill flota sobre hero images de las
-            // noticias y necesita presencia para no perderse contra
-            // un fondo claro. El texto y el chevron en brand verde
-            // hacen el resto.
-            backgroundColor: "rgba(0,200,5,0.18)",
+            // Ink bg — alto contraste contra cualquier hero image
+            // (clara u oscura), con el contenido en brand verde
+            // adentro. Premium, distinctivo, lenguaje de logo
+            // (verde sobre ink es la base del brand kit).
+            backgroundColor: c.ink,
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -923,17 +911,8 @@ function DetailSheet({
                           : change >= 0
                           ? "#00A304"
                           : "#C83B3B";
-                      const pillBg =
-                        change == null
-                          ? "rgba(14,15,12,0.08)"
-                          : change >= 0
-                          ? "rgba(0,163,4,0.14)"
-                          : "rgba(200,59,59,0.14)";
                       return (
-                        <View
-                          key={t}
-                          style={[sheet.tickerPill, { backgroundColor: pillBg }]}
-                        >
+                        <View key={t} style={sheet.tickerPill}>
                           <Text style={[sheet.tickerText, { color: tone }]}>
                             {t}
                           </Text>
@@ -1086,6 +1065,7 @@ const card = StyleSheet.create({
     paddingVertical: 4,
     borderCurve: "continuous",
     borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   tickerText: {
     fontFamily: fontFamily[700],
@@ -1239,6 +1219,8 @@ const sheet = StyleSheet.create({
     paddingVertical: 5,
     borderCurve: "continuous",
     borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(14,15,12,0.18)",
   },
   tickerText: {
     fontFamily: fontFamily[700],
