@@ -257,19 +257,25 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
       >
         <View style={s.heroBlock}>
-          <View style={s.heroTickerRow}>
-            <Text style={[s.heroTicker, { color: c.textMuted }]}>
-              {asset.ticker}
-            </Text>
-            {/* Icono de mercado cerrado — sólo aparece cuando aplica
-                (no en crypto / FCI). Tap → abre MarketClosedSheet. */}
-            <MarketClosedIcon session={marketSessionFor(asset)} size={20} />
-          </View>
+          <Text style={[s.heroTicker, { color: c.textMuted }]}>
+            {asset.ticker}
+          </Text>
           <Text style={[s.heroName, { color: c.text }]} numberOfLines={2}>
             {asset.name}
           </Text>
-          <View style={{ marginTop: 12 }}>
+          <View style={s.heroPriceRow}>
             <AmountDisplay value={current} size={52} currency={cur} />
+            {/* Icono de mercado cerrado — sólo aparece cuando aplica
+                (no en crypto / FCI). Toma el color del estado cromático
+                del chart (verde si rangeUp, rojo si losses). Tap →
+                abre MarketClosedSheet. */}
+            <View style={s.heroPriceBadge}>
+              <MarketClosedIcon
+                session={marketSessionFor(asset)}
+                size={22}
+                color={color}
+              />
+            </View>
           </View>
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color }]}>{displayUp ? "▲" : "▼"}</Text>
@@ -1836,10 +1842,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 12,
   },
-  heroTickerRow: {
+  heroPriceRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 12,
+  },
+  heroPriceBadge: {
+    /* Alineado verticalmente con la base de los decimales del
+       AmountDisplay — el integer es 52px pero los decimales viven
+       arriba a la derecha. ~14px de margin top deja el icono junto
+       a los decimales/sufijo, leído como un complemento del precio
+       y no como algo flotando arriba. */
+    marginTop: 14,
   },
   heroTicker: {
     fontFamily: fontFamily[700],

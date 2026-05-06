@@ -15,6 +15,10 @@ interface Props {
   instrumentLabel?: string;
   /** Tamaño del icono SVG en px. Default 22. */
   size?: number;
+  /** Color del stroke del reloj. Default brand.green. Permite que el
+   *  icono se acomode al estado cromático contextual (ej: rojo cuando
+   *  el chart del activo está en losses). El dot ámbar no cambia. */
+  color?: string;
 }
 
 /**
@@ -34,6 +38,7 @@ export function MarketClosedIcon({
   session,
   instrumentLabel,
   size = 22,
+  color,
 }: Props) {
   const { mode } = useTheme();
   const [open, setOpen] = useState(false);
@@ -41,6 +46,7 @@ export function MarketClosedIcon({
   if (session.open) return null;
 
   const dotBorder = mode === "dark" ? "#0E0F0C" : "#FFFFFF";
+  const stroke = color ?? brand.green;
 
   return (
     <View>
@@ -57,7 +63,7 @@ export function MarketClosedIcon({
           <G
             transform="translate(0 2)"
             fill="none"
-            stroke={brand.green}
+            stroke={stroke}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
