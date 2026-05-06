@@ -77,22 +77,21 @@ import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
 
-type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
+type Range = "1D" | "1S" | "1M" | "3M" | "1A" | "MAX";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
 
-const ranges: Range[] = ["live", "1H", "1D", "1S", "1M", "3M", "YTD"];
+const ranges: Range[] = ["1D", "1S", "1M", "3M", "1A", "MAX"];
 
 /** Variación % por rango — determina el trend y color del chart. */
 const rangeChanges: Record<Range, number> = {
-  live: 0.08,
-  "1H": 0.42,
   "1D": 1.96,
   "1S": 3.24,
   "1M": -2.1,
   "3M": 8.45,
-  YTD: 15.3,
+  "1A": 14.6,
+  MAX: 32.8,
 };
 
 export default function HomeScreen() {
@@ -279,16 +278,6 @@ function BaseHome() {
   // chart del período (la serie de puntos se genera en base a este).
   const total = arsTotal + usdTotal * USD_RATE + usdtTotal * USD_RATE;
 
-  // Tick para el modo Live: cada ~3s rotamos el seed y forzamos
-  // re-render para que el chart "respire" y el último punto se mueva.
-  // Solo corre cuando estás en Inicio + range==="live" — pausa al
-  // cambiar de tab o de rango para no quemar batería.
-  const [liveTick, setLiveTick] = useState(0);
-  useEffect(() => {
-    if (range !== "live" || !isFocused) return;
-    const id = setInterval(() => setLiveTick((t) => t + 1), 3000);
-    return () => clearInterval(id);
-  }, [range, isFocused]);
 
   const series = useMemo(() => {
     // Cuando "considerar movimientos" está apagado, el chart sólo
@@ -299,39 +288,9 @@ function BaseHome() {
     // realidad del balance.
     const ampMult = considerCashflow ? 1 : 0.55;
     const seedSuffix = considerCashflow ? "" : "-pure";
-    const seed =
-      range === "live"
-        ? `home-live-${liveTick}${seedSuffix}`
-        : `home-${range}${seedSuffix}`;
+    const seed = `home-${range}${seedSuffix}`;
     return generateSeries(total, rangeChanges[range] * ampMult, seed);
-  }, [total, range, liveTick, considerCashflow]);
-
-  // Pulse continuo del puntito de Live — corre solo cuando hace falta.
-  const livePulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (range !== "live") {
-      livePulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(livePulse, {
-          toValue: 0.35,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(livePulse, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [range, livePulse]);
+  }, [total, range, considerCashflow]);
 
   // Respiración del botón de regalo: scale 1 → 1.10 → 1 con pausa de 1.5s
   // entre breaths. Suficiente para llamar la atención sin distraer.
@@ -359,16 +318,7 @@ function BaseHome() {
     return () => loop.stop();
   }, [isFocused, giftPulse]);
 
-  // En modo live, el % no es constante — oscila por liveTick para
-  // simular movimiento real de mercado (a veces sube, a veces baja).
-  // El chartColor sigue este pct, así que en ticks "rojos" la línea
-  // y el delta del hero se vuelven rojos en tiempo real.
-  const livePct = useMemo(() => {
-    // Pseudo random walk determinístico: combina dos sinusoides de
-    // frecuencias distintas para no ser predecible. Rango ~ ±0.6%.
-    return Math.sin(liveTick * 1.7) * 0.45 + Math.sin(liveTick * 0.4) * 0.18;
-  }, [liveTick]);
-  const rangePct = range === "live" ? livePct : rangeChanges[range];
+  const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.greenDark : c.red;
   // Color del trazo del chart + timeline: usa el verde-action (mismo
@@ -601,23 +551,9 @@ function BaseHome() {
               {formatPct(displayPct)}
             </Text>
             <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-            {range === "live" && scrubIndex == null ? (
-              <View style={s.liveLabelInline}>
-                <Animated.View
-                  style={[
-                    s.liveDot,
-                    { backgroundColor: trendColor, opacity: livePulse },
-                  ]}
-                />
-                <Text style={[s.timeLabel, { color: c.textMuted }]}>
-                  en vivo
-                </Text>
-              </View>
-            ) : (
-              <Text style={[s.timeLabel, { color: c.textMuted }]}>
-                {timeLabel}
-              </Text>
-            )}
+            <Text style={[s.timeLabel, { color: c.textMuted }]}>
+              {timeLabel}
+            </Text>
           </View>
 
           <View style={[s.chartWrap, { marginTop: 18 }]}>
@@ -627,7 +563,6 @@ function BaseHome() {
               height={300}
               withFill={false}
               sheen
-              live={range === "live"}
               referenceLine={referenceLine}
               strokeWidth={1}
               mode={smoothChart ? "line" : "step"}
@@ -654,7 +589,7 @@ function BaseHome() {
                   hitSlop={8}
                 >
                   <Text style={[s.rangeText, { color: fg }]}>
-                    {r === "live" ? "LIVE" : r}
+                    {r}
                   </Text>
                 </Pressable>
               );
@@ -763,10 +698,6 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
 
 function rangeSubtitle(r: Range): string {
   switch (r) {
-    case "live":
-      return "en vivo";
-    case "1H":
-      return "última hora";
     case "1D":
       return "hoy";
     case "1S":
@@ -774,27 +705,17 @@ function rangeSubtitle(r: Range): string {
     case "1M":
       return "este mes";
     case "3M":
-      return "3 meses";
-    case "YTD":
-      return "en el año";
+      return "últimos 3 meses";
+    case "1A":
+      return "último año";
+    case "MAX":
+      return "histórico";
   }
 }
 
 function indexLabel(r: Range, index: number, length: number): string {
   const t = 1 - index / (length - 1);
   switch (r) {
-    case "live": {
-      const s = Math.round(t * 60);
-      if (s === 0) return "ahora";
-      if (s === 1) return "hace 1s";
-      return `hace ${s}s`;
-    }
-    case "1H": {
-      const m = Math.round(t * 60);
-      if (m === 0) return "ahora";
-      if (m === 1) return "hace 1m";
-      return `hace ${m}m`;
-    }
     case "1D": {
       const h = Math.round(t * 24);
       if (h === 0) return "ahora";
@@ -815,15 +736,17 @@ function indexLabel(r: Range, index: number, length: number): string {
     case "3M": {
       const w = Math.round(t * 13);
       if (w === 0) return "hoy";
-      if (w === 1) return "hace 1 sem";
       return `hace ${w} sem`;
     }
-    case "YTD": {
-      // Hoy es abril, así que 0-3 meses atrás cubren el YTD.
-      const m = Math.round(t * 4);
+    case "1A": {
+      const m = Math.round(t * 12);
       if (m === 0) return "hoy";
-      if (m === 1) return "hace 1 mes";
       return `hace ${m} meses`;
+    }
+    case "MAX": {
+      const y = Math.round(t * 5);
+      if (y === 0) return "este año";
+      return `hace ${y} años`;
     }
   }
 }
@@ -1747,37 +1670,25 @@ const s = StyleSheet.create({
     marginTop: 0,
     paddingHorizontal: 4,
   },
+  /* Range pills clavadas al estilo del stock detail — pill fully
+   * rounded (radius.pill), padding 16/8, text 13 con ls 0.3.
+   * Cuando active, fondo del chartColor y texto en c.bg. */
   rangePill: {
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    /* radius.md (12) en vez de radius.pill (999) — menos cápsula,
-     * más editorial. Las pills 100% redondeadas se sentían genéricas. */
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderCurve: "continuous",
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
   rangeSettingsBtn: {
-    /* Mismos paddings que rangePill para que el gear se alinee al
-     * baseline de los textos del timeline. */
     paddingHorizontal: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   rangeText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.4,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderCurve: "continuous",
-    borderRadius: 3,
-  },
-  liveLabelInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
   row: {
     flexDirection: "row",
