@@ -14,11 +14,9 @@ import Svg, {
   Polygon,
   Text as SvgText,
 } from "react-native-svg";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   FadeInDown,
   FadeOutUp,
-  runOnJS,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -498,41 +496,23 @@ function AllocationBrick({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pan que activa al toque (minDistance 0). Para no robar el
-  // scroll vertical del ScrollView padre usamos failOffsetY:
-  // si el dedo se mueve más de 10px en Y, la Pan FALLA y el
-  // scroll toma el control. handleTouch es estable, así que la
-  // gesture se construye una sola vez — sin rebuilds mid-press.
+  // Tracking del touch via responders nativos de RN. Después de
+  // dos intentos con RNGH (Pan con activateAfterLongPress, después
+  // con failOffsetY) el highlight quedaba stuck en algunas
+  // condiciones — los workers de gesture-handler son async via
+  // runOnJS y el ciclo de vida no siempre cerraba limpio.
   //
-  // No usamos activateAfterLongPress porque tenía un estado
-  // ambiguo en taps cortos (60-100ms): el gesture activaba pero
-  // onEnd a veces no disparaba porque la Pan técnicamente "no se
-  // había movido", dejando el highlight stuck. Con minDistance(0)
-  // + failOffsetY el ciclo END / FINALIZE siempre cierra limpio.
-  const panGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .minDistance(0)
-        .failOffsetY([-10, 10])
-        // onBegin SIEMPRE dispara al primer touch, independiente
-        // del estado del gesture. onFinalize SIEMPRE dispara al
-        // terminar (sea END, CANCELLED o FAILED). Con esos dos
-        // garantizamos que el highlight aparece y desaparece sin
-        // importar cómo se haya cortado el gesto.
-        .onBegin((e) => {
-          "worklet";
-          runOnJS(handleTouch)(e.x);
-        })
-        .onUpdate((e) => {
-          "worklet";
-          runOnJS(handleTouch)(e.x);
-        })
-        .onFinalize(() => {
-          "worklet";
-          runOnJS(handleTouch)(null);
-        }),
-    [handleTouch],
-  );
+  // Los responder events de RN corren sincrónicos en JS thread:
+  // onResponderGrant garantiza set del highlight, onResponderRelease
+  // y onResponderTerminate garantizan el clear. No hay forma de
+  // que se quede colgado.
+  //
+  // onResponderTerminationRequest=false impide que el ScrollView
+  // padre robe el touch mid-press (sino el highlight quedaría
+  // stuck si el scroll lo capturaba). Como el ladrillo ocupa ~150
+  // px de alto, el usuario puede scrollear desde arriba o abajo
+  // sin tocar el chart — UX aceptable.
+  const startTouchY = useRef(0);
 
   const dimmedFront = c.surfaceSunken;
   const dimmedTop = c.surfaceHover;
@@ -685,7 +665,30 @@ function AllocationBrick({
       </View>
 
       <View style={s.brickWrap}>
-        <GestureDetector gesture={panGesture}>
+        <View
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => false}
+          onResponderGrant={(e) => {
+            startTouchY.current = e.nativeEvent.locationY;
+            handleTouch(e.nativeEvent.locationX);
+          }}
+          onResponderMove={(e) => {
+            // Si el dedo se mueve más de 12px en Y, el usuario
+            // está intentando scrollear → soltamos el highlight
+            // pero seguimos siendo responder (RN no puede pasar
+            // el responder al ScrollView una vez agarrado).
+            const dy = Math.abs(
+              e.nativeEvent.locationY - startTouchY.current,
+            );
+            if (dy > 12) {
+              handleTouch(null);
+            } else {
+              handleTouch(e.nativeEvent.locationX);
+            }
+          }}
+          onResponderRelease={() => handleTouch(null)}
+          onResponderTerminate={() => handleTouch(null)}
+        >
           <View>
             <Svg
               viewBox={`0 0 ${W} ${H}`}
@@ -789,7 +792,7 @@ function AllocationBrick({
               </G>
             </Svg>
           </View>
-        </GestureDetector>
+        </View>
 
         {/* Tooltip — pop con FadeInDown. Posición absoluta centrada
             sobre el bloque activo. pointerEvents none para no robar
