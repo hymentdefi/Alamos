@@ -610,19 +610,16 @@ function NewsCard({
           <View style={card.tickerRow}>
             {item.tickers.map((t) => {
               const change = TICKER_CHANGE.get(t) ?? null;
+              const tone =
+                change == null ? c.text : change >= 0 ? c.positive : c.red;
               return (
                 <View
                   key={t}
                   style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
                 >
-                  <Text style={[card.tickerText, { color: c.text }]}>{t}</Text>
+                  <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
                   {change != null ? (
-                    <Text
-                      style={[
-                        card.tickerChange,
-                        { color: change >= 0 ? c.positive : c.red },
-                      ]}
-                    >
+                    <Text style={[card.tickerChange, { color: tone }]}>
                       {formatPct(change)}
                     </Text>
                   ) : null}
@@ -892,18 +889,20 @@ function DetailSheet({
                   <View style={sheet.tickersRow}>
                     {item.tickers.map((t) => {
                       const change = TICKER_CHANGE.get(t) ?? null;
+                      const tone =
+                        change == null
+                          ? "#0E0F0C"
+                          : change >= 0
+                          ? "#00A304"
+                          : "#C83B3B";
                       return (
                         <View key={t} style={sheet.tickerPill}>
-                          <Text style={sheet.tickerText}>{t}</Text>
+                          <Text style={[sheet.tickerText, { color: tone }]}>
+                            {t}
+                          </Text>
                           {change != null ? (
                             <Text
-                              style={[
-                                sheet.tickerChange,
-                                {
-                                  color:
-                                    change >= 0 ? "#00A304" : "#C83B3B",
-                                },
-                              ]}
+                              style={[sheet.tickerChange, { color: tone }]}
                             >
                               {formatPct(change)}
                             </Text>
@@ -1193,7 +1192,6 @@ const sheet = StyleSheet.create({
     borderRadius: radius.sm,
   },
   tickerText: {
-    color: "#0E0F0C",
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.2,
