@@ -348,12 +348,9 @@ function BaseExplore() {
 
         <View style={s.searchRow}>
           <View
-            style={[
-              s.searchBox,
-              { backgroundColor: c.surfaceHover, borderColor: c.border },
-            ]}
+            style={[s.searchBox, { backgroundColor: c.surfaceSunken }]}
           >
-            <MagnifyIcon size={20} color={c.textMuted} strokeWidth={3} />
+            <MagnifyIcon size={18} color={c.textMuted} strokeWidth={2.4} />
             <TextInput
               ref={searchInputRef}
               style={[s.searchInput, { color: c.text }]}
@@ -952,14 +949,13 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderWidth: 1,
-    /* Bordes menos redondeados (era radius.pill ≈ 999): pasa a md
-     * para que el rectángulo se sienta más estructurado, estilo iOS
-     * search. */
+    /* Pill estilo Instagram — fully rounded, sin border, fondo gris
+     * sunken un toque más oscuro que el bg para que se distinga sin
+     * necesidad de stroke. Padding vertical compacto. */
     borderCurve: "continuous",
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   searchInput: {
     flex: 1,
