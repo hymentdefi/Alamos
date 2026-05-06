@@ -37,8 +37,8 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
-import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
@@ -258,7 +258,6 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [activeTab, setActiveTab] = useState(0);
   const [detail, setDetail] = useState<NewsItem | null>(null);
@@ -335,16 +334,21 @@ export default function NewsScreen() {
     return pageRefSetters.current[tabId];
   }, []);
 
-  // Tap en la tab Noticias solo si YA estoy en Noticias → scroll top + refresh
+  // Tap-on-active-tab en Noticias: scroll-to-top de la página
+  // visible (la FlatList del tab category activa). El refresh
+  // como metáfora no aplica acá — el feed es paginado por
+  // cards, no un listado scrolleable de un servicio refrescable.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      const currentId = categoryTabs[activeTab].id;
-      const ref = pageListRefs.current[currentId];
-      ref?.scrollToOffset({ offset: 0, animated: true });
+    return registerTabTap("news", {
+      isAtTop: () => false, // siempre scroll-to-top, nunca refresh
+      scrollToTop: () => {
+        const currentId = categoryTabs[activeTab].id;
+        const ref = pageListRefs.current[currentId];
+        ref?.scrollToOffset({ offset: 0, animated: true });
+      },
+      refresh: () => {},
     });
-    return unsub;
-  }, [navigation, isFocused, activeTab]);
+  }, [activeTab]);
 
   return (
     <View style={[s.root, { backgroundColor: c.bgWarm }]}>

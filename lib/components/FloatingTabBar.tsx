@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
+import { dispatchActiveTabTap } from "../tabs/activeTap";
 
 const BAR_CONTENT_HEIGHT = 68;
 const ACTIVE_COLOR = "#5ac43e";
@@ -72,7 +73,15 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
 
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.selectionAsync().catch(() => {});
-    if (index === activeIndex) return;
+    // Si tappeás la tab que YA está activa: scroll-to-top, y si
+    // ya estás en el top, trigger refresh. Hay un registry global
+    // (lib/tabs/activeTap) donde cada screen se cuelga con sus
+    // handlers — el dispatcher decide qué llamar según el estado
+    // de scroll.
+    if (index === activeIndex) {
+      dispatchActiveTabTap(route.name);
+      return;
+    }
     router.navigate(route.href as never);
   };
 

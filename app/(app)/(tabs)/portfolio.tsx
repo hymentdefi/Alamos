@@ -34,6 +34,7 @@ import {
 } from "../../../lib/data/assets";
 import { convertAmount } from "../../../lib/data/accounts";
 import { GlassCard } from "../../../lib/components/GlassCard";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
@@ -123,12 +124,35 @@ export default function PortfolioScreen() {
 
   /* ─── Handlers ──────────────────────────────────────────────── */
 
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Mock — en MOCK_MODE no hay nada que hacer; simulamos el delay.
-    setTimeout(() => setRefreshing(false), 700);
+    // 1100ms para que el spinner del RefreshControl se sienta bien
+    // smooth, ni muy snappy ni muy lento.
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
+    }, 1100);
   }, []);
+
+  // Tap-on-active-tab: scroll al tope si no estoy arriba, o
+  // refresh si ya estoy. Mismo patrón que Inicio.
+  useEffect(() => {
+    return registerTabTap("portfolio", {
+      isAtTop: () => scrollYRef.current <= 8,
+      scrollToTop: () =>
+        scrollRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {
+        if (!refreshing) onRefresh();
+      },
+    });
+  }, [refreshing, onRefresh]);
 
   /* ─── Render ────────────────────────────────────────────────── */
 
@@ -148,8 +172,13 @@ export default function PortfolioScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
+        onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

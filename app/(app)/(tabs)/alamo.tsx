@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Linking,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
 } from "react-native";
-import { useRouter, useNavigation } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -24,22 +25,38 @@ const APP_VERSION = "v1.0.0";
 export default function AlamoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
-  const isFocused = useIsFocused();
   const { c, pref } = useTheme();
   const { user, logout } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [pushEnabled, setPushEnabled] = useState(true);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
+    }, 1100);
+  }, []);
+
+  // Tap-on-active-tab: scroll al tope si no estoy arriba; refresh
+  // si ya estoy. Mismo patrón que el resto de las tabs.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    return registerTabTap("alamo", {
+      isAtTop: () => scrollYRef.current <= 8,
+      scrollToTop: () =>
+        scrollRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {
+        if (!refreshing) onRefresh();
+      },
     });
-    return unsub;
-  }, [navigation, isFocused]);
+  }, [refreshing, onRefresh]);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
   const fullName = user?.fullName ?? firstName;
@@ -90,6 +107,16 @@ export default function AlamoScreen() {
           paddingBottom: 220,
         }}
         showsVerticalScrollIndicator={false}
+        onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
       >
         {/* ── Sección 1: cuenta ── */}
         <View style={s.group}>

@@ -12,7 +12,8 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { useNavigation, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
@@ -105,7 +106,6 @@ function BaseHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, mode } = useTheme();
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
   const { hasUnread } = useNotifications();
@@ -229,19 +229,21 @@ function BaseHome() {
   );
 
   // Tap sobre la tab Inicio estando en Inicio:
-  //   · si no estoy arriba → scroll al tope
-  //   · si ya estoy arriba → disparar refresh (con animación de pull-to-refresh)
+  //   · si no estoy arriba → scroll al tope (smooth)
+  //   · si ya estoy arriba → disparar refresh (RefreshControl con
+  //     animación nativa de pull-to-refresh, 1100ms de spinner)
+  // El registry vive en lib/tabs/activeTap; FloatingTabBar lo
+  // dispatcha cuando detecta tap-sobre-active.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      if (scrollYRef.current > 8) {
-        scrollRef.current?.scrollTo({ y: 0, animated: true });
-      } else if (!refreshing) {
-        onRefresh();
-      }
+    return registerTabTap("index", {
+      isAtTop: () => scrollYRef.current <= 8,
+      scrollToTop: () =>
+        scrollRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {
+        if (!refreshing) onRefresh();
+      },
     });
-    return unsub;
-  }, [navigation, isFocused, refreshing, onRefresh]);
+  }, [refreshing, onRefresh]);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   // Portfolios separados por moneda nativa del activo. No convertimos —

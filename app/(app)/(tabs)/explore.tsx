@@ -3,13 +3,14 @@ import {
   View,
   Text,
   TextInput,
+  RefreshControl,
   ScrollView,
   Pressable,
   StyleSheet,
   Animated,
 } from "react-native";
-import { useNavigation, useRouter } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Feather,
@@ -116,8 +117,19 @@ function BaseExplore() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { isFavorite } = useFavorites();
-  const navigation = useNavigation();
-  const isFocused = useIsFocused();
+  const scrollYRef = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
+    }, 1100);
+  }, []);
 
   const [query, setQuery] = useState("");
   const [activeMarketIdx, setActiveMarketIdx] = useState(0);
@@ -249,14 +261,18 @@ function BaseExplore() {
     listRef.current?.scrollTo({ y: 0, animated: false });
   }, []);
 
-  // Tap sobre la tab Mercado estando en Mercado → scroll al tope
+  // Tap-on-active-tab: scroll al tope si no estoy arriba; refresh
+  // si ya estoy. Mismo patrón que Inicio / Portfolio.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      listRef.current?.scrollTo({ y: 0, animated: true });
+    return registerTabTap("explore", {
+      isAtTop: () => scrollYRef.current <= 8,
+      scrollToTop: () =>
+        listRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {
+        if (!refreshing) onRefresh();
+      },
     });
-    return unsub;
-  }, [navigation, isFocused]);
+  }, [refreshing, onRefresh]);
 
   return (
     <View style={[s.root, { backgroundColor: c.bgWarm }]}>
@@ -389,6 +405,11 @@ function BaseExplore() {
         listRef={(r) => {
           listRef.current = r;
         }}
+        onScrollY={(y) => {
+          scrollYRef.current = y;
+        }}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
     </View>
   );
@@ -405,6 +426,9 @@ function MarketBody({
   onOpen,
   isFavorite,
   listRef,
+  onScrollY,
+  refreshing,
+  onRefresh,
 }: {
   market: MarketTab;
   query: string;
@@ -413,6 +437,9 @@ function MarketBody({
   onOpen: (a: Asset) => void;
   isFavorite: (t: string) => boolean;
   listRef: (ref: ScrollView | null) => void;
+  onScrollY: (y: number) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }) {
   const { c } = useTheme();
   const router = useRouter();
@@ -494,6 +521,14 @@ function MarketBody({
       contentContainerStyle={{ paddingBottom: 180 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      onScroll={(e) => onScrollY(e.nativeEvent.contentOffset.y)}
+      scrollEventThrottle={16}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      }
     >
       <View style={s.listBlock}>
         <View style={s.sectionHead}>
