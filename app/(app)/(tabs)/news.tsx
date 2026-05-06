@@ -635,34 +635,22 @@ function NewsCard({
           <View style={card.tickerRow}>
             {item.tickers.map((t) => {
               const change = TICKER_CHANGE.get(t) ?? null;
-              const tone =
-                change == null ? c.text : change >= 0 ? c.brand : c.red;
-              // Mismo lenguaje que las pills de categoría: outline
-              // 1.5px del tone + tint 6% adentro. El chip entero
-              // comunica el estado del activo (verde si up, rojo
-              // si down) sin ser un bloque solid.
-              const tint =
-                change == null
-                  ? "transparent"
-                  : change >= 0
-                  ? "rgba(0,200,5,0.06)"
-                  : "rgba(235,93,42,0.06)";
+              // El ticker queda en color neutro (c.text) — el
+              // tone direccional sólo lo lleva la variación. Sin
+              // borde ni fill: el chip se reduce a su contenido,
+              // alineado con el resto del card.
               return (
-                <View
-                  key={t}
-                  style={[
-                    card.tickerPill,
-                    {
-                      backgroundColor: tint,
-                      borderColor:
-                        change == null ? c.border : tone,
-                      borderWidth: 1.5,
-                    },
-                  ]}
-                >
-                  <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
+                <View key={t} style={card.tickerPill}>
+                  <Text style={[card.tickerText, { color: c.text }]}>
+                    {t}
+                  </Text>
                   {change != null ? (
-                    <Text style={[card.tickerChange, { color: tone }]}>
+                    <Text
+                      style={[
+                        card.tickerChange,
+                        { color: change >= 0 ? c.brand : c.red },
+                      ]}
+                    >
                       {change >= 0 ? "▲ " : "▼ "}
                       {formatPct(change, false)}
                     </Text>
@@ -769,13 +757,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Mismo lenguaje que las pills de categoría y los
-            // chips de ticker: outline brand 1.5px + tint 6%
-            // adentro + texto/chevron en c.brand. El frame queda
-            // coherente con el resto del header de Noticias.
+            // Tint brand verde sutil (6%) sin borde — el texto y
+            // el chevron en c.brand cargan el peso cromático, el
+            // fondo apenas insinúa el frame sin gritar.
             backgroundColor: "rgba(0,200,5,0.06)",
-            borderColor: c.brand,
-            borderWidth: 1.5,
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -1092,10 +1077,7 @@ const card = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
+    paddingVertical: 2,
   },
   tickerText: {
     fontFamily: fontFamily[700],
