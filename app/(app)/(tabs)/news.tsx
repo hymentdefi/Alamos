@@ -48,6 +48,10 @@ import {
   DisclaimerShort,
 } from "../../../lib/components/Disclaimer";
 import { assets, formatPct } from "../../../lib/data/assets";
+import {
+  MiniSparkline,
+  seriesFromSeed,
+} from "../../../lib/components/Sparkline";
 import { useLegalConsent } from "../../../lib/legal/context";
 import {
   HorizontalPager,
@@ -612,16 +616,40 @@ function NewsCard({
               const change = TICKER_CHANGE.get(t) ?? null;
               const tone =
                 change == null ? c.text : change >= 0 ? c.positive : c.red;
+              // Bg tinted del mismo tono que el texto pero a 8% — el
+              // chip entero comunica el estado (verde si up, rojo si
+              // down), con el contenido en el mismo hue saturado.
+              // Coherente con cómo el AlertSheet trabaja la
+              // direccionalidad cromática.
+              const pillBg =
+                change == null
+                  ? c.surfaceHover
+                  : change >= 0
+                  ? c.positiveDim
+                  : c.redDim;
               return (
                 <View
                   key={t}
-                  style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
+                  style={[card.tickerPill, { backgroundColor: pillBg }]}
                 >
                   <Text style={[card.tickerText, { color: tone }]}>{t}</Text>
                   {change != null ? (
-                    <Text style={[card.tickerChange, { color: tone }]}>
-                      {formatPct(change)}
-                    </Text>
+                    <>
+                      <Text style={[card.tickerChange, { color: tone }]}>
+                        {formatPct(change)}
+                      </Text>
+                      <MiniSparkline
+                        series={seriesFromSeed(
+                          t,
+                          24,
+                          change >= 0 ? "up" : "down",
+                        )}
+                        color={tone}
+                        width={28}
+                        height={12}
+                        strokeWidth={1.4}
+                      />
+                    </>
                   ) : null}
                 </View>
               );
@@ -895,17 +923,39 @@ function DetailSheet({
                           : change >= 0
                           ? "#00A304"
                           : "#C83B3B";
+                      const pillBg =
+                        change == null
+                          ? "rgba(14,15,12,0.08)"
+                          : change >= 0
+                          ? "rgba(0,163,4,0.14)"
+                          : "rgba(200,59,59,0.14)";
                       return (
-                        <View key={t} style={sheet.tickerPill}>
+                        <View
+                          key={t}
+                          style={[sheet.tickerPill, { backgroundColor: pillBg }]}
+                        >
                           <Text style={[sheet.tickerText, { color: tone }]}>
                             {t}
                           </Text>
                           {change != null ? (
-                            <Text
-                              style={[sheet.tickerChange, { color: tone }]}
-                            >
-                              {formatPct(change)}
-                            </Text>
+                            <>
+                              <Text
+                                style={[sheet.tickerChange, { color: tone }]}
+                              >
+                                {formatPct(change)}
+                              </Text>
+                              <MiniSparkline
+                                series={seriesFromSeed(
+                                  t,
+                                  28,
+                                  change >= 0 ? "up" : "down",
+                                )}
+                                color={tone}
+                                width={34}
+                                height={14}
+                                strokeWidth={1.4}
+                              />
+                            </>
                           ) : null}
                         </View>
                       );
@@ -1185,7 +1235,6 @@ const sheet = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(14,15,12,0.08)",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderCurve: "continuous",
