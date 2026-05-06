@@ -118,7 +118,7 @@ function DrawingSegment({
     <AnimatedPath
       d={d}
       stroke={color}
-      strokeWidth={3.25}
+      strokeWidth={2.75}
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
