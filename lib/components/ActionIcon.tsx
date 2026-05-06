@@ -5,10 +5,10 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir).
  *
- * Anillo hairline en `c.border` (sin fill) + símbolo en stroke verde
- * brand de 4px adentro. El ring define el touch target y le da
- * tactility al botón sin meter el color tint que se sentía pesado.
- * Vibe ghost-button refinado.
+ * Círculo lleno con un tint suave del verde brand (10% en light,
+ * 14% en dark) y símbolo en stroke brand de 4px adentro. Sin anillo
+ * — el tint hace de surface y le da peso al botón sin sentirse
+ * pesado.
  *
  * Variantes fuente:
  *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
@@ -28,25 +28,18 @@ interface Props {
 
 const BRAND_GREEN = "#00C805";
 
+const tintFor = (mode: "light" | "dark") =>
+  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
+
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
   stroke = BRAND_GREEN,
 }: Props) {
-  const { c } = useTheme();
+  const { mode } = useTheme();
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      {/* Ring del frame — strokeWidth 1.5 en viewBox units (~1.2px en
-          pantalla a size=51) para que se sienta hairline pero presente.
-          r=31.25 deja medio stroke adentro para no clipear. */}
-      <Circle
-        cx={32}
-        cy={32}
-        r={31.25}
-        fill="none"
-        stroke={c.border}
-        strokeWidth={1.5}
-      />
+      <Circle cx={32} cy={32} r={32} fill={tintFor(mode)} />
       <G
         transform="translate(32 32)"
         fill="none"

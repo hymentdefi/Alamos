@@ -654,9 +654,9 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* ActionIcon sin fondo — sólo el símbolo en stroke brand verde.
-          Misma lógica que sacar la pill del nav bar: el color y la
-          forma alcanzan, el background se sentía pesado. */}
+      {/* ActionIcon = círculo lleno con tint brand verde + símbolo
+          stroke brand adentro. El tint hace de surface; sin wrapper
+          adicional. */}
       <ActionIcon name={iconName} size={51} />
       <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
@@ -775,9 +775,9 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — sólo símbolo en stroke verde brand,
-          sin fondo. Coherente con el resto del lenguaje (icons del
-          top-right, dot del reloj, etc.). */}
+      {/* Acciones del home — círculo brand verde tinted + símbolo en
+          stroke brand adentro. El tint le da peso de botón sin
+          competir con el resto del Home. */}
       <View style={s.actionsRow}>
         <ActionButton
           iconName="ingresar"
