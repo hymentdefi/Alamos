@@ -279,15 +279,32 @@ export default function DetailScreen() {
             </Text>
           </View>
 
-          {/* Indicador de mercado cerrado: copy específico por escenario
+          {/* Banner de mercado cerrado: copy específico por escenario
               (after-hours / fin de semana / feriado AR / feriado US).
-              Crypto y FCI no muestran nada (24/7 / horario continuo). */}
+              Crypto y FCI no muestran nada (24/7 / horario continuo).
+              Reactivado — se había eliminado en un refactor previo y
+              quedaba sólo un texto sutil sin el banner que lo enmarca. */}
           {(() => {
             const closedMsg = closedHeroMessageFor(asset);
             return closedMsg ? (
-              <Text style={[s.heroClosedHint, { color: c.textMuted }]}>
-                {closedMsg}
-              </Text>
+              <View
+                style={[
+                  s.closedBanner,
+                  { backgroundColor: c.surfaceHover, borderColor: c.border },
+                ]}
+              >
+                <AlamosIcon
+                  name="pendiente"
+                  size={18}
+                  color={c.textSecondary}
+                />
+                <Text
+                  style={[s.closedText, { color: c.textSecondary }]}
+                  numberOfLines={2}
+                >
+                  {closedMsg}
+                </Text>
+              </View>
             ) : null;
           })()}
 
@@ -1869,12 +1886,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 15,
     letterSpacing: -0.2,
-  },
-  heroClosedHint: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 6,
   },
   rangeRow: {
     flexDirection: "row",
