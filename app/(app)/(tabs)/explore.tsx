@@ -629,7 +629,7 @@ function MarketBody({
               return (
                 <Reanimated.View
                   key={asset.ticker}
-                  entering={FadeInUp.delay(i * 55).duration(420).springify().damping(16)}
+                  entering={FadeInUp.delay(i * 55).duration(360)}
                   exiting={FadeOutDown.duration(180)}
                   style={s.trendingCardWrap}
                 >
