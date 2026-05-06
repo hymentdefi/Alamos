@@ -629,8 +629,8 @@ function MarketBody({
               return (
                 <Reanimated.View
                   key={asset.ticker}
-                  entering={FadeInUp.delay(i * 55).duration(360)}
-                  exiting={FadeOutDown.duration(180)}
+                  entering={FadeInUp.delay(i * 30).duration(220)}
+                  exiting={FadeOutDown.duration(140)}
                   style={s.trendingCardWrap}
                 >
                 <Pressable
