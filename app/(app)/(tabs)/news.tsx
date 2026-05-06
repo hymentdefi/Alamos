@@ -705,7 +705,14 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            backgroundColor: "#5ac43e",
+            // Mismo lenguaje que los ActionIcon del Home: surface
+            // sólida + acento brand verde en contenido. El pill flota
+            // sobre las hero images de las noticias, así que el bg
+            // necesita ser opaco (un tint de 5-8% sobre imagen no se
+            // vería). Hairline border para definir el frame.
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            borderWidth: StyleSheet.hairlineWidth,
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -713,10 +720,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
           },
         ]}
       >
-        <Text style={[hint.text, { color: "#FFFFFF" }]}>
+        <Text style={[hint.text, { color: c.brand }]}>
           Deslizá para pasar
         </Text>
-        <Feather name="chevrons-down" size={16} color="#FFFFFF" />
+        <Feather name="chevrons-down" size={16} color={c.brand} />
       </Animated.View>
     </Animated.View>
   );
