@@ -29,7 +29,7 @@ interface Props {
 const BRAND_GREEN = "#00C805";
 
 const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
+  mode === "dark" ? "rgba(0,200,5,0.08)" : "rgba(0,200,5,0.05)";
 
 export const ActionIcon = memo(function ActionIcon({
   name,
