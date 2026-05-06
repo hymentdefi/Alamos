@@ -315,6 +315,7 @@ export default function DetailScreen() {
             mode="line"
             strokeWidth={1}
             withFill={false}
+            sheen
             live={range === "1D" && !marketClosed}
             referenceLine
             style={{ marginTop: 28, marginHorizontal: -24 }}

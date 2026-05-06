@@ -47,6 +47,10 @@ import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
+import Reanimated, {
+  FadeInUp,
+  FadeOutDown,
+} from "react-native-reanimated";
 
 interface MarketTab {
   id: AssetMarket;
@@ -620,11 +624,16 @@ function MarketBody({
              una pill registre como onPress (no solo dismiss del
              keyboard). */
           <View style={s.trendingGrid}>
-            {topMovers.map((asset) => {
+            {topMovers.map((asset, i) => {
               const up = asset.change >= 0;
               return (
-                <Pressable
+                <Reanimated.View
                   key={asset.ticker}
+                  entering={FadeInUp.delay(i * 55).duration(420).springify().damping(16)}
+                  exiting={FadeOutDown.duration(180)}
+                  style={s.trendingCardWrap}
+                >
+                <Pressable
                   onPress={() => onOpen(asset)}
                   style={({ pressed }) => [
                     s.trendingCard,
@@ -682,6 +691,7 @@ function MarketBody({
                     </Text>
                   </View>
                 </Pressable>
+                </Reanimated.View>
               );
             })}
           </View>
@@ -1018,13 +1028,16 @@ const s = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
+  trendingCardWrap: {
+    width: "48.5%",
+    flexGrow: 1,
+    flexBasis: "48.5%",
+  },
   trendingCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    width: "48.5%",
-    flexGrow: 1,
-    flexBasis: "48.5%",
+    width: "100%",
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderCurve: "continuous",
