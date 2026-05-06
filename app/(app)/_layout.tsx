@@ -1,5 +1,12 @@
 import { Stack, useSegments } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { FloatingTabBar } from "../../lib/components/FloatingTabBar";
 import { useTheme } from "../../lib/theme";
 
@@ -13,6 +20,13 @@ import { useTheme } from "../../lib/theme";
  *   - market-category — visible (es continuación del flow de Mercado)
  *   - resto (detail, buy, transfer, settings, etc.) — oculto
  *
+ * Importante: el FloatingTabBar SIEMPRE está montado. La visibilidad
+ * se anima vía opacity + translateY (Reanimated, UI thread). Sin un
+ * mount/unmount evitamos el lag perceptible que pasaba al volver con
+ * swipe-back desde detail — los segments cambian post-commit del
+ * gesto y montar el bar desde cero tomaba unos frames; con la barra
+ * ya en árbol, el fade/slide de 200 ms cubre esa transición.
+ *
  * Cuando aparece en market-category, le pasamos contextTab="explore"
  * para que la pill activa marque Mercado (sino el FloatingTabBar
  * defaultea a Inicio porque segments[2] no matchea ningún tab name).
@@ -25,6 +39,25 @@ export default function AppLayout() {
   const second = (segments as readonly string[])[1] ?? "";
   const showNav = second === "(tabs)" || second === "market-category";
   const navContextTab = second === "market-category" ? "explore" : undefined;
+
+  // Visibilidad animada del nav bar.
+  const navOpacity = useSharedValue(showNav ? 1 : 0);
+  const navTranslateY = useSharedValue(showNav ? 0 : 20);
+  useEffect(() => {
+    navOpacity.value = withTiming(showNav ? 1 : 0, {
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+    });
+    navTranslateY.value = withTiming(showNav ? 0 : 20, {
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [showNav, navOpacity, navTranslateY]);
+
+  const navStyle = useAnimatedStyle(() => ({
+    opacity: navOpacity.value,
+    transform: [{ translateY: navTranslateY.value }],
+  }));
 
   return (
     <View style={styles.root}>
@@ -121,11 +154,27 @@ export default function AppLayout() {
           options={{ animation: "fade", gestureEnabled: false }}
         />
       </Stack>
-      {showNav ? <FloatingTabBar contextTab={navContextTab} /> : null}
+      {/* FloatingTabBar siempre montado. Su visibilidad se controla
+          vía opacity+translateY animados — el cambio de showNav se
+          dispara cuando los segments cambian, y la transición de
+          200ms cubre el frame-gap entre commit del gesto y re-render
+          de React. */}
+      <Animated.View
+        pointerEvents={showNav ? "box-none" : "none"}
+        style={[styles.navContainer, navStyle]}
+      >
+        <FloatingTabBar contextTab={navContextTab} />
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  navContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
 });
