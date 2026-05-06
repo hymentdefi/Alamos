@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -72,6 +68,18 @@ interface Props {
 const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
+const KEYS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  [".", "0", "back"],
+] as const;
+
+// Shortcuts de variación porcentual respecto al precio actual del
+// activo. Tap → setea threshold = price * (1 + pct/100) y autoflip
+// de dirección según signo (subir si +, bajar si -).
+const QUICK_PCTS = [-25, -10, 10, 25] as const;
+
 export function AlertSheet({ visible, asset, onClose }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -128,7 +136,6 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
   }, [visible]);
 
   const dismiss = () => {
-    Keyboard.dismiss();
     translateY.value = withTiming(
       windowH,
       { duration: 240, easing: Easing.in(Easing.cubic) },
@@ -224,6 +231,48 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
     }
   };
 
+  /* ─── Keypad handlers — mismo patrón que buy.tsx (in-app
+       teclado, sin keyboard nativo). USDT permite 4 decimales,
+       ARS/USD se quedan en 2. ─── */
+
+  const maxDecimals = currency === "USDT" ? 4 : 2;
+
+  const handleKey = (k: string) => {
+    setErrorMsg(null);
+    if (k === "back") {
+      setThreshold((p) => (p.length <= 1 ? "" : p.slice(0, -1)));
+      return;
+    }
+    if (k === ".") {
+      if (threshold.includes(".")) return;
+      setThreshold((p) => (p === "" ? "0." : p + "."));
+      return;
+    }
+    setThreshold((p) => {
+      if (p === "" || p === "0") return k;
+      if (p.includes(".")) {
+        if (p.split(".")[1].length >= maxDecimals) return p;
+      }
+      return p + k;
+    });
+  };
+
+  const handleBackLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setThreshold("");
+    setErrorMsg(null);
+  };
+
+  const applyPct = (pct: number) => {
+    setErrorMsg(null);
+    const target = asset.price * (1 + pct / 100);
+    if (!isFinite(target) || target <= 0) return;
+    const decimals = currency === "USDT" ? 4 : 2;
+    setThreshold(target.toFixed(decimals));
+    setDirection(pct >= 0 ? "above" : "below");
+    Haptics.selectionAsync().catch(() => {});
+  };
+
   /* ─── Render ─── */
 
   // Selector de monedas: solo la moneda nativa del activo. ARS para
@@ -243,11 +292,7 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={s.kbAvoid}
-        pointerEvents="box-none"
-      >
+      <View style={s.kbAvoid} pointerEvents="box-none">
         <GestureDetector gesture={pan}>
           <Animated.View
             style={[
@@ -349,7 +394,9 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
                 })}
               </View>
 
-              {/* Price input */}
+              {/* Display del precio — read-only, alimentado por el
+                  keypad in-app de abajo. La pill de moneda queda
+                  fija (única opción según mercado del activo). */}
               <View
                 style={[
                   s.field,
@@ -359,51 +406,94 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
                   },
                 ]}
               >
-                <Text style={[s.fieldLabel, { color: c.textMuted }]}>
-                  Precio objetivo
-                </Text>
-                <TextInput
-                  style={[s.fieldInput, { color: c.text }]}
-                  value={threshold}
-                  onChangeText={(t) => {
-                    setErrorMsg(null);
-                    // Permitimos sólo dígitos, punto y coma (ar-style).
-                    setThreshold(t.replace(/[^0-9.,]/g, ""));
-                  }}
-                  placeholder="0.00"
-                  placeholderTextColor={c.textFaint}
-                  keyboardType="decimal-pad"
-                  autoFocus={activeAlerts.length === 0}
-                />
-                {/* Currency segmented inline */}
-                <View style={s.currencyRow}>
-                  {allCurrencies.map((cu) => {
-                    const active = cu === currency;
-                    return (
-                      <Tap
+                <View style={s.fieldHeader}>
+                  <Text style={[s.fieldLabel, { color: c.textMuted }]}>
+                    Precio objetivo
+                  </Text>
+                  <View style={s.currencyRow}>
+                    {allCurrencies.map((cu) => (
+                      <View
                         key={cu}
                         style={[
                           s.currencyChip,
                           {
-                            backgroundColor: active ? c.text : "transparent",
-                            borderColor: active ? c.text : c.border,
+                            backgroundColor: c.text,
+                            borderColor: c.text,
                           },
                         ]}
-                        haptic="selection"
-                        onPress={() => setCurrency(cu)}
                       >
-                        <Text
-                          style={[
-                            s.currencyText,
-                            { color: active ? c.bg : c.textMuted },
-                          ]}
-                        >
+                        <Text style={[s.currencyText, { color: c.bg }]}>
                           {cu}
                         </Text>
-                      </Tap>
-                    );
-                  })}
+                      </View>
+                    ))}
+                  </View>
                 </View>
+                <Text
+                  style={[
+                    s.fieldDisplay,
+                    {
+                      color: threshold ? c.text : c.textFaint,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {threshold ? threshold.replace(".", ",") : "0"}
+                </Text>
+              </View>
+
+              {/* Quick % chips — aplican price * (1 + pct/100) y
+                  autoflippean dirección según signo. */}
+              <View style={s.quickRow}>
+                {QUICK_PCTS.map((pct) => (
+                  <Tap
+                    key={pct}
+                    style={[
+                      s.quickChip,
+                      {
+                        backgroundColor: c.surface,
+                        borderColor: c.border,
+                      },
+                    ]}
+                    haptic="selection"
+                    onPress={() => applyPct(pct)}
+                  >
+                    <Text style={[s.quickText, { color: c.text }]}>
+                      {pct > 0 ? `+${pct}%` : `${pct}%`}
+                    </Text>
+                  </Tap>
+                ))}
+              </View>
+
+              {/* Keypad in-app — mismo layout que buy.tsx. */}
+              <View style={s.keypad}>
+                {KEYS.map((row, ri) => (
+                  <View key={ri} style={s.keyRow}>
+                    {row.map((k) => (
+                      <Tap
+                        key={k}
+                        onPress={() => handleKey(k)}
+                        onLongPress={
+                          k === "back" ? handleBackLongPress : undefined
+                        }
+                        delayLongPress={400}
+                        haptic="selection"
+                        pressScale={0.92}
+                        rippleColor="rgba(14,15,12,0.08)"
+                        rippleContained={false}
+                        style={s.keyBtn}
+                      >
+                        {k === "back" ? (
+                          <Feather name="delete" size={22} color={c.text} />
+                        ) : (
+                          <Text style={[s.keyText, { color: c.text }]}>
+                            {k === "." ? "," : k}
+                          </Text>
+                        )}
+                      </Tap>
+                    ))}
+                  </View>
+                ))}
               </View>
 
               {errorMsg ? (
@@ -431,7 +521,7 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
             </View>
           </Animated.View>
         </GestureDetector>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -536,23 +626,61 @@ const s = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
+  fieldHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
   fieldLabel: {
     fontFamily: fontFamily[500],
     fontSize: 11,
     letterSpacing: 0.4,
     textTransform: "uppercase",
-    marginBottom: 4,
   },
-  fieldInput: {
+  fieldDisplay: {
     fontFamily: fontFamily[700],
-    fontSize: 24,
+    fontSize: 28,
     letterSpacing: -0.6,
-    padding: 0,
   },
   currencyRow: {
     flexDirection: "row",
     gap: 6,
-    marginTop: 10,
+  },
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  quickChip: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  quickText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  keypad: {
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  keyRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  keyBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyText: {
+    fontFamily: fontFamily[600],
+    fontSize: 24,
+    letterSpacing: -0.5,
   },
   currencyChip: {
     paddingHorizontal: 12,
