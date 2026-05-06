@@ -373,19 +373,6 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
-  const allocations = useMemo(() => {
-    const byCategory = new Map<AssetCategory, number>();
-    for (const h of holdings) {
-      byCategory.set(
-        h.asset.category,
-        (byCategory.get(h.asset.category) ?? 0) + h.ars,
-      );
-    }
-    return Array.from(byCategory.entries())
-      .map(([cat, ars]) => ({ cat, ars, pct: (ars / totalArs) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
-  }, [holdings, totalArs]);
-
   // Geometría del viewBox — clavada al mockup.
   const W = 340;
   const H = 180;
@@ -397,10 +384,41 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
   const yBot = yTop + wallH;
   const topShift = depth * 0.55; // cuánto sube el plano superior
 
+  // Para el tooltip necesitamos no sólo el % de la categoría sino
+  // también los tickers individuales que la componen + su variación
+  // del día. Aprovechamos la pasada de aggregation para arrastrar
+  // las rows ordenadas por contribución descendente.
+  type Row = { ticker: string; change: number; ars: number };
   const blocks = useMemo(() => {
-    const totalPct = allocations.reduce((acc, a) => acc + a.pct, 0) || 1;
+    const byCategory = new Map<
+      AssetCategory,
+      { ars: number; rows: Row[] }
+    >();
+    for (const h of holdings) {
+      const entry = byCategory.get(h.asset.category) ?? {
+        ars: 0,
+        rows: [],
+      };
+      entry.ars += h.ars;
+      entry.rows.push({
+        ticker: h.asset.ticker,
+        change: h.asset.change,
+        ars: h.ars,
+      });
+      byCategory.set(h.asset.category, entry);
+    }
+    const sorted = Array.from(byCategory.entries())
+      .map(([cat, { ars, rows }]) => ({
+        cat,
+        ars,
+        pct: (ars / totalArs) * 100,
+        rows: rows.sort((a, b) => b.ars - a.ars),
+      }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const totalPct = sorted.reduce((acc, a) => acc + a.pct, 0) || 1;
     let xAcc = xL;
-    return allocations.map((a, i) => {
+    return sorted.map((a, i) => {
       const w = (a.pct / totalPct) * wallW;
       const x0 = xAcc;
       xAcc += w;
@@ -411,7 +429,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
         color: BRICK_PALETTE[i % BRICK_PALETTE.length],
       };
     });
-  }, [allocations]);
+  }, [holdings, totalArs]);
 
   // El gesture object SE CONSTRUYE UNA SOLA VEZ — si el handleTouch
   // dependiera de state que cambia mid-press (activeIdx, blocks,
@@ -460,7 +478,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
     () =>
       Gesture.Pan()
         .minDistance(0)
-        .activateAfterLongPress(150)
+        .activateAfterLongPress(60)
         .onStart((e) => {
           "worklet";
           runOnJS(handleTouch)(e.x);
@@ -485,16 +503,14 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
   const dimmedRight = c.border;
 
   // Tooltip — flota arriba del bloque activo con caret hacia abajo.
-  let tooltipLeftPx = 0;
-  let tooltipLabel = "";
-  let tooltipPct = 0;
-  if (activeIdx !== null && blocks[activeIdx] && containerW > 0) {
-    const b = blocks[activeIdx];
-    const centerSvg = (b.x0 + b.x1) / 2;
-    tooltipLeftPx = (centerSvg / W) * containerW;
-    tooltipLabel = categoryLabels[b.cat];
-    tooltipPct = b.pct;
-  }
+  // Header con categoría + pct, abajo lista compacta de tickers
+  // (top 5 por valor) con su variación del día.
+  const activeBlock =
+    activeIdx !== null ? blocks[activeIdx] ?? null : null;
+  const tooltipLeftPx =
+    activeBlock && containerW > 0
+      ? (((activeBlock.x0 + activeBlock.x1) / 2) / W) * containerW
+      : 0;
 
   return (
     <View
@@ -624,7 +640,7 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
         {/* Tooltip — pop con FadeInDown. Posición absoluta centrada
             sobre el bloque activo. pointerEvents none para no robar
             el gesto de pan. */}
-        {activeIdx !== null && containerW > 0 ? (
+        {activeBlock && containerW > 0 ? (
           <Animated.View
             key={`tip-${activeIdx}`}
             entering={FadeInDown.duration(140).springify().damping(18)}
@@ -633,12 +649,45 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
             style={[s.tooltipAnchor, { left: tooltipLeftPx }]}
           >
             <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
-              <Text style={[s.tooltipLabel, { color: c.bg }]}>
-                {tooltipLabel}
-              </Text>
-              <Text style={[s.tooltipPct, { color: c.brand }]}>
-                {formatTooltipPct(tooltipPct)}
-              </Text>
+              <View style={s.tooltipHeader}>
+                <Text style={[s.tooltipLabel, { color: c.bg }]}>
+                  {categoryLabels[activeBlock.cat]}
+                </Text>
+                <Text style={[s.tooltipPct, { color: c.brand }]}>
+                  {formatTooltipPct(activeBlock.pct)}
+                </Text>
+              </View>
+              {activeBlock.rows.length > 0 ? (
+                <View
+                  style={[
+                    s.tooltipDivider,
+                    { backgroundColor: "rgba(255,255,255,0.12)" },
+                  ]}
+                />
+              ) : null}
+              {activeBlock.rows.slice(0, 5).map((r) => (
+                <View key={r.ticker} style={s.tooltipRow}>
+                  <Text
+                    style={[s.tooltipTicker, { color: c.bg }]}
+                    numberOfLines={1}
+                  >
+                    {r.ticker}
+                  </Text>
+                  <Text
+                    style={[
+                      s.tooltipChange,
+                      { color: r.change >= 0 ? c.brand : "#FF6E5C" },
+                    ]}
+                  >
+                    {formatPct(r.change)}
+                  </Text>
+                </View>
+              ))}
+              {activeBlock.rows.length > 5 ? (
+                <Text style={[s.tooltipMore, { color: "rgba(255,255,255,0.45)" }]}>
+                  +{activeBlock.rows.length - 5} más
+                </Text>
+              ) : null}
             </View>
             <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
           </Animated.View>
@@ -886,24 +935,61 @@ const s = StyleSheet.create({
     alignItems: "center",
     zIndex: 5,
   },
+  /* Pill ahora vertical: header (categoría + pct) + lista de
+   * tickers + change. minWidth para que se sienta consistente
+   * entre categorías con pocos vs muchos activos. */
   tooltipPill: {
+    minWidth: 168,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+  },
+  tooltipHeader: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderCurve: "continuous",
-    borderRadius: radius.sm,
+    justifyContent: "space-between",
+    gap: 12,
   },
   tooltipLabel: {
     fontFamily: fontFamily[700],
     fontSize: 12,
-    letterSpacing: -0.1,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   tooltipPct: {
     fontFamily: fontFamily[800],
     fontSize: 13,
     letterSpacing: -0.2,
+  },
+  tooltipDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: 7,
+    marginBottom: 5,
+  },
+  tooltipRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 2,
+  },
+  tooltipTicker: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  tooltipChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  tooltipMore: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.1,
+    marginTop: 4,
   },
   /* Caret — square rotado 45° debajo del pill. marginTop negativo
    * para que la mitad de arriba quede oculta tras el pill y solo
