@@ -1849,12 +1849,11 @@ const s = StyleSheet.create({
     marginTop: 12,
   },
   heroPriceBadge: {
-    /* Alineado verticalmente con la base de los decimales del
-       AmountDisplay — el integer es 52px pero los decimales viven
-       arriba a la derecha. ~14px de margin top deja el icono junto
-       a los decimales/sufijo, leído como un complemento del precio
-       y no como algo flotando arriba. */
-    marginTop: 14,
+    /* Alineado con el top de los decimales/sufijo del AmountDisplay.
+       Para size=52, AmountDisplay calcula decMargin = round(size*0.14)
+       = 7, así el icono arranca exactamente donde arranca el "US$" o
+       los centavos, no a media altura del integer. */
+    marginTop: 7,
   },
   heroTicker: {
     fontFamily: fontFamily[700],
