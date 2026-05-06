@@ -40,23 +40,26 @@ export default function AppLayout() {
   const showNav = second === "(tabs)" || second === "market-category";
   const navContextTab = second === "market-category" ? "explore" : undefined;
 
-  // Visibilidad animada del nav bar.
+  // Visibilidad del nav bar — asimétrico: APARICIÓN instantánea
+  // (sin fade) para que al volver con swipe-back no haya el delay
+  // perceptible del withTiming. OCULTAR sí va animado para que la
+  // salida hacia detail/buy/etc se sienta smooth (no un cut seco).
   const navOpacity = useSharedValue(showNav ? 1 : 0);
-  const navTranslateY = useSharedValue(showNav ? 0 : 20);
   useEffect(() => {
-    navOpacity.value = withTiming(showNav ? 1 : 0, {
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-    });
-    navTranslateY.value = withTiming(showNav ? 0 : 20, {
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [showNav, navOpacity, navTranslateY]);
+    if (showNav) {
+      // Set inmediato — sin withTiming. Reanimated escribe el valor
+      // en el siguiente frame, sin lag de animación.
+      navOpacity.value = 1;
+    } else {
+      navOpacity.value = withTiming(0, {
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+  }, [showNav, navOpacity]);
 
   const navStyle = useAnimatedStyle(() => ({
     opacity: navOpacity.value,
-    transform: [{ translateY: navTranslateY.value }],
   }));
 
   return (
