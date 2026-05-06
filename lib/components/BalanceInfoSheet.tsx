@@ -153,7 +153,7 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
 
             <Text style={[s.body, { color: c.textSecondary }]}>
               Mostramos todo en la moneda que elijas. En pesos, las
-              tenencias en USD y crypto se convierten al oficial
+              tenencias en USD y Crypto se convierten al oficial
               vendedor; en dólares, los pesos pasan a USD a esa
               misma cotización.
             </Text>

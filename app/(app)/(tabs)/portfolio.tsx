@@ -153,6 +153,11 @@ export default function PortfolioScreen() {
               holdings={holdingsSorted}
               totalArs={totalArs}
               groupBy={marketFilter === "CRYPTO" ? "ticker" : "category"}
+              defaultCurrency={
+                marketFilter === "US" || marketFilter === "CRYPTO"
+                  ? "USD"
+                  : "ARS"
+              }
             />
           </View>
         ) : null}
@@ -367,19 +372,40 @@ interface AllocationBrickProps {
    *  "ticker" para Crypto (donde la categoría sería siempre 100%
    *  y no aporta información). */
   groupBy: "category" | "ticker";
+  /** Moneda inicial del pager. Cuando el usuario cambia de filtro
+   *  de mercado, el saldo se resetea a este default — US/Crypto
+   *  arrancan en USD (su moneda nativa), AR/Todo en ARS. El usuario
+   *  puede swipear o tappear los dots para alternar manualmente. */
+  defaultCurrency: "ARS" | "USD";
 }
 
 function AllocationBrick({
   holdings,
   totalArs,
   groupBy,
+  defaultCurrency,
 }: AllocationBrickProps) {
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const [currency, setCurrency] = useState<"ARS" | "USD">(defaultCurrency);
   const [infoOpen, setInfoOpen] = useState(false);
   const pagerRef = useRef<ScrollView | null>(null);
+
+  // Sincroniza el pager cuando cambia el filtro de mercado: el
+  // defaultCurrency llega nuevo desde arriba y reseteamos el state
+  // local + el scroll del ScrollView. Si no scrolleamos, queda
+  // visualmente en la página vieja aunque el state diga otra cosa.
+  useEffect(() => {
+    setCurrency(defaultCurrency);
+    if (containerW > 0) {
+      pagerRef.current?.scrollTo({
+        x: defaultCurrency === "ARS" ? 0 : containerW,
+        y: 0,
+        animated: false,
+      });
+    }
+  }, [defaultCurrency, containerW]);
 
   // Geometría del viewBox — clavada al mockup. El viewBox total es
   // 340×180; la "pared" es 280 ancho × 100 alto, y suma 32 px de
