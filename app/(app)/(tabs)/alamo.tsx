@@ -52,7 +52,7 @@ export default function AlamoScreen() {
       : "Light mode";
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
       {/* ── Card de identidad: avatar + nombre + email. */}
       <View
         style={[

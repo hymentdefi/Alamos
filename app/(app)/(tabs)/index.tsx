@@ -379,7 +379,7 @@ function BaseHome() {
     : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
       <LinearGradient
         pointerEvents="none"
         colors={bgGradient}
