@@ -17,6 +17,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { GlassCard } from "../../../lib/components/GlassCard";
+import { ConvertCurrencyButton } from "../../../lib/components/ConvertCurrencyButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Feather,
@@ -908,6 +909,12 @@ function Dinero(_: {
         ))}
       </GlassCard>
 
+      <View style={s.convertBtnWrap}>
+        <ConvertCurrencyButton
+          onPress={() => router.push("/(app)/convert")}
+        />
+      </View>
+
       <EarningsInfoSheet
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
@@ -1364,6 +1371,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginBottom: 12,
+  },
+  convertBtnWrap: {
+    marginTop: 12,
   },
   earningsTitle: {
     fontFamily: fontFamily[800],
