@@ -436,17 +436,7 @@ function BaseHome() {
           />
         }
       >
-        {/* Card blanco que enmarca el hero (Tu portfolio + balance
-            + chart + range pills) y los 3 action buttons. Vive
-            sobre el bgWarm gris de la página y se diferencia con
-            sombra liviana — mismo lenguaje que las cards de Cocos. */}
-        <View
-          style={[
-            s.heroCard,
-            { backgroundColor: c.surface, shadowColor: c.ink },
-          ]}
-        >
-          <View style={s.heroBlock}>
+        <View style={s.heroBlock}>
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
@@ -623,41 +613,40 @@ function BaseHome() {
               <GearIcon size={20} color={chartColor} holeColor={c.bg} />
             </Pressable>
           </View>
-          </View>
+        </View>
 
-          {/* Acciones del home — squircle gordo (más ancho que alto)
-              con tint brand verde + símbolo en stroke brand adentro.
-              Lenguaje Cocos: 3 botones al ras del card. */}
-          <View style={s.actionsRow}>
-            <ActionButton
-              iconName="ingresar"
-              label="Ingresar"
-              haptic="medium"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "deposit" },
-                })
-              }
-            />
-            <ActionButton
-              iconName="enviar"
-              label="Enviar"
-              haptic="light"
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/transfer",
-                  params: { mode: "send" },
-                })
-              }
-            />
-            <ActionButton
-              iconName="convertir"
-              label="Convertir"
-              haptic="medium"
-              onPress={() => router.push("/(app)/convert")}
-            />
-          </View>
+        {/* Acciones del home — squircle gordo (más ancho que alto)
+            con tint brand verde + símbolo en stroke brand adentro.
+            Lenguaje Cocos. */}
+        <View style={s.actionsRow}>
+          <ActionButton
+            iconName="ingresar"
+            label="Ingresar"
+            haptic="medium"
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "deposit" },
+              })
+            }
+          />
+          <ActionButton
+            iconName="enviar"
+            label="Enviar"
+            haptic="light"
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/transfer",
+                params: { mode: "send" },
+              })
+            }
+          />
+          <ActionButton
+            iconName="convertir"
+            label="Convertir"
+            haptic="medium"
+            onPress={() => router.push("/(app)/convert")}
+          />
         </View>
 
         <Dinero byCategory={byCategory} />
@@ -1154,8 +1143,9 @@ const s = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginTop: 14,
-    paddingHorizontal: 12,
+    marginTop: 18,
+    marginBottom: 28,
+    paddingHorizontal: 24,
   },
   actionItem: {
     alignItems: "center",
@@ -1604,24 +1594,6 @@ const s = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
     paddingVertical: 24,
-  },
-  /* Card blanco que enmarca el hero + actions. marginH 16 deja
-   * que el bgWarm gris respire alrededor; sombra liviana para
-   * despegarlo. overflow:hidden clipea el chart bleed (-24 px)
-   * a los bordes del card. */
-  heroCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 24,
-    borderCurve: "continuous",
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    elevation: 2,
-    paddingTop: 16,
-    paddingBottom: 18,
   },
   heroBlock: {
     paddingHorizontal: 24,

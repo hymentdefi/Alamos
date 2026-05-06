@@ -274,7 +274,7 @@ function BaseExplore() {
   }, [refreshing, onRefresh]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
           <View style={s.titleWithBadge}>
