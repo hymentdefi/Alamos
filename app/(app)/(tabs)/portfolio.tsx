@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  Dimensions,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,7 +9,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
@@ -22,181 +20,45 @@ import {
   formatMoney,
   formatPct,
   formatQty,
-  formatUSD,
   type Asset,
 } from "../../../lib/data/assets";
 import { convertAmount } from "../../../lib/data/accounts";
 import {
   MiniSparkline,
-  Sparkline,
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
-import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { GlassCard } from "../../../lib/components/GlassCard";
-import { FlagIcon } from "../../../lib/components/FlagIcon";
 import {
   MarketSegmented,
   type MarketSegmentedValue,
 } from "../../../lib/components/MarketSegmented";
-import { Tap } from "../../../lib/components/Tap";
 
 /**
- * Tab 'Portfolio' — vista de tus tenencias.
+ * Tab 'Portfolio' — vista enfocada en tus tenencias.
  *
- * Estructura:
- *   1. Hero "Tu portfolio" con balance pager ARS/USD (mismo patrón
- *      del Inicio), currency dots, delta del rango actual y label
- *      temporal.
- *   2. Sparkline + range pills (mismo set 1D/1S/1M/3M/1A/MAX que el
- *      detail de activo).
- *   3. "Tus posiciones" — GlassCard con un row por cada holding
- *      (asset.held=true, qty>0, no efectivo). El row reusa el
- *      layout del market-category.tsx pero del lado derecho muestra
- *      el VALOR DE TU TENENCIA (qty × price) y el delta de hoy en
- *      lugar del precio de mercado.
- *   4. "Resultado del día" — agregado de la pérdida/ganancia del
- *      día sumada de todos tus holdings, en ARS.
+ * Sin hero de balance ni chart: el usuario quiere ver directo el
+ * filtro de mercado y la lista de posiciones. Layout:
+ *   1. Header fijo (mismo layout que Mercado): title "Portfolio" +
+ *      MarketSegmented (AR / EE.UU / Crypto + tab "Todo" extra al
+ *      principio con el isotipo Alamos como flag).
+ *   2. ScrollView debajo: GlassCard con un row por holding, después
+ *      el card de "Resultado del día".
  *
- * Mock layer:
- *   - Las series del chart son procedurales (seriesFromSeed) por
- *     range — coherente con la estética del resto, sin pretender ser
- *     histórica real.
- *   - El delta del DÍA es real-ish: suma de qty × price × change/100
- *     por holding, convertido a ARS. Otros rangos son escalas
- *     determinísticas multiplicadas (mismo enfoque que detail.tsx).
+ * El segmented filtra los holdings — "Todo" muestra todos, AR/US/CRYPTO
+ * filtran por `assetMarket(asset)`. El "Resultado del día" se computa
+ * sobre el subset filtrado para que sea consistente con la lista.
  */
-
-const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
-type Range = (typeof ranges)[number];
-
-const LENGTH_BY_RANGE: Record<Range, number> = {
-  "1D": 280,
-  "1S": 200,
-  "1M": 240,
-  "3M": 260,
-  "1A": 280,
-  MAX: 300,
-};
-
-/* Multiplicador del delta por rango — el "1D" se calcula real desde
- * los holdings; el resto se mockea escalando con sign matcheado al
- * día de hoy (si tu portfolio bajó hoy, el rango más largo "muestra"
- * baja también — coherente para la demo). */
-const RANGE_PCT_MULT: Record<Range, number> = {
-  "1D": 1,
-  "1S": 2.4,
-  "1M": 4.1,
-  "3M": 7.2,
-  "1A": 13.4,
-  MAX: 28.6,
-};
-
-function rangeSubtitle(r: Range): string {
-  switch (r) {
-    case "1D":
-      return "hoy";
-    case "1S":
-      return "esta semana";
-    case "1M":
-      return "este mes";
-    case "3M":
-      return "últimos 3 meses";
-    case "1A":
-      return "último año";
-    case "MAX":
-      return "histórico";
-  }
-}
-
-function indexLabel(r: Range, index: number, length: number): string {
-  const t = 1 - index / (length - 1);
-  switch (r) {
-    case "1D": {
-      const h = Math.round(t * 24);
-      if (h === 0) return "ahora";
-      if (h === 1) return "hace 1h";
-      return `hace ${h}h`;
-    }
-    case "1S": {
-      const d = Math.round(t * 7);
-      if (d === 0) return "hoy";
-      if (d === 1) return "hace 1 día";
-      return `hace ${d} días`;
-    }
-    case "1M": {
-      const d = Math.round(t * 30);
-      if (d === 0) return "hoy";
-      return `hace ${d} días`;
-    }
-    case "3M": {
-      const w = Math.round(t * 13);
-      if (w === 0) return "hoy";
-      return `hace ${w} sem`;
-    }
-    case "1A": {
-      const m = Math.round(t * 12);
-      if (m === 0) return "hoy";
-      return `hace ${m} meses`;
-    }
-    case "MAX": {
-      const y = Math.round(t * 5);
-      if (y === 0) return "este año";
-      return `hace ${y} años`;
-    }
-  }
-}
-
-/** Construye una serie procedural alrededor de un valor target con
- *  un % de variación. Misma idea que el buildPriceSeries del detail
- *  pero sin la nivel de detalle por noise scale. */
-function buildSeries(
-  totalCurrent: number,
-  pct: number,
-  range: Range,
-): number[] {
-  const length = LENGTH_BY_RANGE[range];
-  const start = totalCurrent / (1 + pct / 100);
-  const noise = seriesFromSeed(`portfolio-${range}`, length, "flat");
-  const noiseScale =
-    totalCurrent *
-    (range === "1D"
-      ? 0.004
-      : range === "1S"
-        ? 0.008
-        : range === "1M"
-          ? 0.012
-          : 0.018);
-  const out: number[] = [];
-  for (let i = 0; i < length; i++) {
-    const t = i / (length - 1);
-    const linear = start + (totalCurrent - start) * t;
-    const normalized = (noise[i] - 100) / 6;
-    out.push(linear + normalized * noiseScale);
-  }
-  out[length - 1] = totalCurrent;
-  return out;
-}
-
-const BALANCE_PAGE_W = Dimensions.get("window").width;
 
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { c } = useTheme();
-  const [range, setRange] = useState<Range>("1D");
-  const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
   const [marketFilter, setMarketFilter] =
     useState<MarketSegmentedValue>("all");
-  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const balancePagerRef = useRef<ScrollView | null>(null);
 
-  /* ─── Data ───────────────────────────────────────────────────── */
+  /* ─── Holdings filtrados por el segmented ───────────────────── */
 
-  // Holdings = activos que tenés con qty > 0, excluyendo el efectivo
-  // (eso ya vive en "Tu dinero" del Inicio). El filtro del segmented
-  // (AR / EE.UU / Crypto / Todo) se aplica downstream — el hero, el
-  // chart y la lista responden al mismo subset.
   const holdings = useMemo(() => {
     const all = assets.filter(
       (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
@@ -204,71 +66,6 @@ export default function PortfolioScreen() {
     if (marketFilter === "all") return all;
     return all.filter((a) => assetMarket(a) === marketFilter);
   }, [marketFilter]);
-
-  // Valor total en ARS de los holdings — convertimos cada uno desde
-  // su moneda nativa.
-  const totalArs = useMemo(() => {
-    let acc = 0;
-    for (const a of holdings) {
-      const val = a.price * (a.qty ?? 0);
-      acc += convertAmount(val, assetCurrency(a), "ARS");
-    }
-    return acc;
-  }, [holdings]);
-
-  // Resultado del día en ARS — qty × price × change% del activo,
-  // convertido a ARS y sumado.
-  const todayDeltaArs = useMemo(() => {
-    let acc = 0;
-    for (const a of holdings) {
-      const dayDelta = a.price * (a.qty ?? 0) * (a.change / 100);
-      acc += convertAmount(dayDelta, assetCurrency(a), "ARS");
-    }
-    return acc;
-  }, [holdings]);
-
-  // % del día agregado.
-  const todayPct = totalArs > 0 ? (todayDeltaArs / totalArs) * 100 : 0;
-
-  // % del rango activo. Para 1D usamos el real; para los demás
-  // escalamos con el sign del día.
-  const rangePct = useMemo(() => {
-    if (range === "1D") return todayPct;
-    const sign = todayPct >= 0 ? 1 : -1;
-    return sign * Math.abs(todayPct) * RANGE_PCT_MULT[range];
-  }, [range, todayPct]);
-
-  // Series del chart en ARS — convertimos a USD on-display si hace
-  // falta, sin recalcular.
-  const seriesArs = useMemo(
-    () => buildSeries(totalArs, rangePct, range),
-    [totalArs, rangePct, range],
-  );
-
-  /* ─── Display values ─────────────────────────────────────────── */
-
-  const arsCurrent =
-    scrubIndex != null ? seriesArs[scrubIndex] : seriesArs[seriesArs.length - 1];
-  const usdCurrent = convertAmount(arsCurrent, "ARS", "USD");
-
-  const rangeStartArs = seriesArs[0];
-  const rangeStartUsd = convertAmount(rangeStartArs, "ARS", "USD");
-
-  const arsDelta = arsCurrent - rangeStartArs;
-  const usdDelta = usdCurrent - rangeStartUsd;
-  const displayPct =
-    rangeStartArs > 0 ? (arsDelta / rangeStartArs) * 100 : 0;
-  const isUp = displayPct >= 0;
-
-  const chartColor = isUp ? c.greenDark : c.red;
-  const trendColor = chartColor;
-
-  const timeLabel =
-    scrubIndex != null
-      ? indexLabel(range, scrubIndex, seriesArs.length)
-      : rangeSubtitle(range);
-
-  /* ─── Holdings ordenados por valor desc en ARS ───────────────── */
 
   const holdingsSorted = useMemo(() => {
     const withVal = holdings.map((a) => {
@@ -279,20 +76,23 @@ export default function PortfolioScreen() {
     return withVal.sort((x, y) => y.ars - x.ars);
   }, [holdings]);
 
-  /* ─── Handlers ──────────────────────────────────────────────── */
-
-  const goToCurrency = useCallback(
-    (next: "ARS" | "USD") => {
-      Haptics.selectionAsync().catch(() => {});
-      setCurrency(next);
-      balancePagerRef.current?.scrollTo({
-        x: next === "ARS" ? 0 : BALANCE_PAGE_W,
-        y: 0,
-        animated: true,
-      });
-    },
-    [],
+  const totalArs = useMemo(
+    () => holdingsSorted.reduce((acc, h) => acc + h.ars, 0),
+    [holdingsSorted],
   );
+
+  const todayDeltaArs = useMemo(() => {
+    let acc = 0;
+    for (const a of holdings) {
+      const dayDelta = a.price * (a.qty ?? 0) * (a.change / 100);
+      acc += convertAmount(dayDelta, assetCurrency(a), "ARS");
+    }
+    return acc;
+  }, [holdings]);
+
+  const todayPct = totalArs > 0 ? (todayDeltaArs / totalArs) * 100 : 0;
+
+  /* ─── Handlers ──────────────────────────────────────────────── */
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -301,25 +101,26 @@ export default function PortfolioScreen() {
     setTimeout(() => setRefreshing(false), 700);
   }, []);
 
-  const onScrub = useCallback((idx: number) => {
-    setScrubIndex(idx);
-  }, []);
-
-  const onScrubEnd = useCallback(() => {
-    setScrubIndex(null);
-  }, []);
-
   /* ─── Render ────────────────────────────────────────────────── */
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
+      {/* Header fijo — clavado a la altura del header de Mercado para
+          que el MarketSegmented quede en el mismo Y de pantalla. */}
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <View style={s.titleRow}>
+          <Text style={[s.title, { color: c.text }]}>Portfolio</Text>
+        </View>
+        <MarketSegmented
+          value={marketFilter}
+          onChange={setMarketFilter}
+          withAll
+        />
+      </View>
+
       <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 12,
-          paddingBottom: 180,
-        }}
+        contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={scrubIndex == null}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -330,176 +131,7 @@ export default function PortfolioScreen() {
           />
         }
       >
-        <View style={s.heroBlock}>
-          <Text
-            style={[s.portfolioTitle, { color: c.text }]}
-            numberOfLines={1}
-          >
-            Tu portfolio
-          </Text>
-
-          {/* Balance pager — 2 páginas (ARS / USD) full-width con
-              swipe nativo. Mismo pattern que el Inicio. */}
-          <View style={s.balancePagerWrap}>
-            <ScrollView
-              ref={balancePagerRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="normal"
-              directionalLockEnabled
-              alwaysBounceVertical={false}
-              bounces={false}
-              contentOffset={{
-                x: currency === "ARS" ? 0 : BALANCE_PAGE_W,
-                y: 0,
-              }}
-              onMomentumScrollEnd={(e) => {
-                const idx = Math.round(
-                  e.nativeEvent.contentOffset.x / BALANCE_PAGE_W,
-                );
-                const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
-                if (next !== currency) {
-                  Haptics.selectionAsync().catch(() => {});
-                  setCurrency(next);
-                }
-              }}
-            >
-              {(["ARS", "USD"] as const).map((cur) => (
-                <Pressable
-                  key={cur}
-                  style={[s.balancePage, { width: BALANCE_PAGE_W }]}
-                  onPress={() =>
-                    goToCurrency(cur === "ARS" ? "USD" : "ARS")
-                  }
-                >
-                  <View style={s.flagWrap} pointerEvents="none">
-                    <FlagIcon code={cur === "ARS" ? "AR" : "US"} size={26} />
-                    <View
-                      style={[
-                        s.flagSwapBadge,
-                        { backgroundColor: c.ink, borderColor: c.bg },
-                      ]}
-                    >
-                      <Feather name="repeat" size={7} color={c.bg} />
-                    </View>
-                  </View>
-                  <AmountDisplay
-                    value={cur === "ARS" ? arsCurrent : usdCurrent}
-                    size={40}
-                    weight={800}
-                    currency={cur}
-                  />
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Currency dots */}
-          <View style={s.currencyDots}>
-            {(["ARS", "USD"] as const).map((cur) => {
-              const active = currency === cur;
-              return (
-                <Pressable
-                  key={cur}
-                  hitSlop={10}
-                  onPress={() => goToCurrency(cur)}
-                >
-                  <View
-                    style={[
-                      s.currencyDot,
-                      {
-                        backgroundColor: active ? c.text : c.textFaint,
-                        width: active ? 8 : 6,
-                        height: active ? 8 : 6,
-                      },
-                    ]}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Delta row */}
-          <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color: trendColor }]}>
-              {isUp ? "▲" : "▼"}
-            </Text>
-            <Text style={[s.deltaText, { color: trendColor }]}>
-              {currency === "ARS"
-                ? formatARS(Math.abs(arsDelta))
-                : formatUSD(Math.abs(usdDelta))}
-            </Text>
-            <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
-            <Text style={[s.deltaText, { color: trendColor }]}>
-              {formatPct(displayPct)}
-            </Text>
-            <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-            <Text style={[s.timeLabel, { color: c.textMuted }]}>
-              {timeLabel}
-            </Text>
-          </View>
-
-          {/* Segmented de mercado — mismo lenguaje que en la tab
-              Mercado, con un tab "Todo" extra al principio (isotipo
-              Alamos como flag). Filtra holdings, hero y chart. */}
-          <View style={s.segmentedWrap}>
-            <MarketSegmented
-              value={marketFilter}
-              onChange={setMarketFilter}
-              withAll
-            />
-          </View>
-
-          {/* Chart */}
-          <View style={s.chartWrap}>
-            <Sparkline
-              series={seriesArs}
-              color={chartColor}
-              height={220}
-              mode="line"
-              strokeWidth={1}
-              withFill={false}
-              sheen
-              referenceLine
-              onScrub={onScrub}
-              onScrubEnd={onScrubEnd}
-            />
-          </View>
-
-          {/* Range pills — mismo lenguaje que el detail (pill llena
-              cuando active, color matching del chart). */}
-          <View style={s.rangeRow}>
-            {ranges.map((r) => {
-              const active = r === range;
-              return (
-                <Tap
-                  key={r}
-                  onPress={() => setRange(r)}
-                  haptic="selection"
-                  pressScale={0.92}
-                  style={[
-                    s.rangePill,
-                    active && { backgroundColor: chartColor },
-                  ]}
-                  hitSlop={8}
-                >
-                  <Text
-                    style={[
-                      s.rangeText,
-                      { color: active ? c.bg : chartColor },
-                    ]}
-                  >
-                    {r}
-                  </Text>
-                </Tap>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Tus posiciones */}
-        <View style={[s.sectionBlock, { marginTop: 28 }]}>
+        <View style={s.sectionBlock}>
           <View style={s.sectionHead}>
             <Text style={[s.sectionTitle, { color: c.textMuted }]}>
               Tus posiciones
@@ -530,14 +162,14 @@ export default function PortfolioScreen() {
           ) : (
             <GlassCard padding={16}>
               <Text style={[s.empty, { color: c.textMuted }]}>
-                Todavía no tenés posiciones. Entrá a Mercado para
-                empezar a invertir.
+                {marketFilter === "all"
+                  ? "Todavía no tenés posiciones. Entrá a Mercado para empezar a invertir."
+                  : "No tenés posiciones en este mercado."}
               </Text>
             </GlassCard>
           )}
         </View>
 
-        {/* Resultado del día */}
         <View style={[s.sectionBlock, { marginTop: 28 }]}>
           <View
             style={[
@@ -581,9 +213,8 @@ export default function PortfolioScreen() {
  * cambios:
  *   - El precio principal es el VALOR DE TU TENENCIA (qty × price)
  *     en moneda nativa, no el precio de mercado individual.
- *   - Bajo el valor: la cantidad de unidades + delta del día en %.
- *
- * Mantenemos el square icon, MiniSparkline central y el tap → detail.
+ *   - Bajo el ticker: la cantidad de unidades + unit suffix
+ *     ("unidades", "VN", "cuotapartes", el ticker para crypto).
  */
 interface HoldingRowProps {
   asset: Asset;
@@ -691,118 +322,27 @@ function qtyUnit(asset: Asset): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Hero — paddings y typography clavados al Inicio. */
-  heroBlock: {
-    paddingHorizontal: 24,
-    paddingTop: 0,
-    paddingBottom: 12,
+  /* Header fijo — paddings clavados al header de Mercado para que el
+   * segmented quede en el mismo Y de pantalla. */
+  header: {
+    paddingHorizontal: 20,
   },
-  portfolioTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 38,
-    lineHeight: 40,
-    letterSpacing: -2.2,
-    marginBottom: 6,
-  },
-  balancePagerWrap: {
-    marginHorizontal: -24,
-    marginBottom: 8,
-  },
-  balancePage: {
+  titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 24,
-  },
-  flagWrap: {
-    position: "relative",
-  },
-  flagSwapBadge: {
-    position: "absolute",
-    bottom: -3,
-    right: -4,
-    width: 13,
-    height: 13,
-    borderCurve: "continuous",
-    borderRadius: 7,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  currencyDots: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 10,
-    paddingVertical: 4,
-  },
-  currencyDot: {
-    borderCurve: "continuous",
-    borderRadius: 999,
-  },
-  deltaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
-    flexWrap: "wrap",
-  },
-  deltaTri: {
-    fontFamily: fontFamily[800],
-    fontSize: 12,
-  },
-  deltaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  deltaSep: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  timeLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  /* Wrap del segmented — el componente trae su propio marginBottom
-   * de 14, le agregamos marginTop para separarlo del deltaRow y un
-   * marginHorizontal: -4 para que se acerque al borde igual que en
-   * Mercado (que vive con paddingHorizontal: 20 vs los 24 del
-   * heroBlock acá). */
-  segmentedWrap: {
-    marginTop: 14,
-    marginHorizontal: -4,
-  },
-  chartWrap: {
-    marginTop: 16,
-    marginHorizontal: -24,
-  },
-
-  /* Range pills — mismo look que el detail.tsx (radius pill, fill
-   * cuando active, color matcheado al chart). */
-  rangeRow: {
-    flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 18,
-    paddingHorizontal: 4,
+    marginBottom: 14,
   },
-  rangePill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  rangeText: {
+  title: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: 0.3,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
   },
 
   /* Section block container — paddingHorizontal 20 (matchea Inicio).
    * El "sectionHead" usa el mismo lenguaje que las secciones de
-   * Inicio: titulo grande tipo eyebrow + count compacto a la derecha. */
+   * Inicio: título tipo eyebrow + count compacto a la derecha. */
   sectionBlock: {
     paddingHorizontal: 20,
   },
