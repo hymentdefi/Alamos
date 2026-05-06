@@ -47,6 +47,7 @@ import {
   DisclaimerOnboarding,
   DisclaimerShort,
 } from "../../../lib/components/Disclaimer";
+import { assets, formatPct } from "../../../lib/data/assets";
 import { useLegalConsent } from "../../../lib/legal/context";
 import {
   HorizontalPager,
@@ -71,6 +72,14 @@ interface NewsItem {
   image: string;
   tickers?: string[];
 }
+
+/** Lookup precomputado de tickers → variación % del día. Se arma
+ *  una sola vez al cargar el módulo; los assets son estáticos en
+ *  MOCK_MODE. Devuelve null si el ticker no se encuentra (para que
+ *  el chip caiga con gracia al ticker pelado). */
+const TICKER_CHANGE: Map<string, number> = new Map(
+  assets.map((a) => [a.ticker, a.change]),
+);
 
 const CAT_COLORS: Record<Category, string> = {
   mercado: "#0ECB81",
@@ -599,14 +608,27 @@ function NewsCard({
 
         {item.tickers?.length ? (
           <View style={card.tickerRow}>
-            {item.tickers.map((t) => (
-              <View
-                key={t}
-                style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
-              >
-                <Text style={[card.tickerText, { color: c.text }]}>{t}</Text>
-              </View>
-            ))}
+            {item.tickers.map((t) => {
+              const change = TICKER_CHANGE.get(t) ?? null;
+              return (
+                <View
+                  key={t}
+                  style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
+                >
+                  <Text style={[card.tickerText, { color: c.text }]}>{t}</Text>
+                  {change != null ? (
+                    <Text
+                      style={[
+                        card.tickerChange,
+                        { color: change >= 0 ? c.positive : c.red },
+                      ]}
+                    >
+                      {formatPct(change)}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : null}
 
@@ -705,14 +727,12 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Mismo lenguaje que los ActionIcon del Home: surface
-            // sólida + acento brand verde en contenido. El pill flota
-            // sobre las hero images de las noticias, así que el bg
-            // necesita ser opaco (un tint de 5-8% sobre imagen no se
-            // vería). Hairline border para definir el frame.
-            backgroundColor: c.surface,
-            borderColor: c.border,
-            borderWidth: StyleSheet.hairlineWidth,
+            // Tint brand verde más denso que los ActionIcon del Home
+            // (~18% vs 5%) — la pill flota sobre hero images de las
+            // noticias y necesita presencia para no perderse contra
+            // un fondo claro. El texto y el chevron en brand verde
+            // hacen el resto.
+            backgroundColor: "rgba(0,200,5,0.18)",
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -870,11 +890,27 @@ function DetailSheet({
                 ))}
                 {item.tickers?.length ? (
                   <View style={sheet.tickersRow}>
-                    {item.tickers.map((t) => (
-                      <View key={t} style={sheet.tickerPill}>
-                        <Text style={sheet.tickerText}>{t}</Text>
-                      </View>
-                    ))}
+                    {item.tickers.map((t) => {
+                      const change = TICKER_CHANGE.get(t) ?? null;
+                      return (
+                        <View key={t} style={sheet.tickerPill}>
+                          <Text style={sheet.tickerText}>{t}</Text>
+                          {change != null ? (
+                            <Text
+                              style={[
+                                sheet.tickerChange,
+                                {
+                                  color:
+                                    change >= 0 ? "#00A304" : "#C83B3B",
+                                },
+                              ]}
+                            >
+                              {formatPct(change)}
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })}
                   </View>
                 ) : null}
                 <View style={sheet.disclaimerBox}>
@@ -994,6 +1030,9 @@ const card = StyleSheet.create({
     marginBottom: 16,
   },
   tickerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderCurve: "continuous",
@@ -1003,6 +1042,11 @@ const card = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 0.2,
+  },
+  tickerChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
   readBtn: {
     alignSelf: "flex-start",
@@ -1139,6 +1183,9 @@ const sheet = StyleSheet.create({
     marginBottom: 20,
   },
   tickerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: "rgba(14,15,12,0.08)",
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1150,5 +1197,10 @@ const sheet = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.2,
+  },
+  tickerChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
 });
