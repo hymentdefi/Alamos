@@ -124,7 +124,7 @@ function TabItem({ route, focused, inactiveColor, onPress }: TabItemProps) {
       style={styles.tabItem}
       hitSlop={6}
     >
-      <DrawingIcon path={route.path} focused={focused} color={color} />
+      <DrawingIcon path={route.path} focused={focused} color={color} size={28} />
       <Text numberOfLines={1} style={[styles.label, { color }]}>
         {route.title}
       </Text>
