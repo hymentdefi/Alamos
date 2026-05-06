@@ -74,31 +74,21 @@ export interface MarketSession {
   instrumentLabel: string;
 }
 
+/**
+ * Label que se muestra en el `MarketClosedSheet`. La copy es del
+ * mercado entero ("Mercado argentino" / "Mercado estadounidense"),
+ * no del instrumento — toda la operatoria está sujeta al mismo
+ * horario igual, así que mostrar el mercado da info más útil que
+ * "Las acciones argentinas". Crypto/futuros nunca abren el sheet
+ * (session.open siempre true) pero igual los modelamos.
+ */
 function instrumentLabelFor(asset: Asset): string {
-  switch (asset.category) {
-    case "cedears":
-      return "Los CEDEARs";
-    case "acciones":
-      return assetMarket(asset) === "US"
-        ? "Las acciones de Estados Unidos"
-        : "Las acciones argentinas";
-    case "bonos":
-      return "Los bonos";
-    case "obligaciones":
-      return "Las ONs";
-    case "letras":
-      return "Las letras";
-    case "caucion":
-      return "Las cauciones";
-    case "fci":
-      return "Los fondos comunes";
-    case "crypto":
-      return "Las crypto";
-    case "futuros":
-      return "Los futuros";
-    default:
-      return "Estos instrumentos";
+  if (asset.category === "crypto" || asset.category === "futuros") {
+    return "Crypto";
   }
+  return assetMarket(asset) === "US"
+    ? "Mercado estadounidense"
+    : "Mercado argentino";
 }
 
 /**
@@ -183,7 +173,7 @@ export function marketSessionByMarket(
       open: !isWeekend && mins >= US_OPEN_MINS && mins < US_CLOSE_MINS,
       hours: "11:30 a 18:00 hs (ART)",
       days: "lunes a viernes",
-      instrumentLabel: "Acciones estadounidenses",
+      instrumentLabel: "Mercado estadounidense",
     };
   }
   return {

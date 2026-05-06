@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-import { useTheme } from "../theme";
+import { brand, useTheme } from "../theme";
 import type { MarketSession } from "../market/hours";
 import { MarketClosedSheet } from "./MarketClosedSheet";
 
@@ -40,8 +40,6 @@ export function MarketClosedIcon({
 
   if (session.open) return null;
 
-  const stroke =
-    mode === "dark" ? "rgba(250,250,247,0.7)" : "rgba(14,15,12,0.55)";
   const dotBorder = mode === "dark" ? "#0E0F0C" : "#FFFFFF";
 
   return (
@@ -59,8 +57,8 @@ export function MarketClosedIcon({
           <G
             transform="translate(0 2)"
             fill="none"
-            stroke={stroke}
-            strokeWidth={2}
+            stroke={brand.green}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
           >
