@@ -296,7 +296,7 @@ export default function DetailScreen() {
             color={color}
             height={240}
             mode="line"
-            strokeWidth={1.5}
+            strokeWidth={1}
             withFill={false}
             live={range === "1D" && !marketClosed}
             referenceLine

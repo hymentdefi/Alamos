@@ -628,7 +628,7 @@ function BaseHome() {
               sheen
               live={range === "live"}
               referenceLine={referenceLine}
-              strokeWidth={1.5}
+              strokeWidth={1}
               mode={smoothChart ? "line" : "step"}
               onScrub={onScrub}
               onScrubEnd={onScrubEnd}
