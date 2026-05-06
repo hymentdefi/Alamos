@@ -257,7 +257,7 @@ function BaseExplore() {
           <Text style={[s.title, { color: c.text }]}>Mercado</Text>
           <View style={s.balanceWrap}>
             <Text style={[s.balanceLabel, { color: c.textFaint }]}>
-              Disponible para operar
+              Fondos disponibles
             </Text>
             <View style={s.balanceAmountRow}>
               <Text style={[s.balance, { color: c.textSecondary }]}>
