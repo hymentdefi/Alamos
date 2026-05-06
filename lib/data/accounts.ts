@@ -55,7 +55,7 @@ export const accounts: Account[] = [
   {
     id: "usdt-crypto",
     currency: "USDT",
-    location: "Crypto",
+    location: "Dólar crypto",
     balance: 580,
     yield: { label: "% APY", pct: 8.4 },
   },
