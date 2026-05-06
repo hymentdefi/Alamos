@@ -20,6 +20,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
+import { AlamosBalanceIllustration } from "./illustrations/AlamosBalanceIllustration";
 
 interface Props {
   visible: boolean;
@@ -147,6 +148,10 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
+            <View style={s.heroWrap}>
+              <AlamosBalanceIllustration size={172} />
+            </View>
+
             <Text style={[s.title, { color: c.text }]}>
               Balance unificado
             </Text>
@@ -191,8 +196,12 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
   content: {
-    paddingTop: 18,
+    paddingTop: 6,
     paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  heroWrap: {
+    marginBottom: 12,
   },
   title: {
     fontFamily: fontFamily[800],
