@@ -1,14 +1,12 @@
 import { memo } from "react";
-import Svg, { Circle, G, Path } from "react-native-svg";
-import { useTheme } from "../theme";
+import Svg, { G, Path } from "react-native-svg";
 
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir).
  *
- * Círculo lleno con un tint suave del verde brand (10% en light,
- * 14% en dark) y símbolo en stroke brand de 4px adentro. Sin anillo
- * — el tint hace de surface y le da peso al botón sin sentirse
- * pesado.
+ * Sólo el símbolo en stroke brand verde de 4px sobre transparente
+ * — el wrapper de botón (squircle chunky con tint brand) lo
+ * provee el caller (ver ActionButton en app/(tabs)/index.tsx).
  *
  * Variantes fuente:
  *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
@@ -28,18 +26,13 @@ interface Props {
 
 const BRAND_GREEN = "#00C805";
 
-const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.08)" : "rgba(0,200,5,0.05)";
-
 export const ActionIcon = memo(function ActionIcon({
   name,
-  size = 56,
+  size = 32,
   stroke = BRAND_GREEN,
 }: Props) {
-  const { mode } = useTheme();
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle cx={32} cy={32} r={32} fill={tintFor(mode)} />
       <G
         transform="translate(32 32)"
         fill="none"

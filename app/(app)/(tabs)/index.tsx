@@ -435,7 +435,17 @@ function BaseHome() {
           />
         }
       >
-        <View style={s.heroBlock}>
+        {/* Card blanco que enmarca el hero (Tu portfolio + balance
+            + chart + range pills) y los 3 action buttons. Vive
+            sobre el bgWarm gris de la página y se diferencia con
+            sombra liviana — mismo lenguaje que las cards de Cocos. */}
+        <View
+          style={[
+            s.heroCard,
+            { backgroundColor: c.surface, shadowColor: c.ink },
+          ]}
+        >
+          <View style={s.heroBlock}>
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
@@ -612,6 +622,41 @@ function BaseHome() {
               <GearIcon size={20} color={chartColor} holeColor={c.bg} />
             </Pressable>
           </View>
+          </View>
+
+          {/* Acciones del home — squircle gordo (más ancho que alto)
+              con tint brand verde + símbolo en stroke brand adentro.
+              Lenguaje Cocos: 3 botones al ras del card. */}
+          <View style={s.actionsRow}>
+            <ActionButton
+              iconName="ingresar"
+              label="Ingresar"
+              haptic="medium"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "deposit" },
+                })
+              }
+            />
+            <ActionButton
+              iconName="enviar"
+              label="Enviar"
+              haptic="light"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "send" },
+                })
+              }
+            />
+            <ActionButton
+              iconName="convertir"
+              label="Convertir"
+              haptic="medium"
+              onPress={() => router.push("/(app)/convert")}
+            />
+          </View>
         </View>
 
         <Dinero byCategory={byCategory} />
@@ -650,7 +695,13 @@ function ActionButton({
   onPress: () => void;
   haptic: "medium" | "light";
 }) {
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
+  // Squircle "gordo" (más ancho que alto) — más presencia que el
+  // círculo previo. Tint brand verde sutil + el símbolo en stroke
+  // brand adentro. continuous corners para que se sienta el squircle
+  // nativo en iOS.
+  const tint =
+    mode === "dark" ? "rgba(0,200,5,0.10)" : "rgba(0,200,5,0.07)";
   return (
     <Tap
       style={s.actionItem}
@@ -658,10 +709,9 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* ActionIcon = círculo lleno con tint brand verde + símbolo
-          stroke brand adentro. El tint hace de surface; sin wrapper
-          adicional. */}
-      <ActionIcon name={iconName} size={51} />
+      <View style={[s.actionSquircle, { backgroundColor: tint }]}>
+        <ActionIcon name={iconName} size={32} />
+      </View>
       <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
       </Text>
@@ -788,40 +838,6 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — círculo brand verde tinted + símbolo en
-          stroke brand adentro. El tint le da peso de botón sin
-          competir con el resto del Home. */}
-      <View style={s.actionsRow}>
-        <ActionButton
-          iconName="ingresar"
-          label="Ingresar"
-          haptic="medium"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "deposit" },
-            })
-          }
-        />
-        <ActionButton
-          iconName="enviar"
-          label="Enviar"
-          haptic="light"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "send" },
-            })
-          }
-        />
-        <ActionButton
-          iconName="convertir"
-          label="Convertir"
-          haptic="medium"
-          onPress={() => router.push("/(app)/convert")}
-        />
-      </View>
-
       <View style={s.earningsHead}>
         <Text style={[s.earningsTitle, { color: c.textMuted }]}>Tu dinero</Text>
         <Pressable
@@ -1141,15 +1157,25 @@ const s = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginTop: 18,
-    marginBottom: 28,
-    paddingHorizontal: 4,
+    marginTop: 14,
+    paddingHorizontal: 12,
   },
   actionItem: {
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     flex: 1,
+  },
+  /* Squircle "gordo" del botón — más ancho que alto para que se
+   * sienta tipo Cocos. continuous corners para el squircle iOS
+   * nativo + radius generoso. */
+  actionSquircle: {
+    width: 78,
+    height: 56,
+    borderCurve: "continuous",
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionLabel: {
     // 600 (no 700) a propósito: las labels chiquitas debajo de
@@ -1581,6 +1607,24 @@ const s = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
     paddingVertical: 24,
+  },
+  /* Card blanco que enmarca el hero + actions. marginH 16 deja
+   * que el bgWarm gris respire alrededor; sombra liviana para
+   * despegarlo. overflow:hidden clipea el chart bleed (-24 px)
+   * a los bordes del card. */
+  heroCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 24,
+    borderCurve: "continuous",
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 2,
+    paddingTop: 16,
+    paddingBottom: 18,
   },
   heroBlock: {
     paddingHorizontal: 24,
