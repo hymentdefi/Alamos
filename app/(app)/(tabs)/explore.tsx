@@ -19,7 +19,6 @@ import {
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
-import { FlagIcon } from "../../../lib/components/FlagIcon";
 
 // Verde de acción primaria — usar `c.action` del theme. Esta constante
 // quedó como literal sólo para que no rompa style.create() — donde sí
@@ -48,6 +47,10 @@ import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 import { MarketClosedIcon } from "../../../lib/components/MarketClosedIcon";
+import {
+  MarketSegmented,
+  type MarketSegmentedValue,
+} from "../../../lib/components/MarketSegmented";
 import { marketSessionByMarket } from "../../../lib/market/hours";
 import Reanimated, {
   FadeInUp,
@@ -111,8 +114,7 @@ export default function ExploreScreen() {
 function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, mode } = useTheme();
-  const isDark = mode === "dark";
+  const { c } = useTheme();
   const { isFavorite } = useFavorites();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -292,59 +294,16 @@ function BaseExplore() {
           </View>
         </View>
 
-        {/* Segmented de mercado (AR / EEUU / Crypto). Sin pills de
-            categorías abajo — el filtro por categoría se eliminó.
-            La pill activa usa el mismo verde brand translúcido que la
-            tab activa del nav bar para mantener identidad visual. */}
-        <View
-          style={[
-            s.marketControl,
-            { backgroundColor: c.surfaceHover },
-          ]}
-        >
-          <View style={s.marketSeg}>
-            {MARKET_TABS.map((m, i) => {
-              const active = i === activeMarketIdx;
-              return (
-                <Tap
-                  key={m.id}
-                  onPress={() => switchMarket(i)}
-                  haptic="selection"
-                  pressScale={0.96}
-                  rippleContained
-                  style={[
-                    s.marketSegBtn,
-                    active && {
-                      backgroundColor: isDark
-                        ? "rgba(14, 203, 129, 0.07)"
-                        : "rgba(0, 200, 5, 0.05)",
-                      borderColor: isDark
-                        ? "rgba(14, 203, 129, 0.12)"
-                        : "rgba(0, 200, 5, 0.10)",
-                      borderWidth: 1,
-                    },
-                  ]}
-                >
-                  <MarketGlyph market={m.id} active={active} />
-                  <Text
-                    style={[
-                      s.marketSegLabel,
-                      {
-                        color: active ? c.brand : c.textMuted,
-                        fontFamily: active
-                          ? fontFamily[800]
-                          : fontFamily[600],
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {m.short}
-                  </Text>
-                </Tap>
-              );
-            })}
-          </View>
-        </View>
+        {/* Segmented de mercado (AR / EEUU / Crypto) — componente
+            compartido con Portfolio. */}
+        <MarketSegmented
+          value={market.id as MarketSegmentedValue}
+          onChange={(v) => {
+            if (v === "all") return;
+            const idx = MARKET_TABS.findIndex((m) => m.id === v);
+            if (idx >= 0) switchMarket(idx);
+          }}
+        />
 
         <View style={s.searchRow}>
           <View
@@ -435,81 +394,6 @@ function BaseExplore() {
   );
 }
 
-/* ─── Glyph del mercado para los segmented tabs ─── */
-
-function MarketGlyph({
-  market,
-  active,
-}: {
-  market: AssetMarket;
-  /** Cuando active=true, le aplicamos una capa verde sutil al glyph
-   *  para diferenciar claramente el mercado seleccionado del que no.
-   *  Para AR/US es un overlay round (pill) sobre la bandera; para
-   *  crypto, como ya es un pill verde brand, no hace falta. */
-  active?: boolean;
-}) {
-  const { c } = useTheme();
-  if (market === "AR" || market === "US") {
-    return (
-      <View style={gs.flagWrap}>
-        <FlagIcon code={market === "AR" ? "AR" : "US"} size={18} />
-        {active ? (
-          <View
-            pointerEvents="none"
-            style={[
-              gs.flagTint,
-              { backgroundColor: "rgba(0, 200, 5, 0.04)" },
-            ]}
-          />
-        ) : null}
-      </View>
-    );
-  }
-  // Crypto: pill verde con ₿ — no hay bandera, así que armamos un
-  // glyph que mantenga el peso visual de las dos primeras opciones.
-  // Como el bg ya es verde brand, no necesita el tint extra.
-  return (
-    <View
-      style={[gs.cryptoBadge, { backgroundColor: c.greenDark }]}
-    >
-      <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
-    </View>
-  );
-}
-
-const gs = StyleSheet.create({
-  flagWrap: {
-    width: 18,
-    height: 18,
-    position: "relative",
-  },
-  /* Overlay verde MUY sutil sobre la bandera del mercado activo —
-   * 4% de alpha para apenas dar señal sin saturar el verde acumulado
-   * con el bg del pill y el label en brand. Round-pill matching la
-   * bandera (que tiene borderRadius 999). */
-  flagTint: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderCurve: "continuous",
-    borderRadius: 999,
-  },
-  cryptoBadge: {
-    width: 18,
-    height: 18,
-    borderCurve: "continuous",
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cryptoBadgeText: {
-    fontFamily: fontFamily[800],
-    fontSize: 11,
-    lineHeight: 13,
-  },
-});
 
 /* ─── Body: movers + lista de instrumentos ─── */
 
@@ -914,31 +798,6 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-  },
-  marketControl: {
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    paddingTop: 4,
-    paddingBottom: 4,
-    marginBottom: 14,
-  },
-  marketSeg: {
-    flexDirection: "row",
-    gap: 2,
-  },
-  marketSegBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  marketSegLabel: {
-    fontSize: 13,
-    letterSpacing: -0.1,
   },
   searchRow: {
     flexDirection: "row",

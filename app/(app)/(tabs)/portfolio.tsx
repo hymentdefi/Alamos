@@ -17,6 +17,7 @@ import {
   assets,
   assetCurrency,
   assetIconCode,
+  assetMarket,
   formatARS,
   formatMoney,
   formatPct,
@@ -33,6 +34,10 @@ import {
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
+import {
+  MarketSegmented,
+  type MarketSegmentedValue,
+} from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
 
 /**
@@ -180,6 +185,8 @@ export default function PortfolioScreen() {
   const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
+  const [marketFilter, setMarketFilter] =
+    useState<MarketSegmentedValue>("all");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const balancePagerRef = useRef<ScrollView | null>(null);
@@ -187,14 +194,16 @@ export default function PortfolioScreen() {
   /* ─── Data ───────────────────────────────────────────────────── */
 
   // Holdings = activos que tenés con qty > 0, excluyendo el efectivo
-  // (eso ya vive en "Tu dinero" del Inicio).
-  const holdings = useMemo(
-    () =>
-      assets.filter(
-        (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
-      ),
-    [],
-  );
+  // (eso ya vive en "Tu dinero" del Inicio). El filtro del segmented
+  // (AR / EE.UU / Crypto / Todo) se aplica downstream — el hero, el
+  // chart y la lista responden al mismo subset.
+  const holdings = useMemo(() => {
+    const all = assets.filter(
+      (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+    );
+    if (marketFilter === "all") return all;
+    return all.filter((a) => assetMarket(a) === marketFilter);
+  }, [marketFilter]);
 
   // Valor total en ARS de los holdings — convertimos cada uno desde
   // su moneda nativa.
@@ -429,6 +438,17 @@ export default function PortfolioScreen() {
             <Text style={[s.timeLabel, { color: c.textMuted }]}>
               {timeLabel}
             </Text>
+          </View>
+
+          {/* Segmented de mercado — mismo lenguaje que en la tab
+              Mercado, con un tab "Todo" extra al principio (isotipo
+              Alamos como flag). Filtra holdings, hero y chart. */}
+          <View style={s.segmentedWrap}>
+            <MarketSegmented
+              value={marketFilter}
+              onChange={setMarketFilter}
+              withAll
+            />
           </View>
 
           {/* Chart */}
@@ -745,6 +765,15 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.2,
+  },
+  /* Wrap del segmented — el componente trae su propio marginBottom
+   * de 14, le agregamos marginTop para separarlo del deltaRow y un
+   * marginHorizontal: -4 para que se acerque al borde igual que en
+   * Mercado (que vive con paddingHorizontal: 20 vs los 24 del
+   * heroBlock acá). */
+  segmentedWrap: {
+    marginTop: 14,
+    marginHorizontal: -4,
   },
   chartWrap: {
     marginTop: 16,
