@@ -1,16 +1,14 @@
 import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import Svg, { Ellipse, G, Text as SvgText } from "react-native-svg";
 import Animated, {
   Easing,
-  useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-
-const AnimatedG = Animated.createAnimatedComponent(G);
-const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 interface Props {
   /** Tamaño del cuadrado del SVG. Default 220. */
@@ -34,11 +32,18 @@ interface Props {
  *   - La pila ($) hace un translateY hacia arriba con curva de
  *     gravedad (out cuadratic para subir, in cuadratic para caer)
  *     + un re-bote chico antes de settle.
- *   - La sombra del piso queda anclada en su Y, pero su `rx`
+ *   - La sombra del piso queda anclada en su Y, pero su scaleX
  *     varía inversamente con la altura del símbolo: cuanto más
  *     lejos está la pila del piso, más chica/transparente la
  *     sombra. Cuando la pila impacta (overshoot positivo en Y),
  *     la sombra se agranda. Da un feel "hay luz desde arriba".
+ *
+ * Implementación: dos SVGs apilados en absolute, cada uno
+ * envuelto en Animated.View con su propio transform (translateY
+ * para la pila, scaleX + opacity para la sombra). Esta separación
+ * a nivel View evita los problemas de useAnimatedProps en
+ * react-native-svg, que no propaga animaciones de transform/x/y
+ * en <G> de manera consistente entre versiones.
  */
 export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
   // Capas de profundidad — clavadas al SVG fuente.
@@ -47,9 +52,8 @@ export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
     y: 159.2 + i * 0.6,
   }));
 
-  // jumpY = displacement en unidades del viewBox (0 = piso normal,
-  // negativo = pila en el aire, positivo = "compresión" sobre el
-  // piso).
+  // jumpY = displacement vertical en pixels de pantalla (no en
+  // unidades del viewBox — Animated.View transform usa px).
   const jumpY = useSharedValue(0);
 
   useEffect(() => {
@@ -61,14 +65,14 @@ export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
     jumpY.value = withDelay(
       220,
       withSequence(
-        // Salto principal hacia arriba (out cuadratic — siente la
-        // fuerza inicial del salto).
+        // Salto principal hacia arriba (out cuadratic — siente
+        // la fuerza inicial del salto).
         withTiming(-26, {
           duration: 220,
           easing: Easing.out(Easing.quad),
         }),
-        // Caída con gravedad (in cuadratic) y overshoot leve hacia
-        // abajo simulando el impacto.
+        // Caída con gravedad (in cuadratic) y overshoot leve
+        // hacia abajo simulando el impacto.
         withTiming(8, {
           duration: 280,
           easing: Easing.in(Easing.quad),
@@ -91,65 +95,83 @@ export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
     );
   }, [play, jumpY]);
 
-  // La pila se traslada con jumpY en unidades del viewBox.
-  // Uso el prop `y` directo (no `transform` string) porque
-  // react-native-svg lo trata como una prop numérica nativa y
-  // se anima sin parsing — el transform string no siempre re-
-  // calcula al cambiar via animatedProps.
-  const stackProps = useAnimatedProps(() => ({
-    y: jumpY.value,
+  // La pila se traslada con jumpY en px de pantalla.
+  const stackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: jumpY.value }],
   }));
 
-  // La sombra: su `rx` varía de ~38 (pila en el aire, jumpY=-26)
-  // a ~60 (pila impactando, jumpY=+8). Mapeo lineal:
-  //   rx = 55 + jumpY * 0.6
-  // Y la opacidad amplifica el contraste — más oscura cuando la
-  // pila impacta, más transparente cuando vuela.
-  const shadowProps = useAnimatedProps(() => ({
-    rx: 55 + jumpY.value * 0.6,
+  // La sombra se mantiene anchored. Su scaleX y opacity varían
+  // inversamente con la altura: jumpY=-26 (pila volando) →
+  // scaleX≈0.71 + opacity≈0.07 (chica + transparente). jumpY=+8
+  // (impacto) → scaleX≈1.09 + opacity≈0.16 (grande + más oscura).
+  const shadowStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: 1 + jumpY.value * 0.011 }],
     opacity: 0.14 + jumpY.value * 0.0024,
   }));
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 220 220">
-      <AnimatedEllipse
-        cx={120}
-        cy={205}
-        ry={6}
-        fill="#0E0F0C"
-        animatedProps={shadowProps}
-      />
-      <AnimatedG animatedProps={stackProps}>
-        <G
-          fontFamily="Plus Jakarta Sans, system-ui, sans-serif"
-          fontWeight="900"
-          fontSize={180}
-          textAnchor="middle"
+    <View style={{ width: size, height: size }}>
+      {/* Layer 1: sombra. Ellipse statica adentro de un SVG
+          full-size para preservar la posición original (cy=205
+          en viewBox 220). El Animated.View transforma scaleX +
+          opacity. */}
+      <Animated.View style={[StyleSheet.absoluteFill, shadowStyle]}>
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 220 220"
+          preserveAspectRatio="xMidYMid meet"
         >
-          {layers.map((l, i) => (
+          <Ellipse
+            cx={120}
+            cy={205}
+            rx={55}
+            ry={6}
+            fill="#0E0F0C"
+          />
+        </Svg>
+      </Animated.View>
+
+      {/* Layer 2: la pila $. Misma viewBox 220×220, posicionada
+          en absoluteFill. El Animated.View transforma translateY. */}
+      <Animated.View style={[StyleSheet.absoluteFill, stackStyle]}>
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 220 220"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <G
+            fontFamily="Plus Jakarta Sans, system-ui, sans-serif"
+            fontWeight="900"
+            fontSize={180}
+            textAnchor="middle"
+          >
+            {layers.map((l, i) => (
+              <SvgText
+                key={i}
+                x={l.x}
+                y={l.y}
+                fill="#00B864"
+                stroke="#008F4E"
+                strokeWidth={0.8}
+              >
+                $
+              </SvgText>
+            ))}
             <SvgText
-              key={i}
-              x={l.x}
-              y={l.y}
-              fill="#00B864"
-              stroke="#008F4E"
-              strokeWidth={0.8}
+              x={110}
+              y={170}
+              fill="#00E676"
+              stroke="#0E0F0C"
+              strokeWidth={2.5}
+              paintOrder="stroke"
             >
               $
             </SvgText>
-          ))}
-          <SvgText
-            x={110}
-            y={170}
-            fill="#00E676"
-            stroke="#0E0F0C"
-            strokeWidth={2.5}
-            paintOrder="stroke"
-          >
-            $
-          </SvgText>
-        </G>
-      </AnimatedG>
-    </Svg>
+          </G>
+        </Svg>
+      </Animated.View>
+    </View>
   );
 }
