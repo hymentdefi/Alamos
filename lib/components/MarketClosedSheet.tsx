@@ -170,11 +170,11 @@ export function MarketClosedSheet({
               .
             </Text>
             <Text style={[s.scheduledNote, { color: c.textMuted }]}>
-              Podés mandar tus{" "}
+              Igual podés mandar tus{" "}
               <Text style={[s.subtitleBold, { color: c.text }]}>
                 órdenes de compra y venta
-              </Text>{" "}
-              ahora — quedan{" "}
+              </Text>
+              . Quedan{" "}
               <Text style={[s.subtitleBold, { color: c.text }]}>
                 programadas
               </Text>{" "}
