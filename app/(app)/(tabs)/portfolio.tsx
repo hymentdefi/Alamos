@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -413,40 +413,55 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
     });
   }, [allocations]);
 
-  // Resolver de touch X → bloque activo. CORRE EN JS — los workers
-  // de gesture (onBegin/onUpdate) no pueden llamar funciones JS
-  // regulares directamente (crashea). Pasamos sólo `x` por runOnJS
-  // y todo el resto de la lógica vive acá.
-  const handleTouch = useCallback(
-    (touchPx: number | null) => {
-      if (touchPx === null || containerW === 0) {
-        if (activeIdx !== null) setActiveIdx(null);
-        return;
-      }
-      const svgX = (touchPx / containerW) * W;
-      let next: number | null = null;
+  // El gesture object SE CONSTRUYE UNA SOLA VEZ — si el handleTouch
+  // dependiera de state que cambia mid-press (activeIdx, blocks,
+  // containerW), el useMemo del Pan se rebuildaría y el
+  // GestureDetector recibiría una gesture nueva mientras el dedo
+  // todavía está apoyado. La gesture in-flight queda zombie y no
+  // dispara onEnd/onFinalize → highlight stuck.
+  //
+  // Solución: refs para todo lo mutable. handleTouch tiene deps
+  // vacíos y lee siempre el último valor via .current.
+  const activeIdxRef = useRef<number | null>(null);
+  const containerWRef = useRef(0);
+  const blocksRef = useRef(blocks);
+
+  useEffect(() => {
+    containerWRef.current = containerW;
+  }, [containerW]);
+  useEffect(() => {
+    blocksRef.current = blocks;
+  }, [blocks]);
+
+  const handleTouch = useCallback((touchPx: number | null) => {
+    let next: number | null = null;
+    const cW = containerWRef.current;
+    const blks = blocksRef.current;
+    if (touchPx !== null && cW > 0) {
+      const svgX = (touchPx / cW) * W;
       if (svgX >= xL && svgX <= xL + wallW) {
-        const idx = blocks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
+        const idx = blks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
         next = idx >= 0 ? idx : null;
       }
-      if (next === activeIdx) return;
-      setActiveIdx(next);
-      if (next !== null) Haptics.selectionAsync().catch(() => {});
-    },
-    [containerW, blocks, xL, wallW, activeIdx],
-  );
+    }
+    if (next === activeIdxRef.current) return;
+    activeIdxRef.current = next;
+    setActiveIdx(next);
+    if (next !== null) Haptics.selectionAsync().catch(() => {});
+  // xL y wallW son constantes locales del componente — no cambian.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Pan después de 150ms de long-press — evita conflicto con el
-  // scroll vertical del ScrollView padre. El usuario "agarra" el
-  // ladrillo y desliza para inspeccionar. Todos los callbacks
-  // sólo despachan x a JS via runOnJS — evitamos llamar funciones
-  // no-worklet desde el thread UI.
+  // scroll vertical del ScrollView padre. handleTouch es estable,
+  // así que esta gesture se construye una sola vez y nunca se
+  // rebuildea — la in-flight nunca queda zombie.
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(0)
         .activateAfterLongPress(150)
-        .onBegin((e) => {
+        .onStart((e) => {
           "worklet";
           runOnJS(handleTouch)(e.x);
         })
