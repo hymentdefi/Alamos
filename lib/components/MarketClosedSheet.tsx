@@ -17,6 +17,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { fontFamily, fontMono, radius, useTheme } from "../theme";
@@ -122,6 +123,37 @@ export function MarketClosedSheet({
     opacity: backdropOpacity.value,
   }));
 
+  /* ─── Candado interactivo — pan gesture en la ilustración ───
+   *
+   * Drag con el dedo y vuelve a su lugar con spring rebotón al soltar.
+   * Una rotación sutil ligada a translationX da feel "candado
+   * balanceándose" — divertido y sirve para que el user se quede unos
+   * segundos jugando antes de dismiss-ear el sheet. La gesture es
+   * propia de la ilustración; el swipe-down de dismiss del sheet sigue
+   * andando en el resto del área. */
+  const lockTX = useSharedValue(0);
+  const lockTY = useSharedValue(0);
+  const lockPan = Gesture.Pan()
+    .onUpdate((e) => {
+      "worklet";
+      lockTX.value = e.translationX;
+      lockTY.value = e.translationY;
+    })
+    .onEnd(() => {
+      "worklet";
+      lockTX.value = withSpring(0, { damping: 7, stiffness: 110 });
+      lockTY.value = withSpring(0, { damping: 7, stiffness: 110 });
+    });
+
+  const lockStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: lockTX.value },
+      { translateY: lockTY.value },
+      // 0.06 deg por px de drag → drag de 80px ≈ 5 deg. Tilt sutil.
+      { rotate: `${lockTX.value * 0.06}deg` },
+    ],
+  }));
+
   return (
     <Modal
       visible={visible}
@@ -153,9 +185,11 @@ export function MarketClosedSheet({
           </View>
 
           <View style={s.content}>
-            <View style={s.illustrationWrap}>
-              <MarketClosedIllustration size={188} />
-            </View>
+            <GestureDetector gesture={lockPan}>
+              <Animated.View style={[s.illustrationWrap, lockStyle]}>
+                <MarketClosedIllustration size={188} />
+              </Animated.View>
+            </GestureDetector>
 
             <Text style={[s.title, { color: c.text }]}>Mercado cerrado</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
