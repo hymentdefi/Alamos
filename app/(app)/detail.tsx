@@ -44,12 +44,12 @@ import {
   seriesFromSeed,
 } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
-import { AlamosIcon } from "../../lib/components/AlamosIcon";
 import { WatchlistButton } from "../../lib/components/WatchlistButton";
 import {
   isMarketOpen,
-  closedHeroMessageFor,
+  marketSessionFor,
 } from "../../lib/market/hours";
+import { MarketClosedIcon } from "../../lib/components/MarketClosedIcon";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { AlertSheet } from "../../lib/components/AlertSheet";
@@ -257,9 +257,14 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
       >
         <View style={s.heroBlock}>
-          <Text style={[s.heroTicker, { color: c.textMuted }]}>
-            {asset.ticker}
-          </Text>
+          <View style={s.heroTickerRow}>
+            <Text style={[s.heroTicker, { color: c.textMuted }]}>
+              {asset.ticker}
+            </Text>
+            {/* Icono de mercado cerrado — sólo aparece cuando aplica
+                (no en crypto / FCI). Tap → abre MarketClosedSheet. */}
+            <MarketClosedIcon session={marketSessionFor(asset)} size={20} />
+          </View>
           <Text style={[s.heroName, { color: c.text }]} numberOfLines={2}>
             {asset.name}
           </Text>
@@ -279,34 +284,6 @@ export default function DetailScreen() {
             </Text>
           </View>
 
-          {/* Banner de mercado cerrado: copy específico por escenario
-              (after-hours / fin de semana / feriado AR / feriado US).
-              Crypto y FCI no muestran nada (24/7 / horario continuo).
-              Reactivado — se había eliminado en un refactor previo y
-              quedaba sólo un texto sutil sin el banner que lo enmarca. */}
-          {(() => {
-            const closedMsg = closedHeroMessageFor(asset);
-            return closedMsg ? (
-              <View
-                style={[
-                  s.closedBanner,
-                  { backgroundColor: c.surfaceHover, borderColor: c.border },
-                ]}
-              >
-                <AlamosIcon
-                  name="pendiente"
-                  size={18}
-                  color={c.textSecondary}
-                />
-                <Text
-                  style={[s.closedText, { color: c.textSecondary }]}
-                  numberOfLines={2}
-                >
-                  {closedMsg}
-                </Text>
-              </View>
-            ) : null;
-          })()}
 
           <Sparkline
             series={series}
@@ -1859,6 +1836,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 12,
   },
+  heroTickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   heroTicker: {
     fontFamily: fontFamily[700],
     fontSize: 12,
@@ -1904,25 +1886,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: 0.3,
-  },
-  closedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderWidth: 1,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  closedText: {
-    flex: 1,
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.1,
   },
   positionCard: {
     marginHorizontal: 20,

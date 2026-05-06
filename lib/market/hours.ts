@@ -1,4 +1,4 @@
-import type { Asset } from "../data/assets";
+import type { Asset, AssetMarket } from "../data/assets";
 import { assetMarket } from "../data/assets";
 import { holidayOn, type Holiday, type MarketCode } from "./calendar";
 
@@ -154,6 +154,43 @@ export function marketSessionFor(
     hours: "10:30 a 17:00 hs",
     days: "lunes a viernes",
     instrumentLabel,
+  };
+}
+
+/**
+ * Versión "global" de `marketSessionFor` — devuelve la sesión del
+ * mercado entero (AR / US / CRYPTO) sin depender de un activo
+ * específico. Útil para chrome de la tab Mercado donde no hay un
+ * activo en foco.
+ */
+export function marketSessionByMarket(
+  market: AssetMarket,
+  date: Date = new Date(),
+): MarketSession {
+  if (market === "CRYPTO") {
+    return {
+      open: true,
+      hours: "24 horas",
+      days: "todos los días",
+      instrumentLabel: "Crypto",
+    };
+  }
+  const { day, hour, minute } = argentinaNow(date);
+  const isWeekend = day === 0 || day === 6;
+  const mins = minutesOfDay(hour, minute);
+  if (market === "US") {
+    return {
+      open: !isWeekend && mins >= US_OPEN_MINS && mins < US_CLOSE_MINS,
+      hours: "11:30 a 18:00 hs (ART)",
+      days: "lunes a viernes",
+      instrumentLabel: "Acciones estadounidenses",
+    };
+  }
+  return {
+    open: !isWeekend && mins >= OPEN_MINS && mins < CLOSE_MINS,
+    hours: "10:30 a 17:00 hs",
+    days: "lunes a viernes",
+    instrumentLabel: "Mercado argentino",
   };
 }
 

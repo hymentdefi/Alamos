@@ -47,6 +47,8 @@ import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
+import { MarketClosedIcon } from "../../../lib/components/MarketClosedIcon";
+import { marketSessionByMarket } from "../../../lib/market/hours";
 import Reanimated, {
   FadeInUp,
   FadeOutDown,
@@ -258,7 +260,13 @@ function BaseExplore() {
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
-          <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+          <View style={s.titleWithBadge}>
+            <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+            <MarketClosedIcon
+              session={marketSessionByMarket(market.id)}
+              size={22}
+            />
+          </View>
           <View style={s.balanceWrap}>
             <Text style={[s.balanceLabel, { color: c.textFaint }]}>
               Fondos disponibles
@@ -861,6 +869,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 14,
+  },
+  titleWithBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   title: {
     fontFamily: fontFamily[700],
