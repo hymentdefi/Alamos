@@ -18,11 +18,11 @@ import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
 
-const BAR_CONTENT_HEIGHT = 60;
+const BAR_CONTENT_HEIGHT = 68;
 const ACTIVE_COLOR = "#5ac43e";
-const PILL_INSET_X = 6;
+const PILL_INSET_X = 0;
 const PILL_INSET_Y = 6;
-const ROW_PADDING_X = 6;
+const ROW_PADDING_X = 0;
 
 type TabRoute = {
   name: string;
