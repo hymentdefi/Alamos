@@ -1688,23 +1688,28 @@ const s = StyleSheet.create({
     fontSize: 14,
     letterSpacing: -0.2,
   },
+  /* Distribución por flex igualitaria: las 7 pills + el gear
+   * ocupan exactamente 1/8 del row cada una, con su contenido
+   * centrado adentro. Antes con space-between el gear quedaba
+   * más angosto que las pills y la fila se sentía corrida. */
   rangeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 0,
-    paddingHorizontal: 4,
   },
-  /* Range pills clavadas al estilo del stock detail — pill fully
-   * rounded (radius.pill), padding 16/8, text 13 con ls 0.3.
-   * Cuando active, fondo del chartColor y texto en c.bg. */
+  /* Range pills — fully rounded (radius.pill) + padding vertical
+   * 8. Width via flex:1, contenido centrado. Cuando active,
+   * fondo del chartColor y texto en c.bg. */
   rangePill: {
-    paddingHorizontal: 16,
+    flex: 1,
     paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
     borderCurve: "continuous",
     borderRadius: radius.pill,
   },
   rangeSettingsBtn: {
-    paddingHorizontal: 6,
+    flex: 1,
     paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
