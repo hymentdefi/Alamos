@@ -398,7 +398,7 @@ function BaseHome() {
               hitSlop={8}
               haptic="medium"
             >
-              <TopRightIcon name="sorpresa" size={40} />
+              <TopRightIcon name="sorpresa" size={46} />
             </Tap>
           </Animated.View>
           <Tap
@@ -409,7 +409,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={40}
+              size={46}
             />
           </Tap>
         </View>
@@ -1098,8 +1098,8 @@ const s = StyleSheet.create({
   /* Pill que envuelve el TopRightIcon — el ícono ya trae su propio
      fondo (tint verde), así que el botón solo aporta hit area. */
   topIconBtn: {
-    width: 40,
-    height: 40,
+    width: 46,
+    height: 46,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
