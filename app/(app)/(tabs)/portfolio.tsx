@@ -105,21 +105,50 @@ export default function PortfolioScreen() {
   const groupedByCategory = useMemo(() => {
     const map = new Map<
       string,
-      { totalArs: number; count: number }
+      { totalArs: number; count: number; cat: AssetCategory }
     >();
     for (const { asset, ars } of holdingsSorted) {
       const slug = categorizeAsset(asset);
       if (!slug) continue;
-      const prev = map.get(slug) ?? { totalArs: 0, count: 0 };
+      const prev = map.get(slug) ?? {
+        totalArs: 0,
+        count: 0,
+        cat: asset.category,
+      };
       map.set(slug, {
         totalArs: prev.totalArs + ars,
         count: prev.count + 1,
+        cat: asset.category,
       });
     }
     return [...map.entries()].sort(
       ([, a], [, b]) => b.totalArs - a.totalArs,
     );
   }, [holdingsSorted]);
+
+  /* Color + pct del ladrillo por categoría — agrupamos por
+   * asset.category (mismo que hace el brick en groupBy=category)
+   * y asignamos BRICK_PALETTE[i] por rank. Cada row de "Tus
+   * posiciones" hereda el color y el pct de su categoría, así
+   * el ladrillo y la lista hablan el mismo idioma cromático. */
+  const categoryAllocations = useMemo(() => {
+    const totals = new Map<AssetCategory, number>();
+    for (const h of holdingsSorted) {
+      totals.set(
+        h.asset.category,
+        (totals.get(h.asset.category) ?? 0) + h.ars,
+      );
+    }
+    const sorted = [...totals.entries()].sort(([, a], [, b]) => b - a);
+    const result = new Map<AssetCategory, { color: string; pct: number }>();
+    sorted.forEach(([cat, ars], i) => {
+      result.set(cat, {
+        color: BRICK_PALETTE[i % BRICK_PALETTE.length],
+        pct: totalArs > 0 ? (ars / totalArs) * 100 : 0,
+      });
+    });
+    return result;
+  }, [holdingsSorted, totalArs]);
 
   /* ─── Handlers ──────────────────────────────────────────────── */
 
@@ -220,6 +249,11 @@ export default function PortfolioScreen() {
                 const lookup = findCategoryBySlug(slug);
                 if (!lookup) return null;
                 const { category } = lookup;
+                // Color + pct del ladrillo correspondiente a la
+                // categoría — comparten paleta y aggregation con
+                // el brick. Multiple slug-rows que mapean a la
+                // misma categoría heredan el mismo color/pct.
+                const alloc = categoryAllocations.get(data.cat);
                 return (
                   <Pressable
                     key={slug}
@@ -237,6 +271,17 @@ export default function PortfolioScreen() {
                       },
                     ]}
                   >
+                    {/* Bloquecito de color que matchea el ladrillo —
+                        12px squarish, mismo lenguaje que la legend
+                        que tenía el brick antes. */}
+                    {alloc ? (
+                      <View
+                        style={[
+                          s.invRowSwatch,
+                          { backgroundColor: alloc.color },
+                        ]}
+                      />
+                    ) : null}
                     <View style={{ flex: 1 }}>
                       <Text
                         style={[s.invRowLabel, { color: c.text }]}
@@ -259,6 +304,16 @@ export default function PortfolioScreen() {
                       >
                         {formatARS(data.totalArs)}
                       </Text>
+                      {alloc ? (
+                        <Text
+                          style={[
+                            s.invRowPct,
+                            { color: c.textMuted },
+                          ]}
+                        >
+                          {formatAllocationPct(alloc.pct / 100)}
+                        </Text>
+                      ) : null}
                     </View>
                     <Feather
                       name="chevron-right"
@@ -882,25 +937,6 @@ function AllocationBrick({
         ) : null}
       </View>
 
-      <View style={s.allocLegendGrid}>
-        {blocks.map((b) => (
-          <View key={b.key} style={s.allocLegendRowGrid}>
-            <View
-              style={[s.allocLegendDot, { backgroundColor: b.color }]}
-            />
-            <Text
-              style={[s.allocLegendLabel, { color: c.text }]}
-              numberOfLines={1}
-            >
-              {b.label}
-            </Text>
-            <Text style={[s.allocLegendPct, { color: c.text }]}>
-              {formatAllocationPct(b.pct / 100)}
-            </Text>
-          </View>
-        ))}
-      </View>
-
       <BalanceInfoSheet
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
@@ -1026,6 +1062,14 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
   },
+  /* Swatch de color que matchea el bloque del ladrillo de esa
+   * categoría — squarish con esquinas continuas, 14px de lado. */
+  invRowSwatch: {
+    width: 14,
+    height: 14,
+    borderCurve: "continuous",
+    borderRadius: 3,
+  },
   invRowLabel: {
     fontFamily: fontFamily[700],
     fontSize: 15,
@@ -1041,6 +1085,15 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
+  },
+  /* Pct del ladrillo correspondiente — chico, gris, debajo del
+   * total ARS. Refleja la fracción de la categoría sobre el
+   * portfolio entero. */
+  invRowPct: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 2,
   },
 
 
@@ -1175,37 +1228,5 @@ const s = StyleSheet.create({
     height: 8,
     marginTop: -4,
     transform: [{ rotate: "45deg" }],
-  },
-  allocLegendGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 12,
-  },
-  allocLegendRowGrid: {
-    width: "50%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-    paddingRight: 12,
-  },
-  /* Cuadradito (no círculo) para alinear con el lenguaje "ladrillo"
-   * del chart — cada legend dot es un mini-bloque. */
-  allocLegendDot: {
-    width: 9,
-    height: 9,
-    borderCurve: "continuous",
-    borderRadius: 2,
-  },
-  allocLegendLabel: {
-    flex: 1,
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.1,
-  },
-  allocLegendPct: {
-    fontFamily: fontFamily[800],
-    fontSize: 12,
-    letterSpacing: -0.1,
   },
 });
