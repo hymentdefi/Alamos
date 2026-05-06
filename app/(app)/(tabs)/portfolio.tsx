@@ -413,47 +413,56 @@ function AllocationBrick({ holdings, totalArs }: AllocationBrickProps) {
     });
   }, [allocations]);
 
-  const setActiveSafe = useCallback(
-    (idx: number | null) => {
-      if (idx === activeIdx) return;
-      setActiveIdx(idx);
-      if (idx !== null) Haptics.selectionAsync().catch(() => {});
-    },
-    [activeIdx],
-  );
-
-  const findIdxAtX = useCallback(
-    (touchPx: number): number | null => {
-      if (containerW === 0) return null;
+  // Resolver de touch X → bloque activo. CORRE EN JS — los workers
+  // de gesture (onBegin/onUpdate) no pueden llamar funciones JS
+  // regulares directamente (crashea). Pasamos sólo `x` por runOnJS
+  // y todo el resto de la lógica vive acá.
+  const handleTouch = useCallback(
+    (touchPx: number | null) => {
+      if (touchPx === null || containerW === 0) {
+        if (activeIdx !== null) setActiveIdx(null);
+        return;
+      }
       const svgX = (touchPx / containerW) * W;
-      if (svgX < xL || svgX > xL + wallW) return null;
-      const idx = blocks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
-      return idx >= 0 ? idx : null;
+      let next: number | null = null;
+      if (svgX >= xL && svgX <= xL + wallW) {
+        const idx = blocks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
+        next = idx >= 0 ? idx : null;
+      }
+      if (next === activeIdx) return;
+      setActiveIdx(next);
+      if (next !== null) Haptics.selectionAsync().catch(() => {});
     },
-    [containerW, blocks, xL, wallW],
+    [containerW, blocks, xL, wallW, activeIdx],
   );
 
   // Pan después de 150ms de long-press — evita conflicto con el
   // scroll vertical del ScrollView padre. El usuario "agarra" el
-  // ladrillo y desliza para inspeccionar.
+  // ladrillo y desliza para inspeccionar. Todos los callbacks
+  // sólo despachan x a JS via runOnJS — evitamos llamar funciones
+  // no-worklet desde el thread UI.
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(0)
         .activateAfterLongPress(150)
         .onBegin((e) => {
-          runOnJS(setActiveSafe)(findIdxAtX(e.x));
+          "worklet";
+          runOnJS(handleTouch)(e.x);
         })
         .onUpdate((e) => {
-          runOnJS(setActiveSafe)(findIdxAtX(e.x));
+          "worklet";
+          runOnJS(handleTouch)(e.x);
         })
         .onEnd(() => {
-          runOnJS(setActiveSafe)(null);
+          "worklet";
+          runOnJS(handleTouch)(null);
         })
         .onFinalize(() => {
-          runOnJS(setActiveSafe)(null);
+          "worklet";
+          runOnJS(handleTouch)(null);
         }),
-    [findIdxAtX, setActiveSafe],
+    [handleTouch],
   );
 
   const dimmedFront = c.surfaceSunken;
