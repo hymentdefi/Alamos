@@ -281,16 +281,12 @@ function BaseExplore() {
                 style={({ pressed }) => [
                   s.addBalanceBtn,
                   {
-                    backgroundColor: c.brandDim,
+                    borderColor: c.brand,
                     transform: [{ scale: pressed ? 0.92 : 1 }],
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name="plus-thick"
-                  size={12}
-                  color={c.brand}
-                />
+                <Feather name="plus" size={14} color={c.brand} />
               </Pressable>
             </View>
           </View>
@@ -907,14 +903,16 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  /* Botón '+' alamos-style — pill chiquita con tint verde brand
-   * (c.brandDim) y un plus-thick adentro en c.brand. Mismo
-   * lenguaje que los acentos verdes del resto de la app. */
+  /* Botón '+' al estilo del WatchlistButton del stock detail —
+   * círculo outline con un Feather "plus" en brand green. Sin fill,
+   * borde 1.2 fino para feel afinado y consistente con el "+" del
+   * header del detalle. */
   addBalanceBtn: {
     width: 22,
     height: 22,
     borderCurve: "continuous",
-    borderRadius: 11,
+    borderRadius: 999,
+    borderWidth: 1.2,
     alignItems: "center",
     justifyContent: "center",
   },
