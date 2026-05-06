@@ -762,10 +762,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            // Tint brand verde sutil (6%) sin borde — el texto y
-            // el chevron en c.brand cargan el peso cromático, el
-            // fondo apenas insinúa el frame sin gritar.
-            backgroundColor: "rgba(0,200,5,0.06)",
+            // Bg c.surfaceHover — mismo gris sutil que los chips
+            // de ticker. Texto y chevron en c.brand cargan el
+            // peso cromático.
+            backgroundColor: c.surfaceHover,
             transform: [
               { translateY: bounce },
               { scale: pulse },
