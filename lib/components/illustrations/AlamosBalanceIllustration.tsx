@@ -92,8 +92,12 @@ export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
   }, [play, jumpY]);
 
   // La pila se traslada con jumpY en unidades del viewBox.
+  // Uso el prop `y` directo (no `transform` string) porque
+  // react-native-svg lo trata como una prop numérica nativa y
+  // se anima sin parsing — el transform string no siempre re-
+  // calcula al cambiar via animatedProps.
   const stackProps = useAnimatedProps(() => ({
-    transform: `translate(0 ${jumpY.value})`,
+    y: jumpY.value,
   }));
 
   // La sombra: su `rx` varía de ~38 (pila en el aire, jumpY=-26)
