@@ -375,16 +375,29 @@ export default function NewsScreen() {
                 pressScale={0.93}
                 style={[
                   s.catPill,
-                  {
-                    backgroundColor: active ? c.ink : c.surfaceHover,
-                    borderColor: active ? c.ink : c.border,
-                  },
+                  active
+                    ? {
+                        // Pill activa — outline brand green con tint
+                        // muy sutil adentro. El color y el frame
+                        // alcanzan; sin solid fill.
+                        backgroundColor: "rgba(0,200,5,0.06)",
+                        borderColor: c.brand,
+                        borderWidth: 1.5,
+                      }
+                    : {
+                        backgroundColor: "transparent",
+                        borderColor: c.border,
+                        borderWidth: 1.5,
+                      },
                 ]}
               >
                 <Text
                   style={[
                     s.catPillText,
-                    { color: active ? c.bg : c.textSecondary },
+                    {
+                      color: active ? c.brand : c.textSecondary,
+                      fontFamily: active ? fontFamily[700] : fontFamily[600],
+                    },
                   ]}
                 >
                   {t.label}
@@ -951,7 +964,6 @@ const s = StyleSheet.create({
     paddingVertical: 7,
     borderCurve: "continuous",
     borderRadius: radius.pill,
-    borderWidth: 1,
   },
   catPillText: {
     fontFamily: fontFamily[600],
