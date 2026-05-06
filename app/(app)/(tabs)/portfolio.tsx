@@ -498,26 +498,34 @@ function AllocationBrick({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pan después de 150ms de long-press — evita conflicto con el
-  // scroll vertical del ScrollView padre. handleTouch es estable,
-  // así que esta gesture se construye una sola vez y nunca se
-  // rebuildea — la in-flight nunca queda zombie.
+  // Pan que activa al toque (minDistance 0). Para no robar el
+  // scroll vertical del ScrollView padre usamos failOffsetY:
+  // si el dedo se mueve más de 10px en Y, la Pan FALLA y el
+  // scroll toma el control. handleTouch es estable, así que la
+  // gesture se construye una sola vez — sin rebuilds mid-press.
+  //
+  // No usamos activateAfterLongPress porque tenía un estado
+  // ambiguo en taps cortos (60-100ms): el gesture activaba pero
+  // onEnd a veces no disparaba porque la Pan técnicamente "no se
+  // había movido", dejando el highlight stuck. Con minDistance(0)
+  // + failOffsetY el ciclo END / FINALIZE siempre cierra limpio.
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(0)
-        .activateAfterLongPress(60)
-        .onStart((e) => {
+        .failOffsetY([-10, 10])
+        // onBegin SIEMPRE dispara al primer touch, independiente
+        // del estado del gesture. onFinalize SIEMPRE dispara al
+        // terminar (sea END, CANCELLED o FAILED). Con esos dos
+        // garantizamos que el highlight aparece y desaparece sin
+        // importar cómo se haya cortado el gesto.
+        .onBegin((e) => {
           "worklet";
           runOnJS(handleTouch)(e.x);
         })
         .onUpdate((e) => {
           "worklet";
           runOnJS(handleTouch)(e.x);
-        })
-        .onEnd(() => {
-          "worklet";
-          runOnJS(handleTouch)(null);
         })
         .onFinalize(() => {
           "worklet";
