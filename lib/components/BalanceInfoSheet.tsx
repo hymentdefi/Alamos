@@ -17,8 +17,6 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
@@ -51,13 +49,10 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
 
-  /* Salto de la pila — translateY que sube fuerte, cae con
-   * gravedad (overshoot leve abajo, simulando el impacto contra
-   * la mesa), y un pequeño re-bote chiquito antes de settle.
-   * Delay de 220ms para que arranque cuando el sheet ya entró
-   * visualmente. Feel "saltó la pila de billetes". */
-  const heroJumpY = useSharedValue(0);
-
+  // El salto del símbolo $ + la sombra que cambia de tamaño
+  // según la altura están manejados adentro de la
+  // AlamosBalanceIllustration. Acá sólo le pasamos `play={visible}`
+  // para que dispare el ciclo cuando el sheet entra.
   useEffect(() => {
     if (visible) {
       translateY.value = withTiming(0, {
@@ -68,38 +63,6 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
         duration: 280,
         easing: Easing.out(Easing.cubic),
       });
-      heroJumpY.value = 0;
-      heroJumpY.value = withDelay(
-        220,
-        withSequence(
-          // Salto principal: sube rápido (cuadratic out → siente
-          // la fuerza inicial del salto).
-          withTiming(-26, {
-            duration: 220,
-            easing: Easing.out(Easing.quad),
-          }),
-          // Caída con gravedad (cuadratic in) y overshoot leve
-          // hacia abajo simulando el impacto.
-          withTiming(8, {
-            duration: 280,
-            easing: Easing.in(Easing.quad),
-          }),
-          // Re-bote chiquito.
-          withTiming(-6, {
-            duration: 160,
-            easing: Easing.out(Easing.quad),
-          }),
-          withTiming(2, {
-            duration: 140,
-            easing: Easing.in(Easing.quad),
-          }),
-          // Settle final.
-          withTiming(0, {
-            duration: 130,
-            easing: Easing.out(Easing.cubic),
-          }),
-        ),
-      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -157,9 +120,6 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
-  const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: heroJumpY.value }],
-  }));
 
   return (
     <Modal
@@ -192,9 +152,9 @@ export function BalanceInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
-            <Animated.View style={[s.heroWrap, heroStyle]}>
-              <AlamosBalanceIllustration size={172} />
-            </Animated.View>
+            <View style={s.heroWrap}>
+              <AlamosBalanceIllustration size={172} play={visible} />
+            </View>
 
             <Text style={[s.title, { color: c.text }]}>
               Balance unificado
