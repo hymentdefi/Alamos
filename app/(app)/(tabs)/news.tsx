@@ -635,12 +635,17 @@ function NewsCard({
           <View style={card.tickerRow}>
             {item.tickers.map((t) => {
               const change = TICKER_CHANGE.get(t) ?? null;
-              // El ticker queda en color neutro (c.text) — el
-              // tone direccional sólo lo lleva la variación. Sin
-              // borde ni fill: el chip se reduce a su contenido,
-              // alineado con el resto del card.
+              // Ticker neutro (c.text), variación con tone direccional
+              // (▲ verde / ▼ rojo). Bg gris sutil del theme para
+              // que el chip tenga frame sin gritar.
               return (
-                <View key={t} style={card.tickerPill}>
+                <View
+                  key={t}
+                  style={[
+                    card.tickerPill,
+                    { backgroundColor: c.surfaceHover },
+                  ]}
+                >
                   <Text style={[card.tickerText, { color: c.text }]}>
                     {t}
                   </Text>
@@ -1077,7 +1082,10 @@ const card = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
   },
   tickerText: {
     fontFamily: fontFamily[700],
