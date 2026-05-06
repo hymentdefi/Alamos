@@ -955,7 +955,7 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 11,
   },
   searchInput: {
     flex: 1,
