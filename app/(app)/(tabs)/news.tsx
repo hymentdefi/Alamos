@@ -250,7 +250,7 @@ const feed: NewsItem[] = [
 ];
 
 const categoryTabs: { id: Category | "todas"; label: string }[] = [
-  { id: "todas", label: "Para vos" },
+  { id: "todas", label: "Destacadas" },
   { id: "mercado", label: "Mercado" },
   { id: "crypto", label: "Crypto" },
   { id: "cedears", label: "CEDEARs" },
