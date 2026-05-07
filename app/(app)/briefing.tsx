@@ -59,7 +59,10 @@ export default function BriefingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { ticker } = useLocalSearchParams<{ ticker: string }>();
+  const { ticker, up: upParam } = useLocalSearchParams<{
+    ticker: string;
+    up?: string;
+  }>();
 
   const asset = useMemo(
     () => assets.find((a) => a.ticker === ticker),
@@ -86,10 +89,13 @@ export default function BriefingScreen() {
   }
 
   const briefing = briefingFor(asset.ticker);
-  const isUp = asset.change >= 0;
-  // Verde brand canónico (#00C805 — IGUAL en light y dark mode).
-  // c.greenDark cambia entre modos y se sentía distinto al verde
-  // que se ve en el resto de la app (action buttons, brand mark).
+  // El tone sigue rangeUp del detail (pasado vía URL param) — no
+  // asset.change que es sólo el delta diario. Así, si el usuario
+  // estaba mirando 1M en pérdidas, el briefing se ve rojo aunque
+  // el delta del día sea positivo.
+  // Default fallback al delta diario si no llegó el param.
+  const isUp =
+    upParam !== undefined ? upParam === "1" : asset.change >= 0;
   const tone = isUp ? c.brand : c.red;
   const cur = assetCurrency(asset);
 
@@ -148,7 +154,14 @@ export default function BriefingScreen() {
               key={i}
               style={[
                 s.section,
-                { borderLeftColor: tone, marginTop: i === 0 ? 24 : 22 },
+                {
+                  // Línea izquierda en gris neutro (c.border) para
+                  // no robar protagonismo cromático al título — el
+                  // tone del activo vive sólo en el título de la
+                  // sección, no en el accent line.
+                  borderLeftColor: c.border,
+                  marginTop: i === 0 ? 24 : 22,
+                },
               ]}
             >
               <Text style={[s.sectionTitle, { color: tone }]}>

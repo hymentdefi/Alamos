@@ -336,7 +336,7 @@ export default function DetailScreen() {
           </View>
         </View>
 
-        <BriefingCard asset={asset} c={c} />
+        <BriefingCard asset={asset} up={rangeUp} c={c} />
 
         {pos ? <PositionCard pos={pos} asset={asset} c={c} /> : null}
 
@@ -1624,19 +1624,20 @@ function RelatedCarousel({
  */
 function BriefingCard({
   asset,
+  up,
   c,
 }: {
   asset: Asset;
+  up: boolean;
   c: ColorMap;
 }) {
   const router = useRouter();
   const briefing = useMemo(() => briefingFor(asset.ticker), [asset.ticker]);
   // Tone canónico: c.brand (#00C805 idéntico en light + dark) si
-  // el activo está up; c.red si está en losses. Usar c.brand
-  // mantiene el verde consistente con el resto de la app
-  // (action buttons, isotipo). c.greenDark deriva por modo y
-  // generaba inconsistencia.
-  const tone = asset.change >= 0 ? c.brand : c.red;
+  // el chart está up; c.red si está en losses. Sigue rangeUp del
+  // chart — no asset.change — porque el usuario asocia el color
+  // del briefing al estado VISIBLE del chart, no al delta diario.
+  const tone = up ? c.brand : c.red;
 
   return (
     <Pressable
@@ -1644,7 +1645,10 @@ function BriefingCard({
         Haptics.selectionAsync().catch(() => {});
         router.push({
           pathname: "/(app)/briefing",
-          params: { ticker: asset.ticker },
+          // Pasamos el `up` para que la página completa use el
+          // mismo tone que el chart en el detail (rangeUp), no
+          // el delta diario del asset.
+          params: { ticker: asset.ticker, up: up ? "1" : "0" },
         });
       }}
       style={({ pressed }) => [
