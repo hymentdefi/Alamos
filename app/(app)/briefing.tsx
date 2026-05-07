@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import {
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,8 +11,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -23,28 +22,32 @@ import {
   assetCurrency,
   assets,
   formatMoney,
-  formatPct,
 } from "../../lib/data/assets";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
-/* Geometría del campo de puntitos del briefing.
- *   COLS / ROWS = densidad de la grilla.
- *   DOT_SIZE = tamaño del círculo en px.
- *   DOT_GAP = separación entre dots (margin layout, no padding).
- * Los valores quedaron tuned a un campo lleno-ancho que se siente
- * cinemático sin cargar al device con miles de Animated.Views. */
-const COLS = 18;
-const ROWS = 9;
-const DOT_SIZE = 6;
-const DOT_GAP = 14;
+/* Geometría del campo de puntitos. La grilla cubre todo el ancho
+ * de la pantalla (COLS auto-calculados a partir del width) y
+ * tiene una altura generosa (RIPPLE_H) para que el efecto se
+ * sienta cinemático.
+ *
+ * Stride = DOT_SIZE + DOT_GAP en cada eje.
+ */
+const DOT_SIZE = 5;
+const DOT_GAP = 13;
+const STRIDE = DOT_SIZE + DOT_GAP;
+const RIPPLE_H = 320;
+
+const SCREEN_W = Dimensions.get("window").width;
+const COLS = Math.floor(SCREEN_W / STRIDE);
+const ROWS = Math.floor(RIPPLE_H / STRIDE);
+const GRID_W = COLS * STRIDE - DOT_GAP;
+const GRID_H = ROWS * STRIDE - DOT_GAP;
 
 /**
- * Página completa del briefing AI. Header con close + ticker /
- * precio / variación, el campo de puntitos animado abriéndose
- * desde el centro al color del activo, y debajo el title del
- * briefing + secciones temáticas con accent-line a la izquierda.
- *
- * Stack animation: slide_from_bottom (definido en (app)/_layout).
+ * Página completa del briefing AI. Header con back-arrow + ticker
+ * stacked sobre precio. Hero con un campo de puntitos animado
+ * tipo droplet — la onda nace en el centro-abajo y se expande en
+ * círculos concéntricos hacia las esquinas.
  */
 export default function BriefingScreen() {
   const router = useRouter();
@@ -62,11 +65,11 @@ export default function BriefingScreen() {
       <View style={[s.root, { backgroundColor: c.bg }]}>
         <View style={[s.header, { paddingTop: insets.top + 12 }]}>
           <Pressable
-            style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
+            style={s.backBtn}
             onPress={() => router.back()}
             hitSlop={10}
           >
-            <Feather name="x" size={20} color={c.text} />
+            <Feather name="arrow-left" size={24} color={c.text} />
           </Pressable>
         </View>
         <View style={s.fallback}>
@@ -83,30 +86,26 @@ export default function BriefingScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* Header sticky con close a la izquierda + ticker / precio /
-          variación a la derecha. Mismo gesto que mercado-cerrado:
-          sin border, paddingTop con safe-area inset. */}
+      {/* Header: back-arrow a la izquierda + ticker stacked sobre
+          precio. Sin variación. Mismo layout que la screenshot
+          de referencia. */}
       <View style={[s.header, { paddingTop: insets.top + 10 }]}>
         <Pressable
-          style={[s.closeBtn, { backgroundColor: c.surfaceHover }]}
+          style={s.backBtn}
           onPress={() => {
             Haptics.selectionAsync().catch(() => {});
             router.back();
           }}
           hitSlop={10}
         >
-          <Feather name="x" size={20} color={c.text} />
+          <Feather name="arrow-left" size={24} color={c.text} />
         </Pressable>
-        <View style={s.headRight}>
+        <View style={s.headStack}>
           <Text style={[s.headTicker, { color: c.text }]}>
             {asset.ticker}
           </Text>
-          <Text style={[s.headPrice, { color: c.text }]}>
+          <Text style={[s.headPrice, { color: c.textMuted }]}>
             {formatMoney(asset.price, cur)}
-          </Text>
-          <Text style={[s.headChange, { color: tone }]}>
-            {isUp ? "▲ " : "▼ "}
-            {formatPct(asset.change, false)}
           </Text>
         </View>
       </View>
@@ -150,52 +149,83 @@ export default function BriefingScreen() {
   );
 }
 
-/* ─── Campo de puntitos animado ───────────────────────────────
+/* ─── Campo de puntitos: droplet wave ─────────────────────────
  *
- * Cada dot precomputa su distancia al centro y la usa como delay
- * de stagger para una entrada en olas concéntricas. Cada dot
- * vive en su propio sub-componente — los hooks de Reanimated
- * necesitan ese aislamiento (no podés iterar useSharedValue en un
- * loop). 162 instancias (18×9) corren bien en Reanimated 3 porque
- * el thread UI maneja todas las animaciones sin tocar el JS
- * thread una vez disparadas. */
+ * La onda nace en (cx, cy) = centro-abajo del grid y se expande
+ * en círculos concéntricos. Cada dot precomputa su distancia al
+ * origen (en unidades de grilla, no px) y la usa para decidir
+ * cuándo "lo cruza" la onda.
+ *
+ * Implementación performante: UN solo SharedValue (`wavePos`)
+ * controla la animación. Cada Dot tiene su propio
+ * useAnimatedStyle que lee `wavePos` y compara contra su
+ * `distance` precomputada. La opacidad va:
+ *   - 0  si la onda aún no llegó (wavePos < distance - BAND/2)
+ *   - peak hasta 0.95 cuando la onda está cruzando el dot
+ *     (band-pass: |wavePos - distance| < BAND/2)
+ *   - decae a un residual (0.16) después de que la onda pasó
+ * Reanimated propaga la animación en el thread UI sin tocar
+ * JS — los dots responden parejo aunque el JS thread esté
+ * ocupado con scroll/render.
+ */
 function RippleField({ color }: { color: string }) {
   const { c } = useTheme();
 
+  // Precomputo: distancia normalizada al origen (centro-abajo)
+  // para cada dot. Las diagonales de la esquina superior tardan
+  // más en ser alcanzadas — ese es el feel "droplet".
   const items = useMemo(() => {
-    const arr: { row: number; col: number; delay: number }[] = [];
+    const arr: { row: number; col: number; distance: number }[] = [];
     const cx = (COLS - 1) / 2;
-    const cy = (ROWS - 1) / 2;
-    const maxDist = Math.sqrt(cx * cx + cy * cy);
+    const cy = ROWS - 1; // origen abajo, centrado horizontalmente
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
         const dx = col - cx;
         const dy = r - cy;
-        const d = Math.sqrt(dx * dx + dy * dy) / maxDist; // 0..1
-        // Delay base 60ms + ramp por distancia. La onda tarda
-        // ~700ms en llegar a las esquinas, después decae.
-        arr.push({ row: r, col, delay: 60 + d * 700 });
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        arr.push({ row: r, col, distance });
       }
     }
     return arr;
   }, []);
 
+  const maxDist = useMemo(() => {
+    const cx = (COLS - 1) / 2;
+    const cy = ROWS - 1;
+    // La esquina más lejos del origen es la superior-izquierda
+    // o derecha (cy hacia 0).
+    return Math.sqrt(cx * cx + cy * cy);
+  }, []);
+
+  const wavePos = useSharedValue(-2);
+
+  useEffect(() => {
+    // Reset al desmontar/remontar; arranca debajo de cero para
+    // que el primer frame todos los dots estén apagados, después
+    // sube hasta maxDist + 2 (deja la onda salir del grid).
+    wavePos.value = -2;
+    wavePos.value = withTiming(maxDist + 2, {
+      duration: 1500,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [maxDist, wavePos]);
+
   return (
-    <View style={[s.ripple, { backgroundColor: c.bg }]}>
-      <View
-        style={{
-          width: COLS * (DOT_SIZE + DOT_GAP) - DOT_GAP,
-          height: ROWS * (DOT_SIZE + DOT_GAP) - DOT_GAP,
-        }}
-      >
+    <View
+      style={[
+        s.ripple,
+        { backgroundColor: c.bg, height: RIPPLE_H },
+      ]}
+    >
+      <View style={{ width: GRID_W, height: GRID_H }}>
         {items.map((it, i) => (
           <Dot
             key={i}
             row={it.row}
             col={it.col}
-            delay={it.delay}
+            distance={it.distance}
             color={color}
-            dim={c.textFaint}
+            wavePos={wavePos}
           />
         ))}
       </View>
@@ -203,92 +233,50 @@ function RippleField({ color }: { color: string }) {
   );
 }
 
-function Dot({
-  row,
-  col,
-  delay,
-  color,
-  dim,
-}: {
+interface DotProps {
   row: number;
   col: number;
-  delay: number;
+  distance: number;
   color: string;
-  dim: string;
-}) {
-  // Opacidad arranca en 0 (invisible). Sube a un peak (la "ola"
-  // pasa por este dot) y después se asienta en un valor dim
-  // residual para que el campo quede visible como background sutil.
-  const opacity = useSharedValue(0);
-  const colorMix = useSharedValue(0); // 0 = dim, 1 = full color
+  wavePos: Animated.SharedValue<number>;
+}
 
-  useEffect(() => {
-    opacity.value = withDelay(
-      delay,
-      withSequence(
-        withTiming(0.95, {
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-        }),
-        withTiming(0.18, {
-          duration: 700,
-          easing: Easing.in(Easing.quad),
-        }),
-      ),
-    );
-    colorMix.value = withDelay(
-      delay,
-      withSequence(
-        withTiming(1, {
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-        }),
-        withTiming(0.6, {
-          duration: 700,
-          easing: Easing.in(Easing.quad),
-        }),
-      ),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [delay]);
-
-  // El fondo del dot se interpola entre el dim color (gris faint
-  // del theme) y el color del activo según colorMix. Evitamos
-  // interpolateColor para no agregar otra dependencia — usamos
-  // dos Views apiladas con opacities cruzadas en su lugar.
-  const animDim = useAnimatedStyle(() => ({
-    opacity: opacity.value * (1 - colorMix.value),
-  }));
-  const animTone = useAnimatedStyle(() => ({
-    opacity: opacity.value * colorMix.value,
-  }));
+function Dot({ row, col, distance, color, wavePos }: DotProps) {
+  // Worklet de UI thread — corre cada frame para cada dot. La
+  // matemática es chica (un Math.abs + un divide + un clamp),
+  // así que escala bien aunque haya cientos de dots.
+  const animStyle = useAnimatedStyle(() => {
+    const BAND = 1.4; // ancho de la onda en unidades de grilla
+    const RESIDUAL = 0.16; // opacidad mínima post-onda
+    const PEAK = 0.95;
+    const w = wavePos.value;
+    if (w < distance - BAND / 2) {
+      // La onda no llegó — dot apagado.
+      return { opacity: 0 };
+    }
+    const band = Math.abs(w - distance);
+    if (band < BAND / 2) {
+      // Banda activa: opacidad alta cerca del frente de onda.
+      const t = 1 - band / (BAND / 2);
+      return { opacity: PEAK * t + RESIDUAL * (1 - t) };
+    }
+    // Post-onda: residual.
+    return { opacity: RESIDUAL };
+  });
 
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={[
         s.dot,
         {
-          left: col * (DOT_SIZE + DOT_GAP),
-          top: row * (DOT_SIZE + DOT_GAP),
+          left: col * STRIDE,
+          top: row * STRIDE,
+          backgroundColor: color,
         },
+        animStyle,
       ]}
-    >
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: dim, borderRadius: DOT_SIZE / 2 },
-          animDim,
-        ]}
-      />
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: color, borderRadius: DOT_SIZE / 2 },
-          animTone,
-        ]}
-      />
-    </View>
+    />
   );
 }
 
@@ -297,37 +285,32 @@ const s = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 14,
+    gap: 12,
   },
-  closeBtn: {
+  backBtn: {
     width: 36,
     height: 36,
-    borderCurve: "continuous",
-    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  headRight: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
+  /* Ticker stacked: nombre arriba grande, precio abajo gris.
+   * Sin variación — limpio, mismo layout que la referencia. */
+  headStack: {
+    flexDirection: "column",
   },
   headTicker: {
     fontFamily: fontFamily[800],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 18,
+    letterSpacing: -0.4,
+    lineHeight: 22,
   },
   headPrice: {
     fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  headChange: {
-    fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.1,
+    marginTop: 2,
   },
   fallback: {
     flex: 1,
@@ -337,13 +320,12 @@ const s = StyleSheet.create({
   },
 
   /* Bloque del campo de puntitos. Centramos el grid horizontal-
-   * mente y le damos padding vertical generoso para que tenga
-   * presencia "cinemática" arriba del texto. */
+   * mente, la altura la fija RIPPLE_H. Sin paddings adentro —
+   * el grid ocupa todo el ancho disponible. */
   ripple: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 28,
-    marginHorizontal: 4,
+    overflow: "hidden",
   },
   dot: {
     position: "absolute",
@@ -368,9 +350,6 @@ const s = StyleSheet.create({
     lineHeight: 32,
     letterSpacing: -0.7,
   },
-  /* Cada section va con una línea izquierda en el color del
-   * activo + título en el mismo color + body en textSecondary.
-   * Padding horizontal da el offset de la línea al texto. */
   section: {
     borderLeftWidth: 3,
     paddingLeft: 14,

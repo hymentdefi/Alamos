@@ -1655,7 +1655,7 @@ function BriefingCard({
         <Feather name="arrow-right" size={18} color={chartColor} />
       </View>
       <Text
-        style={[s.briefingSummary, { color: chartColor }]}
+        style={[s.briefingSummary, { color: c.text }]}
         numberOfLines={4}
       >
         {briefing.summary}
