@@ -82,10 +82,10 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
  *      Tus posiciones (por categoría), Distribución (por mercado).
  */
 
-type Currency = "ARS" | "USD" | "USDT";
+type Currency = "ARS" | "USD";
 
 /** Orden canónico del pager y los dots del hero. */
-const CURRENCY_ORDER: readonly Currency[] = ["ARS", "USD", "USDT"];
+const CURRENCY_ORDER: readonly Currency[] = ["ARS", "USD"];
 type ColorMap = ReturnType<typeof useTheme>["c"];
 
 interface Holding {
@@ -116,18 +116,16 @@ export default function PortfolioScreen() {
   const [pagerW, setPagerW] = useState(0);
 
   // Moneda lockeada según el filtro:
-  //  - "all"    → null (usuario puede swipear ARS / USD / USDT).
+  //  - "all"    → null (usuario puede swipear ARS↔USD).
   //  - "AR"     → ARS (en pesos).
   //  - "US"     → USD (USD MEP convertido a dólar duro).
-  //  - "CRYPTO" → USDT (las cripto cotizan en USDT spot).
+  //  - "CRYPTO" → USD (cripto valuadas en dólar duro).
   const lockedCurrency: Currency | null =
     marketFilter === "AR"
       ? "ARS"
-      : marketFilter === "US"
+      : marketFilter === "US" || marketFilter === "CRYPTO"
         ? "USD"
-        : marketFilter === "CRYPTO"
-          ? "USDT"
-          : null;
+        : null;
 
   /* ─── Holdings filtrados ─── */
 
@@ -544,29 +542,6 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          {/* Etiqueta de cotización + timestamp — explicita qué tipo
-              de cambio se está usando (MEP / spot / nativo) y cuándo
-              fue actualizado. Crítico en Argentina por la cantidad
-              de "lentes" de moneda disponibles. */}
-          <Text
-            style={[s.cotizacionLabel, { color: c.textMuted }]}
-            numberOfLines={1}
-          >
-            {cotizacionLabel(currency)}
-          </Text>
-
-          {/* Cash disponible — saldos no invertidos por moneda. En AR
-              "el cash en pesos pierde poder adquisitivo", así que el
-              usuario tiene que verlo siempre presente. Filtrado por el
-              market filter activo cuando aplica. */}
-          {hasHoldings ? (
-            <Text
-              style={[s.cashLabel, { color: c.textMuted }]}
-              numberOfLines={1}
-            >
-              {cashSummary(marketFilter)}
-            </Text>
-          ) : null}
           </View>
 
           {/* Pie chart de distribución — donut con info en el centro.
@@ -584,6 +559,14 @@ export default function PortfolioScreen() {
                 onHoldChange={setBrickHolding}
               />
             </View>
+          ) : null}
+
+          {/* Cash disponible — chips con saldos no invertidos por
+              moneda + yield (TNA / APY). Filtrado por market: en Todo
+              las 3 monedas, en AR solo pesos, etc. Chips tappable a
+              futuro para invertir más. */}
+          {hasHoldings ? (
+            <CashCard marketFilter={marketFilter} c={c} />
           ) : null}
 
           {/* ─── Filtro de mercado — pills sueltas (sin container).
@@ -712,57 +695,115 @@ export default function PortfolioScreen() {
   );
 }
 
-/* ─── Cotización label — debajo del hero, explicita qué tipo de
- *     cambio se está usando para la valuación. Crítico en Argentina
- *     por las múltiples lentes (MEP / CCL / Blue / Oficial / Spot).
- *     Mock: rates derivados de los del módulo accounts; timestamp
- *     hardcoded "hace 2 min" — en producción sería el ts real del
- *     fetch de cotización. */
-function cotizacionLabel(currency: Currency): string {
-  if (currency === "ARS") return "Pesos argentinos · hace 2 min";
-  if (currency === "USD") {
-    const rate = convertAmount(1, "USD", "ARS");
-    return `USD MEP · $ ${formatRate(rate)} · hace 2 min`;
-  }
-  // USDT
-  const rate = convertAmount(1, "USDT", "ARS");
-  return `USDT · $ ${formatRate(rate)} · hace 2 min`;
-}
+/* ─── CashCard — chips de saldos no invertidos ────────────────────
+ *
+ * Vive justo debajo del pie chart. Cada chip representa una moneda
+ * de cash con su monto + yield (TNA o APY según la cuenta). Filtra
+ * por marketFilter: "Todo" muestra los 3, "AR" solo ARS, "US" solo
+ * USD, "Crypto" solo USDT.
+ *
+ * Visual: eyebrow "Sin invertir" + row de chips con flex:1. Cada
+ * chip tiene bg c.surfaceHover, continuous radius, padding cómodo,
+ * dos líneas (monto bold + yield muted). Squarish-pill.
+ */
 
-function formatRate(n: number): string {
-  return Math.round(n).toLocaleString("es-AR");
-}
+function CashCard({
+  marketFilter,
+  c,
+}: {
+  marketFilter: MarketSegmentedValue;
+  c: ColorMap;
+}) {
+  // Saldos sumados por moneda + el mejor yield de las cuentas que la
+  // tienen (típicamente solo hay una por moneda en el mock, así que
+  // tomamos el primero que matchee).
+  const arsAccounts = accounts.filter((a) => a.currency === "ARS");
+  const usdAccounts = accounts.filter((a) => a.currency === "USD");
+  const usdtAccounts = accounts.filter((a) => a.currency === "USDT");
 
-/* ─── Cash summary — suma de saldos no invertidos por moneda. El doc
- *     lo señala como crítico en Argentina porque "el cash en pesos
- *     pierde poder adquisitivo" — tiene que estar siempre visible.
- *     Filtra por market: en "Todo" muestra todas; en AR/US/Crypto
- *     solo la moneda relevante. */
-function cashSummary(marketFilter: MarketSegmentedValue): string {
-  const ars = accounts
-    .filter((a) => a.currency === "ARS")
-    .reduce((acc, a) => acc + a.balance, 0);
-  const usd = accounts
-    .filter((a) => a.currency === "USD")
-    .reduce((acc, a) => acc + a.balance, 0);
-  const usdt = accounts
-    .filter((a) => a.currency === "USDT")
-    .reduce((acc, a) => acc + a.balance, 0);
+  const sumBalance = (list: typeof accounts): number =>
+    list.reduce((acc, a) => acc + a.balance, 0);
 
-  const parts: string[] = [];
   const wantARS = marketFilter === "all" || marketFilter === "AR";
   const wantUSD = marketFilter === "all" || marketFilter === "US";
   const wantUSDT = marketFilter === "all" || marketFilter === "CRYPTO";
 
-  if (wantARS && ars > 0)
-    parts.push(`$ ${formatRate(ars)}`);
-  if (wantUSD && usd > 0)
-    parts.push(`US$ ${formatRate(usd)}`);
-  if (wantUSDT && usdt > 0)
-    parts.push(`${formatRate(usdt)} USDT`);
+  type Chip = {
+    key: string;
+    amount: string;
+    yieldLabel: string;
+  };
+  const chips: Chip[] = [];
+  if (wantARS && arsAccounts.length > 0) {
+    const total = sumBalance(arsAccounts);
+    chips.push({
+      key: "ARS",
+      amount: `$ ${formatCashCompact(total)}`,
+      yieldLabel: `${arsAccounts[0].yield.pct.toFixed(1).replace(".", ",")}% ${arsAccounts[0].yield.label.replace("% ", "")}`,
+    });
+  }
+  if (wantUSD && usdAccounts.length > 0) {
+    const total = sumBalance(usdAccounts);
+    if (total > 0) {
+      chips.push({
+        key: "USD",
+        amount: `US$ ${formatCashCompact(total)}`,
+        yieldLabel: `${usdAccounts.find((a) => a.balance > 0)?.yield.pct.toFixed(1).replace(".", ",") ?? "0"}% APY`,
+      });
+    }
+  }
+  if (wantUSDT && usdtAccounts.length > 0) {
+    const total = sumBalance(usdtAccounts);
+    chips.push({
+      key: "USDT",
+      amount: `${formatCashCompact(total)} USDT`,
+      yieldLabel: `${usdtAccounts[0].yield.pct.toFixed(1).replace(".", ",")}% APY`,
+    });
+  }
 
-  if (parts.length === 0) return "Sin cash disponible";
-  return `Sin invertir · ${parts.join(" · ")}`;
+  if (chips.length === 0) return null;
+
+  return (
+    <View style={s.cashCard}>
+      <Text style={[s.cashEyebrow, { color: c.textMuted }]}>
+        Sin invertir
+      </Text>
+      <View style={s.cashRow}>
+        {chips.map((chip) => (
+          <View
+            key={chip.key}
+            style={[
+              s.cashChip,
+              { backgroundColor: c.surfaceHover },
+            ]}
+          >
+            <Text
+              style={[s.cashAmount, { color: c.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {chip.amount}
+            </Text>
+            <Text
+              style={[s.cashYield, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              {chip.yieldLabel}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** Compact format para los chips de cash — los números acá son
+ *  saldos chicos a medianos: $342.180 → "342k" para entrar en el chip. */
+function formatCashCompact(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return (n / 1e6).toFixed(1).replace(".", ",") + "M";
+  if (abs >= 1e3) return Math.round(n / 1e3).toString() + "k";
+  return n.toLocaleString("es-AR");
 }
 
 /* ─── SegGlyph — glyph del segmented por id. Flippea bg/fg cuando
@@ -1546,8 +1587,9 @@ function FloorPie({
           })}
         </Svg>
 
-        {/* Center text — overlay con Plus Jakarta. pointerEvents none
-            para no robar gestos al responder. */}
+        {/* Center text — siempre constante (balance + 'Distribución').
+            La info dinámica del slice activo vive en el tooltip de
+            abajo, igual que en el ladrillo. */}
         {containerW > 0 ? (
           <View
             pointerEvents="none"
@@ -1559,43 +1601,131 @@ function FloorPie({
               },
             ]}
           >
-            {activeSlice ? (
-              <>
-                <Text
-                  style={[s.pieCenterPrimary, { color: c.text }]}
-                  numberOfLines={1}
-                >
-                  {activeSlice.label}
-                </Text>
-                <Text
-                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {formatTooltipPct(activeSlice.pct)} ·{" "}
-                  {activeSlice.count}{" "}
-                  {activeSlice.count === 1 ? "activo" : "activos"}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text
-                  style={[s.pieCenterPrimary, { color: c.text }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                >
-                  {formatCenterMoney(totalDisplay, currency)}
-                </Text>
-                <Text
-                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  Distribución
-                </Text>
-              </>
-            )}
+            <Text
+              style={[s.pieCenterPrimary, { color: c.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {formatCenterMoney(totalDisplay, currency)}
+            </Text>
+            <Text
+              style={[s.pieCenterSecondary, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              Distribución
+            </Text>
           </View>
         ) : null}
       </View>
+
+      {/* Tooltip — aparece al holdear un slice. Mismo patrón visual
+          que el FloorBrick: pill ink + label uppercase + pct en
+          brand + lista de tickers con su variación. Posicionado
+          debajo del donut, centrado horizontalmente. Caret apunta
+          hacia arriba. */}
+      {activeSlice && containerW > 0 ? (
+        <Animated.View
+          key={`pie-tip-${activeIdx}`}
+          entering={FadeInDown.duration(120)}
+          exiting={FadeOutUp.duration(100)}
+          pointerEvents="none"
+          style={[
+            s.tooltipAnchor,
+            {
+              left: containerW / 2,
+              top: ((cy + outerR + 22) * containerW) / W,
+            },
+          ]}
+        >
+          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={[s.tooltipLabel, { color: c.bg }]}>
+                {activeSlice.label}
+              </Text>
+              <Text style={[s.tooltipPct, { color: c.brand }]}>
+                {formatTooltipPct(activeSlice.pct)}
+              </Text>
+            </View>
+            {groupBy === "ticker" && activeSlice.rows.length === 1 ? (
+              <>
+                <View
+                  style={[
+                    s.tooltipDivider,
+                    { backgroundColor: "rgba(255,255,255,0.12)" },
+                  ]}
+                />
+                <View style={s.tooltipRow}>
+                  <Text
+                    style={[
+                      s.tooltipTicker,
+                      { color: "rgba(255,255,255,0.65)" },
+                    ]}
+                  >
+                    {activeSlice.rows[0].shortTicker}
+                  </Text>
+                  <Text
+                    style={[
+                      s.tooltipChange,
+                      {
+                        color:
+                          activeSlice.rows[0].change >= 0
+                            ? c.brand
+                            : "#FF6E5C",
+                      },
+                    ]}
+                  >
+                    {activeSlice.rows[0].change >= 0 ? "▲ " : "▼ "}
+                    {formatPct(activeSlice.rows[0].change, false)}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                {activeSlice.rows.length > 0 ? (
+                  <View
+                    style={[
+                      s.tooltipDivider,
+                      { backgroundColor: "rgba(255,255,255,0.12)" },
+                    ]}
+                  />
+                ) : null}
+                {activeSlice.rows.slice(0, 5).map((r) => (
+                  <View key={r.ticker} style={s.tooltipRow}>
+                    <Text
+                      style={[s.tooltipTicker, { color: c.bg }]}
+                      numberOfLines={1}
+                    >
+                      {r.ticker}
+                    </Text>
+                    <Text
+                      style={[
+                        s.tooltipChange,
+                        {
+                          color: r.change >= 0 ? c.brand : "#FF6E5C",
+                        },
+                      ]}
+                    >
+                      {r.change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(r.change, false)}
+                    </Text>
+                  </View>
+                ))}
+                {activeSlice.rows.length > 5 ? (
+                  <Text
+                    style={[
+                      s.tooltipMore,
+                      { color: "rgba(255,255,255,0.45)" },
+                    ]}
+                  >
+                    +{activeSlice.rows.length - 5} más
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -1637,7 +1767,7 @@ function formatCenterMoney(n: number, currency: Currency): string {
     if (abs >= 1e3) return `$ ${Math.round(n / 1e3)} K`;
     return formatMoney(n, currency);
   }
-  // USD / USDT — números más chicos, formato natural.
+  // USD — números más chicos, formato natural.
   if (abs >= 1e6) {
     return `${(n / 1e6).toFixed(1).replace(".", ",")} M ${currency}`;
   }
@@ -2188,27 +2318,46 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
     borderRadius: 999,
   },
-  /* Cotización + timestamp — debajo del deltaRow, antes de los dots.
-   * Texto chico muted que da contexto del tipo de cambio aplicado. */
-  cotizacionLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 8,
-  },
-  /* Cash disponible — debajo de los dots. Muestra los saldos no
-   * invertidos por moneda en el contexto del market filter. */
-  cashLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 12,
-  },
-
   /* Ladrillo full-bleed — sigue al hero scrollable. Sin
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
   brickContainer: {
     marginTop: 24,
+  },
+
+  /* Cash card — chips de saldos no invertidos por moneda. Vive justo
+   * debajo del pie chart. Eyebrow chico muted + row de chips flex:1. */
+  cashCard: {
+    paddingHorizontal: 24,
+    marginTop: 8,
+  },
+  cashEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  cashRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  cashChip: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+  },
+  cashAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  cashYield: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 3,
   },
 
   /* Filtro de mercado — 4 pills sueltas (sin container). Active pill
