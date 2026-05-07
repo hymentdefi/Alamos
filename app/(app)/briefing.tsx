@@ -11,6 +11,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -200,14 +201,28 @@ function RippleField({ color }: { color: string }) {
   const wavePos = useSharedValue(-2);
 
   useEffect(() => {
-    // Reset al desmontar/remontar; arranca debajo de cero para
-    // que el primer frame todos los dots estén apagados, después
-    // sube hasta maxDist + 2 (deja la onda salir del grid).
-    wavePos.value = -2;
-    wavePos.value = withTiming(maxDist + 2, {
-      duration: 1500,
-      easing: Easing.out(Easing.cubic),
-    });
+    // Loop infinito.
+    //
+    // wavePos arranca en -1 (onda no nacida) y sube hasta
+    // maxDist + 4.5 — punto en el que la onda + el trail post-
+    // onda ya excedieron el grid completo, así que TODOS los
+    // dots están en opacity 0. En ese momento el withRepeat
+    // resetea a -1 y arranca el siguiente ciclo. Como ningún
+    // dot está visible al boundary, no hay flash.
+    //
+    // Linear easing en lugar de out(cubic) para que el ritmo
+    // del loop sea constante — un out(cubic) deceleraba al
+    // final del ciclo y el loop se notaba (se sentía un
+    // "stutter" antes del reset).
+    wavePos.value = -1;
+    wavePos.value = withRepeat(
+      withTiming(maxDist + 4.5, {
+        duration: 2200,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
   }, [maxDist, wavePos]);
 
   return (
@@ -243,25 +258,37 @@ interface DotProps {
 
 function Dot({ row, col, distance, color, wavePos }: DotProps) {
   // Worklet de UI thread — corre cada frame para cada dot. La
-  // matemática es chica (un Math.abs + un divide + un clamp),
-  // así que escala bien aunque haya cientos de dots.
+  // matemática es chica, escala bien aunque haya cientos de
+  // dots. Cuatro fases:
+  //   1. wavePos < distance - BAND/2 → onda no llegó: opacity 0
+  //   2. |wavePos - distance| < BAND/2 → en la banda activa:
+  //      opacity peak (con falloff lineal hacia los bordes)
+  //   3. dist + BAND/2 < wavePos < dist + BAND/2 + TRAIL →
+  //      trail que decae linealmente del residual a 0
+  //   4. wavePos > dist + BAND/2 + TRAIL → opacity 0
+  // En la fase 4 todos los dots están en 0, lo que hace el
+  // boundary del loop seamless (sin flash).
   const animStyle = useAnimatedStyle(() => {
     const BAND = 1.4; // ancho de la onda en unidades de grilla
-    const RESIDUAL = 0.16; // opacidad mínima post-onda
+    const TRAIL = 3.5; // largo del decay post-onda
+    const RESIDUAL = 0.18;
     const PEAK = 0.95;
     const w = wavePos.value;
-    if (w < distance - BAND / 2) {
-      // La onda no llegó — dot apagado.
+    const delta = w - distance;
+    if (delta < -BAND / 2) {
       return { opacity: 0 };
     }
-    const band = Math.abs(w - distance);
-    if (band < BAND / 2) {
-      // Banda activa: opacidad alta cerca del frente de onda.
-      const t = 1 - band / (BAND / 2);
+    if (delta < BAND / 2) {
+      // Banda activa.
+      const t = 1 - Math.abs(delta) / (BAND / 2);
       return { opacity: PEAK * t + RESIDUAL * (1 - t) };
     }
-    // Post-onda: residual.
-    return { opacity: RESIDUAL };
+    const past = delta - BAND / 2;
+    if (past < TRAIL) {
+      // Trail con fade lineal del residual a 0.
+      return { opacity: RESIDUAL * (1 - past / TRAIL) };
+    }
+    return { opacity: 0 };
   });
 
   return (
