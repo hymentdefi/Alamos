@@ -22,6 +22,7 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import Svg, {
+  Circle,
   Ellipse,
   G,
   Line,
@@ -55,10 +56,6 @@ import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
-import {
-  Sparkline,
-  seriesFromSeed,
-} from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
@@ -276,6 +273,9 @@ export default function PortfolioScreen() {
   // se bloquea (scrollEnabled=false) para que el dedo no scrollee
   // accidentalmente mientras el usuario explora la distribución.
   const [brickHolding, setBrickHolding] = useState(false);
+  // Visualización seleccionada — pie chart por default. El usuario
+  // puede alternar con el toggle de glyphs arriba del chart.
+  const [viz, setViz] = useState<"pie" | "brick">("pie");
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -544,20 +544,113 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* Pie chart de distribución — donut con info en el centro.
-              Pasa onHoldChange para bloquear el ScrollView mientras
-              finger está apoyado en un slice. */}
+          {/* First-block — el bloque más importante del portfolio. Two-col:
+              chart (pie/ladrillo seleccionable) a la izquierda, info column
+              a la derecha con Mejor/Peor del día, Invertido, y Rendimiento
+              con arrow al detalle dedicado. */}
           {hasHoldings ? (
-            <View style={s.brickContainer}>
-              <FloorPie
-                holdings={holdingsSorted}
-                totalArs={totalArs}
-                currency={currency}
-                groupBy={
-                  marketFilter === "CRYPTO" ? "ticker" : "category"
-                }
-                onHoldChange={setBrickHolding}
-              />
+            <View style={s.firstBlock}>
+              {/* Left col — viz toggle + chart */}
+              <View style={s.firstBlockChartCol}>
+                <View style={s.vizToggleRow}>
+                  <Tap
+                    onPress={() => setViz("pie")}
+                    haptic="selection"
+                    pressScale={0.9}
+                    hitSlop={8}
+                  >
+                    <PieGlyph
+                      color={viz === "pie" ? c.text : c.textFaint}
+                    />
+                  </Tap>
+                  <Tap
+                    onPress={() => setViz("brick")}
+                    haptic="selection"
+                    pressScale={0.9}
+                    hitSlop={8}
+                  >
+                    <BrickGlyph
+                      color={viz === "brick" ? c.text : c.textFaint}
+                    />
+                  </Tap>
+                </View>
+                {viz === "pie" ? (
+                  <FloorPie
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    currency={currency}
+                    groupBy={
+                      marketFilter === "CRYPTO" ? "ticker" : "category"
+                    }
+                    onHoldChange={setBrickHolding}
+                  />
+                ) : (
+                  <FloorBrick
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    groupBy={
+                      marketFilter === "CRYPTO" ? "ticker" : "category"
+                    }
+                    onHoldChange={setBrickHolding}
+                  />
+                )}
+              </View>
+
+              {/* Right col — 4 info rows */}
+              <View style={s.firstBlockInfoCol}>
+                <InfoRow
+                  eyebrow="Mejor del día"
+                  eyebrowColor={c.greenDark}
+                  primary={bestOfDay?.asset.ticker ?? "—"}
+                  trailing={
+                    bestOfDay
+                      ? formatPct(bestOfDay.asset.change)
+                      : undefined
+                  }
+                  trailingColor={
+                    bestOfDay && bestOfDay.asset.change >= 0
+                      ? c.greenDark
+                      : c.red
+                  }
+                  c={c}
+                />
+                <InfoRow
+                  eyebrow="Peor del día"
+                  eyebrowColor={c.red}
+                  primary={worstOfDay?.asset.ticker ?? "—"}
+                  trailing={
+                    worstOfDay
+                      ? formatPct(worstOfDay.asset.change)
+                      : undefined
+                  }
+                  trailingColor={
+                    worstOfDay && worstOfDay.asset.change >= 0
+                      ? c.greenDark
+                      : c.red
+                  }
+                  c={c}
+                />
+                <InfoRow
+                  eyebrow="Invertido"
+                  primary={formatCenterMoney(
+                    currency === "ARS"
+                      ? totalArs / (1 + 12.4 / 100)
+                      : convertAmount(totalArs / (1 + 12.4 / 100), "ARS", currency),
+                    currency,
+                  )}
+                  c={c}
+                />
+                <InfoRow
+                  eyebrow="Rendimiento"
+                  primary={formatPct(12.4)}
+                  primaryColor={c.greenDark}
+                  arrow
+                  onPress={() =>
+                    router.push("/(app)/rendimiento" as never)
+                  }
+                  c={c}
+                />
+              </View>
             </View>
           ) : null}
 
@@ -617,20 +710,12 @@ export default function PortfolioScreen() {
 
           {hasHoldings ? (
             <>
-              {/* Orden por prioridad de lo que le importa al inversor:
-                  1. Rendimiento — cómo viene la plata global (lo más
-                     importante — total return + chart histórico).
-                  2. Tus posiciones — qué tiene en cartera (drilldown).
-                  3. Distribución — cómo está distribuido (mercados).
-                  4. Mejor/Peor del día — ruido del día (último). */}
-              <RendimientoCard
-                totalArs={totalArs}
-                currency={currency}
-                dayPct={dayPct}
-                bestOfDay={bestOfDay}
-                worstOfDay={worstOfDay}
-                c={c}
-              />
+              {/* El first-block ya tiene Mejor/Peor/Invertido/Rendimiento
+                  arriba (above the fold). Acá abajo solo van las cards
+                  secundarias: posiciones por categoría + distribución
+                  por mercado. El chart histórico de Rendimiento vive
+                  en /(app)/rendimiento, accesible desde el arrow del
+                  InfoRow. */}
               <PosicionesCard
                 groups={groupedByCategory}
                 allocations={categoryAllocations}
@@ -692,6 +777,155 @@ export default function PortfolioScreen() {
         />
       </View>
     </AssetColorProvider>
+  );
+}
+
+/* ─── InfoRow — fila del info column del first-block ──────────────
+ *
+ * Cada InfoRow es una mini-card vertical: eyebrow uppercase + primary
+ * value. Opcionalmente tiene `trailing` (un pct a la derecha del
+ * primary) y `arrow` (chevron verde para acciones tappable). Spacing
+ * compacto para que las 4 rows entren en la altura del pie chart. */
+
+function InfoRow({
+  eyebrow,
+  eyebrowColor,
+  primary,
+  primaryColor,
+  trailing,
+  trailingColor,
+  arrow,
+  onPress,
+  c,
+}: {
+  eyebrow: string;
+  eyebrowColor?: string;
+  primary: string;
+  primaryColor?: string;
+  trailing?: string;
+  trailingColor?: string;
+  arrow?: boolean;
+  onPress?: () => void;
+  c: ColorMap;
+}) {
+  const content = (
+    <>
+      <Text
+        style={[
+          s.infoEyebrow,
+          { color: eyebrowColor ?? c.textMuted },
+        ]}
+        numberOfLines={1}
+      >
+        {eyebrow}
+      </Text>
+      <View style={s.infoValueRow}>
+        <Text
+          style={[
+            s.infoPrimary,
+            { color: primaryColor ?? c.text },
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {primary}
+        </Text>
+        {trailing ? (
+          <Text
+            style={[
+              s.infoTrailing,
+              { color: trailingColor ?? c.textMuted },
+            ]}
+            numberOfLines={1}
+          >
+            {trailing}
+          </Text>
+        ) : null}
+        {arrow ? (
+          <View style={s.infoArrow}>
+            <Feather
+              name="arrow-up-right"
+              size={14}
+              color={c.greenDark}
+            />
+          </View>
+        ) : null}
+      </View>
+    </>
+  );
+  if (onPress) {
+    return (
+      <Tap
+        onPress={onPress}
+        haptic="selection"
+        pressScale={0.97}
+        style={s.infoRow}
+      >
+        {content}
+      </Tap>
+    );
+  }
+  return <View style={s.infoRow}>{content}</View>;
+}
+
+/* ─── PieGlyph / BrickGlyph — toggle icons del viz selector ─────── */
+
+function PieGlyph({ color, size = 18 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18">
+      <Circle
+        cx={9}
+        cy={9}
+        r={6.5}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.4}
+      />
+      <SvgPath
+        d="M 9 9 L 9 2.5 M 9 9 L 14.6 12.25"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+function BrickGlyph({ color, size = 18 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18">
+      {/* Mini pared 3D — wall front + top inclined */}
+      <Polygon
+        points="3,7 13,7 13,14 3,14"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <Polygon
+        points="3,7 13,7 15,5 5,5"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <Polygon
+        points="13,7 15,5 15,12 13,14"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <Line
+        x1={8}
+        y1={7}
+        x2={8}
+        y2={14}
+        stroke={color}
+        strokeWidth={1.2}
+      />
+    </Svg>
   );
 }
 
@@ -859,342 +1093,6 @@ function SegGlyph({
   );
 }
 
-/* ─── Rendimiento card ─────────────────────────────────────────────
- *
- * La card más detallada del portfolio. Muestra cómo viene rindiendo
- * la cartera a lo largo del tiempo:
- *   - Hero metric: ▲ +$X (ganancia absoluta) + +Y% (ganancia %) ·
- *     período. Tipografía pesada, color contextual del rango.
- *   - Sparkline full-bleed dentro del card — line jagged, sheen
- *     animado, reference line en el valor de inicio del período.
- *     Scrub habilitado: el dedo arrastra y la métrica hero refleja
- *     el valor del punto tocado.
- *   - Range pills (1M / 3M / 6M / 1A / MAX) que tintean el chart.
- *   - Stats grid 2-col x 3 rows: total invertido, YTD, mejor mes,
- *     peor mes, promedio mensual, días positivos.
- *
- * Mock layer: rangePct hardcodeado por rango (escala determinística
- * con sign positivo — la cartera mockeada está en plus). Stats
- * secundarias (mejor mes, ytd, etc.) son fijas — no dependen del
- * range, dan contexto histórico independiente. */
-
-type RendRange = "1D" | "1W" | "1M" | "3M" | "YTD" | "1A" | "MAX";
-
-const RENDIMIENTO_RANGES: RendRange[] = [
-  "1D",
-  "1W",
-  "1M",
-  "3M",
-  "YTD",
-  "1A",
-  "MAX",
-];
-
-/** % de retorno mockeado por rango. Para "1D" se ignora — usamos el
- *  dayPct vivo del portfolio (mismo número que el delta del hero).
- *  Los demás rangos son determinísticos por mock. */
-const RENDIMIENTO_PCTS: Record<RendRange, number> = {
-  "1D": 0,
-  "1W": 0.6,
-  "1M": 1.8,
-  "3M": 4.2,
-  "YTD": 8.4,
-  "1A": 10.8,
-  "MAX": 12.4,
-};
-
-const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
-  "1D": 100,
-  "1W": 70,
-  "1M": 80,
-  "3M": 140,
-  "YTD": 220,
-  "1A": 240,
-  "MAX": 300,
-};
-
-function rendPeriodLabel(r: RendRange): string {
-  switch (r) {
-    case "1D":
-      return "hoy";
-    case "1W":
-      return "esta semana";
-    case "1M":
-      return "último mes";
-    case "3M":
-      return "últimos 3 meses";
-    case "YTD":
-      return "este año";
-    case "1A":
-      return "último año";
-    case "MAX":
-      return "desde marzo 2025";
-  }
-}
-
-function buildRendSeries(
-  start: number,
-  end: number,
-  length: number,
-  seed: string,
-): number[] {
-  const noise = seriesFromSeed(seed, length, "flat");
-  const noiseScale = end * 0.012;
-  const out: number[] = [];
-  for (let i = 0; i < length; i++) {
-    const t = i / (length - 1);
-    const linear = start + (end - start) * t;
-    const normalized = (noise[i] - 100) / 6;
-    out.push(linear + normalized * noiseScale);
-  }
-  out[length - 1] = end;
-  return out;
-}
-
-function RendimientoCard({
-  totalArs,
-  currency,
-  dayPct,
-  bestOfDay,
-  worstOfDay,
-  c,
-}: {
-  totalArs: number;
-  currency: Currency;
-  /** % del día — usado cuando el rango activo es "1D". Para los
-   *  demás rangos usamos el mock determinístico de RENDIMIENTO_PCTS. */
-  dayPct: number;
-  bestOfDay: Holding | null;
-  worstOfDay: Holding | null;
-  c: ColorMap;
-}) {
-  const [range, setRange] = useState<RendRange>("MAX");
-  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
-
-  const totalDisplay =
-    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", "USD");
-  // Para "1D" usamos el dayPct vivo del portfolio; el resto es mock.
-  const rangePct = range === "1D" ? dayPct : RENDIMIENTO_PCTS[range];
-  const invertido = totalDisplay / (1 + rangePct / 100);
-
-  const series = useMemo(
-    () =>
-      buildRendSeries(
-        invertido,
-        totalDisplay,
-        RENDIMIENTO_LENGTHS[range],
-        `rend-${range}-${currency}`,
-      ),
-    [invertido, totalDisplay, range, currency],
-  );
-
-  const current =
-    scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
-  const startVal = series[0];
-  const ganancia = current - startVal;
-  const gananciaPct = startVal > 0 ? (ganancia / startVal) * 100 : 0;
-  const up = ganancia >= 0;
-  const color = up ? c.greenDark : c.red;
-
-  const fmt = (n: number) => formatMoney(n, currency);
-
-  // Stats fijas — independientes del range. Dan contexto histórico
-  // de la cartera (mejor/peor mes, ytd, etc.). Mock determinístico.
-  const stats: Array<[string, string]> = [
-    ["Total invertido", fmt(invertido)],
-    ["YTD", "+8,4%"],
-    ["Mejor mes", "Marzo · +5,2%"],
-    ["Peor mes", "Octubre · −2,1%"],
-    ["Promedio mensual", "+1,3%"],
-    ["Días positivos", "62%"],
-  ];
-  const pairs: Array<
-    [(typeof stats)[number], (typeof stats)[number] | null]
-  > = [];
-  for (let i = 0; i < stats.length; i += 2) {
-    pairs.push([stats[i], stats[i + 1] ?? null]);
-  }
-
-  return (
-    <View style={[s.card, { marginTop: 16 }]}>
-      <Text style={[s.cardEyebrow, { color: c.text }]}>Rendimiento</Text>
-
-      {/* Hero metric — ganancia absoluta con AmountDisplay (mismo
-          treatment que el saldo del hero: integer grande + decimales
-          chiquitos arriba a la derecha) + pct & período abajo. */}
-      <View style={s.rendHero}>
-        <View style={s.rendHeroRow}>
-          <Text style={[s.rendTri, { color }]}>{up ? "▲" : "▼"}</Text>
-          <AmountDisplay
-            value={Math.abs(ganancia)}
-            size={32}
-            color={color}
-            decimalsColor={color}
-            currency={currency}
-          />
-        </View>
-        <View style={s.rendSubRow}>
-          <Text style={[s.rendPct, { color }]}>
-            {formatPct(gananciaPct)}
-          </Text>
-          <Text style={[s.rendPeriod, { color: c.textMuted }]}>
-            · {rendPeriodLabel(range)}
-          </Text>
-        </View>
-      </View>
-
-      <Sparkline
-        series={series}
-        color={color}
-        height={140}
-        mode="line"
-        strokeWidth={1.6}
-        sheen
-        referenceLine
-        style={{ marginTop: 18, marginHorizontal: -24 }}
-        onScrub={(idx) => setScrubIndex(idx)}
-        onScrubEnd={() => setScrubIndex(null)}
-      />
-
-      <View style={s.rendRangeRow}>
-        {RENDIMIENTO_RANGES.map((r) => {
-          const active = r === range;
-          return (
-            <Tap
-              key={r}
-              onPress={() => setRange(r)}
-              haptic="selection"
-              pressScale={0.92}
-              style={[
-                s.rendRangePill,
-                active && { backgroundColor: color },
-              ]}
-              hitSlop={8}
-            >
-              <Text
-                style={[
-                  s.rendRangeText,
-                  { color: active ? c.bg : color },
-                ]}
-              >
-                {r}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
-
-      {/* Stats grid — separado del bloque de chart por borderTop
-          hairline + paddingTop. */}
-      <View
-        style={[s.rendStatsBlock, { borderTopColor: c.border }]}
-      >
-        {pairs.map(([left, right], i) => (
-          <View
-            key={i}
-            style={[
-              s.statsGridRow,
-              i < pairs.length - 1 && {
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: c.border,
-              },
-            ]}
-          >
-            <View style={s.statsCell}>
-              <Text style={[s.statsLabel, { color: c.textMuted }]}>
-                {left[0]}
-              </Text>
-              <Text
-                style={[s.statsValue, { color: c.text }]}
-                numberOfLines={1}
-              >
-                {left[1]}
-              </Text>
-            </View>
-            <View style={s.statsCell}>
-              {right ? (
-                <>
-                  <Text style={[s.statsLabel, { color: c.textMuted }]}>
-                    {right[0]}
-                  </Text>
-                  <Text
-                    style={[s.statsValue, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    {right[1]}
-                  </Text>
-                </>
-              ) : null}
-            </View>
-          </View>
-        ))}
-
-        {/* Movers compactos — Mejor/Peor del día como rows pequeñas
-            al pie del bloque de stats, con el label coloreado
-            (greenDark/red) por identidad. Sin sparkline ni nombre
-            del activo: ticker + change% es suficiente como señal. */}
-        {bestOfDay ? (
-          <CompactMover
-            label="Mejor del día"
-            labelTone={c.greenDark}
-            holding={bestOfDay}
-            c={c}
-            divider
-          />
-        ) : null}
-        {worstOfDay && worstOfDay.asset.ticker !== bestOfDay?.asset.ticker ? (
-          <CompactMover
-            label="Peor del día"
-            labelTone={c.red}
-            holding={worstOfDay}
-            c={c}
-          />
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-/* CompactMover — fila chica al pie de Rendimiento. Label coloreado
- * (verde si "Mejor", rojo si "Peor") + ticker + change%. Sin
- * sparkline ni nombre del activo — más compacta que MoverRow. */
-function CompactMover({
-  label,
-  labelTone,
-  holding,
-  c,
-  divider,
-}: {
-  label: string;
-  labelTone: string;
-  holding: Holding;
-  c: ColorMap;
-  divider?: boolean;
-}) {
-  const up = holding.asset.change >= 0;
-  const changeTone = up ? c.greenDark : c.red;
-  return (
-    <View
-      style={[
-        s.rendMoverRow,
-        divider && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: c.border,
-        },
-      ]}
-    >
-      <Text style={[s.rendMoverLabel, { color: labelTone }]}>{label}</Text>
-      <View style={s.rendMoverRight}>
-        <Text style={[s.rendMoverTicker, { color: c.text }]}>
-          {holding.asset.ticker}
-        </Text>
-        <Text style={[s.rendMoverChange, { color: changeTone }]}>
-          {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
-        </Text>
-      </View>
-    </View>
-  );
-}
 
 /* ─── Posiciones card ─── */
 
@@ -1396,13 +1294,14 @@ function FloorPie({
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
-  // Geometría del viewBox.
-  const W = 340;
+  // Geometría del viewBox — cuadrado para layout 2-col. Donut centrado
+  // con outer 70 / inner 42 → grosor de anillo 28.
+  const W = 200;
   const H = 200;
   const cx = W / 2;
   const cy = H / 2;
-  const outerR = 78;
-  const innerR = 48;
+  const outerR = 70;
+  const innerR = 42;
 
   type Row = {
     ticker: string;
@@ -2209,14 +2108,16 @@ const s = StyleSheet.create({
    * `top: insets.top + 8` (igual que el padding superior del topBar).
    * Tiene bg propio que crossfade-aparece junto con el texto, así no
    * reserva espacio cuando opacity=0 y el hero puede arrancar apenas
-   * debajo del topBar. */
+   * debajo del topBar. justifyContent flex-start + paddingTop chico
+   * deja más whitespace debajo del 'Portfolio · variación' que arriba. */
   stickyOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
-    height: 38,
+    height: 56,
+    paddingTop: 2,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     zIndex: 10,
   },
   stickyPrice: {
@@ -2322,6 +2223,65 @@ const s = StyleSheet.create({
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
   brickContainer: {
     marginTop: 24,
+  },
+
+  /* First-block — bloque hero con chart 2-col + info column. Domina
+   * la primera pantalla del portfolio (above the fold). */
+  firstBlock: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    marginTop: 24,
+    gap: 16,
+  },
+  firstBlockChartCol: {
+    flex: 1,
+  },
+  firstBlockInfoCol: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+
+  /* Toggle viz pie/brick — fila de 2 glyphs arriba del chart. */
+  vizToggleRow: {
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 8,
+  },
+
+  /* InfoRow — fila del info column. Eyebrow + primary + opcional
+   * trailing/arrow. Compacto vertical (4 rows entran en altura del pie). */
+  infoRow: {
+    paddingVertical: 4,
+  },
+  infoEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  infoValueRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  infoPrimary: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  infoTrailing: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  infoArrow: {
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   /* Cash card — chips de saldos no invertidos por moneda. Vive justo
@@ -2487,92 +2447,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.1,
     marginTop: 2,
-  },
-
-  /* Rendimiento card ─────────────────────────────────────────────
-   * Hero metric con ▲/▼ + amount grande + pct/período abajo.
-   * Sparkline full-bleed dentro del card. Range pills tinteadas.
-   * Stats grid separado por hairline divider top. */
-  rendHero: {
-    marginBottom: 4,
-  },
-  rendHeroRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  rendTri: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-  },
-  rendSubRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 6,
-    marginTop: 6,
-  },
-  rendPct: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  rendPeriod: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  rendRangeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingHorizontal: 4,
-  },
-  rendRangePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  rendRangeText: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: 0.3,
-  },
-  rendStatsBlock: {
-    marginTop: 24,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-
-  /* Compact mover — fila chica al pie del Rendimiento card. Label
-   * coloreado a la izquierda, ticker + change% a la derecha. Sin
-   * sparkline ni nombre del activo. */
-  rendMoverRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    gap: 12,
-  },
-  rendMoverLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.2,
-  },
-  rendMoverRight: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  rendMoverTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  rendMoverChange: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
   },
 
   /* Distribución — stats grid 2-col */
