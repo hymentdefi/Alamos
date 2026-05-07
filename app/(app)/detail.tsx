@@ -261,7 +261,7 @@ export default function DetailScreen() {
             </Text>
             <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
             <Text style={[s.stickyPct, { color }]}>
-              {formatPct(displayPct)}
+              {formatPct(pctForRange)}
             </Text>
           </View>
         </Animated.View>
