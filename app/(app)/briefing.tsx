@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Pressable,
@@ -85,6 +85,15 @@ export default function BriefingScreen() {
   const tone = isUp ? c.greenDark : c.red;
   const cur = assetCurrency(asset);
 
+  // Feedback del usuario sobre el briefing — null = no votó
+  // todavía, "up" = thumbs up, "down" = thumbs down. Por ahora
+  // es state local; cuando llegue el backend, lo persistimos.
+  const [vote, setVote] = useState<"up" | "down" | null>(null);
+  const handleVote = (next: "up" | "down") => {
+    Haptics.selectionAsync().catch(() => {});
+    setVote((prev) => (prev === next ? null : next));
+  };
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       {/* Header: back-arrow a la izquierda + ticker stacked sobre
@@ -144,6 +153,49 @@ export default function BriefingScreen() {
               </Text>
             </View>
           ))}
+
+          {/* Feedback — dos botones circulares (thumbs up / down)
+              en el color del activo. Tap → set/toggle vote. Cuando
+              alguno está activo, se rellena con el tone; el otro
+              queda outline. */}
+          <View style={s.feedbackRow}>
+            <Pressable
+              onPress={() => handleVote("up")}
+              hitSlop={10}
+              style={[
+                s.feedbackBtn,
+                {
+                  borderColor: tone,
+                  backgroundColor:
+                    vote === "up" ? tone : "transparent",
+                },
+              ]}
+            >
+              <Feather
+                name="thumbs-up"
+                size={18}
+                color={vote === "up" ? c.bg : tone}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => handleVote("down")}
+              hitSlop={10}
+              style={[
+                s.feedbackBtn,
+                {
+                  borderColor: tone,
+                  backgroundColor:
+                    vote === "down" ? tone : "transparent",
+                },
+              ]}
+            >
+              <Feather
+                name="thumbs-down"
+                size={18}
+                color={vote === "down" ? c.bg : tone}
+              />
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -152,33 +204,26 @@ export default function BriefingScreen() {
 
 /* ─── Campo de puntitos: droplet wave ─────────────────────────
  *
- * La onda nace en (cx, cy) = centro-abajo del grid y se expande
- * en círculos concéntricos. Cada dot precomputa su distancia al
- * origen (en unidades de grilla, no px) y la usa para decidir
- * cuándo "lo cruza" la onda.
+ * El field de dots es SIEMPRE visible — los dots existen como
+ * un fondo gris constante (c.textFaint del theme). La onda lo
+ * único que hace es prender un overlay del color del activo
+ * encima de cada dot mientras lo cruza, y después de que pasó
+ * un trail residual que decae a 0. El gris base permanece.
  *
- * Implementación performante: UN solo SharedValue (`wavePos`)
- * controla la animación. Cada Dot tiene su propio
- * useAnimatedStyle que lee `wavePos` y compara contra su
- * `distance` precomputada. La opacidad va:
- *   - 0  si la onda aún no llegó (wavePos < distance - BAND/2)
- *   - peak hasta 0.95 cuando la onda está cruzando el dot
- *     (band-pass: |wavePos - distance| < BAND/2)
- *   - decae a un residual (0.16) después de que la onda pasó
- * Reanimated propaga la animación en el thread UI sin tocar
- * JS — los dots responden parejo aunque el JS thread esté
- * ocupado con scroll/render.
+ * Implementación performante: UN solo SharedValue (wavePos)
+ * controla el ciclo en el thread UI. Cada Dot tiene su propio
+ * useAnimatedStyle SOLO para el overlay coloreado — el base
+ * gris no se anima, va con backgroundColor estático.
  */
 function RippleField({ color }: { color: string }) {
   const { c } = useTheme();
 
-  // Precomputo: distancia normalizada al origen (centro-abajo)
-  // para cada dot. Las diagonales de la esquina superior tardan
-  // más en ser alcanzadas — ese es el feel "droplet".
+  // Precomputo: distancia al origen (centro-abajo) para cada
+  // dot. Las esquinas superiores tardan más en ser alcanzadas.
   const items = useMemo(() => {
     const arr: { row: number; col: number; distance: number }[] = [];
     const cx = (COLS - 1) / 2;
-    const cy = ROWS - 1; // origen abajo, centrado horizontalmente
+    const cy = ROWS - 1;
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
         const dx = col - cx;
@@ -193,27 +238,15 @@ function RippleField({ color }: { color: string }) {
   const maxDist = useMemo(() => {
     const cx = (COLS - 1) / 2;
     const cy = ROWS - 1;
-    // La esquina más lejos del origen es la superior-izquierda
-    // o derecha (cy hacia 0).
     return Math.sqrt(cx * cx + cy * cy);
   }, []);
 
-  const wavePos = useSharedValue(-2);
+  const wavePos = useSharedValue(-1);
 
   useEffect(() => {
-    // Loop infinito.
-    //
-    // wavePos arranca en -1 (onda no nacida) y sube hasta
-    // maxDist + 4.5 — punto en el que la onda + el trail post-
-    // onda ya excedieron el grid completo, así que TODOS los
-    // dots están en opacity 0. En ese momento el withRepeat
-    // resetea a -1 y arranca el siguiente ciclo. Como ningún
-    // dot está visible al boundary, no hay flash.
-    //
-    // Linear easing en lugar de out(cubic) para que el ritmo
-    // del loop sea constante — un out(cubic) deceleraba al
-    // final del ciclo y el loop se notaba (se sentía un
-    // "stutter" antes del reset).
+    // Loop infinito. wavePos arranca en -1 y sube a maxDist + 4.5
+    // — punto en el que ya pasó el trail post-onda y el overlay
+    // está en 0 para todos los dots. El reset al -1 es seamless.
     wavePos.value = -1;
     wavePos.value = withRepeat(
       withTiming(maxDist + 4.5, {
@@ -240,6 +273,7 @@ function RippleField({ color }: { color: string }) {
             col={it.col}
             distance={it.distance}
             color={color}
+            dim={c.textFaint}
             wavePos={wavePos}
           />
         ))}
@@ -253,57 +287,69 @@ interface DotProps {
   col: number;
   distance: number;
   color: string;
+  dim: string;
   wavePos: Animated.SharedValue<number>;
 }
 
-function Dot({ row, col, distance, color, wavePos }: DotProps) {
-  // Worklet de UI thread — corre cada frame para cada dot. La
-  // matemática es chica, escala bien aunque haya cientos de
-  // dots. Cuatro fases:
-  //   1. wavePos < distance - BAND/2 → onda no llegó: opacity 0
-  //   2. |wavePos - distance| < BAND/2 → en la banda activa:
-  //      opacity peak (con falloff lineal hacia los bordes)
-  //   3. dist + BAND/2 < wavePos < dist + BAND/2 + TRAIL →
-  //      trail que decae linealmente del residual a 0
-  //   4. wavePos > dist + BAND/2 + TRAIL → opacity 0
-  // En la fase 4 todos los dots están en 0, lo que hace el
-  // boundary del loop seamless (sin flash).
-  const animStyle = useAnimatedStyle(() => {
-    const BAND = 1.4; // ancho de la onda en unidades de grilla
-    const TRAIL = 3.5; // largo del decay post-onda
-    const RESIDUAL = 0.18;
-    const PEAK = 0.95;
+function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
+  // Worklet del overlay coloreado. Sólo controla la opacidad
+  // del color del activo encima del dot gris base. Cuatro fases:
+  //   1. wavePos < distance - BAND/2 → onda no llegó: overlay 0
+  //      (sólo se ve el gris base)
+  //   2. |wavePos - distance| < BAND/2 → banda activa: overlay
+  //      hasta peak 1 con falloff lineal hacia los bordes
+  //   3. dist + BAND/2 < wavePos < dist + BAND/2 + TRAIL → trail
+  //      que decae linealmente de 0.4 a 0
+  //   4. wavePos > dist + BAND/2 + TRAIL → overlay 0
+  // El boundary del loop (wavePos vuelve a -1) es seamless porque
+  // todos los dots están en fase 4 al final del ciclo.
+  const overlayStyle = useAnimatedStyle(() => {
+    const BAND = 1.4;
+    const TRAIL = 3.5;
     const w = wavePos.value;
     const delta = w - distance;
     if (delta < -BAND / 2) {
       return { opacity: 0 };
     }
     if (delta < BAND / 2) {
-      // Banda activa.
       const t = 1 - Math.abs(delta) / (BAND / 2);
-      return { opacity: PEAK * t + RESIDUAL * (1 - t) };
+      return { opacity: t };
     }
     const past = delta - BAND / 2;
     if (past < TRAIL) {
-      // Trail con fade lineal del residual a 0.
-      return { opacity: RESIDUAL * (1 - past / TRAIL) };
+      return { opacity: 0.4 * (1 - past / TRAIL) };
     }
     return { opacity: 0 };
   });
 
   return (
-    <Animated.View
+    <View
       pointerEvents="none"
       style={[
         s.dot,
         {
           left: col * STRIDE,
           top: row * STRIDE,
-          backgroundColor: color,
         },
-        animStyle,
       ]}
-    />
+    >
+      {/* Base gris siempre visible. */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: dim, borderRadius: DOT_SIZE / 2 },
+        ]}
+      />
+      {/* Overlay del color del activo — opacity controlada por
+          el wave. */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: color, borderRadius: DOT_SIZE / 2 },
+          overlayStyle,
+        ]}
+      />
+    </View>
   );
 }
 
@@ -392,5 +438,23 @@ const s = StyleSheet.create({
     fontSize: 14.5,
     lineHeight: 22,
     letterSpacing: -0.15,
+  },
+
+  /* Feedback row al final del briefing — dos circulares en el
+   * tono del activo. Outline 1.5px. Cuando uno se vota se llena
+   * con el tone y el icono va en c.bg para contraste. */
+  feedbackRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 28,
+  },
+  feedbackBtn: {
+    width: 42,
+    height: 42,
+    borderCurve: "continuous",
+    borderRadius: 21,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
