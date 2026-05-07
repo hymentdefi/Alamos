@@ -341,7 +341,7 @@ export default function PortfolioScreen() {
             </Text>
             <View style={s.stickyRow}>
               <Text style={[s.stickyTicker, { color: c.textMuted }]}>
-                PORTFOLIO
+                Portfolio
               </Text>
               <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
               <Text style={[s.stickyPct, { color }]}>
@@ -440,10 +440,14 @@ export default function PortfolioScreen() {
               onPress={() => setInfoOpen(true)}
               style={[
                 s.heroInfoDot,
-                { backgroundColor: c.surfaceHover },
+                { borderColor: c.border },
               ]}
             >
-              <Feather name="info" size={12} color={c.textSecondary} />
+              <Text
+                style={[s.heroInfoLetter, { color: c.textMuted }]}
+              >
+                i
+              </Text>
             </Tap>
           </View>
 
@@ -1613,9 +1617,9 @@ const s = StyleSheet.create({
     marginTop: 1,
   },
   stickyTicker: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0,
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.15,
   },
   stickyDot: {
     fontFamily: fontFamily[500],
@@ -1650,13 +1654,24 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  /* Info dot — border-only circle con "i" tipográfica en Plus Jakarta
+   * 800. Reemplaza el Feather "info" genérico por un treatment que
+   * usa la typography del design system (negative letter spacing,
+   * weight álamos, continuous radius). */
   heroInfoDot: {
     width: 22,
     height: 22,
     borderCurve: "continuous",
     borderRadius: 11,
+    borderWidth: 1.2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  heroInfoLetter: {
+    fontFamily: fontFamily[800],
+    fontSize: 12,
+    lineHeight: 14,
+    letterSpacing: -0.4,
   },
   deltaRow: {
     flexDirection: "row",
