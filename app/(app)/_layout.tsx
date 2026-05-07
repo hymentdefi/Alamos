@@ -84,6 +84,7 @@ export default function AppLayout() {
           options={{ fullScreenGestureEnabled: false }}
         />
         <Stack.Screen name="trade" />
+        <Stack.Screen name="briefing" />
         {/* Buy: fullscreen gesture OFF para que arrastrar el slider no
             dispare el swipe-back. El swipe desde el borde izquierdo sigue
             andando como back. */}
