@@ -16,7 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather, FontAwesome } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, useTheme } from "../../lib/theme";
 import {
@@ -28,21 +28,25 @@ import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
 /* Geometría del campo de puntitos.
  *
- * El grid se inset un poco de los bordes laterales (FIELD_PAD_X)
- * para que los dots no toquen el edge de la pantalla. Stride =
- * DOT_SIZE + DOT_GAP. ROWS / COLS auto-calculados.
+ * Grid fijo de 24 columnas × 15 filas. STRIDE se computa para
+ * que el grid llene exactamente el ancho útil de la pantalla
+ * (descontando FIELD_PAD_X de cada lado). DOT_SIZE escala con
+ * STRIDE para mantener la proporción visual.
+ *
+ * El padding lateral (24) matchea el del body — los dots se
+ * extienden hasta donde llega el texto debajo, dando feel
+ * "el field cubre todo el contenido".
  */
-const DOT_SIZE = 5;
-const DOT_GAP = 13;
-const STRIDE = DOT_SIZE + DOT_GAP;
-const RIPPLE_H = 320;
-const FIELD_PAD_X = 26;
-
+const FIELD_PAD_X = 24;
+const COLS = 24;
+const ROWS = 15;
 const SCREEN_W = Dimensions.get("window").width;
-const COLS = Math.floor((SCREEN_W - FIELD_PAD_X * 2) / STRIDE);
-const ROWS = Math.floor(RIPPLE_H / STRIDE);
+const STRIDE = (SCREEN_W - FIELD_PAD_X * 2) / COLS;
+const DOT_SIZE = Math.max(3, Math.round(STRIDE * 0.42));
+const DOT_GAP = STRIDE - DOT_SIZE;
 const GRID_W = COLS * STRIDE - DOT_GAP;
 const GRID_H = ROWS * STRIDE - DOT_GAP;
+const RIPPLE_H = ROWS * STRIDE + 24;
 
 /**
  * Página completa del briefing AI. Header con back-arrow + ticker
@@ -173,9 +177,9 @@ export default function BriefingScreen() {
                 },
               ]}
             >
-              <Ionicons
+              <FontAwesome
                 name="thumbs-up"
-                size={28}
+                size={24}
                 color={vote === "up" ? c.bg : tone}
               />
             </Pressable>
@@ -191,9 +195,9 @@ export default function BriefingScreen() {
                 },
               ]}
             >
-              <Ionicons
+              <FontAwesome
                 name="thumbs-down"
-                size={28}
+                size={24}
                 color={vote === "down" ? c.bg : tone}
               />
             </Pressable>
@@ -246,15 +250,16 @@ function RippleField({ color }: { color: string }) {
   const wavePos = useSharedValue(-1);
 
   useEffect(() => {
-    // Loop infinito. wavePos arranca en -2 (todos los dots
-    // antes del pre-lead) y sube hasta maxDist + 6.5 (todos
-    // pasaron por el trail completo y volvieron a 0). El reset
-    // al -2 es seamless. Bumpeé el duration a 2800ms porque la
-    // onda ahora cubre más rango.
-    wavePos.value = -2;
+    // Loop infinito. wavePos arranca en -3 (todos los dots
+    // antes del pre-lead, overlay 0) y sube hasta maxDist + 10
+    // — donde el último dot pasó por todo el trail (BAND/2 +
+    // TRAIL = 2 + 8 = 10). En ese punto todos los overlays
+    // están en 0 y el reset es seamless. Duration 3200ms para
+    // mantener un pace razonable con el rango ampliado.
+    wavePos.value = -3;
     wavePos.value = withRepeat(
-      withTiming(maxDist + 6.5, {
-        duration: 2800,
+      withTiming(maxDist + 10, {
+        duration: 3200,
         easing: Easing.linear,
       }),
       -1,
@@ -298,24 +303,14 @@ interface DotProps {
 function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
   // Worklet del overlay coloreado. Cinco fases para un feel
   // "rainbow / glow" — muchos dots lit a la vez con falloff
-  // smooth alrededor del frente de onda:
-  //
-  //   1. delta < -LEAD                 → overlay 0 (no light)
-  //   2. -LEAD ≤ delta < -BAND/2       → pre-lead: dots adelante
-  //      del frente lighting up gradually (0 → 0.6)
-  //   3. -BAND/2 ≤ delta ≤ BAND/2      → peak: 0.6 → 1 → 0.6 con
-  //      forma de bell (parabólica)
-  //   4. BAND/2 < delta ≤ BAND/2+TRAIL → trail largo: dots atrás
-  //      del frente decaying smooth (0.6 → 0)
-  //   5. delta > BAND/2 + TRAIL        → overlay 0
-  //
-  // LEAD + BAND + TRAIL ≈ 8.5 unidades de grilla = ~9 filas
-  // de dots lit simultáneamente. El loop es seamless porque
-  // todos los dots terminan en fase 5 antes del reset.
+  // smooth alrededor del frente de onda. Rangos amplios
+  // (LEAD 3 + BAND 4 + TRAIL 8 = 15 unidades de grilla
+  // simultáneamente lit) para que la onda se sienta viva,
+  // arrastrando luz adelante y atrás como en la referencia.
   const overlayStyle = useAnimatedStyle(() => {
-    const LEAD = 1.6;
-    const BAND = 2.2;
-    const TRAIL = 5;
+    const LEAD = 3;
+    const BAND = 4;
+    const TRAIL = 8;
     const w = wavePos.value;
     const delta = w - distance;
 
@@ -323,21 +318,23 @@ function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
       return { opacity: 0 };
     }
     if (delta < -BAND / 2) {
-      // Pre-lead: 0 → 0.6 lineal
+      // Pre-lead: 0 → 0.55 lineal — dots adelante del frente
+      // empiezan a prenderse muy de a poco
       const t = (delta + LEAD) / (LEAD - BAND / 2);
-      return { opacity: 0.6 * t };
+      return { opacity: 0.55 * t };
     }
     if (delta <= BAND / 2) {
-      // Peak: 0.6 + 0.4 * (1 - (delta/(BAND/2))²) — parabólico
+      // Peak: 0.55 + 0.45 * (1 - (delta/(BAND/2))²) — falloff
+      // parabólico suave; el centro alcanza 1.0
       const x = delta / (BAND / 2);
       const peakBoost = 1 - x * x;
-      return { opacity: 0.6 + 0.4 * peakBoost };
+      return { opacity: 0.55 + 0.45 * peakBoost };
     }
     const past = delta - BAND / 2;
     if (past < TRAIL) {
-      // Trail: 0.6 → 0 lineal (un poco más rápido al principio)
+      // Trail largo: 0.55 → 0 lineal
       const t = 1 - past / TRAIL;
-      return { opacity: 0.6 * t };
+      return { opacity: 0.55 * t };
     }
     return { opacity: 0 };
   });
