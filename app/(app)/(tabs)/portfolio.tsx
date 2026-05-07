@@ -111,9 +111,17 @@ export default function PortfolioScreen() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [pagerW, setPagerW] = useState(0);
 
-  // AR/Todo arrancan en ARS, US/Crypto en USD (su moneda nativa).
-  const defaultCurrency: Currency =
-    marketFilter === "US" || marketFilter === "CRYPTO" ? "USD" : "ARS";
+  // Moneda lockeada según el filtro:
+  //  - "all"    → null (usuario puede swipear ARS↔USD).
+  //  - "AR"     → ARS (siempre, en pesos, no se permite switch).
+  //  - "US"     → USD (siempre, en dólares).
+  //  - "CRYPTO" → USD (siempre, en dólares; las cripto cotizan en USD).
+  const lockedCurrency: Currency | null =
+    marketFilter === "AR"
+      ? "ARS"
+      : marketFilter === "US" || marketFilter === "CRYPTO"
+        ? "USD"
+        : null;
 
   /* ─── Holdings filtrados ─── */
 
@@ -289,17 +297,21 @@ export default function PortfolioScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, onRefresh]);
 
-  // Sync currency cuando cambia el filtro de mercado.
+  // Cuando el filtro impone una moneda fija (AR / US / CRYPTO), forza
+  // currency a ese valor. En "all" no toca la state — el usuario
+  // mantiene su última elección.
   useEffect(() => {
-    setCurrency(defaultCurrency);
-    if (pagerW > 0) {
-      pagerRef.current?.scrollTo({
-        x: defaultCurrency === "ARS" ? 0 : pagerW,
-        y: 0,
-        animated: false,
-      });
+    if (lockedCurrency) {
+      setCurrency(lockedCurrency);
+      if (pagerW > 0) {
+        pagerRef.current?.scrollTo({
+          x: lockedCurrency === "ARS" ? 0 : pagerW,
+          y: 0,
+          animated: false,
+        });
+      }
     }
-  }, [defaultCurrency, pagerW]);
+  }, [lockedCurrency, pagerW]);
 
   /* ─── Display values en moneda actual ─── */
 
@@ -315,40 +327,50 @@ export default function PortfolioScreen() {
   return (
     <AssetColorProvider up={dayUp}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
-        {/* Top bar — banda fija con bg sólido c.bg que separa visualmente
-            del contenido scrollable. El sticky overlay (balance compacto
-            + PORTFOLIO · pct%) crossfade-aparece al scrollear, sobre el
-            bg sólido del topBar. */}
+        {/* Top bar — solo bg sólido + safe area + un poco de padding.
+            El sticky overlay vive como sibling absolute (sin reservar
+            espacio en el flex layout) — así cuando está invisible el
+            hero arranca apenas debajo del status bar. */}
         <View
           style={[
             s.topBar,
             {
-              paddingTop: insets.top + 12,
+              paddingTop: insets.top + 8,
               backgroundColor: c.bg,
             },
           ]}
+        />
+
+        {/* Sticky overlay — absolute con bg propio. Crossfade-aparece
+            al scrollear; cuando opacity=0 no oculta nada (bg también
+            transparente). pointerEvents=none para no robar taps. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            s.stickyOverlay,
+            {
+              top: insets.top + 8,
+              backgroundColor: c.bg,
+            },
+            stickyOpacityStyle,
+          ]}
         >
-          <Animated.View
-            style={[s.stickyOverlay, stickyOpacityStyle]}
-            pointerEvents="none"
+          <Text
+            style={[s.stickyPrice, { color: c.text }]}
+            numberOfLines={1}
           >
-            <Text
-              style={[s.stickyPrice, { color: c.text }]}
-              numberOfLines={1}
-            >
-              {formatMoney(totalDisplay, currency)}
+            {formatMoney(totalDisplay, currency)}
+          </Text>
+          <View style={s.stickyRow}>
+            <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+              Portfolio
             </Text>
-            <View style={s.stickyRow}>
-              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
-                Portfolio
-              </Text>
-              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
-              <Text style={[s.stickyPct, { color }]}>
-                {formatPct(dayPct)}
-              </Text>
-            </View>
-          </Animated.View>
-        </View>
+            <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+            <Text style={[s.stickyPct, { color }]}>
+              {formatPct(dayPct)}
+            </Text>
+          </View>
+        </Animated.View>
 
         <Animated.ScrollView
           ref={scrollRef as never}
@@ -376,7 +398,20 @@ export default function PortfolioScreen() {
               style={{ flex: 1 }}
               onLayout={(e) => setPagerW(e.nativeEvent.layout.width)}
             >
-              {pagerW > 0 ? (
+              {lockedCurrency ? (
+                /* Filtro fija la moneda → render single AmountDisplay,
+                   sin pager. AR=ARS, US/CRYPTO=USD. */
+                <AmountDisplay
+                  value={
+                    lockedCurrency === "ARS"
+                      ? totalArs
+                      : convertAmount(totalArs, "ARS", "USD")
+                  }
+                  size={42}
+                  currency={lockedCurrency}
+                />
+              ) : pagerW > 0 ? (
+                /* "Todo" → pager swipeable ARS↔USD. */
                 <ScrollView
                   ref={pagerRef}
                   horizontal
@@ -463,38 +498,43 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          <View style={s.dotsRow}>
-            {(["ARS", "USD"] as const).map((cur) => {
-              const active = cur === currency;
-              return (
-                <Tap
-                  key={cur}
-                  hitSlop={10}
-                  haptic="selection"
-                  onPress={() => {
-                    if (cur === currency) return;
-                    setCurrency(cur);
-                    pagerRef.current?.scrollTo({
-                      x: cur === "ARS" ? 0 : pagerW,
-                      y: 0,
-                      animated: true,
-                    });
-                  }}
-                >
-                  <View
-                    style={[
-                      s.dot,
-                      {
-                        backgroundColor: active ? c.text : c.textFaint,
-                        width: active ? 7 : 5,
-                        height: active ? 7 : 5,
-                      },
-                    ]}
-                  />
-                </Tap>
-              );
-            })}
-          </View>
+          {/* Dots ARS/USD — solo aparecen en filtro "Todo". En AR/US/
+              Crypto la moneda está lockeada por contexto, sin opción
+              de switch. */}
+          {!lockedCurrency ? (
+            <View style={s.dotsRow}>
+              {(["ARS", "USD"] as const).map((cur) => {
+                const active = cur === currency;
+                return (
+                  <Tap
+                    key={cur}
+                    hitSlop={10}
+                    haptic="selection"
+                    onPress={() => {
+                      if (cur === currency) return;
+                      setCurrency(cur);
+                      pagerRef.current?.scrollTo({
+                        x: cur === "ARS" ? 0 : pagerW,
+                        y: 0,
+                        animated: true,
+                      });
+                    }}
+                  >
+                    <View
+                      style={[
+                        s.dot,
+                        {
+                          backgroundColor: active ? c.text : c.textFaint,
+                          width: active ? 7 : 5,
+                          height: active ? 7 : 5,
+                        },
+                      ]}
+                    />
+                  </Tap>
+                );
+              })}
+            </View>
+          ) : null}
           </View>
 
           {/* Ladrillo full-bleed — debajo del hero scrollable. Pasa
@@ -1568,23 +1608,25 @@ function formatAllocationPct(p: number): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Top bar — banda fija con bg sólido (aplicado inline con c.bg).
-   * Aloja al sticky overlay como flex child para que la altura del
-   * topBar contenga al texto del overlay y haya un fondo sólido
-   * detrás. Total height = insets.top + 12 + 38 + 12 = insets.top+62. */
+  /* Top bar — solo bg + safe area. NO contiene el sticky overlay
+   * (vive aparte, absolute) → no reserva espacio cuando está oculto. */
   topBar: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingBottom: 8,
   },
-  /* Sticky overlay — flex child centrado del topBar. Su opacity
-   * arranca en 0 y crossfade-aparece cuando el scrollY cruza
-   * STICKY_START → full opacity en STICKY_FULL. */
+  /* Sticky overlay — absolute, sibling del topBar. Posicionado en
+   * `top: insets.top + 8` (igual que el padding superior del topBar).
+   * Tiene bg propio que crossfade-aparece junto con el texto, así no
+   * reserva espacio cuando opacity=0 y el hero puede arrancar apenas
+   * debajo del topBar. */
   stickyOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
     height: 38,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 10,
   },
   stickyPrice: {
     fontFamily: fontFamily[500],
