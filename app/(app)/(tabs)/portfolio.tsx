@@ -25,6 +25,7 @@ import Svg, {
   Ellipse,
   G,
   Line,
+  Path as SvgPath,
   Polygon,
   Text as SvgText,
 } from "react-native-svg";
@@ -491,6 +492,45 @@ export default function PortfolioScreen() {
             </Tap>
           </View>
 
+          {/* Dots ARS / USD / USDT — SIEMPRE renderizados con la misma
+              altura. En "Todo" son tappable selectors; en AR/US/Crypto
+              son indicadores estáticos del lock contextual. Layout
+              constante entre filtros. */}
+          <View style={s.dotsRow}>
+            {CURRENCY_ORDER.map((cur) => {
+              const active = cur === currency;
+              const interactive = !lockedCurrency;
+              return (
+                <Tap
+                  key={cur}
+                  hitSlop={interactive ? 10 : 0}
+                  haptic={interactive ? "selection" : "none"}
+                  onPress={() => {
+                    if (!interactive) return;
+                    if (cur === currency) return;
+                    setCurrency(cur);
+                    pagerRef.current?.scrollTo({
+                      x: CURRENCY_ORDER.indexOf(cur) * pagerW,
+                      y: 0,
+                      animated: true,
+                    });
+                  }}
+                >
+                  <View
+                    style={[
+                      s.dot,
+                      {
+                        backgroundColor: active ? c.text : c.textFaint,
+                        width: active ? 7 : 5,
+                        height: active ? 7 : 5,
+                      },
+                    ]}
+                  />
+                </Tap>
+              );
+            })}
+          </View>
+
           <View style={s.deltaRow}>
             <Text style={[s.deltaTri, { color }]}>
               {dayUp ? "▲" : "▼"}
@@ -515,43 +555,6 @@ export default function PortfolioScreen() {
             {cotizacionLabel(currency)}
           </Text>
 
-          {/* Dots ARS / USD / USDT — solo aparecen en filtro "Todo".
-              En AR/US/Crypto la moneda está lockeada por contexto. */}
-          {!lockedCurrency ? (
-            <View style={s.dotsRow}>
-              {CURRENCY_ORDER.map((cur) => {
-                const active = cur === currency;
-                return (
-                  <Tap
-                    key={cur}
-                    hitSlop={10}
-                    haptic="selection"
-                    onPress={() => {
-                      if (cur === currency) return;
-                      setCurrency(cur);
-                      pagerRef.current?.scrollTo({
-                        x: CURRENCY_ORDER.indexOf(cur) * pagerW,
-                        y: 0,
-                        animated: true,
-                      });
-                    }}
-                  >
-                    <View
-                      style={[
-                        s.dot,
-                        {
-                          backgroundColor: active ? c.text : c.textFaint,
-                          width: active ? 7 : 5,
-                          height: active ? 7 : 5,
-                        },
-                      ]}
-                    />
-                  </Tap>
-                );
-              })}
-            </View>
-          ) : null}
-
           {/* Cash disponible — saldos no invertidos por moneda. En AR
               "el cash en pesos pierde poder adquisitivo", así que el
               usuario tiene que verlo siempre presente. Filtrado por el
@@ -566,14 +569,15 @@ export default function PortfolioScreen() {
           ) : null}
           </View>
 
-          {/* Ladrillo full-bleed — debajo del hero scrollable. Pasa
-              onHoldChange para bloquear el ScrollView mientras finger
-              está apoyado en el ladrillo. */}
+          {/* Pie chart de distribución — donut con info en el centro.
+              Pasa onHoldChange para bloquear el ScrollView mientras
+              finger está apoyado en un slice. */}
           {hasHoldings ? (
             <View style={s.brickContainer}>
-              <FloorBrick
+              <FloorPie
                 holdings={holdingsSorted}
                 totalArs={totalArs}
+                currency={currency}
                 groupBy={
                   marketFilter === "CRYPTO" ? "ticker" : "category"
                 }
@@ -1310,6 +1314,339 @@ function DistribucionCard({
   );
 }
 
+/* ─── FloorPie — donut chart interactivo ─────────────────────────
+ *
+ * Visualización principal de la distribución de la cartera. Cada slice
+ * representa una categoría (o ticker en Crypto), coloreada con la
+ * misma paleta del FloorBrick así ambas vistas hablan el mismo idioma
+ * cromático sobre los mismos datos.
+ *
+ * Premium touches:
+ *   - Outline 1.5pt ink en cada slice — feel handcrafted, mismo
+ *     lenguaje que el ladrillo.
+ *   - Drop shadow elíptico debajo del donut — depth sutil.
+ *   - Donut hole con info en el centro: balance compact + label
+ *     'Distribución' en estado neutral; categoría + % + count cuando
+ *     se holdea un slice.
+ *   - Slices atenuados a surfaceSunken cuando otro slice está activo
+ *     — focus claro, narrativa simple.
+ *   - Mismo gesture model que el ladrillo: hold + drag highlightea,
+ *     soltar resetea, ScrollView padre se bloquea durante el hold.
+ *
+ * Geometría: viewBox 340 × 200, donut centrado en (170, 100), outer
+ * radius 78, inner radius 48 (anillo de 30 de grosor). */
+
+interface FloorPieProps {
+  holdings: Holding[];
+  totalArs: number;
+  currency: Currency;
+  groupBy: "category" | "ticker";
+  onHoldChange?: (holding: boolean) => void;
+}
+
+function FloorPie({
+  holdings,
+  totalArs,
+  currency,
+  groupBy,
+  onHoldChange,
+}: FloorPieProps) {
+  const { c } = useTheme();
+  const [containerW, setContainerW] = useState(0);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  // Geometría del viewBox.
+  const W = 340;
+  const H = 200;
+  const cx = W / 2;
+  const cy = H / 2;
+  const outerR = 78;
+  const innerR = 48;
+
+  type Row = {
+    ticker: string;
+    shortTicker: string;
+    change: number;
+    ars: number;
+  };
+
+  const slices = useMemo(() => {
+    const byKey = new Map<
+      string,
+      { ars: number; rows: Row[]; cat: AssetCategory; name: string }
+    >();
+    for (const h of holdings) {
+      const key = groupBy === "ticker" ? h.asset.ticker : h.asset.category;
+      const entry = byKey.get(key) ?? {
+        ars: 0,
+        rows: [],
+        cat: h.asset.category,
+        name: h.asset.name,
+      };
+      entry.ars += h.ars;
+      entry.rows.push({
+        ticker: h.asset.ticker,
+        shortTicker: shortCryptoTicker(h.asset.ticker),
+        change: h.asset.change,
+        ars: h.ars,
+      });
+      byKey.set(key, entry);
+    }
+    const sorted = Array.from(byKey.entries())
+      .map(([key, { ars, rows, cat, name }]) => ({
+        key,
+        cat,
+        label: groupBy === "ticker" ? name : categoryLabels[cat],
+        ars,
+        pct: (ars / totalArs) * 100,
+        count: rows.length,
+        rows: rows.sort((a, b) => b.ars - a.ars),
+      }))
+      .sort((a, b) => b.pct - a.pct);
+
+    // Asignación angular acumulativa. -π/2 (12 en punto) como inicio
+    // — convención que se siente más natural en pies financieros.
+    let cumulative = -Math.PI / 2;
+    return sorted.map((s, i) => {
+      const startAngle = cumulative;
+      const sweep = (s.pct / 100) * 2 * Math.PI;
+      const endAngle = startAngle + sweep;
+      cumulative = endAngle;
+      return {
+        ...s,
+        startAngle,
+        endAngle,
+        color: BRICK_PALETTE[i % BRICK_PALETTE.length],
+      };
+    });
+  }, [holdings, totalArs, groupBy]);
+
+  // Refs para el handleTouch (mismo motivo que el FloorBrick).
+  const activeIdxRef = useRef<number | null>(null);
+  const containerWRef = useRef(0);
+  const slicesRef = useRef(slices);
+  useEffect(() => {
+    containerWRef.current = containerW;
+  }, [containerW]);
+  useEffect(() => {
+    slicesRef.current = slices;
+  }, [slices]);
+
+  const handleTouch = useCallback(
+    (px: number | null, py: number | null) => {
+      let next: number | null = null;
+      const cW = containerWRef.current;
+      const sl = slicesRef.current;
+      if (px !== null && py !== null && cW > 0) {
+        // Convertir px/py del container al sistema del viewBox. Como
+        // preserveAspectRatio="xMidYMid meet" y el container ocupa todo
+        // el ancho, scale = W / cW. La altura se renderea como
+        // cW * H / W, así el scale Y es igual.
+        const scale = W / cW;
+        const vbX = px * scale;
+        const vbY = py * scale;
+        const dx = vbX - cx;
+        const dy = vbY - cy;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Solo dentro del anillo (con un poco de tolerancia).
+        if (distance <= outerR + 4 && distance >= innerR - 4) {
+          let angle = Math.atan2(dy, dx);
+          // Normalizar al rango [-π/2, 3π/2) que matchea nuestro start.
+          if (angle < -Math.PI / 2) angle += 2 * Math.PI;
+          const idx = sl.findIndex(
+            (s) => angle >= s.startAngle && angle <= s.endAngle,
+          );
+          next = idx >= 0 ? idx : null;
+        }
+      }
+      if (next === activeIdxRef.current) return;
+      activeIdxRef.current = next;
+      setActiveIdx(next);
+      if (next !== null) Haptics.selectionAsync().catch(() => {});
+    },
+    [],
+  );
+
+  const activeSlice =
+    activeIdx !== null ? slices[activeIdx] ?? null : null;
+  const dimmedFill = c.surfaceSunken;
+
+  // Texto del centro — compact balance en neutral, info de slice activa
+  // en hold. Renderizado como View+Text para honrar Plus Jakarta.
+  const totalDisplay =
+    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", currency);
+
+  return (
+    <View
+      style={s.brickWrap}
+      onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+    >
+      <View
+        onStartShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
+        onResponderGrant={(e) => {
+          onHoldChange?.(true);
+          handleTouch(
+            e.nativeEvent.locationX,
+            e.nativeEvent.locationY,
+          );
+        }}
+        onResponderMove={(e) =>
+          handleTouch(
+            e.nativeEvent.locationX,
+            e.nativeEvent.locationY,
+          )
+        }
+        onResponderRelease={() => {
+          onHoldChange?.(false);
+          handleTouch(null, null);
+        }}
+        onResponderTerminate={() => {
+          onHoldChange?.(false);
+          handleTouch(null, null);
+        }}
+      >
+        <Svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height={containerW > 0 ? (containerW * H) / W : undefined}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Drop shadow debajo del donut — same lenguaje que el
+              ladrillo: óvalo gris bajo de opacidad. */}
+          <Ellipse
+            cx={cx}
+            cy={cy + outerR + 12}
+            rx={outerR + 4}
+            ry={5}
+            fill="rgba(14,15,12,0.10)"
+          />
+
+          {/* Slices del donut. */}
+          {slices.map((slice, i) => {
+            const dimmed = activeIdx !== null && activeIdx !== i;
+            const fill = dimmed ? dimmedFill : slice.color;
+            return (
+              <SvgPath
+                key={slice.key}
+                d={annularSectorPath(
+                  cx,
+                  cy,
+                  innerR,
+                  outerR,
+                  slice.startAngle,
+                  slice.endAngle,
+                )}
+                fill={fill}
+                stroke="#0E0F0C"
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+              />
+            );
+          })}
+        </Svg>
+
+        {/* Center text — overlay con Plus Jakarta. pointerEvents none
+            para no robar gestos al responder. */}
+        {containerW > 0 ? (
+          <View
+            pointerEvents="none"
+            style={[
+              s.pieCenter,
+              {
+                width: containerW,
+                height: (containerW * H) / W,
+              },
+            ]}
+          >
+            {activeSlice ? (
+              <>
+                <Text
+                  style={[s.pieCenterPrimary, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {activeSlice.label}
+                </Text>
+                <Text
+                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {formatTooltipPct(activeSlice.pct)} ·{" "}
+                  {activeSlice.count}{" "}
+                  {activeSlice.count === 1 ? "activo" : "activos"}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  style={[s.pieCenterPrimary, { color: c.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {formatCenterMoney(totalDisplay, currency)}
+                </Text>
+                <Text
+                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  Distribución
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/** Path SVG de un sector anular (donut slice). */
+function annularSectorPath(
+  cx: number,
+  cy: number,
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const x1 = cx + outerR * Math.cos(startAngle);
+  const y1 = cy + outerR * Math.sin(startAngle);
+  const x2 = cx + outerR * Math.cos(endAngle);
+  const y2 = cy + outerR * Math.sin(endAngle);
+  const x3 = cx + innerR * Math.cos(endAngle);
+  const y3 = cy + innerR * Math.sin(endAngle);
+  const x4 = cx + innerR * Math.cos(startAngle);
+  const y4 = cy + innerR * Math.sin(startAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return [
+    `M ${x1} ${y1}`,
+    `A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2}`,
+    `L ${x3} ${y3}`,
+    `A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4}`,
+    "Z",
+  ].join(" ");
+}
+
+/** Compact format para el centro del donut — los millones argentinos
+ *  no caben full ($ 12.840.000), así que abreviamos. */
+function formatCenterMoney(n: number, currency: Currency): string {
+  const abs = Math.abs(n);
+  if (currency === "ARS") {
+    if (abs >= 1e9) return `$ ${(n / 1e9).toFixed(1).replace(".", ",")} B`;
+    if (abs >= 1e6) return `$ ${(n / 1e6).toFixed(1).replace(".", ",")} M`;
+    if (abs >= 1e3) return `$ ${Math.round(n / 1e3)} K`;
+    return formatMoney(n, currency);
+  }
+  // USD / USDT — números más chicos, formato natural.
+  if (abs >= 1e6) {
+    return `${(n / 1e6).toFixed(1).replace(".", ",")} M ${currency}`;
+  }
+  if (abs >= 1e3) {
+    return `${(n / 1e3).toFixed(1).replace(".", ",")} K ${currency}`;
+  }
+  return formatMoney(n, currency);
+}
+
 /* ─── FloorBrick — pared 3D interactiva ──────────────────────────
  *
  * Lift del antiguo AllocationBrick: solo el ladrillo + tooltip +
@@ -1837,12 +2174,15 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
+  /* Dots row — compacto, justo debajo del saldo. Siempre renderizado
+   * con altura constante para que el layout no se mueva al alternar
+   * entre filtros. */
   dotsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     marginTop: 10,
-    paddingVertical: 2,
+    height: 8,
   },
   dot: {
     borderCurve: "continuous",
@@ -2114,6 +2454,32 @@ const s = StyleSheet.create({
   brickWrap: {
     position: "relative",
     overflow: "visible",
+  },
+
+  /* Pie center — overlay con info en el donut hole. position absolute
+   * sobre el SVG, centrado vertical+horizontal con el centro geometrico
+   * del donut. */
+  pieCenter: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pieCenterPrimary: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+    lineHeight: 18,
+    maxWidth: 130,
+  },
+  pieCenterSecondary: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 4,
+    maxWidth: 130,
+    textAlign: "center",
   },
 
   /* Tooltip */
