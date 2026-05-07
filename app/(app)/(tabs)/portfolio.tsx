@@ -45,7 +45,7 @@ import {
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
-import { convertAmount } from "../../../lib/data/accounts";
+import { accounts, convertAmount } from "../../../lib/data/accounts";
 import {
   categorizeAsset,
   findCategoryBySlug,
@@ -81,7 +81,10 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
  *      Tus posiciones (por categoría), Distribución (por mercado).
  */
 
-type Currency = "ARS" | "USD";
+type Currency = "ARS" | "USD" | "USDT";
+
+/** Orden canónico del pager y los dots del hero. */
+const CURRENCY_ORDER: readonly Currency[] = ["ARS", "USD", "USDT"];
 type ColorMap = ReturnType<typeof useTheme>["c"];
 
 interface Holding {
@@ -112,16 +115,18 @@ export default function PortfolioScreen() {
   const [pagerW, setPagerW] = useState(0);
 
   // Moneda lockeada según el filtro:
-  //  - "all"    → null (usuario puede swipear ARS↔USD).
-  //  - "AR"     → ARS (siempre, en pesos, no se permite switch).
-  //  - "US"     → USD (siempre, en dólares).
-  //  - "CRYPTO" → USD (siempre, en dólares; las cripto cotizan en USD).
+  //  - "all"    → null (usuario puede swipear ARS / USD / USDT).
+  //  - "AR"     → ARS (en pesos).
+  //  - "US"     → USD (USD MEP convertido a dólar duro).
+  //  - "CRYPTO" → USDT (las cripto cotizan en USDT spot).
   const lockedCurrency: Currency | null =
     marketFilter === "AR"
       ? "ARS"
-      : marketFilter === "US" || marketFilter === "CRYPTO"
+      : marketFilter === "US"
         ? "USD"
-        : null;
+        : marketFilter === "CRYPTO"
+          ? "USDT"
+          : null;
 
   /* ─── Holdings filtrados ─── */
 
@@ -299,13 +304,14 @@ export default function PortfolioScreen() {
 
   // Cuando el filtro impone una moneda fija (AR / US / CRYPTO), forza
   // currency a ese valor. En "all" no toca la state — el usuario
-  // mantiene su última elección.
+  // mantiene su última elección entre ARS / USD / USDT.
   useEffect(() => {
     if (lockedCurrency) {
       setCurrency(lockedCurrency);
       if (pagerW > 0) {
+        const idx = CURRENCY_ORDER.indexOf(lockedCurrency);
         pagerRef.current?.scrollTo({
-          x: lockedCurrency === "ARS" ? 0 : pagerW,
+          x: idx * pagerW,
           y: 0,
           animated: false,
         });
@@ -316,9 +322,9 @@ export default function PortfolioScreen() {
   /* ─── Display values en moneda actual ─── */
 
   const totalDisplay =
-    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", "USD");
+    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", currency);
   const daySumDisplay =
-    currency === "ARS" ? daySumArs : convertAmount(daySumArs, "ARS", "USD");
+    currency === "ARS" ? daySumArs : convertAmount(daySumArs, "ARS", currency);
 
   const hasHoldings = holdingsSorted.length > 0 && totalArs > 0;
 
@@ -411,7 +417,7 @@ export default function PortfolioScreen() {
                   currency={lockedCurrency}
                 />
               ) : pagerW > 0 ? (
-                /* "Todo" → pager swipeable ARS↔USD. */
+                /* "Todo" → pager swipeable ARS / USD / USDT. */
                 <ScrollView
                   ref={pagerRef}
                   horizontal
@@ -422,14 +428,14 @@ export default function PortfolioScreen() {
                   alwaysBounceVertical={false}
                   bounces={false}
                   contentOffset={{
-                    x: currency === "ARS" ? 0 : pagerW,
+                    x: CURRENCY_ORDER.indexOf(currency) * pagerW,
                     y: 0,
                   }}
                   onMomentumScrollEnd={(e) => {
                     const idx = Math.round(
                       e.nativeEvent.contentOffset.x / pagerW,
                     );
-                    const next: Currency = idx === 0 ? "ARS" : "USD";
+                    const next = CURRENCY_ORDER[idx] ?? "ARS";
                     if (next !== currency) {
                       Haptics.selectionAsync().catch(() => {});
                       setCurrency(next);
@@ -437,11 +443,11 @@ export default function PortfolioScreen() {
                   }}
                   style={{ flexGrow: 0 }}
                 >
-                  {(["ARS", "USD"] as const).map((cur) => {
+                  {CURRENCY_ORDER.map((cur) => {
                     const value =
                       cur === "ARS"
                         ? totalArs
-                        : convertAmount(totalArs, "ARS", "USD");
+                        : convertAmount(totalArs, "ARS", cur);
                     return (
                       <View
                         key={cur}
@@ -498,12 +504,22 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          {/* Dots ARS/USD — solo aparecen en filtro "Todo". En AR/US/
-              Crypto la moneda está lockeada por contexto, sin opción
-              de switch. */}
+          {/* Etiqueta de cotización + timestamp — explicita qué tipo
+              de cambio se está usando (MEP / spot / nativo) y cuándo
+              fue actualizado. Crítico en Argentina por la cantidad
+              de "lentes" de moneda disponibles. */}
+          <Text
+            style={[s.cotizacionLabel, { color: c.textMuted }]}
+            numberOfLines={1}
+          >
+            {cotizacionLabel(currency)}
+          </Text>
+
+          {/* Dots ARS / USD / USDT — solo aparecen en filtro "Todo".
+              En AR/US/Crypto la moneda está lockeada por contexto. */}
           {!lockedCurrency ? (
             <View style={s.dotsRow}>
-              {(["ARS", "USD"] as const).map((cur) => {
+              {CURRENCY_ORDER.map((cur) => {
                 const active = cur === currency;
                 return (
                   <Tap
@@ -514,7 +530,7 @@ export default function PortfolioScreen() {
                       if (cur === currency) return;
                       setCurrency(cur);
                       pagerRef.current?.scrollTo({
-                        x: cur === "ARS" ? 0 : pagerW,
+                        x: CURRENCY_ORDER.indexOf(cur) * pagerW,
                         y: 0,
                         animated: true,
                       });
@@ -534,6 +550,19 @@ export default function PortfolioScreen() {
                 );
               })}
             </View>
+          ) : null}
+
+          {/* Cash disponible — saldos no invertidos por moneda. En AR
+              "el cash en pesos pierde poder adquisitivo", así que el
+              usuario tiene que verlo siempre presente. Filtrado por el
+              market filter activo cuando aplica. */}
+          {hasHoldings ? (
+            <Text
+              style={[s.cashLabel, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              {cashSummary(marketFilter)}
+            </Text>
           ) : null}
           </View>
 
@@ -630,12 +659,42 @@ export default function PortfolioScreen() {
               <DistribucionCard alloc={marketAllocation} c={c} />
             </>
           ) : (
-            <View style={[s.card, { paddingTop: 12 }]}>
-              <Text style={[s.empty, { color: c.textMuted }]}>
+            /* Empty state accionable — el doc lo destaca: "empty
+               states son una oportunidad de activación, no un mensaje
+               de error". Copy específico por filtro + CTA al Mercado. */
+            <View style={[s.card, { paddingTop: 24 }]}>
+              <Text style={[s.emptyTitle, { color: c.text }]}>
                 {marketFilter === "all"
-                  ? "Todavía no tenés posiciones. Entrá a Mercado para empezar."
-                  : "No tenés posiciones en este mercado."}
+                  ? "Empezá con $1.000"
+                  : marketFilter === "AR"
+                    ? "Sin posiciones en pesos"
+                    : marketFilter === "US"
+                      ? "Sin posiciones en dólares"
+                      : "Sin crypto en cartera"}
               </Text>
+              <Text style={[s.emptyBody, { color: c.textMuted }]}>
+                {marketFilter === "all"
+                  ? "Comprá tu primer CEDEAR en 30 segundos y arrancá tu cartera."
+                  : marketFilter === "AR"
+                    ? "Acciones argentinas, bonos en pesos y FCI te esperan."
+                    : marketFilter === "US"
+                      ? "CEDEARs y acciones de EE.UU. en una sola cuenta."
+                      : "BTC, ETH y stablecoins disponibles 24/7."}
+              </Text>
+              <Tap
+                haptic="medium"
+                pressScale={0.97}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/(tabs)/explore",
+                  })
+                }
+                style={[s.emptyCta, { backgroundColor: c.text }]}
+              >
+                <Text style={[s.emptyCtaText, { color: c.bg }]}>
+                  Ir a Mercado
+                </Text>
+              </Tap>
             </View>
           )}
         </Animated.ScrollView>
@@ -647,6 +706,59 @@ export default function PortfolioScreen() {
       </View>
     </AssetColorProvider>
   );
+}
+
+/* ─── Cotización label — debajo del hero, explicita qué tipo de
+ *     cambio se está usando para la valuación. Crítico en Argentina
+ *     por las múltiples lentes (MEP / CCL / Blue / Oficial / Spot).
+ *     Mock: rates derivados de los del módulo accounts; timestamp
+ *     hardcoded "hace 2 min" — en producción sería el ts real del
+ *     fetch de cotización. */
+function cotizacionLabel(currency: Currency): string {
+  if (currency === "ARS") return "Pesos argentinos · hace 2 min";
+  if (currency === "USD") {
+    const rate = convertAmount(1, "USD", "ARS");
+    return `USD MEP · $ ${formatRate(rate)} · hace 2 min`;
+  }
+  // USDT
+  const rate = convertAmount(1, "USDT", "ARS");
+  return `USDT · $ ${formatRate(rate)} · hace 2 min`;
+}
+
+function formatRate(n: number): string {
+  return Math.round(n).toLocaleString("es-AR");
+}
+
+/* ─── Cash summary — suma de saldos no invertidos por moneda. El doc
+ *     lo señala como crítico en Argentina porque "el cash en pesos
+ *     pierde poder adquisitivo" — tiene que estar siempre visible.
+ *     Filtra por market: en "Todo" muestra todas; en AR/US/Crypto
+ *     solo la moneda relevante. */
+function cashSummary(marketFilter: MarketSegmentedValue): string {
+  const ars = accounts
+    .filter((a) => a.currency === "ARS")
+    .reduce((acc, a) => acc + a.balance, 0);
+  const usd = accounts
+    .filter((a) => a.currency === "USD")
+    .reduce((acc, a) => acc + a.balance, 0);
+  const usdt = accounts
+    .filter((a) => a.currency === "USDT")
+    .reduce((acc, a) => acc + a.balance, 0);
+
+  const parts: string[] = [];
+  const wantARS = marketFilter === "all" || marketFilter === "AR";
+  const wantUSD = marketFilter === "all" || marketFilter === "US";
+  const wantUSDT = marketFilter === "all" || marketFilter === "CRYPTO";
+
+  if (wantARS && ars > 0)
+    parts.push(`$ ${formatRate(ars)}`);
+  if (wantUSD && usd > 0)
+    parts.push(`US$ ${formatRate(usd)}`);
+  if (wantUSDT && usdt > 0)
+    parts.push(`${formatRate(usdt)} USDT`);
+
+  if (parts.length === 0) return "Sin cash disponible";
+  return `Sin invertir · ${parts.join(" · ")}`;
 }
 
 /* ─── SegGlyph — glyph del segmented por id. Flippea bg/fg cuando
@@ -721,27 +833,37 @@ function SegGlyph({
  * secundarias (mejor mes, ytd, etc.) son fijas — no dependen del
  * range, dan contexto histórico independiente. */
 
-type RendRange = "1D" | "1M" | "3M" | "6M" | "1A" | "MAX";
+type RendRange = "1D" | "1W" | "1M" | "3M" | "YTD" | "1A" | "MAX";
 
-const RENDIMIENTO_RANGES: RendRange[] = ["1D", "1M", "3M", "6M", "1A", "MAX"];
+const RENDIMIENTO_RANGES: RendRange[] = [
+  "1D",
+  "1W",
+  "1M",
+  "3M",
+  "YTD",
+  "1A",
+  "MAX",
+];
 
 /** % de retorno mockeado por rango. Para "1D" se ignora — usamos el
  *  dayPct vivo del portfolio (mismo número que el delta del hero).
  *  Los demás rangos son determinísticos por mock. */
 const RENDIMIENTO_PCTS: Record<RendRange, number> = {
   "1D": 0,
+  "1W": 0.6,
   "1M": 1.8,
   "3M": 4.2,
-  "6M": 7.5,
+  "YTD": 8.4,
   "1A": 10.8,
   "MAX": 12.4,
 };
 
 const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
   "1D": 100,
+  "1W": 70,
   "1M": 80,
   "3M": 140,
-  "6M": 200,
+  "YTD": 220,
   "1A": 240,
   "MAX": 300,
 };
@@ -750,12 +872,14 @@ function rendPeriodLabel(r: RendRange): string {
   switch (r) {
     case "1D":
       return "hoy";
+    case "1W":
+      return "esta semana";
     case "1M":
       return "último mes";
     case "3M":
       return "últimos 3 meses";
-    case "6M":
-      return "últimos 6 meses";
+    case "YTD":
+      return "este año";
     case "1A":
       return "último año";
     case "MAX":
@@ -1724,6 +1848,22 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
     borderRadius: 999,
   },
+  /* Cotización + timestamp — debajo del deltaRow, antes de los dots.
+   * Texto chico muted que da contexto del tipo de cambio aplicado. */
+  cotizacionLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 8,
+  },
+  /* Cash disponible — debajo de los dots. Muestra los saldos no
+   * invertidos por moneda en el contexto del market filter. */
+  cashLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 12,
+  },
 
   /* Ladrillo full-bleed — sigue al hero scrollable. Sin
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
@@ -1796,13 +1936,32 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
   },
-  empty: {
+  /* Empty state — título grande + body + CTA pill negro. El doc lo
+   * señala como activation moment, no como mensaje de error. */
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  emptyBody: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: -0.1,
-    textAlign: "center",
-    paddingHorizontal: 8,
+    marginBottom: 20,
+  },
+  emptyCta: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  emptyCtaText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 
   /* Posiciones — list rows con hairline dividers */
@@ -1880,7 +2039,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   rendRangePill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
