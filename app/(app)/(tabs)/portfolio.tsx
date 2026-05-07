@@ -514,17 +514,11 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Filtro de mercado — segmented con glyphs/banderas
-              dentro de un container surfaceHover. Active pill filled
-              con el color contextual del día (greenDark/red), glyph
-              flippea sus colores en active para mantener legibilidad
-              sobre el fondo sólido. */}
-          <View
-            style={[
-              s.segContainer,
-              { backgroundColor: c.surfaceHover },
-            ]}
-          >
+          {/* ─── Filtro de mercado — pills sueltas (sin container).
+              Active filled con el color contextual del día (greenDark/
+              red); el glyph del Crypto/Todo flippea bg/fg en active
+              para mantener legibilidad sobre el fondo sólido. */}
+          <View style={s.segRow}>
             {(
               [
                 { id: "all", label: "Todo" },
@@ -568,11 +562,12 @@ export default function PortfolioScreen() {
 
           {hasHoldings ? (
             <>
-              <ResumenCard
-                bestOfDay={bestOfDay}
-                worstOfDay={worstOfDay}
-                c={c}
-              />
+              {/* Orden por prioridad de lo que le importa al inversor:
+                  1. Rendimiento — cómo viene la plata global (lo más
+                     importante — total return + chart histórico).
+                  2. Tus posiciones — qué tiene en cartera (drilldown).
+                  3. Distribución — cómo está distribuido (mercados).
+                  4. Mejor/Peor del día — ruido del día (último). */}
               <RendimientoCard
                 totalArs={totalArs}
                 currency={currency}
@@ -591,6 +586,11 @@ export default function PortfolioScreen() {
                 c={c}
               />
               <DistribucionCard alloc={marketAllocation} c={c} />
+              <ResumenCard
+                bestOfDay={bestOfDay}
+                worstOfDay={worstOfDay}
+                c={c}
+              />
             </>
           ) : (
             <View style={[s.card, { paddingTop: 12 }]}>
@@ -1707,16 +1707,13 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  /* Filtro de mercado — container surfaceHover con 4 pills (Todo/AR/
-   * EE.UU/Crypto). Active pill filled del color contextual del día. */
-  segContainer: {
+  /* Filtro de mercado — 4 pills sueltas (sin container). Active pill
+   * filled del color contextual del día; inactivas son transparentes. */
+  segRow: {
     flexDirection: "row",
     marginTop: 24,
     marginHorizontal: 24,
-    padding: 4,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    gap: 2,
+    gap: 4,
   },
   segPill: {
     flex: 1,
