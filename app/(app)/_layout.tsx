@@ -84,6 +84,13 @@ export default function AppLayout() {
           options={{ fullScreenGestureEnabled: false }}
         />
         <Stack.Screen name="trade" />
+        {/* Briefing AI — animación de presentación slide-from-bottom
+            para que se sienta un drilldown más "deep dive" en lugar
+            de un push lateral común. */}
+        <Stack.Screen
+          name="briefing"
+          options={{ animation: "slide_from_bottom" }}
+        />
         {/* Buy: fullscreen gesture OFF para que arrastrar el slider no
             dispare el swipe-back. El swipe desde el borde izquierdo sigue
             andando como back. */}

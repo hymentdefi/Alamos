@@ -54,6 +54,7 @@ import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
+import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
@@ -334,6 +335,8 @@ export default function DetailScreen() {
             })}
           </View>
         </View>
+
+        <BriefingCard asset={asset} chartColor={color} c={c} />
 
         {pos ? <PositionCard pos={pos} asset={asset} c={c} /> : null}
 
@@ -1607,6 +1610,63 @@ function RelatedCarousel({
 }
 
 /* ─── Noticias del activo ─── */
+/* ─── Briefing AI ─────────────────────────────────────────────
+ *
+ * Card que vive debajo del chart con un resumen AI-powered del
+ * activo. Texto en el color del chart (mismo lenguaje cromático
+ * que el resto del detail — verde si rangeUp, rojo si losses).
+ * Tap → abre la página completa /(app)/briefing?ticker=X.
+ *
+ * Layout:
+ *   [Briefing →]                        ← título + arrow
+ *   [resumen ~4 líneas en chartColor]
+ *   [Actualizado hace X · AI-powered]   ← footer muted
+ */
+function BriefingCard({
+  asset,
+  chartColor,
+  c,
+}: {
+  asset: Asset;
+  chartColor: string;
+  c: ColorMap;
+}) {
+  const router = useRouter();
+  const briefing = useMemo(() => briefingFor(asset.ticker), [asset.ticker]);
+
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        router.push({
+          pathname: "/(app)/briefing",
+          params: { ticker: asset.ticker },
+        });
+      }}
+      style={({ pressed }) => [
+        s.card,
+        { marginTop: 16, opacity: pressed ? 0.86 : 1 },
+      ]}
+    >
+      <View style={s.briefingHead}>
+        <Text style={[s.briefingHeadText, { color: chartColor }]}>
+          Briefing
+        </Text>
+        <Feather name="arrow-right" size={18} color={chartColor} />
+      </View>
+      <Text
+        style={[s.briefingSummary, { color: chartColor }]}
+        numberOfLines={4}
+      >
+        {briefing.summary}
+      </Text>
+      <Text style={[s.briefingMeta, { color: c.textMuted }]}>
+        Actualizado {formatBriefingAge(briefing.updatedAt)} · AI-powered
+      </Text>
+    </Pressable>
+  );
+}
+
 function NewsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
   const items = useMemo(() => mockNews(asset), [asset]);
   return (
@@ -2265,6 +2325,31 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.2,
+  },
+
+  /* ─── Briefing AI ─── */
+  briefingHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  briefingHeadText: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.5,
+  },
+  briefingSummary: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+    marginBottom: 12,
+  },
+  briefingMeta: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
   },
 
   /* ─── Noticias ─── */
