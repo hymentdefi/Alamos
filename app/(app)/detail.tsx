@@ -59,8 +59,24 @@ import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
 
-/** Variación % por rango para el activo (mock, determinístico). */
+/** Variación % por rango para el activo (mock, determinístico).
+ *
+ *  Override de testing para NVIDIA (NVDA / NVDA.US): alterna el
+ *  signo a través de los rangos para verificar que el coloring
+ *  driven-by-rangeUp funcione end-to-end. 1D positivo → 1S
+ *  negativo → 1M positivo → 3M negativo. */
 function rangePctFor(ticker: string, range: Range): number {
+  if (ticker === "NVDA" || ticker === "NVDA.US") {
+    const overrides: Record<Range, number> = {
+      "1D": 3.42,
+      "1S": -4.8,
+      "1M": 6.1,
+      "3M": -8.5,
+      "1A": 21.4,
+      MAX: 48.7,
+    };
+    return overrides[range];
+  }
   let h = 0;
   for (let i = 0; i < ticker.length; i++) h = (h * 31 + ticker.charCodeAt(i)) | 0;
   const base = ((Math.abs(h) % 200) - 100) / 10; // -10 a 10
