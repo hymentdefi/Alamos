@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Pressable,
   RefreshControl,
@@ -7,6 +13,14 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import Svg, {
   Ellipse,
   G,
@@ -14,13 +28,11 @@ import Svg, {
   Polygon,
   Text as SvgText,
 } from "react-native-svg";
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-} from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { Feather } from "@expo/vector-icons";
+
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
   assets,
@@ -28,40 +40,69 @@ import {
   assetMarket,
   categoryLabels,
   formatARS,
+  formatMoney,
   formatPct,
   type Asset,
   type AssetCategory,
 } from "../../../lib/data/assets";
 import { convertAmount } from "../../../lib/data/accounts";
-import { GlassCard } from "../../../lib/components/GlassCard";
-import { registerTabTap } from "../../../lib/tabs/activeTap";
-import { AmountDisplay } from "../../../lib/components/AmountDisplay";
-import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import {
   categorizeAsset,
   findCategoryBySlug,
 } from "../../../lib/data/marketCategories";
+import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import {
   MarketSegmented,
   type MarketSegmentedValue,
 } from "../../../lib/components/MarketSegmented";
-import { Feather } from "@expo/vector-icons";
+import { Tap } from "../../../lib/components/Tap";
+import { AssetColorProvider } from "../../../lib/asset-color/context";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 
 /**
- * Tab 'Portfolio' — vista enfocada en tus tenencias.
+ * Tab 'Portfolio' — gold standard del detail.tsx aplicado a la cartera.
  *
- * Sin hero de balance ni chart: el usuario quiere ver directo el
- * filtro de mercado y la lista de posiciones. Layout:
- *   1. Header fijo (mismo layout que Mercado): title "Portfolio" +
- *      MarketSegmented (AR / EE.UU / Crypto + tab "Todo" extra al
- *      principio con el isotipo Alamos como flag).
- *   2. ScrollView debajo: GlassCard con un row por holding, después
- *      el card de "Resultado del día".
+ * Estructura (mismo lenguaje que detail.tsx):
+ *   1. Hero block — eyebrow "TU CARTERA" + balance grande con pager
+ *      ARS/USD + delta del día con triángulo + dots indicator. El
+ *      balance dicta la cromática del screen (greenDark si el día
+ *      es verde, red si está negativo) via AssetColorProvider.
+ *   2. Ladrillo — full bleed (marginHorizontal:-24), igual lugar que
+ *      el Sparkline en el detail. Hold + drag para highlightear y
+ *      tooltip arriba.
+ *   3. MarketSegmented — debajo del hero, scrollea con el contenido.
+ *      AR/EE.UU/Crypto/Todo filtra holdings + ladrillo + cards.
+ *   4. Cards full-width sin GlassCard:
+ *        - Resumen: grid 2x2 (valor mercado, posiciones, mejor del
+ *          día, peor del día) + ReturnRow del día.
+ *        - Tus posiciones: rows por categoría, hairline dividers,
+ *          swatch que matchea el ladrillo.
+ *        - Distribución: stats grid 2-col por mercado.
+ *   5. Disclaimer Manteca al final.
  *
- * El segmented filtra los holdings — "Todo" muestra todos, AR/US/CRYPTO
- * filtran por `assetMarket(asset)`. El "Resultado del día" se computa
- * sobre el subset filtrado para que sea consistente con la lista.
+ * Sticky overlay aparece al scrollear: balance compacto + delta%,
+ * mismo patrón que el detail.
  */
+
+type Currency = "ARS" | "USD";
+type ColorMap = ReturnType<typeof useTheme>["c"];
+
+interface Holding {
+  asset: Asset;
+  native: number;
+  ars: number;
+}
+
+const BRICK_PALETTE = [
+  "#00E676",
+  "#0E0F0C",
+  "#7EE9A6",
+  "#00B864",
+  "#94A3B8",
+  "#5ac43e",
+  "#6B6C66",
+];
 
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
@@ -70,10 +111,17 @@ export default function PortfolioScreen() {
   const [marketFilter, setMarketFilter] =
     useState<MarketSegmentedValue>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [currency, setCurrency] = useState<Currency>("ARS");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [pagerW, setPagerW] = useState(0);
 
-  /* ─── Holdings filtrados por el segmented ───────────────────── */
+  // AR/Todo arrancan en ARS, US/Crypto en USD (su moneda nativa).
+  const defaultCurrency: Currency =
+    marketFilter === "US" || marketFilter === "CRYPTO" ? "USD" : "ARS";
 
-  const holdings = useMemo(() => {
+  /* ─── Holdings filtrados ─── */
+
+  const holdings = useMemo<Asset[]>(() => {
     const all = assets.filter(
       (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
     );
@@ -81,7 +129,7 @@ export default function PortfolioScreen() {
     return all.filter((a) => assetMarket(a) === marketFilter);
   }, [marketFilter]);
 
-  const holdingsSorted = useMemo(() => {
+  const holdingsSorted = useMemo<Holding[]>(() => {
     const withVal = holdings.map((a) => {
       const native = a.price * (a.qty ?? 0);
       const ars = convertAmount(native, assetCurrency(a), "ARS");
@@ -95,13 +143,38 @@ export default function PortfolioScreen() {
     [holdingsSorted],
   );
 
+  // Delta del día = sum de (ars * change/100) por holding. Da el ARS
+  // que sumó/restó la cartera hoy. % se computa contra el balance
+  // de ayer (totalArs - daySum).
+  const daySumArs = useMemo(
+    () =>
+      holdingsSorted.reduce(
+        (acc, h) => acc + h.ars * (h.asset.change / 100),
+        0,
+      ),
+    [holdingsSorted],
+  );
+  const yesterdayArs = totalArs - daySumArs;
+  const dayPct = yesterdayArs > 0 ? (daySumArs / yesterdayArs) * 100 : 0;
+  const dayUp = daySumArs >= 0;
+  const color = dayUp ? c.greenDark : c.red;
 
-  /* Holdings agrupados por categoría de Mercado — mismo lenguaje
-   * que 'Tus inversiones' del Home: una row por categoría, total
-   * tenido en ARS, count de instrumentos, drilldown a
-   * /(app)/market-category. Sólo aparecen las categorías con
-   * posiciones >0; ordenadas por valor descendente.
-   */
+  // Mejor / peor del día por % de change.
+  const bestOfDay = useMemo<Holding | null>(() => {
+    if (holdingsSorted.length === 0) return null;
+    return [...holdingsSorted].sort(
+      (a, b) => b.asset.change - a.asset.change,
+    )[0];
+  }, [holdingsSorted]);
+  const worstOfDay = useMemo<Holding | null>(() => {
+    if (holdingsSorted.length === 0) return null;
+    return [...holdingsSorted].sort(
+      (a, b) => a.asset.change - b.asset.change,
+    )[0];
+  }, [holdingsSorted]);
+
+  /* ─── Grupos por categoría (para "Tus posiciones") ─── */
+
   const groupedByCategory = useMemo(() => {
     const map = new Map<
       string,
@@ -121,16 +194,12 @@ export default function PortfolioScreen() {
         cat: asset.category,
       });
     }
-    return [...map.entries()].sort(
-      ([, a], [, b]) => b.totalArs - a.totalArs,
-    );
+    return [...map.entries()].sort(([, a], [, b]) => b.totalArs - a.totalArs);
   }, [holdingsSorted]);
 
-  /* Color + pct del ladrillo por categoría — agrupamos por
-   * asset.category (mismo que hace el brick en groupBy=category)
-   * y asignamos BRICK_PALETTE[i] por rank. Cada row de "Tus
-   * posiciones" hereda el color y el pct de su categoría, así
-   * el ladrillo y la lista hablan el mismo idioma cromático. */
+  // Color + pct del ladrillo por categoría — comparten paleta y
+  // ordenamiento con el FloorBrick (groupBy=category), así los
+  // swatches del listado hablan el mismo idioma cromático.
   const categoryAllocations = useMemo(() => {
     const totals = new Map<AssetCategory, number>();
     for (const h of holdingsSorted) {
@@ -150,17 +219,54 @@ export default function PortfolioScreen() {
     return result;
   }, [holdingsSorted, totalArs]);
 
-  /* ─── Handlers ──────────────────────────────────────────────── */
+  /* ─── Distribución por mercado ─── */
 
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollYRef = useRef(0);
+  const marketAllocation = useMemo(() => {
+    let ar = 0;
+    let us = 0;
+    let crypto = 0;
+    for (const h of holdingsSorted) {
+      const m = assetMarket(h.asset);
+      if (m === "AR") ar += h.ars;
+      else if (m === "US") us += h.ars;
+      else if (m === "CRYPTO") crypto += h.ars;
+    }
+    const total = ar + us + crypto;
+    return {
+      arPct: total > 0 ? (ar / total) * 100 : 0,
+      usPct: total > 0 ? (us / total) * 100 : 0,
+      cryptoPct: total > 0 ? (crypto / total) * 100 : 0,
+      categoriesCount: groupedByCategory.length,
+    };
+  }, [holdingsSorted, groupedByCategory]);
+
+  /* ─── Sticky scroll header — crossfade al scrollear ─── */
+
+  const stickyScrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      stickyScrollY.value = e.contentOffset.y;
+    },
+  });
+  const STICKY_START = 130;
+  const STICKY_FULL = 200;
+  const stickyOpacityStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      stickyScrollY.value,
+      [STICKY_START, STICKY_FULL],
+      [0, 1],
+      "clamp",
+    ),
+  }));
+
+  /* ─── Refs + tab tap + refresh ─── */
+
+  const scrollRef = useRef<ScrollView | null>(null);
+  const pagerRef = useRef<ScrollView | null>(null);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // Mock — en MOCK_MODE no hay nada que hacer; simulamos el delay.
-    // 1100ms para que el spinner del RefreshControl se sienta bien
-    // smooth, ni muy snappy ni muy lento.
     setTimeout(() => {
       setRefreshing(false);
       Haptics.notificationAsync(
@@ -169,260 +275,592 @@ export default function PortfolioScreen() {
     }, 1100);
   }, []);
 
-  // Tap-on-active-tab: scroll al tope si no estoy arriba, o
-  // refresh si ya estoy. Mismo patrón que Inicio.
   useEffect(() => {
     return registerTabTap("portfolio", {
-      isAtTop: () => scrollYRef.current <= 8,
+      isAtTop: () => stickyScrollY.value <= 8,
       scrollToTop: () =>
         scrollRef.current?.scrollTo({ y: 0, animated: true }),
       refresh: () => {
         if (!refreshing) onRefresh();
       },
     });
+    // stickyScrollY es shared value — su .value cambia sin re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, onRefresh]);
 
-  /* ─── Render ────────────────────────────────────────────────── */
-
-  return (
-    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
-      {/* Header fijo — clavado a la altura del header de Mercado para
-          que el MarketSegmented quede en el mismo Y de pantalla. */}
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <View style={s.titleRow}>
-          <Text style={[s.title, { color: c.text }]}>Portfolio</Text>
-        </View>
-        <MarketSegmented
-          value={marketFilter}
-          onChange={setMarketFilter}
-          withAll
-        />
-      </View>
-
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ paddingBottom: 180 }}
-        showsVerticalScrollIndicator={false}
-        onScroll={(e) => {
-          scrollYRef.current = e.nativeEvent.contentOffset.y;
-        }}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={c.textMuted}
-            colors={[c.textMuted]}
-            progressBackgroundColor={c.surface}
-          />
-        }
-      >
-        {holdingsSorted.length > 0 && totalArs > 0 ? (
-          <View style={[s.sectionBlock, { marginBottom: 28 }]}>
-            <AllocationBrick
-              holdings={holdingsSorted}
-              totalArs={totalArs}
-              groupBy={marketFilter === "CRYPTO" ? "ticker" : "category"}
-              defaultCurrency={
-                marketFilter === "US" || marketFilter === "CRYPTO"
-                  ? "USD"
-                  : "ARS"
-              }
-            />
-          </View>
-        ) : null}
-
-        <View style={s.sectionBlock}>
-          <View style={s.sectionHead}>
-            <Text style={[s.sectionTitle, { color: c.textMuted }]}>
-              Tus posiciones
-            </Text>
-            <Text style={[s.sectionCount, { color: c.textFaint }]}>
-              {holdingsSorted.length} activo
-              {holdingsSorted.length === 1 ? "" : "s"}
-            </Text>
-          </View>
-
-          {groupedByCategory.length > 0 ? (
-            <GlassCard padding={4}>
-              {groupedByCategory.map(([slug, data], i) => {
-                const lookup = findCategoryBySlug(slug);
-                if (!lookup) return null;
-                const { category } = lookup;
-                // Color + pct del ladrillo correspondiente a la
-                // categoría — comparten paleta y aggregation con
-                // el brick. Multiple slug-rows que mapean a la
-                // misma categoría heredan el mismo color/pct.
-                const alloc = categoryAllocations.get(data.cat);
-                return (
-                  <Pressable
-                    key={slug}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(app)/market-category",
-                        params: { slug },
-                      })
-                    }
-                    style={[
-                      s.invRow,
-                      i > 0 && {
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderTopColor: c.border,
-                      },
-                    ]}
-                  >
-                    {/* Bloquecito de color que matchea el ladrillo —
-                        12px squarish, mismo lenguaje que la legend
-                        que tenía el brick antes. */}
-                    {alloc ? (
-                      <View
-                        style={[
-                          s.invRowSwatch,
-                          { backgroundColor: alloc.color },
-                        ]}
-                      />
-                    ) : null}
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[s.invRowLabel, { color: c.text }]}
-                        numberOfLines={1}
-                      >
-                        {category.label}
-                      </Text>
-                      <Text
-                        style={[s.invRowSub, { color: c.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {data.count} instrumento
-                        {data.count === 1 ? "" : "s"}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text
-                        style={[s.invRowValue, { color: c.text }]}
-                        numberOfLines={1}
-                      >
-                        {formatARS(data.totalArs)}
-                      </Text>
-                      {alloc ? (
-                        <Text
-                          style={[
-                            s.invRowPct,
-                            { color: c.textMuted },
-                          ]}
-                        >
-                          {formatAllocationPct(alloc.pct / 100)}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Feather
-                      name="chevron-right"
-                      size={18}
-                      color={c.textFaint}
-                    />
-                  </Pressable>
-                );
-              })}
-            </GlassCard>
-          ) : (
-            <GlassCard padding={16}>
-              <Text style={[s.empty, { color: c.textMuted }]}>
-                {marketFilter === "all"
-                  ? "Todavía no tenés posiciones. Entrá a Mercado para empezar a invertir."
-                  : "No tenés posiciones en este mercado."}
-              </Text>
-            </GlassCard>
-          )}
-        </View>
-
-      </ScrollView>
-    </View>
-  );
-}
-
-/* ─── Pared 3D de distribución ──────────────────────────────────
- *
- * Diseño: stacked-bar con perspectiva isométrica — una "pared" o
- * "ladrillo" que muestra cómo está distribuido el portfolio por
- * categoría. La cara frontal carga el color, la cara superior va
- * shaded más claro (luz de arriba) y el lado derecho del último
- * bloque va shaded más oscuro (sombra propia). Outline en ink 1.5px
- * para definir geometría — feeling de illustration handcrafted, no
- * "chart genérico de dashboard".
- *
- * Interacción: hold + drag con el dedo highlightea el bloque debajo
- * y dimea el resto a gris. Un pill negro flota arriba con la
- * categoría + el porcentaje. Pop con FadeInDown de Reanimated.
- * El gesto activa después de 150ms de long-press para no robarle
- * el scroll vertical al ScrollView padre.
- *
- * Geometría 1:1 con el mockup (PortfolioDistribution.jsx):
- *   viewBox 340×180 — pared 280×100, depth 32, top inclinado 55%.
- *
- * Paleta: rampa verde brand-aligned (el más grande del portfolio
- * pop con #00E676 vivid mint) → ink → mint pálido → green medium →
- * cool gray. Definida por índice (no por categoría) — siempre el
- * activo dominante captura el vivid green.
- */
-
-const BRICK_PALETTE = [
-  "#00E676", // vivid mint — slice más grande
-  "#0E0F0C", // ink
-  "#7EE9A6", // mint pálido
-  "#00B864", // green medium
-  "#94A3B8", // cool gray
-  "#5ac43e", // action green (fallback)
-  "#6B6C66", // textMuted (fallback)
-];
-
-interface AllocationBrickProps {
-  holdings: { asset: Asset; native: number; ars: number }[];
-  totalArs: number;
-  /** Granularidad del grouping. "category" para AR/EE.UU/Todo,
-   *  "ticker" para Crypto (donde la categoría sería siempre 100%
-   *  y no aporta información). */
-  groupBy: "category" | "ticker";
-  /** Moneda inicial del pager. Cuando el usuario cambia de filtro
-   *  de mercado, el saldo se resetea a este default — US/Crypto
-   *  arrancan en USD (su moneda nativa), AR/Todo en ARS. El usuario
-   *  puede swipear o tappear los dots para alternar manualmente. */
-  defaultCurrency: "ARS" | "USD";
-}
-
-function AllocationBrick({
-  holdings,
-  totalArs,
-  groupBy,
-  defaultCurrency,
-}: AllocationBrickProps) {
-  const { c } = useTheme();
-  const [containerW, setContainerW] = useState(0);
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  const [currency, setCurrency] = useState<"ARS" | "USD">(defaultCurrency);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const pagerRef = useRef<ScrollView | null>(null);
-
-  // Sincroniza el pager cuando cambia el filtro de mercado: el
-  // defaultCurrency llega nuevo desde arriba y reseteamos el state
-  // local + el scroll del ScrollView. Si no scrolleamos, queda
-  // visualmente en la página vieja aunque el state diga otra cosa.
+  // Sync currency cuando cambia el filtro de mercado.
   useEffect(() => {
     setCurrency(defaultCurrency);
-    if (containerW > 0) {
+    if (pagerW > 0) {
       pagerRef.current?.scrollTo({
-        x: defaultCurrency === "ARS" ? 0 : containerW - 32,
+        x: defaultCurrency === "ARS" ? 0 : pagerW,
         y: 0,
         animated: false,
       });
     }
-  }, [defaultCurrency, containerW]);
+  }, [defaultCurrency, pagerW]);
 
-  // Geometría del viewBox — clavada al mockup. El viewBox total es
-  // 340×180; la "pared" es 280 ancho × 100 alto, y suma 32 px de
-  // depth en el plano superior y la cara derecha del último
-  // bloque. xL se computa para CENTRAR la composición visible
-  // (wall + depth) dentro del viewBox — antes el wall arrancaba
-  // a 30 y se sentía corrido a la derecha por el bulge del depth.
+  /* ─── Display values en moneda actual ─── */
+
+  const totalDisplay =
+    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", "USD");
+  const daySumDisplay =
+    currency === "ARS" ? daySumArs : convertAmount(daySumArs, "ARS", "USD");
+
+  const hasHoldings = holdingsSorted.length > 0 && totalArs > 0;
+
+  /* ─── Render ─── */
+
+  return (
+    <AssetColorProvider up={dayUp}>
+      <View style={[s.root, { backgroundColor: c.bg }]}>
+        {/* Top bar — vacío salvo por el sticky overlay que aparece al
+            scrollear. Mismo patrón que detail.tsx pero sin íconos
+            laterales (es una tab, no hay back). */}
+        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+          <View style={{ flex: 1 }} />
+          <Animated.View
+            style={[
+              s.stickyOverlay,
+              { top: insets.top + 12 },
+              stickyOpacityStyle,
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[s.stickyPrice, { color: c.text }]} numberOfLines={1}>
+              {formatMoney(totalDisplay, currency)}
+            </Text>
+            <View style={s.stickyRow}>
+              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+                CARTERA
+              </Text>
+              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+              <Text style={[s.stickyPct, { color }]}>
+                {formatPct(dayPct)}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+
+        <Animated.ScrollView
+          // Animated.ScrollView forwarda el ref al RNScrollView interno.
+          ref={scrollRef as never}
+          contentContainerStyle={{ paddingBottom: 180 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={c.textMuted}
+              colors={[c.textMuted]}
+              progressBackgroundColor={c.surface}
+            />
+          }
+        >
+          {/* ─── Hero ─── */}
+          <View style={s.heroBlock}>
+            <Text style={[s.heroEyebrow, { color: c.textMuted }]}>
+              TU CARTERA
+            </Text>
+
+            <View style={s.heroPagerRow}>
+              <View
+                style={{ flex: 1 }}
+                onLayout={(e) => setPagerW(e.nativeEvent.layout.width)}
+              >
+                {pagerW > 0 ? (
+                  <ScrollView
+                    ref={pagerRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    decelerationRate="normal"
+                    directionalLockEnabled
+                    alwaysBounceVertical={false}
+                    bounces={false}
+                    contentOffset={{
+                      x: currency === "ARS" ? 0 : pagerW,
+                      y: 0,
+                    }}
+                    onMomentumScrollEnd={(e) => {
+                      const idx = Math.round(
+                        e.nativeEvent.contentOffset.x / pagerW,
+                      );
+                      const next: Currency = idx === 0 ? "ARS" : "USD";
+                      if (next !== currency) {
+                        Haptics.selectionAsync().catch(() => {});
+                        setCurrency(next);
+                      }
+                    }}
+                    style={{ flexGrow: 0 }}
+                  >
+                    {(["ARS", "USD"] as const).map((cur) => {
+                      const value =
+                        cur === "ARS"
+                          ? totalArs
+                          : convertAmount(totalArs, "ARS", "USD");
+                      return (
+                        <View
+                          key={cur}
+                          style={{
+                            width: pagerW,
+                            justifyContent: "center",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <AmountDisplay
+                            value={value}
+                            size={42}
+                            currency={cur}
+                          />
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <AmountDisplay
+                    value={totalArs}
+                    size={42}
+                    currency="ARS"
+                  />
+                )}
+              </View>
+              <Tap
+                hitSlop={10}
+                haptic="selection"
+                onPress={() => setInfoOpen(true)}
+                style={[
+                  s.heroInfoDot,
+                  { backgroundColor: c.surfaceHover },
+                ]}
+              >
+                <Feather name="info" size={12} color={c.textSecondary} />
+              </Tap>
+            </View>
+
+            <View style={s.deltaRow}>
+              <Text style={[s.deltaTri, { color }]}>
+                {dayUp ? "▲" : "▼"}
+              </Text>
+              <Text style={[s.deltaText, { color }]}>
+                {formatMoney(Math.abs(daySumDisplay), currency)}
+              </Text>
+              <Text style={[s.deltaText, { color }]}>
+                ({formatPct(dayPct)})
+              </Text>
+              <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
+            </View>
+
+            <View style={s.dotsRow}>
+              {(["ARS", "USD"] as const).map((cur) => {
+                const active = cur === currency;
+                return (
+                  <Tap
+                    key={cur}
+                    hitSlop={10}
+                    haptic="selection"
+                    onPress={() => {
+                      if (cur === currency) return;
+                      setCurrency(cur);
+                      pagerRef.current?.scrollTo({
+                        x: cur === "ARS" ? 0 : pagerW,
+                        y: 0,
+                        animated: true,
+                      });
+                    }}
+                  >
+                    <View
+                      style={[
+                        s.dot,
+                        {
+                          backgroundColor: active ? c.text : c.textFaint,
+                          width: active ? 7 : 5,
+                          height: active ? 7 : 5,
+                        },
+                      ]}
+                    />
+                  </Tap>
+                );
+              })}
+            </View>
+
+            {/* Ladrillo full-bleed — marginHorizontal -24 para spanear
+                el ancho de la pantalla, igual que el Sparkline del detail. */}
+            {hasHoldings ? (
+              <View style={s.brickContainer}>
+                <FloorBrick
+                  holdings={holdingsSorted}
+                  totalArs={totalArs}
+                  groupBy={
+                    marketFilter === "CRYPTO" ? "ticker" : "category"
+                  }
+                />
+              </View>
+            ) : null}
+          </View>
+
+          {/* ─── Filtro de mercado ─── */}
+          <View style={s.segmentedRow}>
+            <MarketSegmented
+              value={marketFilter}
+              onChange={setMarketFilter}
+              withAll
+            />
+          </View>
+
+          {hasHoldings ? (
+            <>
+              <ResumenCard
+                totalDisplay={totalDisplay}
+                daySumDisplay={daySumDisplay}
+                dayPct={dayPct}
+                color={color}
+                currency={currency}
+                positionsCount={holdingsSorted.length}
+                bestOfDay={bestOfDay}
+                worstOfDay={worstOfDay}
+                c={c}
+              />
+              <PosicionesCard
+                groups={groupedByCategory}
+                allocations={categoryAllocations}
+                onTap={(slug) =>
+                  router.push({
+                    pathname: "/(app)/market-category",
+                    params: { slug },
+                  })
+                }
+                c={c}
+              />
+              <DistribucionCard alloc={marketAllocation} c={c} />
+            </>
+          ) : (
+            <View style={[s.card, { paddingTop: 12 }]}>
+              <Text style={[s.empty, { color: c.textMuted }]}>
+                {marketFilter === "all"
+                  ? "Todavía no tenés posiciones. Entrá a Mercado para empezar."
+                  : "No tenés posiciones en este mercado."}
+              </Text>
+            </View>
+          )}
+
+          <Text style={[s.disclaimer, { color: c.textFaint }]}>
+            Las cotizaciones son referenciales y pueden tener delay. Invertir
+            implica riesgo de pérdida de capital. Álamos opera bajo Manteca
+            ALyC, regulada por la CNV.
+          </Text>
+        </Animated.ScrollView>
+
+        <BalanceInfoSheet
+          visible={infoOpen}
+          onClose={() => setInfoOpen(false)}
+        />
+      </View>
+    </AssetColorProvider>
+  );
+}
+
+/* ─── Resumen card ─── */
+
+function ResumenCard({
+  totalDisplay,
+  daySumDisplay,
+  dayPct,
+  color,
+  currency,
+  positionsCount,
+  bestOfDay,
+  worstOfDay,
+  c,
+}: {
+  totalDisplay: number;
+  daySumDisplay: number;
+  dayPct: number;
+  color: string;
+  currency: Currency;
+  positionsCount: number;
+  bestOfDay: Holding | null;
+  worstOfDay: Holding | null;
+  c: ColorMap;
+}) {
+  const dayUp = daySumDisplay >= 0;
+  const fmt = (n: number) => formatMoney(n, currency);
+  const bestColor =
+    bestOfDay && bestOfDay.asset.change >= 0 ? c.greenDark : c.red;
+  const worstColor =
+    worstOfDay && worstOfDay.asset.change >= 0 ? c.greenDark : c.red;
+  return (
+    <View style={[s.card, { marginTop: 16 }]}>
+      <Text style={[s.cardEyebrow, { color: c.text }]}>Resumen</Text>
+      <View style={s.posGrid}>
+        <PosCell
+          label="Valor de mercado"
+          value={fmt(totalDisplay)}
+          c={c}
+        />
+        <PosCell
+          label="Posiciones"
+          value={`${positionsCount}`}
+          align="right"
+          c={c}
+        />
+        <PosCell
+          label="Mejor del día"
+          value={bestOfDay ? formatPct(bestOfDay.asset.change) : "—"}
+          color={bestColor}
+          sub={bestOfDay?.asset.ticker}
+          c={c}
+        />
+        <PosCell
+          label="Peor del día"
+          value={worstOfDay ? formatPct(worstOfDay.asset.change) : "—"}
+          color={worstColor}
+          sub={worstOfDay?.asset.ticker}
+          align="right"
+          c={c}
+        />
+      </View>
+
+      <View style={{ height: 20 }} />
+
+      <View
+        style={[
+          s.returnRow,
+          {
+            borderTopColor: c.border,
+            borderBottomColor: c.border,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+          },
+        ]}
+      >
+        <Text style={[s.returnLabel, { color: c.textMuted }]}>
+          Resultado del día
+        </Text>
+        <Text style={[s.returnValue, { color }]}>
+          {dayUp ? "+" : "−"}
+          {fmt(Math.abs(daySumDisplay))} ({formatPct(dayPct)})
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function PosCell({
+  label,
+  value,
+  sub,
+  color,
+  align = "left",
+  c,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  color?: string;
+  align?: "left" | "right";
+  c: ColorMap;
+}) {
+  return (
+    <View
+      style={{
+        width: "50%",
+        paddingRight: align === "left" ? 12 : 0,
+        paddingLeft: align === "right" ? 12 : 0,
+        alignItems: align === "right" ? "flex-end" : "flex-start",
+      }}
+    >
+      <Text style={[s.posCellLabel, { color: c.textMuted }]}>{label}</Text>
+      <Text
+        style={[s.posCellValue, { color: color ?? c.text }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value}
+      </Text>
+      {sub ? (
+        <Text style={[s.posCellSub, { color: c.textMuted }]}>{sub}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/* ─── Posiciones card ─── */
+
+function PosicionesCard({
+  groups,
+  allocations,
+  onTap,
+  c,
+}: {
+  groups: Array<
+    [string, { totalArs: number; count: number; cat: AssetCategory }]
+  >;
+  allocations: Map<AssetCategory, { color: string; pct: number }>;
+  onTap: (slug: string) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View style={[s.card, { marginTop: 16 }]}>
+      <Text style={[s.cardEyebrow, { color: c.text }]}>Tus posiciones</Text>
+      {groups.map(([slug, data], i) => {
+        const lookup = findCategoryBySlug(slug);
+        if (!lookup) return null;
+        const { category } = lookup;
+        const alloc = allocations.get(data.cat);
+        return (
+          <Pressable
+            key={slug}
+            onPress={() => onTap(slug)}
+            style={[
+              s.posRow,
+              i > 0 && {
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: c.border,
+              },
+            ]}
+          >
+            {alloc ? (
+              <View
+                style={[s.posSwatch, { backgroundColor: alloc.color }]}
+              />
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[s.posLabel, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {category.label}
+              </Text>
+              <Text
+                style={[s.posSub, { color: c.textMuted }]}
+                numberOfLines={1}
+              >
+                {data.count} instrumento{data.count === 1 ? "" : "s"}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text
+                style={[s.posValue, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {formatARS(data.totalArs)}
+              </Text>
+              {alloc ? (
+                <Text style={[s.posPct, { color: c.textMuted }]}>
+                  {formatAllocationPct(alloc.pct / 100)}
+                </Text>
+              ) : null}
+            </View>
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={c.textFaint}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Distribución card — stats grid 2-col por mercado ─── */
+
+function DistribucionCard({
+  alloc,
+  c,
+}: {
+  alloc: {
+    arPct: number;
+    usPct: number;
+    cryptoPct: number;
+    categoriesCount: number;
+  };
+  c: ColorMap;
+}) {
+  const stats: Array<[string, string]> = [
+    ["Argentina", formatAllocationPct(alloc.arPct / 100)],
+    ["Estados Unidos", formatAllocationPct(alloc.usPct / 100)],
+    ["Crypto", formatAllocationPct(alloc.cryptoPct / 100)],
+    ["Categorías", `${alloc.categoriesCount}`],
+  ];
+  const pairs: Array<[(typeof stats)[number], (typeof stats)[number] | null]> =
+    [];
+  for (let i = 0; i < stats.length; i += 2) {
+    pairs.push([stats[i], stats[i + 1] ?? null]);
+  }
+  return (
+    <View style={[s.card, { marginTop: 16 }]}>
+      <Text style={[s.cardEyebrow, { color: c.text }]}>Distribución</Text>
+      {pairs.map(([left, right], i) => (
+        <View
+          key={i}
+          style={[
+            s.statsGridRow,
+            i < pairs.length - 1 && {
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: c.border,
+            },
+          ]}
+        >
+          <View style={s.statsCell}>
+            <Text style={[s.statsLabel, { color: c.textMuted }]}>
+              {left[0]}
+            </Text>
+            <Text
+              style={[s.statsValue, { color: c.text }]}
+              numberOfLines={1}
+            >
+              {left[1]}
+            </Text>
+          </View>
+          <View style={s.statsCell}>
+            {right ? (
+              <>
+                <Text style={[s.statsLabel, { color: c.textMuted }]}>
+                  {right[0]}
+                </Text>
+                <Text
+                  style={[s.statsValue, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {right[1]}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* ─── FloorBrick — pared 3D interactiva ──────────────────────────
+ *
+ * Lift del antiguo AllocationBrick: solo el ladrillo + tooltip +
+ * gesture. El balance, pager y dots ahora viven en el hero.
+ *
+ * Geometría 1:1 con el mockup original — viewBox 340×180, pared
+ * 280×100, depth 32, top inclinado 55%.
+ *
+ * Hold + drag highlightea un bloque y dimea el resto. Tooltip con
+ * categoría + pct + lista de tickers. onResponderTerminationRequest
+ * false impide que el ScrollView padre robe el touch mid-press.
+ */
+
+interface FloorBrickProps {
+  holdings: Holding[];
+  totalArs: number;
+  /** Granularidad. "category" para AR/EE.UU/Todo, "ticker" para Crypto. */
+  groupBy: "category" | "ticker";
+}
+
+function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
+  const { c } = useTheme();
+  const [containerW, setContainerW] = useState(0);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
   const W = 340;
   const H = 180;
   const wallW = 280;
@@ -431,19 +869,14 @@ function AllocationBrick({
   const xL = (W - (wallW + depth)) / 2;
   const yTop = 36;
   const yBot = yTop + wallH;
-  const topShift = depth * 0.55; // cuánto sube el plano superior
+  const topShift = depth * 0.55;
 
-  // Para el tooltip necesitamos no sólo el % del grupo sino los
-  // tickers individuales + su variación del día. Aprovechamos la
-  // pasada de aggregation para arrastrar las rows ordenadas por
-  // contribución descendente.
-  //
-  // En groupBy="ticker" cada bloque ES un ticker — el grouping
-  // colapsa la lista de holdings tal cual. Arrastramos el `name`
-  // (full name del activo, ej. "Bitcoin") y el `shortTicker`
-  // ("BTC" en lugar de "BTC/USDT") para mostrarlos en el tooltip
-  // y la legend en lugar del par cripto que se siente técnico.
-  type Row = { ticker: string; shortTicker: string; change: number; ars: number };
+  type Row = {
+    ticker: string;
+    shortTicker: string;
+    change: number;
+    ars: number;
+  };
   const blocks = useMemo(() => {
     const byKey = new Map<
       string,
@@ -493,19 +926,13 @@ function AllocationBrick({
     });
   }, [holdings, totalArs, groupBy, xL, wallW]);
 
-  // El gesture object SE CONSTRUYE UNA SOLA VEZ — si el handleTouch
-  // dependiera de state que cambia mid-press (activeIdx, blocks,
-  // containerW), el useMemo del Pan se rebuildaría y el
-  // GestureDetector recibiría una gesture nueva mientras el dedo
-  // todavía está apoyado. La gesture in-flight queda zombie y no
-  // dispara onEnd/onFinalize → highlight stuck.
-  //
-  // Solución: refs para todo lo mutable. handleTouch tiene deps
-  // vacíos y lee siempre el último valor via .current.
+  // Refs para handleTouch — el gesture se construye una sola vez,
+  // si el handler dependiera de state mid-press el GestureDetector
+  // recibiría una gesture nueva con el dedo apoyado y el highlight
+  // quedaría stuck.
   const activeIdxRef = useRef<number | null>(null);
   const containerWRef = useRef(0);
   const blocksRef = useRef(blocks);
-
   useEffect(() => {
     containerWRef.current = containerW;
   }, [containerW]);
@@ -528,35 +955,15 @@ function AllocationBrick({
     activeIdxRef.current = next;
     setActiveIdx(next);
     if (next !== null) Haptics.selectionAsync().catch(() => {});
-  // xL y wallW son constantes locales del componente — no cambian.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // xL y wallW son constantes locales — no cambian.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tracking del touch via responders nativos de RN. Después de
-  // dos intentos con RNGH (Pan con activateAfterLongPress, después
-  // con failOffsetY) el highlight quedaba stuck en algunas
-  // condiciones — los workers de gesture-handler son async via
-  // runOnJS y el ciclo de vida no siempre cerraba limpio.
-  //
-  // Los responder events de RN corren sincrónicos en JS thread:
-  // onResponderGrant garantiza set del highlight, onResponderRelease
-  // y onResponderTerminate garantizan el clear. No hay forma de
-  // que se quede colgado.
-  //
-  // onResponderTerminationRequest=false impide que el ScrollView
-  // padre robe el touch mid-press (sino el highlight quedaría
-  // stuck si el scroll lo capturaba). Como el ladrillo ocupa ~150
-  // px de alto, el usuario puede scrollear desde arriba o abajo
-  // sin tocar el chart — UX aceptable.
   const startTouchY = useRef(0);
-
   const dimmedFront = c.surfaceSunken;
   const dimmedTop = c.surfaceHover;
   const dimmedRight = c.border;
 
-  // Tooltip — flota arriba del bloque activo con caret hacia abajo.
-  // Header con categoría + pct, abajo lista compacta de tickers
-  // (top 5 por valor) con su variación del día.
   const activeBlock =
     activeIdx !== null ? blocks[activeIdx] ?? null : null;
   const tooltipLeftPx =
@@ -566,384 +973,229 @@ function AllocationBrick({
 
   return (
     <View
-      style={[
-        s.allocCard,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
+      style={s.brickWrap}
+      onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
     >
       <View
-        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
+        onResponderGrant={(e) => {
+          startTouchY.current = e.nativeEvent.locationY;
+          handleTouch(e.nativeEvent.locationX);
+        }}
+        onResponderMove={(e) => {
+          // Si el dedo se mueve más de 12px en Y, soltamos el highlight
+          // para que el usuario pueda scrollear. Una vez agarrado el
+          // responder, RN no puede pasarlo al ScrollView padre, pero
+          // esto evita estado pegado.
+          const dy = Math.abs(
+            e.nativeEvent.locationY - startTouchY.current,
+          );
+          if (dy > 12) handleTouch(null);
+          else handleTouch(e.nativeEvent.locationX);
+        }}
+        onResponderRelease={() => handleTouch(null)}
+        onResponderTerminate={() => handleTouch(null)}
       >
-        {/* Layout horizontal: pager (que swipea horizontalmente
-            entre ARS/USD) + info icon FIJO a la derecha. El info
-            icon vive afuera del ScrollView así no se desliza junto
-            con las páginas — la idea es que sea un botón siempre
-            disponible, no parte del contenido swipeable. */}
-        <View style={s.allocPagerRow}>
-          <View style={{ flex: 1 }}>
-            {containerW > 0 ? (
-              <ScrollView
-                ref={pagerRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                decelerationRate="normal"
-                directionalLockEnabled
-                alwaysBounceVertical={false}
-                bounces={false}
-                contentOffset={{
-                  x: currency === "ARS" ? 0 : containerW - 32,
-                  y: 0,
-                }}
-                onMomentumScrollEnd={(e) => {
-                  const idx = Math.round(
-                    e.nativeEvent.contentOffset.x / (containerW - 32),
-                  );
-                  const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
-                  if (next !== currency) {
-                    Haptics.selectionAsync().catch(() => {});
-                    setCurrency(next);
-                  }
-                }}
-                style={s.allocPager}
-              >
-                {(["ARS", "USD"] as const).map((cur) => {
-                  const value =
-                    cur === "ARS"
-                      ? totalArs
-                      : convertAmount(totalArs, "ARS", "USD");
-                  return (
-                    <View
-                      key={cur}
-                      style={[
-                        s.allocPagerPage,
-                        { width: containerW - 32 },
-                      ]}
-                    >
-                      {/* Mismo formato del balance del Home: integer
-                          grande + decimales chicos arriba a la derecha
-                          (estilo Robinhood). Sin flag — no aplica acá,
-                          es el portfolio total agregado. */}
-                      <AmountDisplay
-                        value={value}
-                        size={36}
-                        weight={800}
-                        currency={cur}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <AmountDisplay
-                value={totalArs}
-                size={36}
-                weight={800}
-                currency="ARS"
-              />
-            )}
-          </View>
-
-          {/* Info icon — abre el bottom sheet con el detalle de
-              cómo se calcula el saldo unificado. Fuera del pager
-              para que no se desplace con el swipe. */}
-          <Pressable
-            hitSlop={10}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              setInfoOpen(true);
-            }}
-            style={[
-              s.allocInfoDot,
-              { backgroundColor: c.surfaceHover },
-            ]}
-          >
-            <Feather name="info" size={12} color={c.textSecondary} />
-          </Pressable>
-        </View>
-
-        {/* Dots indicator — cada uno tappable para saltar a esa
-            moneda directo, sin tener que swipear. */}
-        <View style={s.allocCurrencyDots}>
-          {(["ARS", "USD"] as const).map((cur) => {
-            const active = cur === currency;
+        <Svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height={containerW > 0 ? (containerW * H) / W : undefined}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <Ellipse
+            cx={xL + (wallW + depth) / 2}
+            cy={yBot + 14}
+            rx={wallW / 2 + 14}
+            ry={7}
+            fill="rgba(14,15,12,0.10)"
+          />
+          {blocks.map((blk, i) => {
+            const dimmed = activeIdx !== null && activeIdx !== i;
+            const front = dimmed ? dimmedFront : blk.color;
+            const top = dimmed ? dimmedTop : shadeHex(blk.color, 0.22);
+            const labelW = blk.x1 - blk.x0;
+            const showLabel = labelW > 38 && !dimmed;
             return (
-              <Pressable
-                key={cur}
-                hitSlop={10}
-                onPress={() => {
-                  if (cur === currency) return;
-                  Haptics.selectionAsync().catch(() => {});
-                  setCurrency(cur);
-                  pagerRef.current?.scrollTo({
-                    x: cur === "ARS" ? 0 : containerW - 32,
-                    y: 0,
-                    animated: true,
-                  });
-                }}
-              >
-                <View
-                  style={[
-                    s.allocCurrencyDot,
-                    {
-                      backgroundColor: active ? c.text : c.textFaint,
-                      width: active ? 7 : 5,
-                      height: active ? 7 : 5,
-                    },
-                  ]}
+              <G key={blk.key}>
+                <Polygon
+                  points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1},${yBot} ${blk.x0},${yBot}`}
+                  fill={front}
                 />
-              </Pressable>
+                <Polygon
+                  points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1 + depth},${yTop - topShift} ${blk.x0 + depth},${yTop - topShift}`}
+                  fill={top}
+                />
+                {showLabel ? (
+                  <SvgText
+                    x={(blk.x0 + blk.x1) / 2}
+                    y={(yTop + yBot) / 2 + 5}
+                    textAnchor="middle"
+                    fontSize="14"
+                    fontWeight="800"
+                    fill={textOnHex(blk.color)}
+                    fontFamily={fontFamily[800]}
+                  >
+                    {Math.round(blk.pct)}%
+                  </SvgText>
+                ) : null}
+              </G>
             );
           })}
-        </View>
-      </View>
-
-      <View style={s.brickWrap}>
-        <View
-          onStartShouldSetResponder={() => true}
-          onResponderTerminationRequest={() => false}
-          onResponderGrant={(e) => {
-            startTouchY.current = e.nativeEvent.locationY;
-            handleTouch(e.nativeEvent.locationX);
-          }}
-          onResponderMove={(e) => {
-            // Si el dedo se mueve más de 12px en Y, el usuario
-            // está intentando scrollear → soltamos el highlight
-            // pero seguimos siendo responder (RN no puede pasar
-            // el responder al ScrollView una vez agarrado).
-            const dy = Math.abs(
-              e.nativeEvent.locationY - startTouchY.current,
-            );
-            if (dy > 12) {
-              handleTouch(null);
-            } else {
-              handleTouch(e.nativeEvent.locationX);
-            }
-          }}
-          onResponderRelease={() => handleTouch(null)}
-          onResponderTerminate={() => handleTouch(null)}
-        >
-          <View>
-            <Svg
-              viewBox={`0 0 ${W} ${H}`}
-              width="100%"
-              height={containerW > 0 ? (containerW * H) / W : undefined}
-              preserveAspectRatio="xMidYMid meet"
-            >
-              {/* Sombra del piso — centrada en el punto medio
-                  visible (xL + (wallW + depth)/2). */}
-              <Ellipse
-                cx={xL + (wallW + depth) / 2}
-                cy={yBot + 14}
-                rx={wallW / 2 + 14}
-                ry={7}
-                fill="rgba(14,15,12,0.10)"
-              />
-
-              {/* Cuerpos de cada bloque (front + top). */}
-              {blocks.map((blk, i) => {
-                const dimmed = activeIdx !== null && activeIdx !== i;
-                const front = dimmed ? dimmedFront : blk.color;
-                const top = dimmed ? dimmedTop : shadeHex(blk.color, 0.22);
-                const labelW = blk.x1 - blk.x0;
-                const showLabel = labelW > 38 && !dimmed;
+          {blocks.length > 0
+            ? (() => {
+                const last = blocks[blocks.length - 1];
+                const lastIdx = blocks.length - 1;
+                const dimmed =
+                  activeIdx !== null && activeIdx !== lastIdx;
+                const fillR = dimmed
+                  ? dimmedRight
+                  : shadeHex(last.color, -0.2);
                 return (
-                  <G key={blk.key}>
-                    {/* Front face */}
-                    <Polygon
-                      points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1},${yBot} ${blk.x0},${yBot}`}
-                      fill={front}
-                    />
-                    {/* Top face — depth */}
-                    <Polygon
-                      points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1 + depth},${yTop - topShift} ${blk.x0 + depth},${yTop - topShift}`}
-                      fill={top}
-                    />
-                    {showLabel ? (
-                      <SvgText
-                        x={(blk.x0 + blk.x1) / 2}
-                        y={(yTop + yBot) / 2 + 5}
-                        textAnchor="middle"
-                        fontSize="14"
-                        fontWeight="800"
-                        fill={textOnHex(blk.color)}
-                        fontFamily={fontFamily[800]}
-                      >
-                        {Math.round(blk.pct)}%
-                      </SvgText>
-                    ) : null}
-                  </G>
+                  <Polygon
+                    points={`${last.x1},${yTop} ${last.x1 + depth},${yTop - topShift} ${last.x1 + depth},${yBot - topShift} ${last.x1},${yBot}`}
+                    fill={fillR}
+                  />
                 );
-              })}
-
-              {/* Cara derecha del último bloque — sombra propia. */}
-              {blocks.length > 0
-                ? (() => {
-                    const last = blocks[blocks.length - 1];
-                    const lastIdx = blocks.length - 1;
-                    const dimmed =
-                      activeIdx !== null && activeIdx !== lastIdx;
-                    const fillR = dimmed
-                      ? dimmedRight
-                      : shadeHex(last.color, -0.2);
-                    return (
-                      <Polygon
-                        points={`${last.x1},${yTop} ${last.x1 + depth},${yTop - topShift} ${last.x1 + depth},${yBot - topShift} ${last.x1},${yBot}`}
-                        fill={fillR}
-                      />
-                    );
-                  })()
-                : null}
-
-              {/* Outlines en ink. */}
-              <G
-                stroke="#0E0F0C"
-                strokeWidth={1.5}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                fill="none"
-              >
-                {blocks.slice(0, -1).map((blk) => (
-                  <G key={`div-${blk.key}`}>
-                    <Line x1={blk.x1} y1={yTop} x2={blk.x1} y2={yBot} />
-                    <Line
-                      x1={blk.x1}
-                      y1={yTop}
-                      x2={blk.x1 + depth}
-                      y2={yTop - topShift}
-                    />
-                  </G>
-                ))}
-                <Polygon
-                  points={`${xL},${yTop} ${xL + wallW},${yTop} ${xL + wallW},${yBot} ${xL},${yBot}`}
-                />
-                <Polygon
-                  points={`${xL},${yTop} ${xL + wallW},${yTop} ${xL + wallW + depth},${yTop - topShift} ${xL + depth},${yTop - topShift}`}
-                />
-                <Polygon
-                  points={`${xL + wallW},${yTop} ${xL + wallW + depth},${yTop - topShift} ${xL + wallW + depth},${yBot - topShift} ${xL + wallW},${yBot}`}
+              })()
+            : null}
+          <G
+            stroke="#0E0F0C"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            fill="none"
+          >
+            {blocks.slice(0, -1).map((blk) => (
+              <G key={`div-${blk.key}`}>
+                <Line x1={blk.x1} y1={yTop} x2={blk.x1} y2={yBot} />
+                <Line
+                  x1={blk.x1}
+                  y1={yTop}
+                  x2={blk.x1 + depth}
+                  y2={yTop - topShift}
                 />
               </G>
-            </Svg>
-          </View>
-        </View>
+            ))}
+            <Polygon
+              points={`${xL},${yTop} ${xL + wallW},${yTop} ${xL + wallW},${yBot} ${xL},${yBot}`}
+            />
+            <Polygon
+              points={`${xL},${yTop} ${xL + wallW},${yTop} ${xL + wallW + depth},${yTop - topShift} ${xL + depth},${yTop - topShift}`}
+            />
+            <Polygon
+              points={`${xL + wallW},${yTop} ${xL + wallW + depth},${yTop - topShift} ${xL + wallW + depth},${yBot - topShift} ${xL + wallW},${yBot}`}
+            />
+          </G>
+        </Svg>
+      </View>
 
-        {/* Tooltip — pop con FadeInDown. Posición absoluta centrada
-            sobre el bloque activo. pointerEvents none para no robar
-            el gesto de pan. */}
-        {activeBlock && containerW > 0 ? (
-          <Animated.View
-            key={`tip-${activeIdx}`}
-            entering={FadeInDown.duration(120)}
-            exiting={FadeOutUp.duration(100)}
-            pointerEvents="none"
-            style={[
-              s.tooltipAnchor,
-              {
-                left: tooltipLeftPx,
-                // Anchor desde el bottom del brickWrap para que la
-                // punta del caret quede JUSTO arriba del front face
-                // del ladrillo (yTop). Así el dedo, que está sobre
-                // el bloque, nunca tapa la pill.
-                bottom:
-                  ((H - yTop) * containerW) / W + 6,
-              },
-            ]}
-          >
-            <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
-              <View style={s.tooltipHeader}>
-                <Text style={[s.tooltipLabel, { color: c.bg }]}>
-                  {activeBlock.label}
-                </Text>
-                <Text style={[s.tooltipPct, { color: c.brand }]}>
-                  {formatTooltipPct(activeBlock.pct)}
-                </Text>
-              </View>
-              {/* En groupBy="ticker" cada bloque ya ES un ticker —
-                  el header lo muestra y la lista de rows debajo
-                  sería redundante. Mostramos sólo la variación
-                  del día inline en su propia row.
-                  En groupBy="category" el header es la categoría
-                  y las rows son los tickers que la componen. */}
-              {groupBy === "ticker" && activeBlock.rows.length === 1 ? (
-                <>
+      {activeBlock && containerW > 0 ? (
+        <Animated.View
+          key={`tip-${activeIdx}`}
+          entering={FadeInDown.duration(120)}
+          exiting={FadeOutUp.duration(100)}
+          pointerEvents="none"
+          style={[
+            s.tooltipAnchor,
+            {
+              left: tooltipLeftPx,
+              bottom: ((H - yTop) * containerW) / W + 6,
+            },
+          ]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={[s.tooltipLabel, { color: c.bg }]}>
+                {activeBlock.label}
+              </Text>
+              <Text style={[s.tooltipPct, { color: c.brand }]}>
+                {formatTooltipPct(activeBlock.pct)}
+              </Text>
+            </View>
+            {groupBy === "ticker" && activeBlock.rows.length === 1 ? (
+              <>
+                <View
+                  style={[
+                    s.tooltipDivider,
+                    { backgroundColor: "rgba(255,255,255,0.12)" },
+                  ]}
+                />
+                <View style={s.tooltipRow}>
+                  <Text
+                    style={[
+                      s.tooltipTicker,
+                      { color: "rgba(255,255,255,0.65)" },
+                    ]}
+                  >
+                    {activeBlock.rows[0].shortTicker}
+                  </Text>
+                  <Text
+                    style={[
+                      s.tooltipChange,
+                      {
+                        color:
+                          activeBlock.rows[0].change >= 0
+                            ? c.brand
+                            : "#FF6E5C",
+                      },
+                    ]}
+                  >
+                    {activeBlock.rows[0].change >= 0 ? "▲ " : "▼ "}
+                    {formatPct(activeBlock.rows[0].change, false)}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                {activeBlock.rows.length > 0 ? (
                   <View
                     style={[
                       s.tooltipDivider,
                       { backgroundColor: "rgba(255,255,255,0.12)" },
                     ]}
                   />
-                  <View style={s.tooltipRow}>
+                ) : null}
+                {activeBlock.rows.slice(0, 5).map((r) => (
+                  <View key={r.ticker} style={s.tooltipRow}>
                     <Text
-                      style={[s.tooltipTicker, { color: "rgba(255,255,255,0.65)" }]}
+                      style={[s.tooltipTicker, { color: c.bg }]}
+                      numberOfLines={1}
                     >
-                      {activeBlock.rows[0].shortTicker}
+                      {r.ticker}
                     </Text>
                     <Text
                       style={[
                         s.tooltipChange,
-                        {
-                          color:
-                            activeBlock.rows[0].change >= 0
-                              ? c.brand
-                              : "#FF6E5C",
-                        },
+                        { color: r.change >= 0 ? c.brand : "#FF6E5C" },
                       ]}
                     >
-                      {activeBlock.rows[0].change >= 0 ? "▲ " : "▼ "}
-                      {formatPct(activeBlock.rows[0].change, false)}
+                      {r.change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(r.change, false)}
                     </Text>
                   </View>
-                </>
-              ) : (
-                <>
-                  {activeBlock.rows.length > 0 ? (
-                    <View
-                      style={[
-                        s.tooltipDivider,
-                        { backgroundColor: "rgba(255,255,255,0.12)" },
-                      ]}
-                    />
-                  ) : null}
-                  {activeBlock.rows.slice(0, 5).map((r) => (
-                    <View key={r.ticker} style={s.tooltipRow}>
-                      <Text
-                        style={[s.tooltipTicker, { color: c.bg }]}
-                        numberOfLines={1}
-                      >
-                        {r.ticker}
-                      </Text>
-                      <Text
-                        style={[
-                          s.tooltipChange,
-                          { color: r.change >= 0 ? c.brand : "#FF6E5C" },
-                        ]}
-                      >
-                        {r.change >= 0 ? "▲ " : "▼ "}
-                        {formatPct(r.change, false)}
-                      </Text>
-                    </View>
-                  ))}
-                  {activeBlock.rows.length > 5 ? (
-                    <Text style={[s.tooltipMore, { color: "rgba(255,255,255,0.45)" }]}>
-                      +{activeBlock.rows.length - 5} más
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-            <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
-          </Animated.View>
-        ) : null}
-      </View>
-
-      <BalanceInfoSheet
-        visible={infoOpen}
-        onClose={() => setInfoOpen(false)}
-      />
+                ))}
+                {activeBlock.rows.length > 5 ? (
+                  <Text
+                    style={[
+                      s.tooltipMore,
+                      { color: "rgba(255,255,255,0.45)" },
+                    ]}
+                  >
+                    +{activeBlock.rows.length - 5} más
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
+
+/* ─── Helpers ─── */
 
 /** Mezcla un hex con blanco (amt > 0) o negro (amt < 0). amt en
  *  rango [-1, 1]. Devuelve "rgb(r,g,b)". */
@@ -971,12 +1223,7 @@ function textOnHex(color: string): string {
   return color === "#0E0F0C" || color === "#000000" ? "#FAFAF7" : "#0E0F0C";
 }
 
-/** Devuelve el ticker corto de un par crypto.
- *  "BTC/USDT" → "BTC", "BTCUSDT.P" → "BTC.P", el resto se devuelve
- *  tal cual (acciones / cedears etc no se tocan). En la pared 3D
- *  los pares completos se sienten técnicos y restan al lenguaje
- *  retail — preferimos mostrar el nombre full ("Bitcoin") con el
- *  short ticker como sub-label. */
+/** Devuelve el ticker corto de un par crypto. "BTC/USDT" → "BTC". */
 function shortCryptoTicker(ticker: string): string {
   if (ticker.includes("/USDT")) return ticker.replace("/USDT", "");
   if (ticker.endsWith("USDT.P"))
@@ -989,9 +1236,7 @@ function formatTooltipPct(p: number): string {
   return p.toFixed(1).replace(".", ",") + "%";
 }
 
-/** Pct sin signo, máximo un decimal cuando es chico (< 10%) — en
- *  legend queremos que las cifras dominantes se vean limpias y las
- *  pequeñas no caigan a 0%. */
+/** Pct sin signo, máximo un decimal cuando es chico (< 10%). */
 function formatAllocationPct(p: number): string {
   const v = p * 100;
   if (v >= 10) return Math.round(v).toString() + "%";
@@ -1001,46 +1246,128 @@ function formatAllocationPct(p: number): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Header fijo — paddings clavados al header de Mercado para que el
-   * segmented quede en el mismo Y de pantalla. */
-  header: {
-    paddingHorizontal: 20,
-  },
-  titleRow: {
+  /* Top bar invisible — solo aloja el sticky overlay. Mismo patrón
+   * que detail.tsx pero sin íconos (es una tab). */
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 12,
   },
-  title: {
+  stickyOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stickyPrice: {
+    fontFamily: fontFamily[500],
+    fontSize: 17,
+    letterSpacing: -0.3,
+    lineHeight: 20,
+  },
+  stickyRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    marginTop: 1,
+  },
+  stickyTicker: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0,
+  },
+  stickyDot: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  stickyPct: {
     fontFamily: fontFamily[700],
-    fontSize: 32,
-    lineHeight: 36,
-    letterSpacing: -1.2,
+    fontSize: 11,
+    letterSpacing: -0.05,
   },
 
-  /* Section block container — paddingHorizontal 20 (matchea Inicio).
-   * El "sectionHead" usa el mismo lenguaje que las secciones de
-   * Inicio: título tipo eyebrow + count compacto a la derecha. */
-  sectionBlock: {
-    paddingHorizontal: 20,
+  /* Hero */
+  heroBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 4,
   },
-  sectionHead: {
+  heroEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  heroPagerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    gap: 10,
   },
-  sectionTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 21,
-    letterSpacing: -0.7,
-    lineHeight: 24,
+  heroInfoDot: {
+    width: 22,
+    height: 22,
+    borderCurve: "continuous",
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sectionCount: {
+  deltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  deltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+  },
+  deltaText: {
     fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 2,
+  },
+  dot: {
+    borderCurve: "continuous",
+    borderRadius: 999,
+  },
+
+  /* Ladrillo full-bleed — span del ancho de pantalla, igual lugar
+   * que el Sparkline en detail.tsx. */
+  brickContainer: {
+    marginTop: 24,
+    marginHorizontal: -24,
+  },
+
+  /* Filtro de mercado debajo del hero */
+  segmentedRow: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+
+  /* Cards full-width sin chrome — mismo s.card que detail.tsx */
+  card: {
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  cardEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.5,
+    marginBottom: 16,
   },
   empty: {
     fontFamily: fontFamily[500],
@@ -1051,122 +1378,120 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  /* Row del listado por categoría — copia de Inicio para que las
-   * dos vistas (Home 'Tus inversiones' y Portfolio 'Tus posiciones')
-   * se sientan exactamente iguales: label / count + total ARS +
-   * chevron. Tap → drilldown a market-category. */
-  invRow: {
+  /* Resumen — grid 2x2 + ReturnRow */
+  posGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 16,
+  },
+  posCellLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginBottom: 6,
+  },
+  posCellValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 19,
+    letterSpacing: -0.4,
+  },
+  posCellSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 3,
+  },
+  returnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  returnLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  returnValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.3,
+  },
+
+  /* Posiciones — list rows con hairline dividers */
+  posRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
   },
-  /* Swatch de color que matchea el bloque del ladrillo de esa
-   * categoría — squarish con esquinas continuas, 14px de lado. */
-  invRowSwatch: {
+  posSwatch: {
     width: 14,
     height: 14,
     borderCurve: "continuous",
     borderRadius: 3,
   },
-  invRowLabel: {
+  posLabel: {
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  invRowSub: {
+  posSub: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.1,
     marginTop: 2,
   },
-  invRowValue: {
+  posValue: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
   },
-  /* Pct del ladrillo correspondiente — chico, gris, debajo del
-   * total ARS. Refleja la fracción de la categoría sobre el
-   * portfolio entero. */
-  invRowPct: {
+  posPct: {
     fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.1,
     marginTop: 2,
   },
 
+  /* Distribución — stats grid 2-col */
+  statsGridRow: {
+    flexDirection: "row",
+    paddingVertical: 15,
+    gap: 32,
+  },
+  statsCell: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  statsLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.1,
+  },
+  statsValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
 
-  /* Pared 3D de distribución — card vertical: header (eyebrow +
-   * total) → SVG con la pared → legend en grid 2 columnas. */
-  allocCard: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  /* Row del header del card — pager (saldo) + info icon fijo a
-   * la derecha. El info icon está afuera del ScrollView para que
-   * no se desplace con el swipe horizontal. */
-  allocPagerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  /* Pager horizontal de moneda — ScrollView pagingEnabled, dos
-   * páginas (ARS / USD) cada una al ancho del wrapper menos el
-   * info icon a la derecha. */
-  allocPager: {
-    flexGrow: 0,
-  },
-  allocPagerPage: {
-    /* width se setea inline (containerW - 32 = ancho de la
-     * ScrollView, así pagingEnabled snapea exacto y no se ve
-     * peek de la página siguiente). overflow:hidden evita que
-     * un saldo muy ancho (12 millones+) se desborde por la
-     * derecha hacia el info icon. */
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  allocInfoDot: {
-    width: 22,
-    height: 22,
-    borderCurve: "continuous",
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  allocCurrencyDots: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 8,
-    marginBottom: 6,
-    paddingVertical: 2,
-  },
-  allocCurrencyDot: {
-    borderCurve: "continuous",
-    borderRadius: 999,
-  },
+  /* Ladrillo */
   brickWrap: {
     position: "relative",
     overflow: "visible",
   },
-  /* Tooltip — anchor con width 0 + alignItems center centra el
-   * children en el punto `left` que pasamos. `bottom` se setea
-   * inline para que el caret termine justo arriba del front
-   * face del ladrillo (la pill crece hacia arriba). */
+
+  /* Tooltip */
   tooltipAnchor: {
     position: "absolute",
     width: 0,
     alignItems: "center",
     zIndex: 5,
   },
-  /* Pill ahora vertical: header (categoría + pct) + lista de
-   * tickers + change. minWidth para que se sienta consistente
-   * entre categorías con pocos vs muchos activos. */
   tooltipPill: {
     minWidth: 168,
     paddingHorizontal: 12,
@@ -1220,13 +1545,20 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
-  /* Caret — square rotado 45° debajo del pill. marginTop negativo
-   * para que la mitad de arriba quede oculta tras el pill y solo
-   * sobresalga la mitad de abajo (forma de triángulo). */
   tooltipCaret: {
     width: 8,
     height: 8,
     marginTop: -4,
     transform: [{ rotate: "45deg" }],
+  },
+
+  /* Disclaimer */
+  disclaimer: {
+    marginTop: 24,
+    marginHorizontal: 20,
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
 });
