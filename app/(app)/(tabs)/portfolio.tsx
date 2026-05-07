@@ -315,16 +315,21 @@ export default function PortfolioScreen() {
   return (
     <AssetColorProvider up={dayUp}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
-        {/* Top bar — sticky overlay con balance compacto + delta% que
-            aparece al scrollear. Mismo patrón que el detail.tsx. */}
-        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-          <View style={{ flex: 1 }} />
+        {/* Top bar — banda fija con bg sólido c.bg que separa visualmente
+            del contenido scrollable. El sticky overlay (balance compacto
+            + PORTFOLIO · pct%) crossfade-aparece al scrollear, sobre el
+            bg sólido del topBar. */}
+        <View
+          style={[
+            s.topBar,
+            {
+              paddingTop: insets.top + 12,
+              backgroundColor: c.bg,
+            },
+          ]}
+        >
           <Animated.View
-            style={[
-              s.stickyOverlay,
-              { top: insets.top + 12 },
-              stickyOpacityStyle,
-            ]}
+            style={[s.stickyOverlay, stickyOpacityStyle]}
             pointerEvents="none"
           >
             <Text
@@ -1500,23 +1505,20 @@ function formatAllocationPct(p: number): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Top bar invisible — solo aloja el sticky overlay absoluto que
-   * crossfade-aparece al scrollear. Mismo patrón que detail.tsx. */
+  /* Top bar — banda fija con bg sólido (aplicado inline con c.bg).
+   * Aloja al sticky overlay como flex child para que la altura del
+   * topBar contenga al texto del overlay y haya un fondo sólido
+   * detrás. Total height = insets.top + 12 + 38 + 12 = insets.top+62. */
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingBottom: 8,
-    gap: 12,
+    paddingBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  /* Sticky overlay — absolute span left:0/right:0 → centro real de
-   * pantalla. Se desvanece in cuando el scrollY cruza STICKY_START
-   * y queda full opacity en STICKY_FULL. */
+  /* Sticky overlay — flex child centrado del topBar. Su opacity
+   * arranca en 0 y crossfade-aparece cuando el scrollY cruza
+   * STICKY_START → full opacity en STICKY_FULL. */
   stickyOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
     height: 38,
     alignItems: "center",
     justifyContent: "center",
