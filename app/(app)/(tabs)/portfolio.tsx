@@ -13,14 +13,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
 import Svg, {
   Ellipse,
   G,
@@ -63,16 +56,16 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
 /**
  * Tab 'Portfolio' — gold standard del detail.tsx aplicado a la cartera.
  *
- * Estructura (mismo lenguaje que detail.tsx):
- *   1. Hero block — eyebrow "TU CARTERA" + balance grande con pager
- *      ARS/USD + delta del día con triángulo + dots indicator. El
- *      balance dicta la cromática del screen (greenDark si el día
- *      es verde, red si está negativo) via AssetColorProvider.
- *   2. Ladrillo — full bleed (marginHorizontal:-24), igual lugar que
- *      el Sparkline en el detail. Hold + drag para highlightear y
- *      tooltip arriba.
- *   3. MarketSegmented — debajo del hero, scrollea con el contenido.
- *      AR/EE.UU/Crypto/Todo filtra holdings + ladrillo + cards.
+ * Estructura:
+ *   1. Hero block FIJO (afuera del ScrollView) — eyebrow "PORTFOLIO" +
+ *      balance grande con pager ARS/USD + delta del día con triángulo +
+ *      dots indicator. Permanece visible siempre, no scrollea. El delta
+ *      del día dicta la cromática (greenDark si el día es verde, red si
+ *      está negativo) via AssetColorProvider.
+ *   2. Ladrillo full-bleed — primer item dentro del ScrollView. Hold +
+ *      drag para highlightear y tooltip arriba.
+ *   3. MarketSegmented — debajo del ladrillo. AR/EE.UU/Crypto/Todo
+ *      filtra holdings + ladrillo + cards.
  *   4. Cards full-width sin GlassCard:
  *        - Resumen: grid 2x2 (valor mercado, posiciones, mejor del
  *          día, peor del día) + ReturnRow del día.
@@ -80,9 +73,6 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
  *          swatch que matchea el ladrillo.
  *        - Distribución: stats grid 2-col por mercado.
  *   5. Disclaimer Manteca al final.
- *
- * Sticky overlay aparece al scrollear: balance compacto + delta%,
- * mismo patrón que el detail.
  */
 
 type Currency = "ARS" | "USD";
@@ -240,29 +230,12 @@ export default function PortfolioScreen() {
     };
   }, [holdingsSorted, groupedByCategory]);
 
-  /* ─── Sticky scroll header — crossfade al scrollear ─── */
-
-  const stickyScrollY = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      stickyScrollY.value = e.contentOffset.y;
-    },
-  });
-  const STICKY_START = 130;
-  const STICKY_FULL = 200;
-  const stickyOpacityStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      stickyScrollY.value,
-      [STICKY_START, STICKY_FULL],
-      [0, 1],
-      "clamp",
-    ),
-  }));
-
   /* ─── Refs + tab tap + refresh ─── */
 
   const scrollRef = useRef<ScrollView | null>(null);
   const pagerRef = useRef<ScrollView | null>(null);
+  // Track scroll Y en JS thread para el tab tap (scroll-to-top vs refresh).
+  const scrollYRef = useRef(0);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -277,15 +250,13 @@ export default function PortfolioScreen() {
 
   useEffect(() => {
     return registerTabTap("portfolio", {
-      isAtTop: () => stickyScrollY.value <= 8,
+      isAtTop: () => scrollYRef.current <= 8,
       scrollToTop: () =>
         scrollRef.current?.scrollTo({ y: 0, animated: true }),
       refresh: () => {
         if (!refreshing) onRefresh();
       },
     });
-    // stickyScrollY es shared value — su .value cambia sin re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, onRefresh]);
 
   // Sync currency cuando cambia el filtro de mercado.
@@ -314,40 +285,145 @@ export default function PortfolioScreen() {
   return (
     <AssetColorProvider up={dayUp}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
-        {/* Top bar — vacío salvo por el sticky overlay que aparece al
-            scrollear. Mismo patrón que detail.tsx pero sin íconos
-            laterales (es una tab, no hay back). */}
-        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-          <View style={{ flex: 1 }} />
-          <Animated.View
-            style={[
-              s.stickyOverlay,
-              { top: insets.top + 12 },
-              stickyOpacityStyle,
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={[s.stickyPrice, { color: c.text }]} numberOfLines={1}>
-              {formatMoney(totalDisplay, currency)}
-            </Text>
-            <View style={s.stickyRow}>
-              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
-                CARTERA
-              </Text>
-              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
-              <Text style={[s.stickyPct, { color }]}>
-                {formatPct(dayPct)}
-              </Text>
+        {/* Safe area spacer — el header del status bar. El hero arranca
+            apenas debajo y vive afuera del ScrollView, así no scrollea. */}
+        <View style={{ paddingTop: insets.top + 12 }} />
+
+        {/* ─── Hero FIJO (afuera del ScrollView) ─── */}
+        <View style={s.heroBlock}>
+          <Text style={[s.heroEyebrow, { color: c.textMuted }]}>
+            PORTFOLIO
+          </Text>
+
+          <View style={s.heroPagerRow}>
+            <View
+              style={{ flex: 1 }}
+              onLayout={(e) => setPagerW(e.nativeEvent.layout.width)}
+            >
+              {pagerW > 0 ? (
+                <ScrollView
+                  ref={pagerRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="normal"
+                  directionalLockEnabled
+                  alwaysBounceVertical={false}
+                  bounces={false}
+                  contentOffset={{
+                    x: currency === "ARS" ? 0 : pagerW,
+                    y: 0,
+                  }}
+                  onMomentumScrollEnd={(e) => {
+                    const idx = Math.round(
+                      e.nativeEvent.contentOffset.x / pagerW,
+                    );
+                    const next: Currency = idx === 0 ? "ARS" : "USD";
+                    if (next !== currency) {
+                      Haptics.selectionAsync().catch(() => {});
+                      setCurrency(next);
+                    }
+                  }}
+                  style={{ flexGrow: 0 }}
+                >
+                  {(["ARS", "USD"] as const).map((cur) => {
+                    const value =
+                      cur === "ARS"
+                        ? totalArs
+                        : convertAmount(totalArs, "ARS", "USD");
+                    return (
+                      <View
+                        key={cur}
+                        style={{
+                          width: pagerW,
+                          justifyContent: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <AmountDisplay
+                          value={value}
+                          size={42}
+                          currency={cur}
+                        />
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <AmountDisplay
+                  value={totalArs}
+                  size={42}
+                  currency="ARS"
+                />
+              )}
             </View>
-          </Animated.View>
+            <Tap
+              hitSlop={10}
+              haptic="selection"
+              onPress={() => setInfoOpen(true)}
+              style={[
+                s.heroInfoDot,
+                { backgroundColor: c.surfaceHover },
+              ]}
+            >
+              <Feather name="info" size={12} color={c.textSecondary} />
+            </Tap>
+          </View>
+
+          <View style={s.deltaRow}>
+            <Text style={[s.deltaTri, { color }]}>
+              {dayUp ? "▲" : "▼"}
+            </Text>
+            <Text style={[s.deltaText, { color }]}>
+              {formatMoney(Math.abs(daySumDisplay), currency)}
+            </Text>
+            <Text style={[s.deltaText, { color }]}>
+              ({formatPct(dayPct)})
+            </Text>
+            <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
+          </View>
+
+          <View style={s.dotsRow}>
+            {(["ARS", "USD"] as const).map((cur) => {
+              const active = cur === currency;
+              return (
+                <Tap
+                  key={cur}
+                  hitSlop={10}
+                  haptic="selection"
+                  onPress={() => {
+                    if (cur === currency) return;
+                    setCurrency(cur);
+                    pagerRef.current?.scrollTo({
+                      x: cur === "ARS" ? 0 : pagerW,
+                      y: 0,
+                      animated: true,
+                    });
+                  }}
+                >
+                  <View
+                    style={[
+                      s.dot,
+                      {
+                        backgroundColor: active ? c.text : c.textFaint,
+                        width: active ? 7 : 5,
+                        height: active ? 7 : 5,
+                      },
+                    ]}
+                  />
+                </Tap>
+              );
+            })}
+          </View>
         </View>
 
-        <Animated.ScrollView
-          // Animated.ScrollView forwarda el ref al RNScrollView interno.
-          ref={scrollRef as never}
-          contentContainerStyle={{ paddingBottom: 180 }}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 180 }}
           showsVerticalScrollIndicator={false}
-          onScroll={onScroll}
+          onScroll={(e) => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
           scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
@@ -359,147 +435,19 @@ export default function PortfolioScreen() {
             />
           }
         >
-          {/* ─── Hero ─── */}
-          <View style={s.heroBlock}>
-            <Text style={[s.heroEyebrow, { color: c.textMuted }]}>
-              TU CARTERA
-            </Text>
-
-            <View style={s.heroPagerRow}>
-              <View
-                style={{ flex: 1 }}
-                onLayout={(e) => setPagerW(e.nativeEvent.layout.width)}
-              >
-                {pagerW > 0 ? (
-                  <ScrollView
-                    ref={pagerRef}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    decelerationRate="normal"
-                    directionalLockEnabled
-                    alwaysBounceVertical={false}
-                    bounces={false}
-                    contentOffset={{
-                      x: currency === "ARS" ? 0 : pagerW,
-                      y: 0,
-                    }}
-                    onMomentumScrollEnd={(e) => {
-                      const idx = Math.round(
-                        e.nativeEvent.contentOffset.x / pagerW,
-                      );
-                      const next: Currency = idx === 0 ? "ARS" : "USD";
-                      if (next !== currency) {
-                        Haptics.selectionAsync().catch(() => {});
-                        setCurrency(next);
-                      }
-                    }}
-                    style={{ flexGrow: 0 }}
-                  >
-                    {(["ARS", "USD"] as const).map((cur) => {
-                      const value =
-                        cur === "ARS"
-                          ? totalArs
-                          : convertAmount(totalArs, "ARS", "USD");
-                      return (
-                        <View
-                          key={cur}
-                          style={{
-                            width: pagerW,
-                            justifyContent: "center",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <AmountDisplay
-                            value={value}
-                            size={42}
-                            currency={cur}
-                          />
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                ) : (
-                  <AmountDisplay
-                    value={totalArs}
-                    size={42}
-                    currency="ARS"
-                  />
-                )}
-              </View>
-              <Tap
-                hitSlop={10}
-                haptic="selection"
-                onPress={() => setInfoOpen(true)}
-                style={[
-                  s.heroInfoDot,
-                  { backgroundColor: c.surfaceHover },
-                ]}
-              >
-                <Feather name="info" size={12} color={c.textSecondary} />
-              </Tap>
+          {/* Ladrillo full-bleed — primer contenido scrollable, span
+              completo del ancho de pantalla. */}
+          {hasHoldings ? (
+            <View style={s.brickContainer}>
+              <FloorBrick
+                holdings={holdingsSorted}
+                totalArs={totalArs}
+                groupBy={
+                  marketFilter === "CRYPTO" ? "ticker" : "category"
+                }
+              />
             </View>
-
-            <View style={s.deltaRow}>
-              <Text style={[s.deltaTri, { color }]}>
-                {dayUp ? "▲" : "▼"}
-              </Text>
-              <Text style={[s.deltaText, { color }]}>
-                {formatMoney(Math.abs(daySumDisplay), currency)}
-              </Text>
-              <Text style={[s.deltaText, { color }]}>
-                ({formatPct(dayPct)})
-              </Text>
-              <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
-            </View>
-
-            <View style={s.dotsRow}>
-              {(["ARS", "USD"] as const).map((cur) => {
-                const active = cur === currency;
-                return (
-                  <Tap
-                    key={cur}
-                    hitSlop={10}
-                    haptic="selection"
-                    onPress={() => {
-                      if (cur === currency) return;
-                      setCurrency(cur);
-                      pagerRef.current?.scrollTo({
-                        x: cur === "ARS" ? 0 : pagerW,
-                        y: 0,
-                        animated: true,
-                      });
-                    }}
-                  >
-                    <View
-                      style={[
-                        s.dot,
-                        {
-                          backgroundColor: active ? c.text : c.textFaint,
-                          width: active ? 7 : 5,
-                          height: active ? 7 : 5,
-                        },
-                      ]}
-                    />
-                  </Tap>
-                );
-              })}
-            </View>
-
-            {/* Ladrillo full-bleed — marginHorizontal -24 para spanear
-                el ancho de la pantalla, igual que el Sparkline del detail. */}
-            {hasHoldings ? (
-              <View style={s.brickContainer}>
-                <FloorBrick
-                  holdings={holdingsSorted}
-                  totalArs={totalArs}
-                  groupBy={
-                    marketFilter === "CRYPTO" ? "ticker" : "category"
-                  }
-                />
-              </View>
-            ) : null}
-          </View>
+          ) : null}
 
           {/* ─── Filtro de mercado ─── */}
           <View style={s.segmentedRow}>
@@ -551,7 +499,7 @@ export default function PortfolioScreen() {
             implica riesgo de pérdida de capital. Álamos opera bajo Manteca
             ALyC, regulada por la CNV.
           </Text>
-        </Animated.ScrollView>
+        </ScrollView>
 
         <BalanceInfoSheet
           visible={infoOpen}
@@ -1246,56 +1194,11 @@ function formatAllocationPct(p: number): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Top bar invisible — solo aloja el sticky overlay. Mismo patrón
-   * que detail.tsx pero sin íconos (es una tab). */
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  stickyOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stickyPrice: {
-    fontFamily: fontFamily[500],
-    fontSize: 17,
-    letterSpacing: -0.3,
-    lineHeight: 20,
-  },
-  stickyRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 5,
-    marginTop: 1,
-  },
-  stickyTicker: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0,
-  },
-  stickyDot: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    opacity: 0.6,
-  },
-  stickyPct: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: -0.05,
-  },
-
-  /* Hero */
+  /* Hero FIJO — vive afuera del ScrollView, no scrollea. */
   heroBlock: {
     paddingHorizontal: 24,
     paddingTop: 4,
+    paddingBottom: 4,
   },
   heroEyebrow: {
     fontFamily: fontFamily[700],
@@ -1345,17 +1248,16 @@ const s = StyleSheet.create({
     borderRadius: 999,
   },
 
-  /* Ladrillo full-bleed — span del ancho de pantalla, igual lugar
-   * que el Sparkline en detail.tsx. */
+  /* Ladrillo full-bleed — primer item dentro del ScrollView. Sin
+   * marginHorizontal porque no hay padding lateral en el ScrollView. */
   brickContainer: {
-    marginTop: 24,
-    marginHorizontal: -24,
+    marginTop: 8,
   },
 
-  /* Filtro de mercado debajo del hero */
+  /* Filtro de mercado debajo del ladrillo */
   segmentedRow: {
     paddingHorizontal: 20,
-    marginTop: 20,
+    marginTop: 24,
   },
 
   /* Cards full-width sin chrome — mismo s.card que detail.tsx */
