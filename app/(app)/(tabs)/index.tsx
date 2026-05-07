@@ -448,7 +448,7 @@ function BaseHome() {
               hitSlop={8}
               haptic="medium"
             >
-              <TopRightIcon name="sorpresa" size={40} />
+              <TopRightIcon name="sorpresa" size={44} />
             </Tap>
           </Animated.View>
           <Tap
@@ -459,7 +459,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={40}
+              size={44}
             />
           </Tap>
         </View>

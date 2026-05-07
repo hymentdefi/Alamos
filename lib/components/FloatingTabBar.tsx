@@ -1,28 +1,12 @@
-import { useEffect, useState } from "react";
 import { useRouter, useSegments } from "expo-router";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius } from "../theme";
+import { useTheme, fontFamily } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
 
 const BAR_CONTENT_HEIGHT = 68;
 const ACTIVE_COLOR = "#5ac43e";
-const PILL_INSET_X = 0;
-const PILL_INSET_Y = 6;
-const ROW_PADDING_X = 0;
 
 type TabRoute = {
   name: string;
@@ -61,13 +45,9 @@ interface Props {
 
 /**
  * Bottom nav pegado al piso — edge-to-edge, fondo sólido del theme,
- * hairline arriba, safe-area inset adentro. Mantiene la sliding pill
- * animada para el tab activo (squash & stretch en el viaje).
- *
- * Reusable en cualquier screen — basta con renderearlo como sibling
- * del contenido principal. El navigate usa router.navigate(href) que
- * pop-pea el Stack y vuelve a la tab destino si estás en un screen
- * fuera del (tabs).
+ * hairline arriba, safe-area inset adentro. El tab activo se distingue
+ * solo por color (action green) y por el pop-scale del icono — sin
+ * pill de fondo. Diseño minimal, álamos-styled.
  */
 export function FloatingTabBar({ contextTab }: Props = {}) {
   const router = useRouter();
@@ -78,61 +58,8 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
     "index";
   const segIdx = TAB_ROUTES.findIndex((r) => r.name === tabSegment);
   const activeIndex = segIdx >= 0 ? segIdx : 0;
-  const { mode, c } = useTheme();
+  const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const isDark = mode === "dark";
-
-  const [rowWidth, setRowWidth] = useState(0);
-
-  const pillIndex = useSharedValue(activeIndex);
-  const pillScaleX = useSharedValue(1);
-  const pillScaleY = useSharedValue(1);
-  useEffect(() => {
-    pillIndex.value = withTiming(activeIndex, {
-      duration: 250,
-      easing: Easing.out(Easing.cubic),
-    });
-    pillScaleX.value = withSequence(
-      withTiming(1.32, {
-        duration: 110,
-        easing: Easing.out(Easing.cubic),
-      }),
-      withTiming(0.88, {
-        duration: 90,
-        easing: Easing.out(Easing.cubic),
-      }),
-      withTiming(1, {
-        duration: 80,
-        easing: Easing.out(Easing.quad),
-      }),
-    );
-    pillScaleY.value = withSequence(
-      withTiming(0.74, {
-        duration: 110,
-        easing: Easing.out(Easing.cubic),
-      }),
-      withTiming(1.16, {
-        duration: 90,
-        easing: Easing.out(Easing.cubic),
-      }),
-      withTiming(1, {
-        duration: 80,
-        easing: Easing.out(Easing.quad),
-      }),
-    );
-  }, [activeIndex, pillIndex, pillScaleX, pillScaleY]);
-
-  const itemWidth =
-    rowWidth > 0 ? (rowWidth - ROW_PADDING_X * 2) / TAB_ROUTES.length : 0;
-
-  const pillStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: ROW_PADDING_X + PILL_INSET_X + pillIndex.value * itemWidth },
-      { scaleX: pillScaleX.value },
-      { scaleY: pillScaleY.value },
-    ],
-    width: Math.max(0, itemWidth - PILL_INSET_X * 2),
-  }));
 
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.selectionAsync().catch(() => {});
@@ -152,27 +79,7 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
         },
       ]}
     >
-      <View
-        style={[styles.row, { height: BAR_CONTENT_HEIGHT }]}
-        onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
-      >
-        {itemWidth > 0 ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.slidingPill,
-              {
-                top: PILL_INSET_Y,
-                bottom: PILL_INSET_Y,
-                backgroundColor: isDark
-                  ? "rgba(14, 203, 129, 0.14)"
-                  : "rgba(0, 200, 5, 0.10)",
-              },
-              pillStyle,
-            ]}
-          />
-        ) : null}
-
+      <View style={[styles.row, { height: BAR_CONTENT_HEIGHT }]}>
         {TAB_ROUTES.map((route, index) => {
           const focused = index === activeIndex;
           return (
@@ -208,7 +115,12 @@ function TabItem({ route, focused, inactiveColor, onPress }: TabItemProps) {
       style={styles.tabItem}
       hitSlop={6}
     >
-      <DrawingIcon path={route.path} focused={focused} color={color} />
+      <DrawingIcon
+        path={route.path}
+        focused={focused}
+        color={color}
+        size={28}
+      />
       <Text numberOfLines={1} style={[styles.label, { color }]}>
         {route.title}
       </Text>
@@ -228,7 +140,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
     justifyContent: "space-between",
-    paddingHorizontal: ROW_PADDING_X,
   },
   tabItem: {
     flex: 1,
@@ -236,12 +147,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 7,
     gap: 3,
-  },
-  slidingPill: {
-    position: "absolute",
-    left: 0,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
   },
   label: {
     fontFamily: fontFamily[700],
