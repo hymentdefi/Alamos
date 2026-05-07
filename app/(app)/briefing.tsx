@@ -86,7 +86,10 @@ export default function BriefingScreen() {
 
   const briefing = briefingFor(asset.ticker);
   const isUp = asset.change >= 0;
-  const tone = isUp ? c.greenDark : c.red;
+  // Verde brand canónico (#00C805 — IGUAL en light y dark mode).
+  // c.greenDark cambia entre modos y se sentía distinto al verde
+  // que se ve en el resto de la app (action buttons, brand mark).
+  const tone = isUp ? c.brand : c.red;
   const cur = assetCurrency(asset);
 
   // Feedback del usuario sobre el briefing — null = no votó
@@ -208,64 +211,101 @@ export default function BriefingScreen() {
   );
 }
 
-/* ─── Campo de puntitos: droplet wave ─────────────────────────
+/* ─── Campo de puntitos: dual-wave droplet ─────────────────────
  *
- * El field de dots es SIEMPRE visible — los dots existen como
- * un fondo gris constante (c.textFaint del theme). La onda lo
- * único que hace es prender un overlay del color del activo
- * encima de cada dot mientras lo cruza, y después de que pasó
- * un trail residual que decae a 0. El gris base permanece.
+ * El field es SIEMPRE visible — los dots viven como un gris
+ * constante (c.textFaint). Encima corren DOS olas independientes
+ * que prenden el overlay coloreado:
  *
- * Implementación performante: UN solo SharedValue (wavePos)
- * controla el ciclo en el thread UI. Cada Dot tiene su propio
- * useAnimatedStyle SOLO para el overlay coloreado — el base
- * gris no se anima, va con backgroundColor estático.
+ *   - Wave A (primaria) — emerge de centro-abajo, period
+ *     2.6s. Es la onda dominante.
+ *   - Wave B (secundaria) — emerge de centro-arriba en la otra
+ *     dirección, period 4.1s, amplitud 65% de la primaria.
+ *
+ * Las dos corren en sus propios SharedValues con periods
+ * deliberadamente desfasados (no son múltiplos uno del otro),
+ * así el patrón combinado nunca se repite — cada vuelta de la
+ * onda principal cae en un momento diferente de la secundaria.
+ * Eso elimina el feel "loop mecánico".
+ *
+ * Per-dot jitter: cada dot le suma a su `distance` un offset
+ * deterministic (basado en row*7+col*13) de hasta ±0.2 unidades.
+ * El frente de onda no es un círculo perfecto, dots vecinos se
+ * prenden en momentos sutilmente distintos → feel orgánico.
+ *
+ * Performance: dos shared values + un useAnimatedStyle por dot
+ * que computa Math.max de las dos olas. Reanimated propaga las
+ * animaciones en el thread UI sin tocar JS.
  */
 function RippleField({ color }: { color: string }) {
   const { c } = useTheme();
 
-  // Precomputo: distancia al origen (centro-abajo) para cada
-  // dot. Las esquinas superiores tardan más en ser alcanzadas.
+  // Precomputo: distancia a los DOS orígenes + jitter por dot.
   const items = useMemo(() => {
-    const arr: { row: number; col: number; distance: number }[] = [];
-    const cx = (COLS - 1) / 2;
-    const cy = ROWS - 1;
+    const arr: {
+      row: number;
+      col: number;
+      dA: number;
+      dB: number;
+    }[] = [];
+    const cxA = (COLS - 1) / 2;
+    const cyA = ROWS - 1; // origen de la wave A: centro-abajo
+    const cxB = (COLS - 1) / 2;
+    const cyB = 0; // origen de la wave B: centro-arriba
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
-        const dx = col - cx;
-        const dy = r - cy;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        arr.push({ row: r, col, distance });
+        const dxA = col - cxA;
+        const dyA = r - cyA;
+        const dxB = col - cxB;
+        const dyB = r - cyB;
+        // Jitter deterministic: pseudo-noise hash del (row, col).
+        // Range -0.2..+0.2 unidades de grilla.
+        const seed = (r * 7 + col * 13) % 19;
+        const jitter = (seed / 19 - 0.5) * 0.4;
+        arr.push({
+          row: r,
+          col,
+          dA: Math.sqrt(dxA * dxA + dyA * dyA) + jitter,
+          dB: Math.sqrt(dxB * dxB + dyB * dyB) + jitter,
+        });
       }
     }
     return arr;
   }, []);
 
+  // maxDist es el mismo para ambos orígenes (simétrico):
+  // del centro-vertical-borde a la esquina opuesta.
   const maxDist = useMemo(() => {
     const cx = (COLS - 1) / 2;
     const cy = ROWS - 1;
     return Math.sqrt(cx * cx + cy * cy);
   }, []);
 
-  const wavePos = useSharedValue(-1);
+  const waveA = useSharedValue(-3);
+  const waveB = useSharedValue(-3);
 
   useEffect(() => {
-    // Loop infinito. wavePos arranca en -3 (todos los dots
-    // antes del pre-lead, overlay 0) y sube hasta maxDist + 10
-    // — donde el último dot pasó por todo el trail (BAND/2 +
-    // TRAIL = 2 + 8 = 10). En ese punto todos los overlays
-    // están en 0 y el reset es seamless. Duration 3200ms para
-    // mantener un pace razonable con el rango ampliado.
-    wavePos.value = -3;
-    wavePos.value = withRepeat(
+    // Periods desfasados: 2600 y 4100 ms. Ambos individualmente
+    // looping seamless (los dots vuelven a 0 antes del reset).
+    waveA.value = -3;
+    waveA.value = withRepeat(
       withTiming(maxDist + 10, {
-        duration: 3200,
+        duration: 2600,
         easing: Easing.linear,
       }),
       -1,
       false,
     );
-  }, [maxDist, wavePos]);
+    waveB.value = -3;
+    waveB.value = withRepeat(
+      withTiming(maxDist + 10, {
+        duration: 4100,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+  }, [maxDist, waveA, waveB]);
 
   return (
     <View
@@ -280,10 +320,12 @@ function RippleField({ color }: { color: string }) {
             key={i}
             row={it.row}
             col={it.col}
-            distance={it.distance}
+            dA={it.dA}
+            dB={it.dB}
             color={color}
             dim={c.textFaint}
-            wavePos={wavePos}
+            waveA={waveA}
+            waveB={waveB}
           />
         ))}
       </View>
@@ -294,49 +336,47 @@ function RippleField({ color }: { color: string }) {
 interface DotProps {
   row: number;
   col: number;
-  distance: number;
+  dA: number;
+  dB: number;
   color: string;
   dim: string;
-  wavePos: Animated.SharedValue<number>;
+  waveA: Animated.SharedValue<number>;
+  waveB: Animated.SharedValue<number>;
 }
 
-function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
-  // Worklet del overlay coloreado. Cinco fases para un feel
-  // "rainbow / glow" — muchos dots lit a la vez con falloff
-  // smooth alrededor del frente de onda. Rangos amplios
-  // (LEAD 3 + BAND 4 + TRAIL 8 = 15 unidades de grilla
-  // simultáneamente lit) para que la onda se sienta viva,
-  // arrastrando luz adelante y atrás como en la referencia.
+function Dot({ row, col, dA, dB, color, dim, waveA, waveB }: DotProps) {
+  // Worklet del overlay coloreado. Computa la intensidad de
+  // CADA ola para este dot y devuelve el max — el dot brilla
+  // cuando lo cruza cualquiera de las dos. Donde se solapan,
+  // el peak es más intenso (efecto interferencia).
+  //
+  // Cinco fases por ola: pre-lead → peak parabólico → trail →
+  // 0. Rangos: LEAD=3, BAND=4, TRAIL=8 (~15 unidades de grilla
+  // lit a la vez por ola).
   const overlayStyle = useAnimatedStyle(() => {
-    const LEAD = 3;
-    const BAND = 4;
-    const TRAIL = 8;
-    const w = wavePos.value;
-    const delta = w - distance;
-
-    if (delta < -LEAD) {
-      return { opacity: 0 };
-    }
-    if (delta < -BAND / 2) {
-      // Pre-lead: 0 → 0.55 lineal — dots adelante del frente
-      // empiezan a prenderse muy de a poco
-      const t = (delta + LEAD) / (LEAD - BAND / 2);
-      return { opacity: 0.55 * t };
-    }
-    if (delta <= BAND / 2) {
-      // Peak: 0.55 + 0.45 * (1 - (delta/(BAND/2))²) — falloff
-      // parabólico suave; el centro alcanza 1.0
-      const x = delta / (BAND / 2);
-      const peakBoost = 1 - x * x;
-      return { opacity: 0.55 + 0.45 * peakBoost };
-    }
-    const past = delta - BAND / 2;
-    if (past < TRAIL) {
-      // Trail largo: 0.55 → 0 lineal
-      const t = 1 - past / TRAIL;
-      return { opacity: 0.55 * t };
-    }
-    return { opacity: 0 };
+    "worklet";
+    const compute = (w: number, d: number) => {
+      const LEAD = 3;
+      const BAND = 4;
+      const TRAIL = 8;
+      const delta = w - d;
+      if (delta < -LEAD) return 0;
+      if (delta < -BAND / 2) {
+        const t = (delta + LEAD) / (LEAD - BAND / 2);
+        return 0.55 * t;
+      }
+      if (delta <= BAND / 2) {
+        const x = delta / (BAND / 2);
+        return 0.55 + 0.45 * (1 - x * x);
+      }
+      const past = delta - BAND / 2;
+      if (past < TRAIL) return 0.55 * (1 - past / TRAIL);
+      return 0;
+    };
+    const oa = compute(waveA.value, dA);
+    // Wave B con amplitud reducida para que la wave A domine.
+    const ob = compute(waveB.value, dB) * 0.65;
+    return { opacity: Math.max(oa, ob) };
   });
 
   return (

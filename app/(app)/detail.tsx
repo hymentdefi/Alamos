@@ -336,7 +336,7 @@ export default function DetailScreen() {
           </View>
         </View>
 
-        <BriefingCard asset={asset} chartColor={color} c={c} />
+        <BriefingCard asset={asset} c={c} />
 
         {pos ? <PositionCard pos={pos} asset={asset} c={c} /> : null}
 
@@ -1619,20 +1619,24 @@ function RelatedCarousel({
  *
  * Layout:
  *   [Briefing →]                        ← título + arrow
- *   [resumen ~4 líneas en chartColor]
+ *   [resumen ~4 líneas en tone]
  *   [Actualizado hace X · AI-powered]   ← footer muted
  */
 function BriefingCard({
   asset,
-  chartColor,
   c,
 }: {
   asset: Asset;
-  chartColor: string;
   c: ColorMap;
 }) {
   const router = useRouter();
   const briefing = useMemo(() => briefingFor(asset.ticker), [asset.ticker]);
+  // Tone canónico: c.brand (#00C805 idéntico en light + dark) si
+  // el activo está up; c.red si está en losses. Usar c.brand
+  // mantiene el verde consistente con el resto de la app
+  // (action buttons, isotipo). c.greenDark deriva por modo y
+  // generaba inconsistencia.
+  const tone = asset.change >= 0 ? c.brand : c.red;
 
   return (
     <Pressable
@@ -1649,10 +1653,10 @@ function BriefingCard({
       ]}
     >
       <View style={s.briefingHead}>
-        <Text style={[s.briefingHeadText, { color: chartColor }]}>
+        <Text style={[s.briefingHeadText, { color: tone }]}>
           Briefing
         </Text>
-        <Feather name="arrow-right" size={18} color={chartColor} />
+        <Feather name="arrow-right" size={18} color={tone} />
       </View>
       <Text
         style={[s.briefingSummary, { color: c.text }]}
