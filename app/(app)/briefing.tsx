@@ -16,7 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, useTheme } from "../../lib/theme";
 import {
@@ -154,10 +154,12 @@ export default function BriefingScreen() {
             </View>
           ))}
 
-          {/* Feedback — dos botones circulares (thumbs up / down)
-              en el color del activo. Tap → set/toggle vote. Cuando
-              alguno está activo, se rellena con el tone; el otro
-              queda outline. */}
+          {/* Feedback — dos botones circulares grandes con
+              thumbs filled en el color del activo. Tap →
+              set/toggle vote. Cuando alguno está activo, se
+              rellena con el tone y el icono pasa a c.bg para
+              contraste. Iconos de Ionicons (filled, no outline)
+              porque Feather sólo tiene la versión line. */}
           <View style={s.feedbackRow}>
             <Pressable
               onPress={() => handleVote("up")}
@@ -171,9 +173,9 @@ export default function BriefingScreen() {
                 },
               ]}
             >
-              <Feather
+              <Ionicons
                 name="thumbs-up"
-                size={18}
+                size={28}
                 color={vote === "up" ? c.bg : tone}
               />
             </Pressable>
@@ -189,9 +191,9 @@ export default function BriefingScreen() {
                 },
               ]}
             >
-              <Feather
+              <Ionicons
                 name="thumbs-down"
-                size={18}
+                size={28}
                 color={vote === "down" ? c.bg : tone}
               />
             </Pressable>
@@ -463,14 +465,14 @@ const s = StyleSheet.create({
    * con el tone y el icono va en c.bg para contraste. */
   feedbackRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 28,
+    gap: 14,
+    marginTop: 32,
   },
   feedbackBtn: {
-    width: 42,
-    height: 42,
+    width: 56,
+    height: 56,
     borderCurve: "continuous",
-    borderRadius: 21,
+    borderRadius: 28,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
