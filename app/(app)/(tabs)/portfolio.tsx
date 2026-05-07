@@ -45,10 +45,11 @@ import {
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
+import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import {
-  MarketSegmented,
-  type MarketSegmentedValue,
-} from "../../../lib/components/MarketSegmented";
+  MiniSparkline,
+  seriesFromSeed,
+} from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
@@ -64,8 +65,10 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
  *      está negativo) via AssetColorProvider.
  *   2. Ladrillo full-bleed — primer item dentro del ScrollView. Hold +
  *      drag para highlightear y tooltip arriba.
- *   3. MarketSegmented — debajo del ladrillo. AR/EE.UU/Crypto/Todo
- *      filtra holdings + ladrillo + cards.
+ *   3. Range pills (Todo/AR/EE.UU/Crypto) — debajo del ladrillo.
+ *      Active filled con el color contextual del día (greenDark si
+ *      verde, red si en losses). Mismo lenguaje que el rangeRow del
+ *      detail.tsx. Filtra holdings + ladrillo + cards.
  *   4. Cards full-width sin GlassCard:
  *        - Resumen: grid 2x2 (valor mercado, posiciones, mejor del
  *          día, peor del día) + ReturnRow del día.
@@ -291,9 +294,7 @@ export default function PortfolioScreen() {
 
         {/* ─── Hero FIJO (afuera del ScrollView) ─── */}
         <View style={s.heroBlock}>
-          <Text style={[s.heroEyebrow, { color: c.textMuted }]}>
-            PORTFOLIO
-          </Text>
+          <Text style={[s.heroTitle, { color: c.text }]}>Portfolio</Text>
 
           <View style={s.heroPagerRow}>
             <View
@@ -449,22 +450,49 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Filtro de mercado ─── */}
-          <View style={s.segmentedRow}>
-            <MarketSegmented
-              value={marketFilter}
-              onChange={setMarketFilter}
-              withAll
-            />
+          {/* ─── Filtro de mercado — range-pill style à la detail.tsx.
+              Active filled con el color contextual del día (greenDark
+              si dayUp, red si losses), inactive solo texto coloreado.
+              Mismo lenguaje que las pills 1D/1S/etc del detail. */}
+          <View style={s.rangeRow}>
+            {(
+              [
+                { id: "all", label: "Todo" },
+                { id: "AR", label: "AR" },
+                { id: "US", label: "EE.UU." },
+                { id: "CRYPTO", label: "Crypto" },
+              ] as const
+            ).map((t) => {
+              const active = t.id === marketFilter;
+              return (
+                <Tap
+                  key={t.id}
+                  onPress={() => setMarketFilter(t.id)}
+                  haptic="selection"
+                  pressScale={0.92}
+                  style={[
+                    s.rangePill,
+                    active && { backgroundColor: color },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Text
+                    style={[
+                      s.rangeText,
+                      { color: active ? c.bg : color },
+                    ]}
+                  >
+                    {t.label}
+                  </Text>
+                </Tap>
+              );
+            })}
           </View>
 
           {hasHoldings ? (
             <>
               <ResumenCard
                 totalDisplay={totalDisplay}
-                daySumDisplay={daySumDisplay}
-                dayPct={dayPct}
-                color={color}
                 currency={currency}
                 positionsCount={holdingsSorted.length}
                 bestOfDay={bestOfDay}
@@ -493,12 +521,6 @@ export default function PortfolioScreen() {
               </Text>
             </View>
           )}
-
-          <Text style={[s.disclaimer, { color: c.textFaint }]}>
-            Las cotizaciones son referenciales y pueden tener delay. Invertir
-            implica riesgo de pérdida de capital. Álamos opera bajo Manteca
-            ALyC, regulada por la CNV.
-          </Text>
         </ScrollView>
 
         <BalanceInfoSheet
@@ -514,9 +536,6 @@ export default function PortfolioScreen() {
 
 function ResumenCard({
   totalDisplay,
-  daySumDisplay,
-  dayPct,
-  color,
   currency,
   positionsCount,
   bestOfDay,
@@ -524,112 +543,112 @@ function ResumenCard({
   c,
 }: {
   totalDisplay: number;
-  daySumDisplay: number;
-  dayPct: number;
-  color: string;
   currency: Currency;
   positionsCount: number;
   bestOfDay: Holding | null;
   worstOfDay: Holding | null;
   c: ColorMap;
 }) {
-  const dayUp = daySumDisplay >= 0;
   const fmt = (n: number) => formatMoney(n, currency);
-  const bestColor =
-    bestOfDay && bestOfDay.asset.change >= 0 ? c.greenDark : c.red;
-  const worstColor =
-    worstOfDay && worstOfDay.asset.change >= 0 ? c.greenDark : c.red;
   return (
     <View style={[s.card, { marginTop: 16 }]}>
-      <Text style={[s.cardEyebrow, { color: c.text }]}>Resumen</Text>
-      <View style={s.posGrid}>
-        <PosCell
-          label="Valor de mercado"
-          value={fmt(totalDisplay)}
-          c={c}
-        />
-        <PosCell
-          label="Posiciones"
-          value={`${positionsCount}`}
-          align="right"
-          c={c}
-        />
-        <PosCell
-          label="Mejor del día"
-          value={bestOfDay ? formatPct(bestOfDay.asset.change) : "—"}
-          color={bestColor}
-          sub={bestOfDay?.asset.ticker}
-          c={c}
-        />
-        <PosCell
+      <Text style={[s.cardEyebrow, { color: c.text }]}>Hoy</Text>
+
+      {bestOfDay ? (
+        <MoverRow label="Mejor del día" holding={bestOfDay} c={c} />
+      ) : null}
+      {worstOfDay && worstOfDay.asset.ticker !== bestOfDay?.asset.ticker ? (
+        <MoverRow
           label="Peor del día"
-          value={worstOfDay ? formatPct(worstOfDay.asset.change) : "—"}
-          color={worstColor}
-          sub={worstOfDay?.asset.ticker}
-          align="right"
+          holding={worstOfDay}
           c={c}
+          isLast
         />
-      </View>
+      ) : null}
 
-      <View style={{ height: 20 }} />
-
-      <View
-        style={[
-          s.returnRow,
-          {
-            borderTopColor: c.border,
-            borderBottomColor: c.border,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-          },
-        ]}
-      >
-        <Text style={[s.returnLabel, { color: c.textMuted }]}>
-          Resultado del día
-        </Text>
-        <Text style={[s.returnValue, { color }]}>
-          {dayUp ? "+" : "−"}
-          {fmt(Math.abs(daySumDisplay))} ({formatPct(dayPct)})
-        </Text>
+      <View style={s.summaryFooter}>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.summaryLabel, { color: c.textMuted }]}>
+            Valor de mercado
+          </Text>
+          <Text
+            style={[s.summaryValue, { color: c.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {fmt(totalDisplay)}
+          </Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={[s.summaryLabel, { color: c.textMuted }]}>
+            Posiciones
+          </Text>
+          <Text
+            style={[s.summaryValue, { color: c.text }]}
+            numberOfLines={1}
+          >
+            {positionsCount}
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
-function PosCell({
+/* Mover row — fila dedicada a un activo (mejor o peor del día) con
+ * mini sparkline, ticker, nombre y variación. Mismo lenguaje cromático
+ * que el RelatedCarousel del detail. */
+function MoverRow({
   label,
-  value,
-  sub,
-  color,
-  align = "left",
+  holding,
   c,
+  isLast,
 }: {
   label: string;
-  value: string;
-  sub?: string;
-  color?: string;
-  align?: "left" | "right";
+  holding: Holding;
   c: ColorMap;
+  isLast?: boolean;
 }) {
+  const up = holding.asset.change >= 0;
+  const tone = up ? c.greenDark : c.red;
+  const series = seriesFromSeed(
+    holding.asset.ticker,
+    50,
+    up ? "up" : "down",
+  );
   return (
     <View
-      style={{
-        width: "50%",
-        paddingRight: align === "left" ? 12 : 0,
-        paddingLeft: align === "right" ? 12 : 0,
-        alignItems: align === "right" ? "flex-end" : "flex-start",
-      }}
+      style={[
+        s.moverRow,
+        !isLast && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: c.border,
+        },
+      ]}
     >
-      <Text style={[s.posCellLabel, { color: c.textMuted }]}>{label}</Text>
-      <Text
-        style={[s.posCellValue, { color: color ?? c.text }]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {value}
-      </Text>
-      {sub ? (
-        <Text style={[s.posCellSub, { color: c.textMuted }]}>{sub}</Text>
-      ) : null}
+      <View style={{ flex: 1, paddingRight: 12 }}>
+        <Text style={[s.moverLabel, { color: c.textMuted }]}>{label}</Text>
+        <Text style={[s.moverTicker, { color: c.text }]} numberOfLines={1}>
+          {holding.asset.ticker}
+        </Text>
+        <Text style={[s.moverName, { color: c.textMuted }]} numberOfLines={1}>
+          {holding.asset.name}
+        </Text>
+      </View>
+      <View style={s.moverSpark}>
+        <MiniSparkline
+          series={series}
+          color={tone}
+          width={88}
+          height={32}
+          strokeWidth={1.4}
+        />
+      </View>
+      <View style={{ alignItems: "flex-end", minWidth: 64 }}>
+        <Text style={[s.moverChange, { color: tone }]}>
+          {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -1200,12 +1219,15 @@ const s = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 4,
   },
-  heroEyebrow: {
+  /* Título "Portfolio" — mismo peso visual que "Mercado" / "Noticias"
+   * en sus respectivas tabs. 32pt bold con letterSpacing negativo
+   * fuerte. Wayfinding consistente entre tabs. */
+  heroTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginBottom: 10,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
+    marginBottom: 14,
   },
   heroPagerRow: {
     flexDirection: "row",
@@ -1254,10 +1276,25 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
 
-  /* Filtro de mercado debajo del ladrillo */
-  segmentedRow: {
-    paddingHorizontal: 20,
+  /* Range pills del filtro de mercado — mismo lenguaje que el rangeRow
+   * de detail.tsx (1D/1S/1M/3M/1A/MAX). Active filled con el color
+   * contextual del día. */
+  rangeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 24,
+    paddingHorizontal: 24,
+  },
+  rangePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  rangeText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
 
   /* Cards full-width sin chrome — mismo s.card que detail.tsx */
@@ -1280,45 +1317,66 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  /* Resumen — grid 2x2 + ReturnRow */
-  posGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 16,
-  },
-  posCellLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginBottom: 6,
-  },
-  posCellValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 19,
-    letterSpacing: -0.4,
-  },
-  posCellSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginTop: 3,
-  },
-  returnRow: {
+  /* Resumen card — movers showcase ─────────────────────────────────
+   * Cada MoverRow ocupa una fila con label / ticker / nombre a la
+   * izquierda, mini sparkline al centro, y change% a la derecha.
+   * Hairline divider entre rows. Después de los movers viene el
+   * summaryFooter con valor de mercado + posiciones. */
+  moverRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
-  returnLabel: {
+  moverLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  moverTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
+  },
+  moverName: {
     fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 1,
   },
-  returnValue: {
+  moverSpark: {
+    width: 88,
+    height: 32,
+    justifyContent: "center",
+  },
+  moverChange: {
     fontFamily: fontFamily[700],
     fontSize: 15,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
+  },
+
+  /* Footer del card Resumen — valor de mercado + posiciones, separado
+   * del bloque de movers por padding generoso. Sin divider extra: la
+   * última MoverRow ya cierra la sección con su isLast=true. */
+  summaryFooter: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingTop: 22,
+    gap: 16,
+  },
+  summaryLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
   },
 
   /* Posiciones — list rows con hairline dividers */
@@ -1452,15 +1510,5 @@ const s = StyleSheet.create({
     height: 8,
     marginTop: -4,
     transform: [{ rotate: "45deg" }],
-  },
-
-  /* Disclaimer */
-  disclaimer: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: -0.1,
   },
 });
