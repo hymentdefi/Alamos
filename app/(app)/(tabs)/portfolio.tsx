@@ -570,6 +570,7 @@ export default function PortfolioScreen() {
               <RendimientoCard
                 totalArs={totalArs}
                 currency={currency}
+                dayPct={dayPct}
                 bestOfDay={bestOfDay}
                 worstOfDay={worstOfDay}
                 c={c}
@@ -680,11 +681,15 @@ function SegGlyph({
  * secundarias (mejor mes, ytd, etc.) son fijas — no dependen del
  * range, dan contexto histórico independiente. */
 
-type RendRange = "1M" | "3M" | "6M" | "1A" | "MAX";
+type RendRange = "1D" | "1M" | "3M" | "6M" | "1A" | "MAX";
 
-const RENDIMIENTO_RANGES: RendRange[] = ["1M", "3M", "6M", "1A", "MAX"];
+const RENDIMIENTO_RANGES: RendRange[] = ["1D", "1M", "3M", "6M", "1A", "MAX"];
 
+/** % de retorno mockeado por rango. Para "1D" se ignora — usamos el
+ *  dayPct vivo del portfolio (mismo número que el delta del hero).
+ *  Los demás rangos son determinísticos por mock. */
 const RENDIMIENTO_PCTS: Record<RendRange, number> = {
+  "1D": 0,
   "1M": 1.8,
   "3M": 4.2,
   "6M": 7.5,
@@ -693,6 +698,7 @@ const RENDIMIENTO_PCTS: Record<RendRange, number> = {
 };
 
 const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
+  "1D": 100,
   "1M": 80,
   "3M": 140,
   "6M": 200,
@@ -702,6 +708,8 @@ const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
 
 function rendPeriodLabel(r: RendRange): string {
   switch (r) {
+    case "1D":
+      return "hoy";
     case "1M":
       return "último mes";
     case "3M":
@@ -737,12 +745,16 @@ function buildRendSeries(
 function RendimientoCard({
   totalArs,
   currency,
+  dayPct,
   bestOfDay,
   worstOfDay,
   c,
 }: {
   totalArs: number;
   currency: Currency;
+  /** % del día — usado cuando el rango activo es "1D". Para los
+   *  demás rangos usamos el mock determinístico de RENDIMIENTO_PCTS. */
+  dayPct: number;
   bestOfDay: Holding | null;
   worstOfDay: Holding | null;
   c: ColorMap;
@@ -752,7 +764,8 @@ function RendimientoCard({
 
   const totalDisplay =
     currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", "USD");
-  const rangePct = RENDIMIENTO_PCTS[range];
+  // Para "1D" usamos el dayPct vivo del portfolio; el resto es mock.
+  const rangePct = range === "1D" ? dayPct : RENDIMIENTO_PCTS[range];
   const invertido = totalDisplay / (1 + rangePct / 100);
 
   const series = useMemo(
@@ -797,17 +810,19 @@ function RendimientoCard({
     <View style={[s.card, { marginTop: 16 }]}>
       <Text style={[s.cardEyebrow, { color: c.text }]}>Rendimiento</Text>
 
-      {/* Hero metric — ganancia absoluta grande + pct & período abajo. */}
+      {/* Hero metric — ganancia absoluta con AmountDisplay (mismo
+          treatment que el saldo del hero: integer grande + decimales
+          chiquitos arriba a la derecha) + pct & período abajo. */}
       <View style={s.rendHero}>
         <View style={s.rendHeroRow}>
           <Text style={[s.rendTri, { color }]}>{up ? "▲" : "▼"}</Text>
-          <Text
-            style={[s.rendAmount, { color }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {fmt(Math.abs(ganancia))}
-          </Text>
+          <AmountDisplay
+            value={Math.abs(ganancia)}
+            size={32}
+            color={color}
+            decimalsColor={color}
+            currency={currency}
+          />
         </View>
         <View style={s.rendSubRow}>
           <Text style={[s.rendPct, { color }]}>
@@ -1800,12 +1815,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 16,
   },
-  rendAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 30,
-    letterSpacing: -0.7,
-    lineHeight: 34,
-  },
   rendSubRow: {
     flexDirection: "row",
     alignItems: "baseline",
@@ -1829,7 +1838,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   rendRangePill: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
