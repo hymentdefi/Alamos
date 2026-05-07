@@ -55,7 +55,6 @@ import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import {
-  MiniSparkline,
   Sparkline,
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
@@ -571,6 +570,8 @@ export default function PortfolioScreen() {
               <RendimientoCard
                 totalArs={totalArs}
                 currency={currency}
+                bestOfDay={bestOfDay}
+                worstOfDay={worstOfDay}
                 c={c}
               />
               <PosicionesCard
@@ -586,11 +587,6 @@ export default function PortfolioScreen() {
                 c={c}
               />
               <DistribucionCard alloc={marketAllocation} c={c} />
-              <ResumenCard
-                bestOfDay={bestOfDay}
-                worstOfDay={worstOfDay}
-                c={c}
-              />
             </>
           ) : (
             <View style={[s.card, { paddingTop: 12 }]}>
@@ -609,102 +605,6 @@ export default function PortfolioScreen() {
         />
       </View>
     </AssetColorProvider>
-  );
-}
-
-/* ─── Resumen card ─── */
-
-function ResumenCard({
-  bestOfDay,
-  worstOfDay,
-  c,
-}: {
-  bestOfDay: Holding | null;
-  worstOfDay: Holding | null;
-  c: ColorMap;
-}) {
-  return (
-    <View style={[s.card, { marginTop: 16, paddingVertical: 12 }]}>
-      {bestOfDay ? (
-        <MoverRow
-          label="Mejor del día"
-          labelColor={c.greenDark}
-          holding={bestOfDay}
-          c={c}
-        />
-      ) : null}
-      {worstOfDay && worstOfDay.asset.ticker !== bestOfDay?.asset.ticker ? (
-        <MoverRow
-          label="Peor del día"
-          labelColor={c.red}
-          holding={worstOfDay}
-          c={c}
-          isLast
-        />
-      ) : null}
-    </View>
-  );
-}
-
-/* Mover row — fila dedicada a un activo (mejor o peor del día) con
- * mini sparkline, ticker, nombre y variación. Mismo lenguaje cromático
- * que el RelatedCarousel del detail. */
-function MoverRow({
-  label,
-  labelColor,
-  holding,
-  c,
-  isLast,
-}: {
-  label: string;
-  /** Color del label "Mejor del día" / "Peor del día" — green para
-   *  el mejor, red para el peor, independiente del signo del activo. */
-  labelColor: string;
-  holding: Holding;
-  c: ColorMap;
-  isLast?: boolean;
-}) {
-  const up = holding.asset.change >= 0;
-  const tone = up ? c.greenDark : c.red;
-  const series = seriesFromSeed(
-    holding.asset.ticker,
-    50,
-    up ? "up" : "down",
-  );
-  return (
-    <View
-      style={[
-        s.moverRow,
-        !isLast && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: c.border,
-        },
-      ]}
-    >
-      <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text style={[s.moverLabel, { color: labelColor }]}>{label}</Text>
-        <Text style={[s.moverTicker, { color: c.text }]} numberOfLines={1}>
-          {holding.asset.ticker}
-        </Text>
-        <Text style={[s.moverName, { color: c.textMuted }]} numberOfLines={1}>
-          {holding.asset.name}
-        </Text>
-      </View>
-      <View style={s.moverSpark}>
-        <MiniSparkline
-          series={series}
-          color={tone}
-          width={88}
-          height={32}
-          strokeWidth={1.4}
-        />
-      </View>
-      <View style={{ alignItems: "flex-end", minWidth: 64 }}>
-        <Text style={[s.moverChange, { color: tone }]}>
-          {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
-        </Text>
-      </View>
-    </View>
   );
 }
 
@@ -837,10 +737,14 @@ function buildRendSeries(
 function RendimientoCard({
   totalArs,
   currency,
+  bestOfDay,
+  worstOfDay,
   c,
 }: {
   totalArs: number;
   currency: Currency;
+  bestOfDay: Holding | null;
+  worstOfDay: Holding | null;
   c: ColorMap;
 }) {
   const [range, setRange] = useState<RendRange>("MAX");
@@ -1000,6 +904,69 @@ function RendimientoCard({
             </View>
           </View>
         ))}
+
+        {/* Movers compactos — Mejor/Peor del día como rows pequeñas
+            al pie del bloque de stats, con el label coloreado
+            (greenDark/red) por identidad. Sin sparkline ni nombre
+            del activo: ticker + change% es suficiente como señal. */}
+        {bestOfDay ? (
+          <CompactMover
+            label="Mejor del día"
+            labelTone={c.greenDark}
+            holding={bestOfDay}
+            c={c}
+            divider
+          />
+        ) : null}
+        {worstOfDay && worstOfDay.asset.ticker !== bestOfDay?.asset.ticker ? (
+          <CompactMover
+            label="Peor del día"
+            labelTone={c.red}
+            holding={worstOfDay}
+            c={c}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/* CompactMover — fila chica al pie de Rendimiento. Label coloreado
+ * (verde si "Mejor", rojo si "Peor") + ticker + change%. Sin
+ * sparkline ni nombre del activo — más compacta que MoverRow. */
+function CompactMover({
+  label,
+  labelTone,
+  holding,
+  c,
+  divider,
+}: {
+  label: string;
+  labelTone: string;
+  holding: Holding;
+  c: ColorMap;
+  divider?: boolean;
+}) {
+  const up = holding.asset.change >= 0;
+  const changeTone = up ? c.greenDark : c.red;
+  return (
+    <View
+      style={[
+        s.rendMoverRow,
+        divider && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: c.border,
+        },
+      ]}
+    >
+      <Text style={[s.rendMoverLabel, { color: labelTone }]}>{label}</Text>
+      <View style={s.rendMoverRight}>
+        <Text style={[s.rendMoverTicker, { color: c.text }]}>
+          {holding.asset.ticker}
+        </Text>
+        <Text style={[s.rendMoverChange, { color: changeTone }]}>
+          {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
+        </Text>
       </View>
     </View>
   );
@@ -1781,45 +1748,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  /* Resumen card — movers showcase ─────────────────────────────────
-   * Cada MoverRow ocupa una fila con label / ticker / nombre a la
-   * izquierda, mini sparkline al centro, y change% a la derecha.
-   * Hairline divider entre rows. */
-  moverRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    gap: 12,
-  },
-  moverLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.2,
-    marginBottom: 6,
-  },
-  moverTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-  },
-  moverName: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 1,
-  },
-  moverSpark: {
-    width: 88,
-    height: 32,
-    justifyContent: "center",
-  },
-  moverChange: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-
-
   /* Posiciones — list rows con hairline dividers */
   posRow: {
     flexDirection: "row",
@@ -1915,6 +1843,37 @@ const s = StyleSheet.create({
     marginTop: 24,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+
+  /* Compact mover — fila chica al pie del Rendimiento card. Label
+   * coloreado a la izquierda, ticker + change% a la derecha. Sin
+   * sparkline ni nombre del activo. */
+  rendMoverRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    gap: 12,
+  },
+  rendMoverLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
+  },
+  rendMoverRight: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+  },
+  rendMoverTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  rendMoverChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 
   /* Distribución — stats grid 2-col */
