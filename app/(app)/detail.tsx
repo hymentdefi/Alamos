@@ -352,7 +352,12 @@ export default function DetailScreen() {
           </View>
         </View>
 
-        <BriefingCard asset={asset} up={rangeUp} c={c} />
+        <BriefingCard
+          asset={asset}
+          up={rangeUp}
+          pct={pctForRange}
+          c={c}
+        />
 
         {pos ? <PositionCard pos={pos} asset={asset} c={c} /> : null}
 
@@ -1641,10 +1646,12 @@ function RelatedCarousel({
 function BriefingCard({
   asset,
   up,
+  pct,
   c,
 }: {
   asset: Asset;
   up: boolean;
+  pct: number;
   c: ColorMap;
 }) {
   const router = useRouter();
@@ -1661,10 +1668,14 @@ function BriefingCard({
         Haptics.selectionAsync().catch(() => {});
         router.push({
           pathname: "/(app)/briefing",
-          // Pasamos el `up` para que la página completa use el
-          // mismo tone que el chart en el detail (rangeUp), no
-          // el delta diario del asset.
-          params: { ticker: asset.ticker, up: up ? "1" : "0" },
+          // Pasamos el `up` y el `pct` para que la página completa
+          // use el mismo tone + variación que el chart en el detail
+          // (rangeUp / pctForRange), no el delta diario del asset.
+          params: {
+            ticker: asset.ticker,
+            up: up ? "1" : "0",
+            pct: pct.toFixed(2),
+          },
         });
       }}
       style={({ pressed }) => [

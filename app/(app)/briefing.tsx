@@ -24,6 +24,7 @@ import {
   assetCurrency,
   assets,
   formatMoney,
+  formatPct,
 } from "../../lib/data/assets";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
@@ -59,9 +60,10 @@ export default function BriefingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { ticker, up: upParam } = useLocalSearchParams<{
+  const { ticker, up: upParam, pct: pctParam } = useLocalSearchParams<{
     ticker: string;
     up?: string;
+    pct?: string;
   }>();
 
   const asset = useMemo(
@@ -89,13 +91,14 @@ export default function BriefingScreen() {
   }
 
   const briefing = briefingFor(asset.ticker);
-  // El tone sigue rangeUp del detail (pasado vía URL param) — no
-  // asset.change que es sólo el delta diario. Así, si el usuario
-  // estaba mirando 1M en pérdidas, el briefing se ve rojo aunque
-  // el delta del día sea positivo.
-  // Default fallback al delta diario si no llegó el param.
+  // El tone + pct siguen el rango que el usuario tenía
+  // seleccionado en el detail (pasados vía URL params) — no el
+  // delta diario que sería sólo 1D. Así si estaba mirando 1M
+  // en pérdidas, el briefing se ve rojo y muestra el % del 1M.
   const isUp =
     upParam !== undefined ? upParam === "1" : asset.change >= 0;
+  const headerPct =
+    pctParam !== undefined ? parseFloat(pctParam) : asset.change;
   const tone = isUp ? c.brand : c.red;
   const cur = assetCurrency(asset);
 
@@ -128,9 +131,15 @@ export default function BriefingScreen() {
           <Text style={[s.headTicker, { color: c.text }]}>
             {asset.ticker}
           </Text>
-          <Text style={[s.headPrice, { color: c.textMuted }]}>
-            {formatMoney(asset.price, cur)}
-          </Text>
+          <View style={s.headRow}>
+            <Text style={[s.headPrice, { color: c.textMuted }]}>
+              {formatMoney(asset.price, cur)}
+            </Text>
+            <Text style={[s.headChange, { color: tone }]}>
+              {isUp ? "▲ " : "▼ "}
+              {formatPct(headerPct, false)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -469,11 +478,23 @@ const s = StyleSheet.create({
     letterSpacing: -0.4,
     lineHeight: 22,
   },
+  /* Row con price + variación inline. marginTop separa el ticker
+   * de arriba; gap entre price y change. */
+  headRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    marginTop: 2,
+  },
   headPrice: {
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.1,
-    marginTop: 2,
+  },
+  headChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
   fallback: {
     flex: 1,
