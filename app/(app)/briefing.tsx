@@ -344,37 +344,58 @@ interface DotProps {
 }
 
 function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
-  // Worklet del overlay coloreado. Cinco fases:
-  //   1. delta < -LEAD                 → overlay 0
-  //   2. -LEAD ≤ delta < -BAND/2       → pre-lead: 0 → 0.55
-  //   3. -BAND/2 ≤ delta ≤ BAND/2      → peak parabólico hasta 1
-  //   4. BAND/2 < delta ≤ BAND/2+TRAIL → trail 0.55 → 0
-  //   5. delta > BAND/2 + TRAIL        → overlay 0
-  // Plus scale 1..1.7 ligado a la intensidad — los dots lit
-  // crecen físicamente además de iluminarse.
+  // Worklet del overlay. La OPACITY usa una curva amplia
+  // (LEAD + peak + TRAIL = ~15 grid units lit) que prende los
+  // dots como halo. El SCALE usa una curva separada y más
+  // angosta — sólo los dots MUY cerca del frente de onda crecen
+  // hasta el max. Con falloff cuartico (1-x²)² para que el
+  // peak sea afilado: pocos dots a tamaño grande, muchos al
+  // tamaño normal aunque estén lit.
+  //
+  // Resultado: una "línea de wave" donde el frente tiene 1-2
+  // dots grandes, halos alrededor con dots normales pero
+  // brillando, y trail con dots fading sin crecer. Mismo feel
+  // del ejemplo premium.
   const overlayStyle = useAnimatedStyle(() => {
     "worklet";
     const LEAD = 3;
     const BAND = 4;
     const TRAIL = 8;
+    const SCALE_BAND = 1.2; // banda angosta para el scale
     const w = wavePos.value;
     const delta = w - distance;
-    let intensity = 0;
+    const absDelta = delta < 0 ? -delta : delta;
+
+    // Opacity (halo amplio).
+    let opacity = 0;
     if (delta < -LEAD) {
-      intensity = 0;
+      opacity = 0;
     } else if (delta < -BAND / 2) {
       const t = (delta + LEAD) / (LEAD - BAND / 2);
-      intensity = 0.55 * t;
+      opacity = 0.55 * t;
     } else if (delta <= BAND / 2) {
       const x = delta / (BAND / 2);
-      intensity = 0.55 + 0.45 * (1 - x * x);
+      opacity = 0.55 + 0.45 * (1 - x * x);
     } else {
       const past = delta - BAND / 2;
-      if (past < TRAIL) intensity = 0.55 * (1 - past / TRAIL);
+      if (past < TRAIL) opacity = 0.55 * (1 - past / TRAIL);
     }
+
+    // Scale (banda angosta, peak afilado).
+    let peakBoost = 0;
+    if (absDelta < SCALE_BAND) {
+      const x = absDelta / SCALE_BAND;
+      const q = 1 - x * x;
+      peakBoost = q * q; // cuartico: cae rápido fuera del centro
+    }
+    // Crecimiento sutil para los dots con opacity alta (los del
+    // halo no quedan totalmente planos), más el peak afilado
+    // del wave-front.
+    const scale = 1 + opacity * 0.12 + peakBoost * 0.55;
+
     return {
-      opacity: intensity,
-      transform: [{ scale: 1 + intensity * 0.7 }],
+      opacity,
+      transform: [{ scale }],
     };
   });
 
