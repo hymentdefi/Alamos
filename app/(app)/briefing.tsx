@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
+  InteractionManager,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -131,7 +132,7 @@ export default function BriefingScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        <RippleField color={tone} />
+        <DeferredRippleField color={tone} />
 
         <View style={s.body}>
           <Text style={[s.bodyMeta, { color: c.textMuted }]}>
@@ -209,6 +210,38 @@ export default function BriefingScreen() {
       </ScrollView>
     </View>
   );
+}
+
+/* ─── Wrapper que difiere el mount del RippleField ─────────────
+ *
+ * El field instancia 360 dots, cada uno con un useAnimatedStyle
+ * subscribiendo a 2 shared values — eso son ~720 worklet
+ * registrations al mount. Si lo renderizamos durante la
+ * transición de Stack (slide_from_right), el JS thread queda
+ * bloqueado ~100-200ms y la animación se siente lagueada antes
+ * de aparecer la pantalla.
+ *
+ * InteractionManager.runAfterInteractions espera a que terminen
+ * las "interacciones" en curso (que incluye animaciones de
+ * navigation) y entonces dispara el callback. Con eso renderea
+ * primero el header + body (livianos), después la pantalla
+ * "termina de entrar", y recién ahí se montan los dots.
+ *
+ * Mientras los dots no están montados, dejamos un View placeholder
+ * con la misma altura para que el layout no salte cuando
+ * aparezcan. */
+function DeferredRippleField({ color }: { color: string }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setReady(true);
+    });
+    return () => handle.cancel();
+  }, []);
+  if (!ready) {
+    return <View style={{ height: RIPPLE_H }} />;
+  }
+  return <RippleField color={color} />;
 }
 
 /* ─── Campo de puntitos: dual-wave droplet ─────────────────────
