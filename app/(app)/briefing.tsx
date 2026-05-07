@@ -26,20 +26,20 @@ import {
 } from "../../lib/data/assets";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
-/* Geometría del campo de puntitos. La grilla cubre todo el ancho
- * de la pantalla (COLS auto-calculados a partir del width) y
- * tiene una altura generosa (RIPPLE_H) para que el efecto se
- * sienta cinemático.
+/* Geometría del campo de puntitos.
  *
- * Stride = DOT_SIZE + DOT_GAP en cada eje.
+ * El grid se inset un poco de los bordes laterales (FIELD_PAD_X)
+ * para que los dots no toquen el edge de la pantalla. Stride =
+ * DOT_SIZE + DOT_GAP. ROWS / COLS auto-calculados.
  */
 const DOT_SIZE = 5;
 const DOT_GAP = 13;
 const STRIDE = DOT_SIZE + DOT_GAP;
 const RIPPLE_H = 320;
+const FIELD_PAD_X = 26;
 
 const SCREEN_W = Dimensions.get("window").width;
-const COLS = Math.floor(SCREEN_W / STRIDE);
+const COLS = Math.floor((SCREEN_W - FIELD_PAD_X * 2) / STRIDE);
 const ROWS = Math.floor(RIPPLE_H / STRIDE);
 const GRID_W = COLS * STRIDE - DOT_GAP;
 const GRID_H = ROWS * STRIDE - DOT_GAP;
@@ -244,13 +244,15 @@ function RippleField({ color }: { color: string }) {
   const wavePos = useSharedValue(-1);
 
   useEffect(() => {
-    // Loop infinito. wavePos arranca en -1 y sube a maxDist + 4.5
-    // — punto en el que ya pasó el trail post-onda y el overlay
-    // está en 0 para todos los dots. El reset al -1 es seamless.
-    wavePos.value = -1;
+    // Loop infinito. wavePos arranca en -2 (todos los dots
+    // antes del pre-lead) y sube hasta maxDist + 6.5 (todos
+    // pasaron por el trail completo y volvieron a 0). El reset
+    // al -2 es seamless. Bumpeé el duration a 2800ms porque la
+    // onda ahora cubre más rango.
+    wavePos.value = -2;
     wavePos.value = withRepeat(
-      withTiming(maxDist + 4.5, {
-        duration: 2200,
+      withTiming(maxDist + 6.5, {
+        duration: 2800,
         easing: Easing.linear,
       }),
       -1,
@@ -292,32 +294,48 @@ interface DotProps {
 }
 
 function Dot({ row, col, distance, color, dim, wavePos }: DotProps) {
-  // Worklet del overlay coloreado. Sólo controla la opacidad
-  // del color del activo encima del dot gris base. Cuatro fases:
-  //   1. wavePos < distance - BAND/2 → onda no llegó: overlay 0
-  //      (sólo se ve el gris base)
-  //   2. |wavePos - distance| < BAND/2 → banda activa: overlay
-  //      hasta peak 1 con falloff lineal hacia los bordes
-  //   3. dist + BAND/2 < wavePos < dist + BAND/2 + TRAIL → trail
-  //      que decae linealmente de 0.4 a 0
-  //   4. wavePos > dist + BAND/2 + TRAIL → overlay 0
-  // El boundary del loop (wavePos vuelve a -1) es seamless porque
-  // todos los dots están en fase 4 al final del ciclo.
+  // Worklet del overlay coloreado. Cinco fases para un feel
+  // "rainbow / glow" — muchos dots lit a la vez con falloff
+  // smooth alrededor del frente de onda:
+  //
+  //   1. delta < -LEAD                 → overlay 0 (no light)
+  //   2. -LEAD ≤ delta < -BAND/2       → pre-lead: dots adelante
+  //      del frente lighting up gradually (0 → 0.6)
+  //   3. -BAND/2 ≤ delta ≤ BAND/2      → peak: 0.6 → 1 → 0.6 con
+  //      forma de bell (parabólica)
+  //   4. BAND/2 < delta ≤ BAND/2+TRAIL → trail largo: dots atrás
+  //      del frente decaying smooth (0.6 → 0)
+  //   5. delta > BAND/2 + TRAIL        → overlay 0
+  //
+  // LEAD + BAND + TRAIL ≈ 8.5 unidades de grilla = ~9 filas
+  // de dots lit simultáneamente. El loop es seamless porque
+  // todos los dots terminan en fase 5 antes del reset.
   const overlayStyle = useAnimatedStyle(() => {
-    const BAND = 1.4;
-    const TRAIL = 3.5;
+    const LEAD = 1.6;
+    const BAND = 2.2;
+    const TRAIL = 5;
     const w = wavePos.value;
     const delta = w - distance;
-    if (delta < -BAND / 2) {
+
+    if (delta < -LEAD) {
       return { opacity: 0 };
     }
-    if (delta < BAND / 2) {
-      const t = 1 - Math.abs(delta) / (BAND / 2);
-      return { opacity: t };
+    if (delta < -BAND / 2) {
+      // Pre-lead: 0 → 0.6 lineal
+      const t = (delta + LEAD) / (LEAD - BAND / 2);
+      return { opacity: 0.6 * t };
+    }
+    if (delta <= BAND / 2) {
+      // Peak: 0.6 + 0.4 * (1 - (delta/(BAND/2))²) — parabólico
+      const x = delta / (BAND / 2);
+      const peakBoost = 1 - x * x;
+      return { opacity: 0.6 + 0.4 * peakBoost };
     }
     const past = delta - BAND / 2;
     if (past < TRAIL) {
-      return { opacity: 0.4 * (1 - past / TRAIL) };
+      // Trail: 0.6 → 0 lineal (un poco más rápido al principio)
+      const t = 1 - past / TRAIL;
+      return { opacity: 0.6 * t };
     }
     return { opacity: 0 };
   });
