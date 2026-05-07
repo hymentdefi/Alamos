@@ -13,7 +13,14 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import Svg, {
   Ellipse,
   G,
@@ -48,6 +55,7 @@ import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import {
   MiniSparkline,
+  Sparkline,
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
@@ -57,25 +65,20 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
 /**
  * Tab 'Portfolio' — gold standard del detail.tsx aplicado a la cartera.
  *
- * Estructura:
- *   1. Hero block FIJO (afuera del ScrollView) — eyebrow "PORTFOLIO" +
- *      balance grande con pager ARS/USD + delta del día con triángulo +
- *      dots indicator. Permanece visible siempre, no scrollea. El delta
- *      del día dicta la cromática (greenDark si el día es verde, red si
- *      está negativo) via AssetColorProvider.
- *   2. Ladrillo full-bleed — primer item dentro del ScrollView. Hold +
- *      drag para highlightear y tooltip arriba.
- *   3. Range pills (Todo/AR/EE.UU/Crypto) — debajo del ladrillo.
- *      Active filled con el color contextual del día (greenDark si
- *      verde, red si en losses). Mismo lenguaje que el rangeRow del
- *      detail.tsx. Filtra holdings + ladrillo + cards.
- *   4. Cards full-width sin GlassCard:
- *        - Resumen: grid 2x2 (valor mercado, posiciones, mejor del
- *          día, peor del día) + ReturnRow del día.
- *        - Tus posiciones: rows por categoría, hairline dividers,
- *          swatch que matchea el ladrillo.
- *        - Distribución: stats grid 2-col por mercado.
- *   5. Disclaimer Manteca al final.
+ * Estructura (mismo patrón que detail.tsx):
+ *   1. Top bar fijo con sticky overlay — el balance compacto + delta%
+ *      aparecen al scrollear (crossfade), mismo lenguaje que detail.
+ *   2. Hero scrollable — title 'Portfolio', balance pager ARS/USD,
+ *      delta del día, dots. Scrollea hacia arriba con el contenido.
+ *      El delta del día dicta la cromática del screen.
+ *   3. Ladrillo full-bleed — pared 3D de distribución. Hold + drag
+ *      para highlightear; tooltip aparece DEBAJO del bloque tocado
+ *      para no chocar con el sticky overlay. Mientras holdeés el
+ *      ladrillo, el ScrollView se bloquea (no scrolla).
+ *   4. Range pills (Todo/AR/EE.UU/Crypto) — active filled con color
+ *      contextual del día.
+ *   5. Cards: Resumen (movers), Rendimiento (histórico, premium),
+ *      Tus posiciones (por categoría), Distribución (por mercado).
  */
 
 type Currency = "ARS" | "USD";
@@ -233,12 +236,34 @@ export default function PortfolioScreen() {
     };
   }, [holdingsSorted, groupedByCategory]);
 
+  /* ─── Sticky overlay scroll-aware (mismo patrón detail.tsx) ─── */
+
+  const stickyScrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      stickyScrollY.value = e.contentOffset.y;
+    },
+  });
+  const STICKY_START = 110;
+  const STICKY_FULL = 180;
+  const stickyOpacityStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      stickyScrollY.value,
+      [STICKY_START, STICKY_FULL],
+      [0, 1],
+      "clamp",
+    ),
+  }));
+
   /* ─── Refs + tab tap + refresh ─── */
 
   const scrollRef = useRef<ScrollView | null>(null);
   const pagerRef = useRef<ScrollView | null>(null);
-  // Track scroll Y en JS thread para el tab tap (scroll-to-top vs refresh).
-  const scrollYRef = useRef(0);
+
+  // Holding del ladrillo — mientras finger está apoyado, el ScrollView
+  // se bloquea (scrollEnabled=false) para que el dedo no scrollee
+  // accidentalmente mientras el usuario explora la distribución.
+  const [brickHolding, setBrickHolding] = useState(false);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -253,13 +278,15 @@ export default function PortfolioScreen() {
 
   useEffect(() => {
     return registerTabTap("portfolio", {
-      isAtTop: () => scrollYRef.current <= 8,
+      isAtTop: () => stickyScrollY.value <= 8,
       scrollToTop: () =>
         scrollRef.current?.scrollTo({ y: 0, animated: true }),
       refresh: () => {
         if (!refreshing) onRefresh();
       },
     });
+    // stickyScrollY es shared value — su .value cambia sin re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, onRefresh]);
 
   // Sync currency cuando cambia el filtro de mercado.
@@ -288,13 +315,56 @@ export default function PortfolioScreen() {
   return (
     <AssetColorProvider up={dayUp}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
-        {/* Safe area spacer — el header del status bar. El hero arranca
-            apenas debajo y vive afuera del ScrollView, así no scrollea. */}
-        <View style={{ paddingTop: insets.top + 12 }} />
+        {/* Top bar — sticky overlay con balance compacto + delta% que
+            aparece al scrollear. Mismo patrón que el detail.tsx. */}
+        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+          <View style={{ flex: 1 }} />
+          <Animated.View
+            style={[
+              s.stickyOverlay,
+              { top: insets.top + 12 },
+              stickyOpacityStyle,
+            ]}
+            pointerEvents="none"
+          >
+            <Text
+              style={[s.stickyPrice, { color: c.text }]}
+              numberOfLines={1}
+            >
+              {formatMoney(totalDisplay, currency)}
+            </Text>
+            <View style={s.stickyRow}>
+              <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+                PORTFOLIO
+              </Text>
+              <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+              <Text style={[s.stickyPct, { color }]}>
+                {formatPct(dayPct)}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
 
-        {/* ─── Hero FIJO (afuera del ScrollView) ─── */}
-        <View style={s.heroBlock}>
-          <Text style={[s.heroTitle, { color: c.text }]}>Portfolio</Text>
+        <Animated.ScrollView
+          ref={scrollRef as never}
+          contentContainerStyle={{ paddingBottom: 180 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          scrollEnabled={!brickHolding}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={c.textMuted}
+              colors={[c.textMuted]}
+              progressBackgroundColor={c.surface}
+            />
+          }
+        >
+          {/* ─── Hero scrollable ─── */}
+          <View style={s.heroBlock}>
+            <Text style={[s.heroTitle, { color: c.text }]}>Portfolio</Text>
 
           <View style={s.heroPagerRow}>
             <View
@@ -416,28 +486,11 @@ export default function PortfolioScreen() {
               );
             })}
           </View>
-        </View>
+          </View>
 
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 180 }}
-          showsVerticalScrollIndicator={false}
-          onScroll={(e) => {
-            scrollYRef.current = e.nativeEvent.contentOffset.y;
-          }}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={c.textMuted}
-              colors={[c.textMuted]}
-              progressBackgroundColor={c.surface}
-            />
-          }
-        >
-          {/* Ladrillo full-bleed — primer contenido scrollable, span
-              completo del ancho de pantalla. */}
+          {/* Ladrillo full-bleed — debajo del hero scrollable. Pasa
+              onHoldChange para bloquear el ScrollView mientras finger
+              está apoyado en el ladrillo. */}
           {hasHoldings ? (
             <View style={s.brickContainer}>
               <FloorBrick
@@ -446,6 +499,7 @@ export default function PortfolioScreen() {
                 groupBy={
                   marketFilter === "CRYPTO" ? "ticker" : "category"
                 }
+                onHoldChange={setBrickHolding}
               />
             </View>
           ) : null}
@@ -496,6 +550,11 @@ export default function PortfolioScreen() {
                 worstOfDay={worstOfDay}
                 c={c}
               />
+              <RendimientoCard
+                totalArs={totalArs}
+                currency={currency}
+                c={c}
+              />
               <PosicionesCard
                 groups={groupedByCategory}
                 allocations={categoryAllocations}
@@ -519,7 +578,7 @@ export default function PortfolioScreen() {
               </Text>
             </View>
           )}
-        </ScrollView>
+        </Animated.ScrollView>
 
         <BalanceInfoSheet
           visible={infoOpen}
@@ -611,6 +670,250 @@ function MoverRow({
         <Text style={[s.moverChange, { color: tone }]}>
           {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
         </Text>
+      </View>
+    </View>
+  );
+}
+
+/* ─── Rendimiento card ─────────────────────────────────────────────
+ *
+ * La card más detallada del portfolio. Muestra cómo viene rindiendo
+ * la cartera a lo largo del tiempo:
+ *   - Hero metric: ▲ +$X (ganancia absoluta) + +Y% (ganancia %) ·
+ *     período. Tipografía pesada, color contextual del rango.
+ *   - Sparkline full-bleed dentro del card — line jagged, sheen
+ *     animado, reference line en el valor de inicio del período.
+ *     Scrub habilitado: el dedo arrastra y la métrica hero refleja
+ *     el valor del punto tocado.
+ *   - Range pills (1M / 3M / 6M / 1A / MAX) que tintean el chart.
+ *   - Stats grid 2-col x 3 rows: total invertido, YTD, mejor mes,
+ *     peor mes, promedio mensual, días positivos.
+ *
+ * Mock layer: rangePct hardcodeado por rango (escala determinística
+ * con sign positivo — la cartera mockeada está en plus). Stats
+ * secundarias (mejor mes, ytd, etc.) son fijas — no dependen del
+ * range, dan contexto histórico independiente. */
+
+type RendRange = "1M" | "3M" | "6M" | "1A" | "MAX";
+
+const RENDIMIENTO_RANGES: RendRange[] = ["1M", "3M", "6M", "1A", "MAX"];
+
+const RENDIMIENTO_PCTS: Record<RendRange, number> = {
+  "1M": 1.8,
+  "3M": 4.2,
+  "6M": 7.5,
+  "1A": 10.8,
+  "MAX": 12.4,
+};
+
+const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
+  "1M": 80,
+  "3M": 140,
+  "6M": 200,
+  "1A": 240,
+  "MAX": 300,
+};
+
+function rendPeriodLabel(r: RendRange): string {
+  switch (r) {
+    case "1M":
+      return "último mes";
+    case "3M":
+      return "últimos 3 meses";
+    case "6M":
+      return "últimos 6 meses";
+    case "1A":
+      return "último año";
+    case "MAX":
+      return "desde marzo 2025";
+  }
+}
+
+function buildRendSeries(
+  start: number,
+  end: number,
+  length: number,
+  seed: string,
+): number[] {
+  const noise = seriesFromSeed(seed, length, "flat");
+  const noiseScale = end * 0.012;
+  const out: number[] = [];
+  for (let i = 0; i < length; i++) {
+    const t = i / (length - 1);
+    const linear = start + (end - start) * t;
+    const normalized = (noise[i] - 100) / 6;
+    out.push(linear + normalized * noiseScale);
+  }
+  out[length - 1] = end;
+  return out;
+}
+
+function RendimientoCard({
+  totalArs,
+  currency,
+  c,
+}: {
+  totalArs: number;
+  currency: Currency;
+  c: ColorMap;
+}) {
+  const [range, setRange] = useState<RendRange>("MAX");
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+
+  const totalDisplay =
+    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", "USD");
+  const rangePct = RENDIMIENTO_PCTS[range];
+  const invertido = totalDisplay / (1 + rangePct / 100);
+
+  const series = useMemo(
+    () =>
+      buildRendSeries(
+        invertido,
+        totalDisplay,
+        RENDIMIENTO_LENGTHS[range],
+        `rend-${range}-${currency}`,
+      ),
+    [invertido, totalDisplay, range, currency],
+  );
+
+  const current =
+    scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
+  const startVal = series[0];
+  const ganancia = current - startVal;
+  const gananciaPct = startVal > 0 ? (ganancia / startVal) * 100 : 0;
+  const up = ganancia >= 0;
+  const color = up ? c.greenDark : c.red;
+
+  const fmt = (n: number) => formatMoney(n, currency);
+
+  // Stats fijas — independientes del range. Dan contexto histórico
+  // de la cartera (mejor/peor mes, ytd, etc.). Mock determinístico.
+  const stats: Array<[string, string]> = [
+    ["Total invertido", fmt(invertido)],
+    ["YTD", "+8,4%"],
+    ["Mejor mes", "Marzo · +5,2%"],
+    ["Peor mes", "Octubre · −2,1%"],
+    ["Promedio mensual", "+1,3%"],
+    ["Días positivos", "62%"],
+  ];
+  const pairs: Array<
+    [(typeof stats)[number], (typeof stats)[number] | null]
+  > = [];
+  for (let i = 0; i < stats.length; i += 2) {
+    pairs.push([stats[i], stats[i + 1] ?? null]);
+  }
+
+  return (
+    <View style={[s.card, { marginTop: 16 }]}>
+      <Text style={[s.cardEyebrow, { color: c.text }]}>Rendimiento</Text>
+
+      {/* Hero metric — ganancia absoluta grande + pct & período abajo. */}
+      <View style={s.rendHero}>
+        <View style={s.rendHeroRow}>
+          <Text style={[s.rendTri, { color }]}>{up ? "▲" : "▼"}</Text>
+          <Text
+            style={[s.rendAmount, { color }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {fmt(Math.abs(ganancia))}
+          </Text>
+        </View>
+        <View style={s.rendSubRow}>
+          <Text style={[s.rendPct, { color }]}>
+            {formatPct(gananciaPct)}
+          </Text>
+          <Text style={[s.rendPeriod, { color: c.textMuted }]}>
+            · {rendPeriodLabel(range)}
+          </Text>
+        </View>
+      </View>
+
+      <Sparkline
+        series={series}
+        color={color}
+        height={140}
+        mode="line"
+        strokeWidth={1.6}
+        sheen
+        referenceLine
+        style={{ marginTop: 18, marginHorizontal: -24 }}
+        onScrub={(idx) => setScrubIndex(idx)}
+        onScrubEnd={() => setScrubIndex(null)}
+      />
+
+      <View style={s.rendRangeRow}>
+        {RENDIMIENTO_RANGES.map((r) => {
+          const active = r === range;
+          return (
+            <Tap
+              key={r}
+              onPress={() => setRange(r)}
+              haptic="selection"
+              pressScale={0.92}
+              style={[
+                s.rendRangePill,
+                active && { backgroundColor: color },
+              ]}
+              hitSlop={8}
+            >
+              <Text
+                style={[
+                  s.rendRangeText,
+                  { color: active ? c.bg : color },
+                ]}
+              >
+                {r}
+              </Text>
+            </Tap>
+          );
+        })}
+      </View>
+
+      {/* Stats grid — separado del bloque de chart por borderTop
+          hairline + paddingTop. */}
+      <View
+        style={[s.rendStatsBlock, { borderTopColor: c.border }]}
+      >
+        {pairs.map(([left, right], i) => (
+          <View
+            key={i}
+            style={[
+              s.statsGridRow,
+              i < pairs.length - 1 && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: c.border,
+              },
+            ]}
+          >
+            <View style={s.statsCell}>
+              <Text style={[s.statsLabel, { color: c.textMuted }]}>
+                {left[0]}
+              </Text>
+              <Text
+                style={[s.statsValue, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {left[1]}
+              </Text>
+            </View>
+            <View style={s.statsCell}>
+              {right ? (
+                <>
+                  <Text style={[s.statsLabel, { color: c.textMuted }]}>
+                    {right[0]}
+                  </Text>
+                  <Text
+                    style={[s.statsValue, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {right[1]}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -793,9 +1096,18 @@ interface FloorBrickProps {
   totalArs: number;
   /** Granularidad. "category" para AR/EE.UU/Todo, "ticker" para Crypto. */
   groupBy: "category" | "ticker";
+  /** Callback que dispara true cuando el dedo agarra el ladrillo
+   *  y false cuando lo suelta. El ScrollView padre lo usa para
+   *  bloquearse mientras el usuario está holdeando. */
+  onHoldChange?: (holding: boolean) => void;
 }
 
-function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
+function FloorBrick({
+  holdings,
+  totalArs,
+  groupBy,
+  onHoldChange,
+}: FloorBrickProps) {
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
@@ -898,7 +1210,6 @@ function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startTouchY = useRef(0);
   const dimmedFront = c.surfaceSunken;
   const dimmedTop = c.surfaceHover;
   const dimmedRight = c.border;
@@ -919,22 +1230,23 @@ function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
         onStartShouldSetResponder={() => true}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
-          startTouchY.current = e.nativeEvent.locationY;
+          onHoldChange?.(true);
           handleTouch(e.nativeEvent.locationX);
         }}
         onResponderMove={(e) => {
-          // Si el dedo se mueve más de 12px en Y, soltamos el highlight
-          // para que el usuario pueda scrollear. Una vez agarrado el
-          // responder, RN no puede pasarlo al ScrollView padre, pero
-          // esto evita estado pegado.
-          const dy = Math.abs(
-            e.nativeEvent.locationY - startTouchY.current,
-          );
-          if (dy > 12) handleTouch(null);
-          else handleTouch(e.nativeEvent.locationX);
+          // Mientras el dedo está apoyado, el ScrollView padre está
+          // bloqueado (scrollEnabled=false) — así que el highlight
+          // sigue al dedo sin escape. Soltar para volver a scrollear.
+          handleTouch(e.nativeEvent.locationX);
         }}
-        onResponderRelease={() => handleTouch(null)}
-        onResponderTerminate={() => handleTouch(null)}
+        onResponderRelease={() => {
+          onHoldChange?.(false);
+          handleTouch(null);
+        }}
+        onResponderTerminate={() => {
+          onHoldChange?.(false);
+          handleTouch(null);
+        }}
       >
         <Svg
           viewBox={`0 0 ${W} ${H}`}
@@ -1039,10 +1351,14 @@ function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
             s.tooltipAnchor,
             {
               left: tooltipLeftPx,
-              bottom: ((H - yTop) * containerW) / W + 6,
+              // Position DEBAJO del bloque tocado — apunta hacia el
+              // bloque desde abajo. Antes estaba arriba, pero el
+              // sticky overlay del header lo ocultaba al scrollear.
+              top: (yBot * containerW) / W + 6,
             },
           ]}
         >
+          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
           <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
@@ -1127,7 +1443,6 @@ function FloorBrick({ holdings, totalArs, groupBy }: FloorBrickProps) {
               </>
             )}
           </View>
-          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
         </Animated.View>
       ) : null}
     </View>
@@ -1185,7 +1500,57 @@ function formatAllocationPct(p: number): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Hero FIJO — vive afuera del ScrollView, no scrollea. */
+  /* Top bar invisible — solo aloja el sticky overlay absoluto que
+   * crossfade-aparece al scrollear. Mismo patrón que detail.tsx. */
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  /* Sticky overlay — absolute span left:0/right:0 → centro real de
+   * pantalla. Se desvanece in cuando el scrollY cruza STICKY_START
+   * y queda full opacity en STICKY_FULL. */
+  stickyOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stickyPrice: {
+    fontFamily: fontFamily[500],
+    fontSize: 17,
+    letterSpacing: -0.3,
+    lineHeight: 20,
+  },
+  stickyRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    marginTop: 1,
+  },
+  stickyTicker: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0,
+  },
+  stickyDot: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  stickyPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
+
+  /* Hero scrollable — title + balance + delta + dots. Scrollea
+   * normal con el contenido (no es sticky, eso lo hace el overlay). */
   heroBlock: {
     paddingHorizontal: 24,
     paddingTop: 4,
@@ -1242,10 +1607,10 @@ const s = StyleSheet.create({
     borderRadius: 999,
   },
 
-  /* Ladrillo full-bleed — primer item dentro del ScrollView. Sin
-   * marginHorizontal porque no hay padding lateral en el ScrollView. */
+  /* Ladrillo full-bleed — sigue al hero scrollable. Sin
+   * marginHorizontal porque el ScrollView no tiene padding lateral. */
   brickContainer: {
-    marginTop: 8,
+    marginTop: 24,
   },
 
   /* Range pills del filtro de mercado — mismo lenguaje que el rangeRow
@@ -1381,6 +1746,67 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
+  /* Rendimiento card ─────────────────────────────────────────────
+   * Hero metric con ▲/▼ + amount grande + pct/período abajo.
+   * Sparkline full-bleed dentro del card. Range pills tinteadas.
+   * Stats grid separado por hairline divider top. */
+  rendHero: {
+    marginBottom: 4,
+  },
+  rendHeroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rendTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+  },
+  rendAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 30,
+    letterSpacing: -0.7,
+    lineHeight: 34,
+  },
+  rendSubRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginTop: 6,
+  },
+  rendPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  rendPeriod: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.1,
+  },
+  rendRangeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    paddingHorizontal: 4,
+  },
+  rendRangePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  rendRangeText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  rendStatsBlock: {
+    marginTop: 24,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+
   /* Distribución — stats grid 2-col */
   statsGridRow: {
     flexDirection: "row",
@@ -1471,10 +1897,14 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
+  /* Caret apuntando hacia ARRIBA — el tooltip vive debajo del bloque
+   * tocado. La mitad de abajo del cuadrado rotado queda oculta tras
+   * el pill, dejando solo la mitad de arriba visible (forma triangular
+   * apuntando al bloque). */
   tooltipCaret: {
     width: 8,
     height: 8,
-    marginTop: -4,
+    marginBottom: -4,
     transform: [{ rotate: "45deg" }],
   },
 });
