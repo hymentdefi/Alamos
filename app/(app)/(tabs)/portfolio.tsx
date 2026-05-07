@@ -1227,7 +1227,7 @@ const s = StyleSheet.create({
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -1.2,
-    marginBottom: 14,
+    marginBottom: 4,
   },
   heroPagerRow: {
     flexDirection: "row",
