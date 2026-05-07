@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "decisions-log": {
+      "command": "node",
+      "args": [".mcp-servers/decisions-log/index.js"],
+      "env": {}
+    }
+  }
+}
