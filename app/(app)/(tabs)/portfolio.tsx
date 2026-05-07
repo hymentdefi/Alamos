@@ -52,6 +52,7 @@ import {
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
+import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import {
   MiniSparkline,
@@ -509,11 +510,17 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Filtro de mercado — range-pill style à la detail.tsx.
-              Active filled con el color contextual del día (greenDark
-              si dayUp, red si losses), inactive solo texto coloreado.
-              Mismo lenguaje que las pills 1D/1S/etc del detail. */}
-          <View style={s.rangeRow}>
+          {/* ─── Filtro de mercado — segmented con glyphs/banderas
+              dentro de un container surfaceHover. Active pill filled
+              con el color contextual del día (greenDark/red), glyph
+              flippea sus colores en active para mantener legibilidad
+              sobre el fondo sólido. */}
+          <View
+            style={[
+              s.segContainer,
+              { backgroundColor: c.surfaceHover },
+            ]}
+          >
             {(
               [
                 { id: "all", label: "Todo" },
@@ -528,18 +535,25 @@ export default function PortfolioScreen() {
                   key={t.id}
                   onPress={() => setMarketFilter(t.id)}
                   haptic="selection"
-                  pressScale={0.92}
+                  pressScale={0.96}
+                  rippleContained
                   style={[
-                    s.rangePill,
+                    s.segPill,
                     active && { backgroundColor: color },
                   ]}
-                  hitSlop={8}
                 >
+                  <SegGlyph id={t.id} active={active} color={color} c={c} />
                   <Text
                     style={[
-                      s.rangeText,
-                      { color: active ? c.bg : color },
+                      s.segLabel,
+                      {
+                        color: active ? c.bg : c.textMuted,
+                        fontFamily: active
+                          ? fontFamily[800]
+                          : fontFamily[600],
+                      },
                     ]}
+                    numberOfLines={1}
                   >
                     {t.label}
                   </Text>
@@ -608,11 +622,17 @@ function ResumenCard({
   return (
     <View style={[s.card, { marginTop: 16, paddingVertical: 12 }]}>
       {bestOfDay ? (
-        <MoverRow label="Mejor del día" holding={bestOfDay} c={c} />
+        <MoverRow
+          label="Mejor del día"
+          labelColor={c.greenDark}
+          holding={bestOfDay}
+          c={c}
+        />
       ) : null}
       {worstOfDay && worstOfDay.asset.ticker !== bestOfDay?.asset.ticker ? (
         <MoverRow
           label="Peor del día"
+          labelColor={c.red}
           holding={worstOfDay}
           c={c}
           isLast
@@ -627,11 +647,15 @@ function ResumenCard({
  * que el RelatedCarousel del detail. */
 function MoverRow({
   label,
+  labelColor,
   holding,
   c,
   isLast,
 }: {
   label: string;
+  /** Color del label "Mejor del día" / "Peor del día" — green para
+   *  el mejor, red para el peor, independiente del signo del activo. */
+  labelColor: string;
   holding: Holding;
   c: ColorMap;
   isLast?: boolean;
@@ -654,7 +678,7 @@ function MoverRow({
       ]}
     >
       <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text style={[s.moverLabel, { color: c.textMuted }]}>{label}</Text>
+        <Text style={[s.moverLabel, { color: labelColor }]}>{label}</Text>
         <Text style={[s.moverTicker, { color: c.text }]} numberOfLines={1}>
           {holding.asset.ticker}
         </Text>
@@ -676,6 +700,59 @@ function MoverRow({
           {up ? "▲" : "▼"} {formatPct(holding.asset.change, false)}
         </Text>
       </View>
+    </View>
+  );
+}
+
+/* ─── SegGlyph — glyph del segmented por id. Flippea bg/fg cuando
+ *     el pill está active para mantener legibilidad sobre el fondo
+ *     sólido contextual del active state. */
+function SegGlyph({
+  id,
+  active,
+  color,
+  c,
+}: {
+  id: MarketSegmentedValue;
+  active: boolean;
+  color: string;
+  c: ColorMap;
+}) {
+  if (id === "AR" || id === "US") {
+    return <FlagIcon code={id} size={18} />;
+  }
+  if (id === "CRYPTO") {
+    const bg = active ? c.bg : c.greenDark;
+    const fg = active ? color : c.bg;
+    return (
+      <View style={[s.segBadge, { backgroundColor: bg }]}>
+        <Text style={[s.segBadgeText, { color: fg }]}>₿</Text>
+      </View>
+    );
+  }
+  // "all" — alamos isotipo (2 triángulos overlapping). En active el
+  // círculo se vuelve c.bg con triángulos en el color contextual,
+  // así sobresale del fondo solid del active pill.
+  const bg = active ? c.bg : c.brand;
+  const stroke = active ? color : "#FFFFFF";
+  return (
+    <View style={[s.segBadge, { backgroundColor: bg }]}>
+      <Svg width={14} height={14} viewBox="0 0 100 100">
+        <Polygon
+          points="38,26 16,86 60,86"
+          stroke={stroke}
+          strokeWidth={10}
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Polygon
+          points="56,12 29,86 83,86"
+          stroke={stroke}
+          strokeWidth={10}
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
     </View>
   );
 }
@@ -1615,25 +1692,45 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  /* Range pills del filtro de mercado — mismo lenguaje que el rangeRow
-   * de detail.tsx (1D/1S/1M/3M/1A/MAX). Active filled con el color
-   * contextual del día. */
-  rangeRow: {
+  /* Filtro de mercado — container surfaceHover con 4 pills (Todo/AR/
+   * EE.UU/Crypto). Active pill filled del color contextual del día. */
+  segContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     marginTop: 24,
-    paddingHorizontal: 24,
+    marginHorizontal: 24,
+    padding: 4,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+    gap: 2,
   },
-  rangePill: {
-    paddingHorizontal: 16,
+  segPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     paddingVertical: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
   },
-  rangeText: {
-    fontFamily: fontFamily[700],
+  segLabel: {
     fontSize: 13,
-    letterSpacing: 0.3,
+    letterSpacing: -0.1,
+  },
+  /* Badge del glyph (Crypto / Todo) — círculo de 18 que aloja el
+   * símbolo ₿ o el isotipo Alamos. Bg/fg flipean en active. */
+  segBadge: {
+    width: 18,
+    height: 18,
+    borderCurve: "continuous",
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segBadgeText: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    lineHeight: 13,
   },
 
   /* Cards full-width sin chrome — mismo s.card que detail.tsx */
@@ -1683,11 +1780,10 @@ const s = StyleSheet.create({
     gap: 12,
   },
   moverLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginBottom: 4,
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
+    marginBottom: 6,
   },
   moverTicker: {
     fontFamily: fontFamily[700],
