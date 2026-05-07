@@ -492,9 +492,6 @@ export default function PortfolioScreen() {
           {hasHoldings ? (
             <>
               <ResumenCard
-                totalDisplay={totalDisplay}
-                currency={currency}
-                positionsCount={holdingsSorted.length}
                 bestOfDay={bestOfDay}
                 worstOfDay={worstOfDay}
                 c={c}
@@ -502,6 +499,7 @@ export default function PortfolioScreen() {
               <PosicionesCard
                 groups={groupedByCategory}
                 allocations={categoryAllocations}
+                positionsCount={holdingsSorted.length}
                 onTap={(slug) =>
                   router.push({
                     pathname: "/(app)/market-category",
@@ -535,25 +533,16 @@ export default function PortfolioScreen() {
 /* ─── Resumen card ─── */
 
 function ResumenCard({
-  totalDisplay,
-  currency,
-  positionsCount,
   bestOfDay,
   worstOfDay,
   c,
 }: {
-  totalDisplay: number;
-  currency: Currency;
-  positionsCount: number;
   bestOfDay: Holding | null;
   worstOfDay: Holding | null;
   c: ColorMap;
 }) {
-  const fmt = (n: number) => formatMoney(n, currency);
   return (
-    <View style={[s.card, { marginTop: 16 }]}>
-      <Text style={[s.cardEyebrow, { color: c.text }]}>Hoy</Text>
-
+    <View style={[s.card, { marginTop: 16, paddingVertical: 12 }]}>
       {bestOfDay ? (
         <MoverRow label="Mejor del día" holding={bestOfDay} c={c} />
       ) : null}
@@ -565,32 +554,6 @@ function ResumenCard({
           isLast
         />
       ) : null}
-
-      <View style={s.summaryFooter}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.summaryLabel, { color: c.textMuted }]}>
-            Valor de mercado
-          </Text>
-          <Text
-            style={[s.summaryValue, { color: c.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {fmt(totalDisplay)}
-          </Text>
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={[s.summaryLabel, { color: c.textMuted }]}>
-            Posiciones
-          </Text>
-          <Text
-            style={[s.summaryValue, { color: c.text }]}
-            numberOfLines={1}
-          >
-            {positionsCount}
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -658,6 +621,7 @@ function MoverRow({
 function PosicionesCard({
   groups,
   allocations,
+  positionsCount,
   onTap,
   c,
 }: {
@@ -665,12 +629,20 @@ function PosicionesCard({
     [string, { totalArs: number; count: number; cat: AssetCategory }]
   >;
   allocations: Map<AssetCategory, { color: string; pct: number }>;
+  positionsCount: number;
   onTap: (slug: string) => void;
   c: ColorMap;
 }) {
   return (
     <View style={[s.card, { marginTop: 16 }]}>
-      <Text style={[s.cardEyebrow, { color: c.text }]}>Tus posiciones</Text>
+      <View style={s.cardHead}>
+        <Text style={[s.cardEyebrow, { color: c.text, marginBottom: 0 }]}>
+          Tus posiciones
+        </Text>
+        <Text style={[s.cardCount, { color: c.textMuted }]}>
+          {positionsCount} {positionsCount === 1 ? "activo" : "activos"}
+        </Text>
+      </View>
       {groups.map(([slug, data], i) => {
         const lookup = findCategoryBySlug(slug);
         if (!lookup) return null;
@@ -1308,6 +1280,22 @@ const s = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 16,
   },
+  /* Head row del card — title + count alineados horizontalmente, cuando
+   * el card quiere mostrar un total al lado del título (ej: "Tus
+   * posiciones · 14 activos"). Override marginBottom del cardEyebrow
+   * inline cuando se usa en este wrapper. */
+  cardHead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  cardCount: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
   empty: {
     fontFamily: fontFamily[500],
     fontSize: 14,
@@ -1320,8 +1308,7 @@ const s = StyleSheet.create({
   /* Resumen card — movers showcase ─────────────────────────────────
    * Cada MoverRow ocupa una fila con label / ticker / nombre a la
    * izquierda, mini sparkline al centro, y change% a la derecha.
-   * Hairline divider entre rows. Después de los movers viene el
-   * summaryFooter con valor de mercado + posiciones. */
+   * Hairline divider entre rows. */
   moverRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1357,27 +1344,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Footer del card Resumen — valor de mercado + posiciones, separado
-   * del bloque de movers por padding generoso. Sin divider extra: la
-   * última MoverRow ya cierra la sección con su isLast=true. */
-  summaryFooter: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingTop: 22,
-    gap: 16,
-  },
-  summaryLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.4,
-  },
 
   /* Posiciones — list rows con hairline dividers */
   posRow: {
