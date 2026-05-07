@@ -19,11 +19,7 @@ import {
   type Asset,
 } from "../../lib/data/assets";
 import { findCategoryBySlug } from "../../lib/data/marketCategories";
-import { CategoryGlyph } from "../../lib/components/CategoryGlyph";
-import {
-  FloatingTabBar,
-  useFloatingTabBarHeight,
-} from "../../lib/components/FloatingTabBar";
+import { useFloatingTabBarHeight } from "../../lib/components/FloatingTabBar";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -111,9 +107,8 @@ export default function MarketCategoryScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero del header de categoría — icon grande + label + hint. */}
+        {/* Hero del header de categoría — label + hint. */}
         <View style={s.hero}>
-          <CategoryGlyph slug={category.slug} size={64} />
           <Text style={[s.heroLabel, { color: c.text }]}>
             {category.label}
           </Text>
@@ -237,12 +232,6 @@ export default function MarketCategoryScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* FloatingTabBar siempre visible — el user pidió que el nav
-          no desaparezca cuando entra a una categoría desde Mercado.
-          contextTab 'explore' marca Mercado como la pestaña de
-          origen / contexto. */}
-      <FloatingTabBar contextTab="explore" />
     </View>
   );
 }

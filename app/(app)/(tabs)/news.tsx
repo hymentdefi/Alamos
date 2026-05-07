@@ -37,8 +37,8 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
-import { useNavigation } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
@@ -47,6 +47,7 @@ import {
   DisclaimerOnboarding,
   DisclaimerShort,
 } from "../../../lib/components/Disclaimer";
+import { assets, formatPct } from "../../../lib/data/assets";
 import { useLegalConsent } from "../../../lib/legal/context";
 import {
   HorizontalPager,
@@ -71,6 +72,14 @@ interface NewsItem {
   image: string;
   tickers?: string[];
 }
+
+/** Lookup precomputado de tickers → variación % del día. Se arma
+ *  una sola vez al cargar el módulo; los assets son estáticos en
+ *  MOCK_MODE. Devuelve null si el ticker no se encuentra (para que
+ *  el chip caiga con gracia al ticker pelado). */
+const TICKER_CHANGE: Map<string, number> = new Map(
+  assets.map((a) => [a.ticker, a.change]),
+);
 
 const CAT_COLORS: Record<Category, string> = {
   mercado: "#0ECB81",
@@ -237,7 +246,7 @@ const feed: NewsItem[] = [
 ];
 
 const categoryTabs: { id: Category | "todas"; label: string }[] = [
-  { id: "todas", label: "Para vos" },
+  { id: "todas", label: "Destacadas" },
   { id: "mercado", label: "Mercado" },
   { id: "crypto", label: "Crypto" },
   { id: "cedears", label: "CEDEARs" },
@@ -249,7 +258,6 @@ const categoryTabs: { id: Category | "todas"; label: string }[] = [
 export default function NewsScreen() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [activeTab, setActiveTab] = useState(0);
   const [detail, setDetail] = useState<NewsItem | null>(null);
@@ -326,24 +334,31 @@ export default function NewsScreen() {
     return pageRefSetters.current[tabId];
   }, []);
 
-  // Tap en la tab Noticias solo si YA estoy en Noticias → scroll top + refresh
+  // Tap-on-active-tab en Noticias: scroll-to-top de la página
+  // visible (la FlatList del tab category activa). El refresh
+  // como metáfora no aplica acá — el feed es paginado por
+  // cards, no un listado scrolleable de un servicio refrescable.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      const currentId = categoryTabs[activeTab].id;
-      const ref = pageListRefs.current[currentId];
-      ref?.scrollToOffset({ offset: 0, animated: true });
+    return registerTabTap("news", {
+      isAtTop: () => false, // siempre scroll-to-top, nunca refresh
+      scrollToTop: () => {
+        const currentId = categoryTabs[activeTab].id;
+        const ref = pageListRefs.current[currentId];
+        ref?.scrollToOffset({ offset: 0, animated: true });
+      },
+      refresh: () => {},
     });
-    return unsub;
-  }, [navigation, isFocused, activeTab]);
+  }, [activeTab]);
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* Header sticky con título Noticias + tabs */}
+    <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+      {/* Header sticky con título Noticias + tabs — bg cálido para
+          que la página entera respire en gris (mismo lenguaje de
+          Cocos / Robinhood) y los cards blancos resaltan adentro. */}
       <View
         style={[
           s.header,
-          { backgroundColor: c.bg, borderBottomColor: c.border },
+          { backgroundColor: c.bgWarm, borderBottomColor: c.border },
         ]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
@@ -366,16 +381,29 @@ export default function NewsScreen() {
                 pressScale={0.93}
                 style={[
                   s.catPill,
-                  {
-                    backgroundColor: active ? c.ink : c.surfaceHover,
-                    borderColor: active ? c.ink : c.border,
-                  },
+                  active
+                    ? {
+                        // Pill activa — outline brand green con tint
+                        // muy sutil adentro. El color y el frame
+                        // alcanzan; sin solid fill.
+                        backgroundColor: "rgba(0,200,5,0.06)",
+                        borderColor: c.brand,
+                        borderWidth: 1.5,
+                      }
+                    : {
+                        backgroundColor: "transparent",
+                        borderColor: c.border,
+                        borderWidth: 1.5,
+                      },
                 ]}
               >
                 <Text
                   style={[
                     s.catPillText,
-                    { color: active ? c.bg : c.textSecondary },
+                    {
+                      color: active ? c.brand : c.textSecondary,
+                      fontFamily: active ? fontFamily[700] : fontFamily[600],
+                    },
                   ]}
                 >
                   {t.label}
@@ -564,28 +592,38 @@ function NewsCard({
   });
 
   return (
-    <View style={{ height, paddingTop: topPad, backgroundColor: c.bg }}>
-      {/* Imagen que ocupa todo el espacio entre header y contenido */}
-      <Pressable style={card.imageWrap} onPress={onOpenDetail}>
-        <Animated.View
-          style={[
-            card.imageAnim,
-            {
-              transform: [{ translateY }],
-              shadowColor: c.ink,
-            },
-          ]}
-        >
-          <Image
-            source={{ uri: item.image }}
-            style={card.image}
-            resizeMode="cover"
-          />
-        </Animated.View>
-      </Pressable>
+    <View
+      style={{ height, paddingTop: topPad, backgroundColor: c.bgWarm }}
+    >
+      {/* Frame blanco que enmarca image + bottom — la página es
+          gris cálido (c.bgWarm) y la noticia se ve "encartonada"
+          adentro de este frame, mismo lenguaje que las cards de
+          Cocos / Robinhood. Shadow sutil para que despegue del
+          fondo sin gritar. */}
+      <View
+        style={[
+          card.frame,
+          { backgroundColor: c.surface, shadowColor: c.ink },
+        ]}
+      >
+        {/* Imagen que ocupa todo el espacio entre header y contenido */}
+        <Pressable style={card.imageWrap} onPress={onOpenDetail}>
+          <Animated.View
+            style={[
+              card.imageAnim,
+              { transform: [{ translateY }] },
+            ]}
+          >
+            <Image
+              source={{ uri: item.image }}
+              style={card.image}
+              resizeMode="cover"
+            />
+          </Animated.View>
+        </Pressable>
 
-      {/* Contenido debajo — todo tappable para abrir la noticia */}
-      <Pressable style={card.bottom} onPress={onOpenDetail}>
+        {/* Contenido debajo — todo tappable para abrir la noticia */}
+        <Pressable style={card.bottom} onPress={onOpenDetail}>
         <Text style={[card.source, { color: c.textMuted }]}>
           {item.source} · {item.time}
         </Text>
@@ -599,22 +637,45 @@ function NewsCard({
 
         {item.tickers?.length ? (
           <View style={card.tickerRow}>
-            {item.tickers.map((t) => (
-              <View
-                key={t}
-                style={[card.tickerPill, { backgroundColor: c.surfaceHover }]}
-              >
-                <Text style={[card.tickerText, { color: c.text }]}>{t}</Text>
-              </View>
-            ))}
+            {item.tickers.map((t) => {
+              const change = TICKER_CHANGE.get(t) ?? null;
+              // Ticker neutro (c.text), variación con tone direccional
+              // (▲ verde / ▼ rojo). Bg gris sutil del theme para
+              // que el chip tenga frame sin gritar.
+              return (
+                <View
+                  key={t}
+                  style={[
+                    card.tickerPill,
+                    { backgroundColor: c.surfaceHover },
+                  ]}
+                >
+                  <Text style={[card.tickerText, { color: c.text }]}>
+                    {t}
+                  </Text>
+                  {change != null ? (
+                    <Text
+                      style={[
+                        card.tickerChange,
+                        { color: change >= 0 ? c.brand : c.red },
+                      ]}
+                    >
+                      {change >= 0 ? "▲ " : "▼ "}
+                      {formatPct(change, false)}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : null}
 
-        <View style={[card.readBtn, { backgroundColor: c.ink }]}>
-          <Feather name="chevron-up" size={16} color={c.bg} />
-          <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
-        </View>
-      </Pressable>
+          <View style={[card.readBtn, { backgroundColor: c.ink }]}>
+            <Feather name="chevron-up" size={16} color={c.bg} />
+            <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
+          </View>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -705,7 +766,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
         style={[
           hint.pill,
           {
-            backgroundColor: "#5ac43e",
+            // Bg c.surfaceHover — mismo gris sutil que los chips
+            // de ticker. Texto y chevron en c.brand cargan el
+            // peso cromático.
+            backgroundColor: c.surfaceHover,
             transform: [
               { translateY: bounce },
               { scale: pulse },
@@ -713,10 +777,10 @@ function SwipeHint({ visible }: { visible: boolean }) {
           },
         ]}
       >
-        <Text style={[hint.text, { color: "#FFFFFF" }]}>
+        <Text style={[hint.text, { color: c.brand }]}>
           Deslizá para pasar
         </Text>
-        <Feather name="chevrons-down" size={16} color="#FFFFFF" />
+        <Feather name="chevrons-down" size={16} color={c.brand} />
       </Animated.View>
     </Animated.View>
   );
@@ -863,11 +927,30 @@ function DetailSheet({
                 ))}
                 {item.tickers?.length ? (
                   <View style={sheet.tickersRow}>
-                    {item.tickers.map((t) => (
-                      <View key={t} style={sheet.tickerPill}>
-                        <Text style={sheet.tickerText}>{t}</Text>
-                      </View>
-                    ))}
+                    {item.tickers.map((t) => {
+                      const change = TICKER_CHANGE.get(t) ?? null;
+                      const tone =
+                        change == null
+                          ? "#0E0F0C"
+                          : change >= 0
+                          ? "#00C805"
+                          : "#EB5D2A";
+                      return (
+                        <View key={t} style={sheet.tickerPill}>
+                          <Text style={[sheet.tickerText, { color: tone }]}>
+                            {t}
+                          </Text>
+                          {change != null ? (
+                            <Text
+                              style={[sheet.tickerChange, { color: tone }]}
+                            >
+                              {change >= 0 ? "▲ " : "▼ "}
+                              {formatPct(change, false)}
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })}
                   </View>
                 ) : null}
                 <View style={sheet.disclaimerBox}>
@@ -896,8 +979,9 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: fontFamily[700],
-    fontSize: 28,
-    letterSpacing: -1,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
   },
   catRow: {
     paddingHorizontal: 20,
@@ -909,7 +993,6 @@ const s = StyleSheet.create({
     paddingVertical: 7,
     borderCurve: "continuous",
     borderRadius: radius.pill,
-    borderWidth: 1,
   },
   catPillText: {
     fontFamily: fontFamily[600],
@@ -935,30 +1018,44 @@ const s = StyleSheet.create({
 });
 
 const card = StyleSheet.create({
+  /* Frame blanco que enmarca toda la noticia (image + texto). El
+   * page bg es gris cálido (c.bgWarm) y este frame se siente como
+   * un card de Cocos / Robinhood — borderRadius 24, sombra liviana,
+   * margenes laterales para que se vea el gris alrededor. */
+  frame: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderCurve: "continuous",
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+  },
   imageWrap: {
     flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   imageAnim: {
     flex: 1,
     borderCurve: "continuous",
-    borderRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    elevation: 12,
+    borderRadius: 18,
+    overflow: "hidden",
   },
   image: {
     flex: 1,
     width: "100%",
     borderCurve: "continuous",
-    borderRadius: 24,
+    borderRadius: 18,
   },
   bottom: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   source: {
     fontFamily: fontFamily[600],
@@ -987,15 +1084,23 @@ const card = StyleSheet.create({
     marginBottom: 16,
   },
   tickerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderCurve: "continuous",
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
   },
   tickerText: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 0.2,
+  },
+  tickerChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
   readBtn: {
     alignSelf: "flex-start",
@@ -1132,16 +1237,24 @@ const sheet = StyleSheet.create({
     marginBottom: 20,
   },
   tickerPill: {
-    backgroundColor: "rgba(14,15,12,0.08)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderCurve: "continuous",
     borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(14,15,12,0.18)",
   },
   tickerText: {
-    color: "#0E0F0C",
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.2,
+  },
+  tickerChange: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
 });

@@ -5,10 +5,15 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { FloatingTabBar } from "../../../lib/components/FloatingTabBar";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
+/**
+ * Layout de las tabs internas. El FloatingTabBar NO se renderea acá
+ * — vive en el parent (app)/_layout.tsx para quedar fijo durante
+ * las transiciones del Stack hacia screens hijo (market-category,
+ * detail, etc.).
+ */
 export default function TabsLayout() {
   return (
     <View style={styles.root}>
@@ -59,7 +64,6 @@ export default function TabsLayout() {
         <Tabs.Screen name="news" />
         <Tabs.Screen name="alamo" />
       </Tabs>
-      <FloatingTabBar />
     </View>
   );
 }

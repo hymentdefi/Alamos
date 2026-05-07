@@ -1,208 +1,54 @@
-# CLAUDE.md — Alamos Capital
+# Álamos Capital
 
-## Qué es este proyecto
+App de inversiones retail para Argentina. 3 mercados: argentino (CEDEARs, bonos, FCI), estadounidense, crypto. 3 divisas: ARS, USD, USDT. React Native 0.81 + Expo SDK 54.
 
-App móvil de inversiones para retail en Argentina. Productos: CEDEARs, bonos soberanos y fondos comunes de inversión. React Native + Expo.
+## Map
+- `app/` — screens (Expo Router 6, file-based). Auth + tabs (Inicio/Mercado/Cartera/Noticias/Perfil)
+- `lib/components/` — componentes compartidos (Button, Logo, Sparkline, Squircle)
+- `lib/theme/` — tokens, tipografía, radius, colores. FUENTE DE VERDAD para diseño.
+- `lib/auth/` — auth context + API client (MOCK_MODE=true)
+- `lib/data/` — mock assets (CEDEARs, bonos, FCI)
+- `context/` — sistema de contexto para IA (strategy, domains, decisions)
+- `thoughts/` — research, planes, handoffs entre sesiones
+- `assets/brand-assets/` — brand pack oficial
 
-## Stack
+## Commands
+- Install: `npm install --legacy-peer-deps`
+- Run: `npx expo start` (o `--tunnel` si no conecta)
+- NO hay backend propio todavía. Solo app mobile con datos mockeados.
 
-- **Framework:** React Native 0.81 + Expo SDK 54
-- **Router:** Expo Router 6 (file-based)
-- **Language:** TypeScript
-- **Auth backend:** Manteca (ALyC argentina) — MOCK_MODE=true
-- **Secure storage:** expo-secure-store
-- **Styling:** StyleSheet — NO NativeWind
-- **Tipografía:** Plus Jakarta Sans (via @expo-google-fonts)
-- **SVG/Charts:** react-native-svg
+## Comunicación
+- Español. Términos técnicos en inglés.
+- Directo, técnico, sin padding.
+- Outputs exhaustivos > resumidos.
+- Leer `context/strategy/decisions.md` antes de proponer alternativas ya evaluadas.
 
-## Estructura
+## DO NOT
+- NO usar NativeWind, Tailwind, ni styled-components. Solo `StyleSheet.create()`.
+- NO inventar colores. Usar SOLO los tokens de `lib/theme/index.ts`.
+- NO usar `borderRadius` sin `borderCurve: "continuous"`. NUNCA.
+- NO inventar componentes genéricos. Revisar `lib/components/` primero.
+- NO sugerir Y Combinator. Descartado.
+- NO mencionar "Alamos Pro". Fue descartado. El dark mode es simplemente una preferencia de usuario.
+- NO asumir que decisiones abiertas están cerradas. Verificar status en `decisions.md`.
+- NO escribir contenido in-app genérico. Leer `.claude/skills/alamos-copy/SKILL.md`.
+- NO usar guiones largos (—) como muletilla en contenido de la app.
+- NO usar exclamaciones (!) en contenido de la app.
 
-```
-app/
-  _layout.tsx                → Root. Carga fuentes, splash, AuthProvider, AuthGate
-  (auth)/
-    welcome.tsx              → Landing-style welcome
-    login.tsx                → Login email/password
-    register.tsx             → Registro multi-step (email/pw/nombre/CUIL)
-  (app)/
-    _layout.tsx              → Tabs: Inicio / Mercado / Cartera / Noticias / Perfil
-    index.tsx                → Home (mockup del landing: balance + chart + tabs + lista)
-    explore.tsx              → Mercado (legacy, pendiente rediseño fase 2)
-    portfolio.tsx            → Cartera (legacy, pendiente)
-    news.tsx                 → Noticias (legacy, pendiente)
-    profile.tsx              → Perfil (legacy, pendiente)
-    detail.tsx, buy.tsx,
-    confirm.tsx, success.tsx → Flow de compra (legacy)
+<important if="you are creating or modifying any UI component or screen">
+LEER `.claude/skills/alamos-design/SKILL.md` ANTES de escribir una sola línea.
+El stock detail es el gold standard. Estudiarlo antes de crear pantallas nuevas.
+Álamos tiene un design system específico. Nada genérico. Si el output podría
+pertenecer a cualquier app de finanzas, está mal.
+</important>
 
-lib/
-  auth/
-    context.tsx              → AuthProvider, SecureStore para tokens
-    manteca.ts               → API client mockeado
-  components/
-    Button.tsx               → Botón (primary/secondary/accent/ghost)
-    Logo.tsx                 → <AlamosLogo /> — mark/lockup/lockupShort, light/dark
-    Sparkline.tsx            → Chart reutilizable + pathFromSeed()
-  data/
-    assets.ts                → CEDEARs, bonos, FCI + formatARS/formatPct/assetIconCode
-  theme/
-    index.ts                 → Tokens (light + dark), type, radius, spacing, fontFamily
+<important if="you are writing ANY user-facing text — labels, titles, descriptions, errors, buttons, empty states">
+LEER `.claude/skills/alamos-copy/SKILL.md` ANTES de escribir.
+Contenido in-app en español, tuteo suave, profesional y corto.
+Si suena a IA genérica, reescribir.
+</important>
 
-assets/
-  brand-assets/              → Brand pack oficial (app/, empresa/, empresa-mono/)
-  index.html                 → Landing de referencia (no se usa en app)
-  icon.png, splash-icon.png  → Derivados del brand pack para Expo
-```
-
-## Design tokens
-
-Copiados exactos del landing (`assets/index.html`).
-
-### Colores (light — default)
-```
-bg:            #FAFAF7   // off-white cálido
-bgWarm:        #F2F1EB
-surface:       #FFFFFF
-surfaceHover:  #F2F1EB
-surfaceSunken: #EBEBE3
-border:        #E5E4DC
-text:          #0E0F0C   // ink
-textSecondary: #2A2B27
-textMuted:     #6B6C66
-textFaint:     #B8B8B0
-brand:         #00C805   // verde de marca — único, definido en lib/theme/index.ts brand.green
-action:        #5ac43e   // verde un poco más tierra para CTAs y nav active pill
-positive:      #00A304   // verde técnico para deltas/% positivos en charts
-red:           #C83B3B   // negativos
-```
-
-### Tipografía
-- **Plus Jakarta Sans** — pesos 400/500/600/700/800
-- Display: 44-52px, weight 700, letter-spacing ~-2
-- Body: 15-17px, weight 500
-- Letter-spacing negativo en todo (entre -0.1 y -2 según tamaño)
-- Helpers: `fontFamily[weight]` y `type.{display,h1,h2,body,small,...}` desde `lib/theme`
-
-### Radius
-```
-sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, pill: 999
-```
-
-### Dark mode
-Existe `dark` en `themes` pero por default se usa `light`. Pensado para Alamos Pro (terminal tipo Binance). No activo aún.
-
-## Logos
-
-3 familias en `assets/brand-assets/`:
-- **app/** — app icon con halo (iOS/Android/favicon)
-- **empresa/** — outline bold con verde + negro (uso general)
-- **empresa-mono/** — un solo color (blanco/negro/verde, para fondos fuertes)
-
-Usar `<AlamosLogo variant tone size />`:
-- `variant="mark"` — isotipo (2 triángulos)
-- `variant="lockup"` — ícono + "Alamos Capital"
-- `variant="lockupShort"` — ícono + "Alamos"
-- `tone="light"|"dark"` — según fondo
-
-Regla: el verde de marca es `#00C805` (constante `brand.green` en `lib/theme/index.ts`, igual que `c.brand` del theme). No inventar otros verdes para identidad de marca — los tokens `action` y `positive` son para CTAs y deltas, NO para marca.
-
-## API de Manteca
-
-- Base: `https://api.manteca.dev`
-- Endpoints: POST /auth/login, POST /auth/register, GET /auth/me
-- Auth: Bearer token en header
-- MOCK_MODE=true en `lib/auth/manteca.ts`
-
-## Convenciones
-
-- Estilos: `StyleSheet.create()` + `useTheme()` para colores, `fontFamily[weight]` para tipografía
-- UI text en español; código en inglés
-- Commits en español: "agregué X", "mejoré Y"
-- Componentes compartidos en `lib/components/`
-- Servicios de API en `lib/api/` (cuando se cree)
-
-### Esquinas redondeadas — siempre continuous (squircle)
-
-La app usa **continuous corners** (squircle estilo Figma/iOS) para todo
-elemento con esquinas redondeadas — nunca el border-radius circular
-estándar. Hay dos caminos según el tipo de elemento:
-
-**1. Default — `borderCurve: "continuous"` + `borderRadius`**
-
-Para todo lo "no-hero" (chips, badges, tiles, inputs, list items, cards
-internas) en cualquier `StyleSheet.create({})`:
-
-```ts
-{
-  borderCurve: "continuous",
-  borderRadius: radius.lg,
-  ...
-}
-```
-
-En iOS toma el squircle nativo de Apple gratis. En Android queda como
-border-radius normal pero la consistencia con iOS y la simplicidad
-ganan. Cero dependencias, cero overhead. **Esto va siempre, sin
-excepción** — no agregues `borderRadius` solo, siempre con
-`borderCurve: "continuous"`.
-
-**2. Hero components — `<Squircle>` cross-platform**
-
-Para componentes de alto impacto visual (Button principal, cards
-destacadas, modales hero) donde queremos que el squircle se vea igual
-en iOS y Android, usar el wrapper `<Squircle>` de
-[lib/components/Squircle.tsx](lib/components/Squircle.tsx) que
-encapsula `react-native-figma-squircle`:
-
-```tsx
-<Squircle
-  radius={radius.btn}
-  backgroundColor={c.ink}
-  borderColor={c.border}
-  borderWidth={1}
-  style={StyleSheet.absoluteFill}
-/>
-```
-
-Patrón típico: outer touchable/View con dimensiones + padding,
-`<Squircle>` como `absoluteFill` para el bg/border, children encima.
-
-**Limitaciones del wrapper:**
-- Sombras (`shadow*`/`elevation`) y ripple Android siguen siendo
-  rectangulares — el wrapper no las clipea al squircle.
-- Los children NO se clipean al squircle. Si el componente tiene
-  overlays absoluteFill (ej: gradient highlight), considerar dejarlo
-  con border-radius común + `borderCurve: continuous`.
-
-## Cómo correr
-
-```bash
-npm install --legacy-peer-deps
-npx expo start
-# Si no conecta el celular: npx expo start --tunnel
-```
-
-## Estado actual
-
-Rediseño completo terminado (Fases 1, 2 y 3). Toda la app corre con el design
-system nuevo: light-first, Plus Jakarta Sans, tokens del landing.
-
-- ✓ Auth: welcome / login / register
-- ✓ Home, Mercado, Cartera, Noticias, Perfil (bottom tabs)
-- ✓ Detalle de activo con stats específicos por tipo (CEDEAR/bono/FCI)
-- ✓ Flow de compra: buy (keypad) → confirm → success
-- ✓ Transferencias (ingresar/extraer)
-- ✓ Notificaciones, Seguridad, Soporte, Acerca de, Datos personales
-- ✓ Preferencias de app (tema, idioma, moneda, notifs)
-- ✓ Onboarding con 3 slides
-- ✓ Pantallas Robinhood eliminadas (crypto, margin, options, lending, cash)
-- ✓ Legacy `colors` export eliminado — todas las pantallas usan `useTheme()`
-- ✓ Legacy AssetItem component eliminado
-
-## Próximos pasos
-
-- Sacar MOCK_MODE de Manteca y conectar API real
-- Conectar datos reales al hero (precio, holdings, delta del día)
-- Implementar ejecución real de órdenes contra la API
-- Alertas de precio funcionales
-- Explorar modo Alamos Pro (dark + terminal densa)
-- Web build con Expo Web
+<important if="you are evaluating legal, fiscal, or corporate structure options">
+La estructura corporativa NO está decidida. Hay múltiples opciones en evaluación.
+NO asumir BVI como decidido. Leer `context/domains/` para estado actual.
+</important>
