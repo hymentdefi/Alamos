@@ -29,7 +29,6 @@ import {
   assetCurrency,
   type Asset,
 } from "../../lib/data/assets";
-import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useAlerts } from "../../lib/alerts/context";
 import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
@@ -144,13 +143,13 @@ export default function AssetAlertsScreen() {
     }
   };
 
-  /* Hero del header — mismo patrón que stock detail: ticker (eyebrow),
-   * nombre (display), precio grande, delta del día. El delta usa el
-   * `change` que ya viene en el modelo del asset (% del día). El
-   * color del delta sigue brand canónico para el up, red para down. */
+  /* Header sticky-style — mismo bloque centrado que aparece en el
+   * stock detail al scrollear: precio grande + fila chica con
+   * ticker · pct% del día. El X close va a la izquierda; spacer
+   * del mismo ancho a la derecha para que el bloque centrado
+   * quede REAL al medio (no comido por el botón). */
   const cur = assetCurrency(asset);
   const dayUp = asset.change >= 0;
-  const deltaAbs = (asset.price * asset.change) / 100;
   const deltaColor = dayUp ? c.brand : c.red;
 
   return (
@@ -167,34 +166,31 @@ export default function AssetAlertsScreen() {
           <Feather name="x" size={26} color={c.text} />
         </Pressable>
         <View style={{ flex: 1 }} />
-      </View>
+        {/* Spacer simétrico al iconBtn izquierdo para que el sticky
+         *  overlay (centrado real con left:0 right:0) no quede
+         *  visualmente desplazado hacia la derecha. */}
+        <View style={s.iconBtn} />
 
-      <View style={s.heroBlock}>
-        <Text style={[s.heroTicker, { color: c.textMuted }]}>
-          {asset.ticker}
-        </Text>
-        <Text style={[s.heroName, { color: c.text }]} numberOfLines={2}>
-          {asset.name}
-        </Text>
-        <View style={s.heroPriceRow}>
-          <AmountDisplay value={asset.price} size={52} currency={cur} />
+        <View
+          style={[s.stickyOverlay, { top: insets.top + 12 }]}
+          pointerEvents="none"
+        >
+          <Text
+            style={[s.stickyPrice, { color: c.text }]}
+            numberOfLines={1}
+          >
+            {formatMoney(asset.price, cur)}
+          </Text>
+          <View style={s.stickyRow}>
+            <Text style={[s.stickyTicker, { color: c.textMuted }]}>
+              {asset.ticker}
+            </Text>
+            <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
+            <Text style={[s.stickyPct, { color: deltaColor }]}>
+              {formatPct(asset.change)}
+            </Text>
+          </View>
         </View>
-        <View style={s.deltaRow}>
-          <Text style={[s.deltaTri, { color: deltaColor }]}>
-            {dayUp ? "▲" : "▼"}
-          </Text>
-          <Text style={[s.deltaText, { color: deltaColor }]}>
-            {formatMoney(Math.abs(deltaAbs), cur)}
-          </Text>
-          <Text style={[s.deltaText, { color: deltaColor }]}>
-            ({formatPct(asset.change)})
-          </Text>
-          <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-          <Text style={[s.deltaSubtle, { color: c.textMuted }]}>hoy</Text>
-        </View>
-        <Text style={[s.alertsSubtitle, { color: c.textMuted }]}>
-          Te avisamos como máximo una vez al día por cada alerta.
-        </Text>
       </View>
 
       <View style={[s.tabsRow, { paddingHorizontal: 24 }]}>
@@ -742,14 +738,16 @@ function formatTriggeredDate(iso: string): string {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  /* Top bar + hero — mismo lenguaje que stock detail (detail.tsx).
-   * Sin sticky overlay porque la pantalla suele ser más corta y no
-   * vale la complejidad. */
+  /* Top bar — X (left) + sticky-style overlay centrado (precio +
+   * ticker · pct%) replicando el header del stock detail. Misma
+   * geometría que detail.tsx pero estática (no scroll-driven, la
+   * pantalla de alertas no necesita el fade-in). */
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingBottom: 12,
+    position: "relative",
   },
   iconBtn: {
     width: 40,
@@ -757,61 +755,40 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  heroBlock: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 14,
-  },
-  heroTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  heroName: {
-    fontFamily: fontFamily[700],
-    fontSize: 30,
-    letterSpacing: -0.7,
-    lineHeight: 34,
-    marginTop: 2,
-  },
-  heroPriceRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 12,
-  },
-  deltaRow: {
-    flexDirection: "row",
+  stickyOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 38,
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 10,
+    justifyContent: "center",
   },
-  deltaTri: {
+  stickyPrice: {
+    fontFamily: fontFamily[500],
+    fontSize: 17,
+    letterSpacing: -0.3,
+    lineHeight: 20,
+  },
+  stickyRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    marginTop: 1,
+  },
+  stickyTicker: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0,
+  },
+  stickyDot: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  stickyPct: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-  },
-  deltaText: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  deltaSep: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-  },
-  deltaSubtle: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  alertsSubtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 18,
-    letterSpacing: -0.1,
-    marginTop: 14,
+    fontSize: 11,
+    letterSpacing: -0.05,
   },
 
   tabsRow: {
