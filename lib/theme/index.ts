@@ -61,19 +61,23 @@ const light = {
   textMuted: "#737373",
   textFaint: "#A3A3A3",
 
-  /* Sistema de verdes — DOS tokens semánticos, idénticos en
-   * light y dark mode:
+  /* Sistema de verdes — DOS tokens semánticos:
    *
    *   c.brand     #00C805 — identity, CTAs, action buttons,
    *                         briefing tone, asset-up no-data,
    *                         notifications, success, badges.
-   *   c.dataGreen #5AC53A — charts, sparklines, deltas %,
-   *                         contextos de lectura continua donde
-   *                         el brand machaca el ojo. */
+   *                         IDÉNTICO en light + dark.
+   *
+   *   c.dataGreen — verde para la LÍNEA del chart de activo
+   *                 individual. En light se mantiene igual que
+   *                 brand (#00C805 vivid sobre cards blancas se
+   *                 lee bien), en dark baja a #5AC53A para no
+   *                 machacar el ojo sobre fondo oscuro mientras
+   *                 el usuario mira el chart fijo. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.14)",
-  dataGreen: "#5AC53A",
-  dataGreenDim: "rgba(90,197,58,0.14)",
+  dataGreen: "#00C805",
+  dataGreenDim: "rgba(0,200,5,0.14)",
 
   // Token "down" para activos: naranja cálido #EB5D2A en vez de rojo
   // puro. El rojo cargado se leía como error/warning en una pantalla
