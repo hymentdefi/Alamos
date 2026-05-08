@@ -452,8 +452,9 @@ const s = StyleSheet.create({
   label: {
     fontFamily: fontFamily[700],
     fontSize: 17,
-    // Base atenuada para que el shimmer se note al pasar.
-    color: "rgba(255,255,255,0.72)",
+    /* Base atenuada — negra translúcida para que se lea contra
+     * el verde brand y deje que el shimmer pase por encima. */
+    color: "rgba(14,15,12,0.72)",
     letterSpacing: -0.2,
   },
   // Mask element: mismo layout que el pill, texto y chevron en blanco

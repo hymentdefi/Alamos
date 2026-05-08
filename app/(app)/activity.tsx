@@ -162,7 +162,7 @@ export default function ActivityScreen() {
                       s.iconWrap,
                       {
                         backgroundColor: positive
-                          ? c.dataGreenDim
+                          ? c.brandDim
                           : c.surfaceHover,
                       },
                     ]}
@@ -170,7 +170,7 @@ export default function ActivityScreen() {
                     <Feather
                       name={item.icon}
                       size={16}
-                      color={positive ? c.dataGreen : c.text}
+                      color={positive ? c.brand : c.text}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -184,7 +184,7 @@ export default function ActivityScreen() {
                   <Text
                     style={[
                       s.amount,
-                      { color: positive ? c.dataGreen : c.text },
+                      { color: positive ? c.brand : c.text },
                     ]}
                   >
                     {positive ? "+" : "−"}
@@ -227,7 +227,7 @@ export default function ActivityScreen() {
                     </Text>
                     {n.unread ? (
                       <View
-                        style={[s.unreadDot, { backgroundColor: c.dataGreen }]}
+                        style={[s.unreadDot, { backgroundColor: c.brand }]}
                       />
                     ) : null}
                   </View>

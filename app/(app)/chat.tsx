@@ -235,7 +235,7 @@ export default function ChatScreen() {
             <View
               style={[
                 s.headerOnlineDot,
-                { backgroundColor: c.dataGreen, borderColor: c.bg },
+                { backgroundColor: c.brand, borderColor: c.bg },
               ]}
             />
           </View>

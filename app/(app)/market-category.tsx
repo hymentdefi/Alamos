@@ -173,7 +173,7 @@ export default function MarketCategoryScreen() {
                         <Ionicons
                           name="star"
                           size={12}
-                          color={c.dataGreen}
+                          color={c.brand}
                         />
                       ) : null}
                     </View>
@@ -199,7 +199,7 @@ export default function MarketCategoryScreen() {
                       {formatMoney(asset.price, currency)}
                     </Text>
                     {asset.annualYield != null ? (
-                      <Text style={[s.rowYield, { color: c.dataGreen }]}>
+                      <Text style={[s.rowYield, { color: c.brand }]}>
                         TNA {formatPct(asset.annualYield)}
                       </Text>
                     ) : (
@@ -208,7 +208,7 @@ export default function MarketCategoryScreen() {
                           s.rowChange,
                           {
                             color:
-                              asset.change >= 0 ? c.dataGreen : c.red,
+                              asset.change >= 0 ? c.brand : c.red,
                           },
                         ]}
                       >

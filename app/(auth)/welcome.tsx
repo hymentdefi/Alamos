@@ -31,7 +31,14 @@ export default function WelcomeScreen() {
 
         <Text style={[s.display, { color: c.text }]}>
           Inversiones,{" "}
-          <Text style={[s.displayAccent, { backgroundColor: c.brand }]}>simples</Text>
+          <Text
+            style={[
+              s.displayAccent,
+              { backgroundColor: c.brand, color: c.ink },
+            ]}
+          >
+            simples
+          </Text>
           {"\n"}y transparentes.
         </Text>
 

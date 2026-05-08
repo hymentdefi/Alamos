@@ -188,7 +188,12 @@ export default function DetailScreen() {
   // posición, los movimientos, todo va en US$. No mezclamos con peso.
   const cur = assetCurrency(asset);
   const rangeUp = pctForRange >= 0;
-  const color = rangeUp ? c.dataGreen : c.red;
+  const color = rangeUp ? c.brand : c.red;
+  /* chartColor — verde más suave (#5AC53A vía c.dataGreen) sólo
+   * para la LÍNEA del chart (Sparkline). El resto de la UI
+   * (sticky pct, deltas, pills) sigue con el `color` brand para
+   * que el verde unificado se mantenga consistente. */
+  const chartColor = rangeUp ? c.dataGreen : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -313,7 +318,7 @@ export default function DetailScreen() {
 
           <Sparkline
             series={series}
-            color={color}
+            color={chartColor}
             height={240}
             mode="line"
             strokeWidth={1}
@@ -1015,14 +1020,14 @@ function PositionCard({
         label="Resultado del día"
         amount={`${todayUp ? "+" : "−"}${fmt(Math.abs(pos.todayDelta))}`}
         pct={formatPct(pos.todayPct)}
-        color={todayUp ? c.dataGreen : c.red}
+        color={todayUp ? c.brand : c.red}
         c={c}
       />
       <ReturnRow
         label="Resultado total"
         amount={`${totalUp ? "+" : "−"}${fmt(Math.abs(pos.totalDelta))}`}
         pct={formatPct(pos.totalPct)}
-        color={totalUp ? c.dataGreen : c.red}
+        color={totalUp ? c.brand : c.red}
         c={c}
         isLast
       />
@@ -1318,7 +1323,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
   const actDiff = active.actual - active.expected;
   const actDiffPct =
     active.expected !== 0 ? (actDiff / Math.abs(active.expected)) * 100 : 0;
-  const actDiffColor = actBeat ? c.dataGreen : c.red;
+  const actDiffColor = actBeat ? c.brand : c.red;
   const actDiffSign = actDiff >= 0 ? "+" : "−";
   const next = useMemo(() => mockNextEarning(asset.ticker), [asset.ticker]);
 
@@ -1400,7 +1405,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
                 const x = padX + i * xStep;
                 const beat = d.actual >= d.expected;
                 const isSelected = isHolding && i === activeIdx;
-                const actualColor = beat ? c.dataGreen : c.red;
+                const actualColor = beat ? c.brand : c.red;
                 // Split del label "Q3 FY24" → ["Q3", "FY24"] para
                 // renderearlo en 2 líneas en el eje X.
                 const [quarter, fy] = d.label.split(" ");
@@ -1505,7 +1510,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
                 // todavía no se sabe si va a ser positivo o negativo.
                 <SplitDot
                   size={10}
-                  leftColor={c.dataGreen}
+                  leftColor={c.brand}
                   rightColor={c.red}
                   idSuffix={`info-${asset.ticker}`}
                 />
@@ -1576,7 +1581,7 @@ function RelatedCarousel({
       >
         {items.map((a) => {
           const up = a.change >= 0;
-          const tone = up ? c.dataGreen : c.red;
+          const tone = up ? c.brand : c.red;
           return (
             <Tap
               key={a.ticker}
@@ -1602,7 +1607,7 @@ function RelatedCarousel({
               <View style={{ height: 44, marginTop: 10, marginBottom: 8 }}>
                 <MiniSparkline
                   series={seriesFromSeed(a.ticker, 50, up ? "up" : "down")}
-                  color={tone}
+                  color={up ? c.dataGreen : c.red}
                   width={156}
                   height={44}
                   strokeWidth={1.4}
@@ -1757,7 +1762,7 @@ function HistoryCard({ asset, c }: { asset: Asset; c: ColorMap }) {
         const isBuy = h.side === "buy";
         const isSell = h.side === "sell";
         const isDiv = h.side === "dividend";
-        const sideColor = isDiv ? c.dataGreen : isSell ? c.red : c.text;
+        const sideColor = isDiv ? c.brand : isSell ? c.red : c.text;
         return (
           <View
             key={h.id}

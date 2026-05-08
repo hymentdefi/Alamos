@@ -285,7 +285,7 @@ function OptionCard({
       <View style={cs.previewWrap}>
         <MiniSparkline
           series={series}
-          color={selected ? accent : c.textFaint}
+          color={selected ? c.dataGreen : c.textFaint}
           width={120}
           height={48}
           strokeWidth={2.4}

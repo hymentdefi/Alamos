@@ -73,8 +73,8 @@ export default function AccountScreen() {
           ]}
         >
           <View style={s.kycHead}>
-            <View style={[s.kycIcon, { backgroundColor: c.dataGreenDim }]}>
-              <Feather name="check" size={16} color={c.dataGreen} />
+            <View style={[s.kycIcon, { backgroundColor: c.brandDim }]}>
+              <Feather name="check" size={16} color={c.brand} />
             </View>
             <Text style={[s.kycLabel, { color: c.text }]}>
               Identidad verificada

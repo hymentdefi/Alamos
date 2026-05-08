@@ -41,11 +41,11 @@ export function AssetColorProvider({
   const value = useMemo<AssetColorValue>(
     () => ({
       state: up ? "up" : "down",
-      color: up ? c.dataGreen : c.red,
-      dim: up ? c.dataGreenDim : c.redDim,
+      color: up ? c.brand : c.red,
+      dim: up ? c.brandDim : c.redDim,
       onColor: "#FFFFFF",
     }),
-    [up, c.dataGreen, c.red, c.dataGreenDim, c.redDim],
+    [up, c.brand, c.red, c.brandDim, c.redDim],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

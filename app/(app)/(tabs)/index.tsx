@@ -370,11 +370,11 @@ function BaseHome() {
   }, [liveTick]);
   const rangePct = range === "live" ? livePct : rangeChanges[range];
   const isUp = rangePct >= 0;
-  const trendColor = isUp ? c.dataGreen : c.red;
+  const trendColor = isUp ? c.brand : c.red;
   // Color del trazo del chart + timeline: usa el verde-action (mismo
   // que el botón "Ingresar") para que la identidad Alamos se vea más
   // viva en el chart y los rangos. El delta numérico sigue usando
-  // c.dataGreen más oscuro porque ahí lee mejor como "subió".
+  // c.brand más oscuro porque ahí lee mejor como "subió".
   const chartColor = isUp ? c.brand : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];

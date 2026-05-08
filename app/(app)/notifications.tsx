@@ -188,14 +188,14 @@ export default function NotificationsScreen() {
                   style={[
                     s.itemIcon,
                     {
-                      backgroundColor: n.unread ? c.dataGreenDim : c.surfaceHover,
+                      backgroundColor: n.unread ? c.brandDim : c.surfaceHover,
                     },
                   ]}
                 >
                   <Feather
                     name={n.icon}
                     size={16}
-                    color={n.unread ? c.dataGreen : c.text}
+                    color={n.unread ? c.brand : c.text}
                   />
                 </View>
                 <View style={{ flex: 1 }}>

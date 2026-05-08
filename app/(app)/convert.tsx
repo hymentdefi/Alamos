@@ -268,9 +268,9 @@ export default function ConvertScreen() {
             { borderColor: c.border, backgroundColor: c.surface },
           ]}
         >
-          <Feather name="trending-up" size={13} color={c.dataGreen} />
+          <Feather name="trending-up" size={13} color={c.brand} />
           <Text
-            style={[s.rateText, { color: c.dataGreen }]}
+            style={[s.rateText, { color: c.brand }]}
             numberOfLines={1}
           >
             1 {from.currency} = {formatRate(rate, to.currency)}{" "}
@@ -306,7 +306,7 @@ export default function ConvertScreen() {
               onPress={swap}
               hitSlop={8}
             >
-              <Feather name="arrow-down" size={18} color="#FFFFFF" />
+              <Feather name="arrow-down" size={18} color={c.ink} />
             </Pressable>
           </View>
 
@@ -567,7 +567,7 @@ function AccountPickerSheet({
                     <Feather
                       name="check"
                       size={18}
-                      color={c.dataGreen}
+                      color={c.brand}
                       style={{ marginLeft: 10 }}
                     />
                   ) : null}

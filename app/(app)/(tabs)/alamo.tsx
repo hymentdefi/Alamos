@@ -311,7 +311,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: c.surfaceSunken, true: c.dataGreen }}
+        trackColor={{ false: c.surfaceSunken, true: c.brand }}
         thumbColor="#FFFFFF"
       />
     </View>

@@ -224,7 +224,7 @@ function statusColor(
     case "queued":
       return c.textSecondary;
     case "executed":
-      return c.dataGreen;
+      return c.brand;
     case "failed":
       return c.red;
     case "cancelled":

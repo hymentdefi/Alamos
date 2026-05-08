@@ -276,7 +276,7 @@ export default function SuccessScreen() {
           onLayout={onCheckLayout}
           style={[
             s.checkCircle,
-            { backgroundColor: c.dataGreen },
+            { backgroundColor: c.brand },
             checkAnimStyle,
           ]}
         >
@@ -286,7 +286,7 @@ export default function SuccessScreen() {
           <Svg width={44} height={44} viewBox="0 0 24 24">
             <Path
               d="M5 12 L10 17 L19 7"
-              stroke="#FFFFFF"
+              stroke={c.ink}
               strokeWidth={3}
               fill="none"
               strokeLinecap="round"

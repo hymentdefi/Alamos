@@ -365,8 +365,8 @@ export function BankDepositCard({
               Share.share({ message: data.alias }).catch(() => {});
             }}
           >
-            <Feather name="share" size={16} color={c.dataGreen} />
-            <Text style={[s.shareAliasText, { color: c.dataGreen }]}>
+            <Feather name="share" size={16} color={c.brand} />
+            <Text style={[s.shareAliasText, { color: c.brand }]}>
               Compartir alias
             </Text>
           </Tap>
@@ -588,7 +588,7 @@ function CopyRow({
         style={[
           s.copyBtn,
           {
-            backgroundColor: copied ? c.dataGreenDim : c.surfaceHover,
+            backgroundColor: copied ? c.brandDim : c.surfaceHover,
           },
         ]}
         hitSlop={8}
@@ -596,7 +596,7 @@ function CopyRow({
         <Feather
           name={copied ? "check" : "copy"}
           size={16}
-          color={c.dataGreen}
+          color={c.brand}
         />
       </Tap>
     </View>
@@ -629,8 +629,8 @@ function LinkedAccountRow({
       </View>
       {/* Flechita al tocar: dispara el sub-flow de ingresar desde
           esta cuenta. */}
-      <View style={[s.linkedArrow, { backgroundColor: c.dataGreenDim }]}>
-        <Feather name="arrow-down-left" size={16} color={c.dataGreen} />
+      <View style={[s.linkedArrow, { backgroundColor: c.brandDim }]}>
+        <Feather name="arrow-down-left" size={16} color={c.brand} />
       </View>
     </Tap>
   );

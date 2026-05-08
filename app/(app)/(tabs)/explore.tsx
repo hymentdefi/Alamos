@@ -470,7 +470,7 @@ function MarketGlyph({
   // Como el bg ya es verde brand, no necesita el tint extra.
   return (
     <View
-      style={[gs.cryptoBadge, { backgroundColor: c.dataGreen }]}
+      style={[gs.cryptoBadge, { backgroundColor: c.brand }]}
     >
       <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
     </View>
@@ -685,7 +685,7 @@ function MarketBody({
                     <Text
                       style={[
                         s.trendingDelta,
-                        { color: up ? c.dataGreen : c.red },
+                        { color: up ? c.brand : c.red },
                       ]}
                     >
                       {up ? "▲ " : "▼ "}
@@ -799,7 +799,7 @@ function MarketBody({
                       {asset.ticker}
                     </Text>
                     {fav ? (
-                      <Ionicons name="star" size={12} color={c.dataGreen} />
+                      <Ionicons name="star" size={12} color={c.brand} />
                     ) : null}
                   </View>
                   <Text style={[s.rowSub, { color: c.textMuted }]}>
@@ -824,14 +824,14 @@ function MarketBody({
                     /* FCI: mostramos TNA (o rendimiento 12M para RV)
                        en vez del % del día — mucho más representativo
                        para el usuario cuando mira un fondo. */
-                    <Text style={[s.rowYield, { color: c.dataGreen }]}>
+                    <Text style={[s.rowYield, { color: c.brand }]}>
                       TNA {formatPct(asset.annualYield)}
                     </Text>
                   ) : (
                     <Text
                       style={[
                         s.rowChange,
-                        { color: asset.change >= 0 ? c.dataGreen : c.red },
+                        { color: asset.change >= 0 ? c.brand : c.red },
                       ]}
                     >
                       {asset.change >= 0 ? "▲ " : "▼ "}
