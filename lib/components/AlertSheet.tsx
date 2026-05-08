@@ -85,17 +85,17 @@ const KEYS = [
 // (subir/bajar) se infiere del threshold vs precio actual al crear,
 // no la elige el usuario explícitamente.
 //
-// Valores y opacidad: cada chip tiene un peso visual proporcional a
-// la magnitud (cerca del 0 = más translúcido, lejos = sólido).
-//   ±25% → 100 % de opacidad
-//   ±10% → 70  %
-//   ± 5% → 40  %
+// Opacity ramp continua: la magnitud del chip mapea linealmente a la
+// opacidad. ±5 → 35 %, ±10 → 65 %, ±25 → 100 %. Da sensación de
+// "escala" en vez de "botones individuales sueltos".
+//
+// Naranja del lado negativo, verde del positivo.
 const QUICK_CHIPS: { pct: number; opacity: number }[] = [
   { pct: -25, opacity: 1 },
-  { pct: -10, opacity: 0.7 },
-  { pct: -5, opacity: 0.4 },
-  { pct: 5, opacity: 0.4 },
-  { pct: 10, opacity: 0.7 },
+  { pct: -10, opacity: 0.65 },
+  { pct: -5, opacity: 0.35 },
+  { pct: 5, opacity: 0.35 },
+  { pct: 10, opacity: 0.65 },
   { pct: 25, opacity: 1 },
 ];
 
@@ -119,13 +119,6 @@ export function AlertSheet({
   const SLIDER_WIDTH = windowW - 48;
   const { activeForAsset, create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
-  /* CTA SIEMPRE en brand canónico (#00C805) — antes el accent venía
-   * de assetColor (que cambia a rojo si el activo está down). El
-   * usuario quiere consistencia con la marca: la alerta es una acción
-   * positiva del user, no debería pintarse de rojo aunque el asset
-   * esté bajando. */
-  const accent = c.brand;
-
   const isEditing = !!editingAlert;
 
   const activeAlerts = useMemo(
@@ -481,25 +474,11 @@ export function AlertSheet({
                 {isEditing ? "Editando" : "Nueva alerta"}
               </Text>
 
-              {/* Banner del precio actual — referencia fija arriba
-                  del slider para que el user vea qué es 0% y a qué
-                  variación está apuntando con el threshold. */}
-              <View
-                style={[
-                  s.priceRefRow,
-                  { backgroundColor: c.surfaceHover, borderColor: c.border },
-                ]}
-              >
-                <Text style={[s.priceRefLabel, { color: c.textMuted }]}>
-                  Precio actual
-                </Text>
-                <Text style={[s.priceRefValue, { color: c.text }]}>
-                  {formatMoney(asset.price, allCurrencies[0])}
-                </Text>
-              </View>
-
               {/* Display del precio — read-only, alimentado por el
-                  slider, los chips o el keypad in-app de abajo. */}
+                  slider, los chips o el keypad. El banner de "precio
+                  actual" desapareció (vive en el header, era
+                  redundante). El % delta se integra como texto
+                  secundario al lado del precio, no como pill. */}
               <View
                 style={[
                   s.field,
@@ -514,40 +493,6 @@ export function AlertSheet({
                     Precio objetivo
                   </Text>
                   <View style={s.currencyRow}>
-                    {targetValue != null ? (
-                      <View
-                        style={[
-                          s.deltaChip,
-                          {
-                            backgroundColor:
-                              direction === "above" ? c.brandDim : c.redDim,
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name={
-                            direction === "above"
-                              ? "trending-up"
-                              : "trending-down"
-                          }
-                          size={11}
-                          color={direction === "above" ? c.brand : c.red}
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text
-                          style={[
-                            s.deltaChipText,
-                            {
-                              color:
-                                direction === "above" ? c.brand : c.red,
-                            },
-                          ]}
-                        >
-                          {currentPct >= 0 ? "+" : ""}
-                          {currentPct.toFixed(currentPct === 0 ? 0 : 1)}%
-                        </Text>
-                      </View>
-                    ) : null}
                     {allCurrencies.map((cu) => (
                       <View
                         key={cu}
@@ -586,6 +531,23 @@ export function AlertSheet({
                       ]}
                     >
                       ,{thresholdParts.decimals}
+                    </Text>
+                  ) : null}
+                  {/* Delta inline — texto secundario al lado del
+                      precio, no pill. Verde si sube, naranja si baja.
+                      Se omite cuando el threshold está vacío o vale
+                      el precio actual exacto (delta = 0). */}
+                  {targetValue != null && Math.abs(currentPct) >= 0.05 ? (
+                    <Text
+                      style={[
+                        s.fieldDeltaInline,
+                        {
+                          color: direction === "above" ? c.brand : c.red,
+                        },
+                      ]}
+                    >
+                      {currentPct >= 0 ? "+" : ""}
+                      {currentPct.toFixed(1)}%
                     </Text>
                   ) : null}
                 </View>
@@ -673,7 +635,11 @@ export function AlertSheet({
                 style={[
                   s.cta,
                   {
-                    backgroundColor: submitting ? c.textMuted : accent,
+                    /* CTA neutro ink/text — coherente con el botón
+                     * principal de la pantalla de alertas. El brand
+                     * verde lo dejamos para CTAs primarios del flow
+                     * de transacciones (Operar, Comprar, etc.). */
+                    backgroundColor: submitting ? c.textMuted : c.text,
                     opacity: submitting ? 0.7 : 1,
                   },
                 ]}
@@ -681,7 +647,7 @@ export function AlertSheet({
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                <Text style={[s.ctaText, { color: c.onColor }]}>
+                <Text style={[s.ctaText, { color: c.bg }]}>
                   {submitting
                     ? isEditing
                       ? "Guardando…"
@@ -765,9 +731,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  /* Form gap aumentado para que la pantalla respire — el banner
+   * de "precio actual" desapareció y el espacio liberado se reparte
+   * acá, separando precio objetivo / slider / chips / keypad. */
   form: {
     paddingTop: 4,
-    gap: 16,
+    gap: 24,
   },
   eyebrow: {
     fontFamily: fontFamily[700],
@@ -781,40 +750,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 18,
-  },
-  priceRefRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: "continuous",
-  },
-  priceRefLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  priceRefValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-  },
-  deltaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
-  },
-  deltaChipText: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: -0.05,
   },
   fieldHeader: {
     flexDirection: "row",
@@ -845,6 +780,17 @@ const s = StyleSheet.create({
     lineHeight: 22,
     marginTop: 6,
     marginLeft: 2,
+  },
+  /* Delta inline al lado del precio — texto secundario coloreado
+   * por signo. NO es una pill, NO es una chip; es parte del display
+   * tipográfico del precio para que se sienta integrado. */
+  fieldDeltaInline: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.2,
+    lineHeight: 22,
+    marginLeft: 10,
+    marginTop: 8,
   },
   currencyRow: {
     flexDirection: "row",
