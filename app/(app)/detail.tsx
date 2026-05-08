@@ -52,7 +52,6 @@ import {
 import { MarketClosedIcon } from "../../lib/components/MarketClosedIcon";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
-import { AlertSheet } from "../../lib/components/AlertSheet";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
@@ -136,7 +135,6 @@ export default function DetailScreen() {
   const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
-  const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
   /* ─── Sticky header — scroll detection ──────────────────────────
    *
@@ -231,7 +229,12 @@ export default function DetailScreen() {
         <View style={{ flex: 1 }} />
         <PriceAlertButton
           ticker={asset.ticker}
-          onPress={() => setAlertSheetOpen(true)}
+          onPress={() => {
+            router.push({
+              pathname: "/(app)/asset-alerts",
+              params: { ticker: asset.ticker },
+            });
+          }}
         />
         <WatchlistButton ticker={asset.ticker} />
 
@@ -407,15 +410,6 @@ export default function DetailScreen() {
         onConvert={() => router.push("/(app)/convert")}
       />
 
-      {/* AlertSheet — key={ticker} fuerza remount cuando se navega
-          entre activos sin desmontar el screen, así el form arranca
-          en estado limpio para cada activo. */}
-      <AlertSheet
-        key={`alert-${asset.ticker}`}
-        visible={alertSheetOpen}
-        asset={asset}
-        onClose={() => setAlertSheetOpen(false)}
-      />
     </View>
     </AssetColorProvider>
   );

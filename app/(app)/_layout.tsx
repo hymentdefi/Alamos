@@ -85,6 +85,13 @@ export default function AppLayout() {
         />
         <Stack.Screen name="trade" />
         <Stack.Screen name="briefing" />
+        {/* Asset alerts — pantalla full-screen con la lista de
+            alertas custom del activo. Slide_from_bottom para
+            que se sienta deep-dive. */}
+        <Stack.Screen
+          name="asset-alerts"
+          options={{ animation: "slide_from_bottom" }}
+        />
         {/* Buy: fullscreen gesture OFF para que arrastrar el slider no
             dispare el swipe-back. El swipe desde el borde izquierdo sigue
             andando como back. */}
