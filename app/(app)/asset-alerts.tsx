@@ -55,6 +55,12 @@ export default function AssetAlertsScreen() {
 
   const [tab, setTab] = useState<Tab>("price");
   const [createOpen, setCreateOpen] = useState(false);
+  /* Si !== null, abrimos la AlertSheet en modo EDIT con esta alerta.
+   * Coexiste con createOpen — son flujos exclusivos: o creás (sheet
+   * sin editingAlert) o editás una existente (sheet con la alerta). */
+  const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(
+    null,
+  );
 
   const { activeForAsset, remove } = useAlerts();
   const alertsForAsset = useMemo(
@@ -129,6 +135,10 @@ export default function AssetAlertsScreen() {
                   alert={alert}
                   asset={asset}
                   withTopDivider={i > 0}
+                  onEdit={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setEditingAlert(alert);
+                  }}
                   onDelete={() => handleDelete(alert)}
                 />
               ))}
@@ -156,7 +166,10 @@ export default function AssetAlertsScreen() {
             style={({ pressed }) => [
               s.cta,
               {
-                backgroundColor: c.text,
+                /* CTA en brand canónico — coherencia con el resto
+                 * de los CTAs verdes de la app (ingresar, comprar,
+                 * crear alerta dentro del sheet). */
+                backgroundColor: c.brand,
                 opacity: pressed ? 0.86 : 1,
               },
             ]}
@@ -165,19 +178,33 @@ export default function AssetAlertsScreen() {
               setCreateOpen(true);
             }}
           >
-            <Text style={[s.ctaText, { color: c.bg }]}>
+            <Text style={[s.ctaText, { color: c.onColor }]}>
               Agregar alerta
             </Text>
           </Pressable>
         </View>
       ) : null}
 
+      {/* Sheet de creación — sin editingAlert. */}
       <AlertSheet
-        key={asset.ticker}
+        key={`create-${asset.ticker}`}
         visible={createOpen}
         asset={asset}
         onClose={() => setCreateOpen(false)}
       />
+
+      {/* Sheet de edición — montada sólo cuando hay una alerta para
+       *  editar. La key incluye el id del alert para que cada edición
+       *  sea un mount fresco con su threshold precargado. */}
+      {editingAlert ? (
+        <AlertSheet
+          key={`edit-${editingAlert.id}`}
+          visible
+          asset={asset}
+          editingAlert={editingAlert}
+          onClose={() => setEditingAlert(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -272,17 +299,23 @@ function AlertRow({
   alert,
   asset,
   withTopDivider,
+  onEdit,
   onDelete,
 }: {
   alert: PriceAlert;
   asset: Asset;
   withTopDivider: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const { c } = useTheme();
   const cur = assetCurrency(asset);
   const dirIcon = alert.direction === "above" ? "arrow-up" : "arrow-down";
   const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
+  /* Toda la fila (excepto el botón de borrar) es tappeable y abre la
+   * AlertSheet en modo edit. El delete queda separado a la derecha
+   * con su propio Pressable para que el tap target del edit no
+   * compita con el del delete. */
   return (
     <View
       style={[
@@ -293,23 +326,39 @@ function AlertRow({
         },
       ]}
     >
-      <View
-        style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}
+      <Pressable
+        onPress={onEdit}
+        style={({ pressed }) => [
+          s.alertRowTap,
+          { opacity: pressed ? 0.7 : 1 },
+        ]}
+        accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
       >
-        <Feather name={dirIcon} size={16} color={c.text} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[s.alertLabel, { color: c.textMuted }]}>
-          {dirLabel}
-        </Text>
-        <Text style={[s.alertPrice, { color: c.text }]}>
-          {formatMoney(alert.threshold, cur)}
-        </Text>
-      </View>
+        <View
+          style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}
+        >
+          <Feather name={dirIcon} size={16} color={c.text} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.alertLabel, { color: c.textMuted }]}>
+            {dirLabel}
+          </Text>
+          <Text style={[s.alertPrice, { color: c.text }]}>
+            {formatMoney(alert.threshold, cur)}
+          </Text>
+        </View>
+        <Feather
+          name="chevron-right"
+          size={18}
+          color={c.textMuted}
+          style={{ marginRight: 8 }}
+        />
+      </Pressable>
       <Pressable
         hitSlop={10}
         onPress={onDelete}
         style={[s.deleteBtn, { backgroundColor: c.surfaceHover }]}
+        accessibilityLabel="Eliminar alerta"
       >
         <Feather name="trash-2" size={16} color={c.textMuted} />
       </Pressable>
@@ -396,8 +445,14 @@ const s = StyleSheet.create({
   alertRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 8,
     paddingVertical: 14,
+  },
+  alertRowTap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
   },
   dirBadge: {
     width: 36,

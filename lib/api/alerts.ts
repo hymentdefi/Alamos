@@ -183,6 +183,56 @@ export async function deleteAlert(
   throw new AlertApiError("deleteAlert no implementado");
 }
 
+/** PATCH /alerts/:id — Update threshold + direction de una alerta
+ *  existente. La currency y assetId no se cambian (si querés otra
+ *  combinación, borrala y creá una nueva). El backend hará el mismo
+ *  check de duplicado que en create. Conserva el id (importante para
+ *  que la UI pueda mantener la posición en la lista durante el edit). */
+export async function updateAlert(
+  alertId: string,
+  patch: { threshold: number; direction: AlertDirection },
+  _accessToken?: string,
+): Promise<PriceAlert> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const idx = _mockStore.findIndex((a) => a.id === alertId);
+    if (idx === -1) {
+      throw new AlertApiError("Alerta no encontrada.", "invalid");
+    }
+    if (!isFinite(patch.threshold) || patch.threshold <= 0) {
+      throw new AlertApiError(
+        "El precio objetivo debe ser mayor a 0.",
+        "invalid",
+      );
+    }
+    // Check duplicado contra OTRAS alertas (excluyendo ésta).
+    const current = _mockStore[idx];
+    const dup = _mockStore.find(
+      (a) =>
+        a.id !== alertId &&
+        a.status === "active" &&
+        a.assetId === current.assetId &&
+        a.direction === patch.direction &&
+        a.currency === current.currency &&
+        a.threshold === patch.threshold,
+    );
+    if (dup) {
+      throw new AlertApiError(
+        "Ya tenés una alerta configurada a este precio.",
+        "duplicate",
+      );
+    }
+    const updated: PriceAlert = {
+      ...current,
+      threshold: patch.threshold,
+      direction: patch.direction,
+    };
+    _mockStore[idx] = updated;
+    return updated;
+  }
+  throw new AlertApiError("updateAlert no implementado");
+}
+
 /* ─── Helpers para tests / dev ──────────────────────────────── */
 
 /** Reset del store mock — útil sólo para dev/storybook. */

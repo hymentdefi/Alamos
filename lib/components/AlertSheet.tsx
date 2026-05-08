@@ -38,7 +38,6 @@ import {
   type PriceAlert,
 } from "../api/alerts";
 import { useToast } from "../toast/context";
-import { useAssetColorOptional } from "../asset-color/context";
 
 /**
  * Bottom sheet de creación + gestión de alertas para un activo.
@@ -62,6 +61,11 @@ import { useAssetColorOptional } from "../asset-color/context";
 interface Props {
   visible: boolean;
   asset: Asset;
+  /** Si está presente, la sheet abre en modo EDICIÓN: precarga el
+   *  threshold + currency de la alerta, el CTA dice "Guardar" y al
+   *  submit llama update() en lugar de create(). Si es undefined,
+   *  modo CREACIÓN normal. */
+  editingAlert?: PriceAlert;
   onClose: () => void;
 }
 
@@ -81,15 +85,25 @@ const KEYS = [
 // no la elige el usuario explícitamente.
 const QUICK_PCTS = [-25, -10, -5, 5, 10, 25] as const;
 
-export function AlertSheet({ visible, asset, onClose }: Props) {
+export function AlertSheet({
+  visible,
+  asset,
+  editingAlert,
+  onClose,
+}: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { height: windowH } = useWindowDimensions();
-  const { activeForAsset, create, remove } = useAlerts();
+  const { activeForAsset, create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
-  const assetColor = useAssetColorOptional();
+  /* CTA SIEMPRE en brand canónico (#00C805) — antes el accent venía
+   * de assetColor (que cambia a rojo si el activo está down). El
+   * usuario quiere consistencia con la marca: la alerta es una acción
+   * positiva del user, no debería pintarse de rojo aunque el asset
+   * esté bajando. */
+  const accent = c.brand;
 
-  const accent = assetColor ? assetColor.color : c.brand;
+  const isEditing = !!editingAlert;
 
   const activeAlerts = useMemo(
     () => activeForAsset(asset.ticker),
@@ -97,23 +111,36 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
   );
 
   // Form state — se resetea cada vez que se abre la sheet con un
-  // activo nuevo (key={asset.ticker} en el padre asegura remount).
+  // activo nuevo (key del padre asegura remount). En modo edit
+  // arrancamos con el threshold de la alerta.
   const [threshold, setThreshold] = useState("");
   const [currency, setCurrency] = useState<AssetCurrency>(
-    () => assetCurrency(asset),
+    () => editingAlert?.currency ?? assetCurrency(asset),
   );
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Reset al cambiar visibilidad — pasada la animación de cierre,
   // limpiamos el form para que la próxima apertura arranque limpia.
+  // En modo edit, precargamos el threshold con el formato del keypad
+  // (punto como separador decimal, sin separadores de miles).
   useEffect(() => {
     if (visible) {
-      setThreshold("");
-      setCurrency(assetCurrency(asset));
+      if (editingAlert) {
+        const decimals = editingAlert.currency === "USDT" ? 4 : 2;
+        const txt = editingAlert.threshold.toFixed(decimals);
+        // Saco trailing zeros si los hay (1500.00 → 1500).
+        setThreshold(
+          txt.includes(".") ? txt.replace(/\.?0+$/, "") : txt,
+        );
+        setCurrency(editingAlert.currency);
+      } else {
+        setThreshold("");
+        setCurrency(assetCurrency(asset));
+      }
       setErrorMsg(null);
     }
-  }, [visible, asset]);
+  }, [visible, asset, editingAlert]);
 
   /* ─── Animación bottom sheet (mismo patrón que MarketClosedSheet) ─── */
 
@@ -187,7 +214,7 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
 
   /* ─── Handlers ─── */
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     setErrorMsg(null);
     const value = parseFloat(threshold.replace(",", "."));
     if (!isFinite(value) || value <= 0) {
@@ -199,22 +226,34 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
     const direction: AlertDirection = value >= asset.price ? "above" : "below";
     setSubmitting(true);
     try {
-      await create({
-        assetId: asset.ticker,
-        threshold: value,
-        direction,
-        currency,
-      });
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-      showToast("Alerta creada", { variant: "success" });
+      if (editingAlert) {
+        await update(editingAlert.id, { threshold: value, direction });
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => {});
+        showToast("Alerta actualizada", { variant: "success" });
+      } else {
+        await create({
+          assetId: asset.ticker,
+          threshold: value,
+          direction,
+          currency,
+        });
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => {});
+        showToast("Alerta creada", { variant: "success" });
+      }
       dismiss();
     } catch (e) {
       if (isDuplicateAlertError(e)) {
         setErrorMsg("Ya tenés una alerta configurada a este precio.");
       } else {
-        setErrorMsg("No pudimos crear la alerta. Reintentá.");
+        setErrorMsg(
+          editingAlert
+            ? "No pudimos actualizar la alerta. Reintentá."
+            : "No pudimos crear la alerta. Reintentá.",
+        );
       }
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Warning,
@@ -331,14 +370,14 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
 
             <View style={s.header}>
               <Text style={[s.title, { color: c.text }]}>
-                Alertas de precio
+                {isEditing ? "Editar alerta" : "Nueva alerta de precio"}
               </Text>
               <Text style={[s.subtitle, { color: c.textMuted }]}>
                 {asset.name} · {asset.ticker}
               </Text>
             </View>
 
-            {activeAlerts.length > 0 ? (
+            {!isEditing && activeAlerts.length > 0 ? (
               <View style={s.activeList}>
                 {activeAlerts.map((a) => (
                   <View
@@ -371,7 +410,7 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
 
             <View style={s.form}>
               <Text style={[s.eyebrow, { color: c.textMuted }]}>
-                Nueva alerta
+                {isEditing ? "Editando" : "Nueva alerta"}
               </Text>
 
               {/* Display del precio — read-only, alimentado por el
@@ -503,11 +542,17 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
                   },
                 ]}
                 haptic="medium"
-                onPress={handleCreate}
+                onPress={handleSubmit}
                 disabled={submitting}
               >
-                <Text style={[s.ctaText, { color: c.bg }]}>
-                  {submitting ? "Creando…" : "Crear alerta"}
+                <Text style={[s.ctaText, { color: c.onColor }]}>
+                  {submitting
+                    ? isEditing
+                      ? "Guardando…"
+                      : "Creando…"
+                    : isEditing
+                    ? "Guardar cambios"
+                    : "Crear alerta"}
                 </Text>
               </Tap>
             </View>
@@ -531,31 +576,31 @@ const s = StyleSheet.create({
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 8,
   },
   grabber: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   grabberPill: {
-    width: 40,
+    width: 44,
     height: 4,
     borderRadius: 2,
   },
   header: {
-    paddingTop: 4,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   title: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.7,
+    fontSize: 26,
+    letterSpacing: -0.9,
   },
   subtitle: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 14,
+    marginTop: 4,
     letterSpacing: -0.1,
   },
   activeList: {
@@ -586,7 +631,7 @@ const s = StyleSheet.create({
   },
   form: {
     paddingTop: 4,
-    gap: 12,
+    gap: 16,
   },
   eyebrow: {
     fontFamily: fontFamily[700],
@@ -596,10 +641,10 @@ const s = StyleSheet.create({
   },
   field: {
     borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
+    borderRadius: radius.lg,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
   },
   fieldHeader: {
     flexDirection: "row",
@@ -619,17 +664,17 @@ const s = StyleSheet.create({
   },
   fieldDisplayInteger: {
     fontFamily: fontFamily[700],
-    fontSize: 28,
-    letterSpacing: -0.6,
-    lineHeight: 30,
+    fontSize: 36,
+    letterSpacing: -0.9,
+    lineHeight: 38,
   },
   fieldDisplayDecimals: {
     fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-    lineHeight: 16,
-    marginTop: 4,
-    marginLeft: 1,
+    fontSize: 18,
+    letterSpacing: -0.3,
+    lineHeight: 22,
+    marginTop: 6,
+    marginLeft: 2,
   },
   currencyRow: {
     flexDirection: "row",
@@ -637,11 +682,11 @@ const s = StyleSheet.create({
   },
   quickRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
   },
   quickChip: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 11,
     paddingHorizontal: 4,
     alignItems: "center",
     borderRadius: radius.pill,
@@ -649,12 +694,12 @@ const s = StyleSheet.create({
   },
   quickText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: -0.1,
   },
   keypad: {
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   keyRow: {
     flexDirection: "row",
@@ -662,13 +707,13 @@ const s = StyleSheet.create({
   },
   keyBtn: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   keyText: {
     fontFamily: fontFamily[600],
-    fontSize: 24,
+    fontSize: 28,
     letterSpacing: -0.5,
   },
   currencyChip: {
@@ -689,15 +734,15 @@ const s = StyleSheet.create({
     marginTop: -4,
   },
   cta: {
-    height: 52,
-    borderRadius: radius.btn,
+    height: 58,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
+    marginTop: 8,
   },
   ctaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontFamily: fontFamily[800],
+    fontSize: 17,
     letterSpacing: -0.2,
   },
 });
