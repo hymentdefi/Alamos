@@ -255,7 +255,10 @@ function OptionCard({
         </Text>
         {selected ? (
           <View style={[cs.checkBubble, { backgroundColor: accent }]}>
-            <Text style={cs.checkText}>✓</Text>
+            {/* check sobre bg verde brand → c.onColor (blanco en light,
+             *  casi-negro en dark). Antes era hardcoded #0E0F0C, lo
+             *  que invertía mal el contraste en light mode. */}
+            <Text style={[cs.checkText, { color: c.onColor }]}>✓</Text>
           </View>
         ) : null}
       </View>
@@ -356,7 +359,6 @@ const cs = StyleSheet.create({
     justifyContent: "center",
   },
   checkText: {
-    color: "#0E0F0C",
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 13,
