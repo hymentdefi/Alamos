@@ -225,7 +225,7 @@ export default function ChatScreen() {
                   s.headerInitial,
                   {
                     color:
-                      selectedAgent.tone === "green" ? c.ink : "#FFFFFF",
+                      selectedAgent.tone === "green" ? c.onColor : "#FFFFFF",
                   },
                 ]}
               >
@@ -251,8 +251,8 @@ export default function ChatScreen() {
 
         {urgent ? (
           <View style={[s.urgentPill, { backgroundColor: c.red }]}>
-            <Feather name="alert-triangle" size={10} color="#0E0F0C" />
-            <Text style={s.urgentPillText}>URGENTE</Text>
+            <Feather name="alert-triangle" size={10} color={c.onColor} />
+            <Text style={[s.urgentPillText, { color: c.onColor }]}>URGENTE</Text>
           </View>
         ) : (
           <View style={{ width: 40 }} />

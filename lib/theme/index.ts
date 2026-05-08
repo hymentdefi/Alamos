@@ -88,6 +88,13 @@ const light = {
   red: "#EB5D2A",
   redDim: "rgba(235,93,42,0.12)",
   ink: brand.ink,
+  /* Texto que va ENCIMA de un fondo de color (brand verde, red,
+   * etc.). En light mode el bg de la app ya es blanco — sobre
+   * pills/botones verdes el texto blanco mantiene contraste y se
+   * lee como CTA clásico. En dark mode (ver `dark.onColor`),
+   * el texto pasa a casi-negro porque el verde brand sobre fondo
+   * negro se siente vibrante y el texto negro le da peso. */
+  onColor: "#FFFFFF",
 } as const;
 
 /* Dark mode — negro puro (pure-black OLED). */
@@ -120,6 +127,9 @@ const dark = {
   red: "#F26A3D",
   redDim: "rgba(242,106,61,0.16)",
   ink: "#000000",
+  /* Ver `light.onColor` — en dark, el texto sobre verde brand /
+   * red es casi-negro para darle peso al CTA. */
+  onColor: "#0E0F0C",
 } as const;
 
 
@@ -146,6 +156,9 @@ export interface ThemeColors {
   red: string;
   redDim: string;
   ink: string;
+  /* Texto/iconos sobre fondos de color (brand, red). Cambia con
+   * el modo: blanco en light, casi-negro en dark. */
+  onColor: string;
 }
 export type ThemeMode = "light" | "dark";
 

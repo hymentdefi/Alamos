@@ -376,6 +376,11 @@ function BaseHome() {
   // viva en el chart y los rangos. El delta numérico sigue usando
   // c.brand más oscuro porque ahí lee mejor como "subió".
   const chartColor = isUp ? c.brand : c.red;
+  /* Color específico para la LÍNEA del Sparkline — usa
+   * c.dataGreen, que en dark mode resuelve al #5AC53A más
+   * suave (no machaca el ojo cuando mirás el chart fijo).
+   * En light queda igual al brand. Mismo patrón que detail.tsx. */
+  const sparklineColor = isUp ? c.dataGreen : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -623,7 +628,7 @@ function BaseHome() {
           <View style={[s.chartWrap, { marginTop: 18 }]}>
             <Sparkline
               series={series}
-              color={chartColor}
+              color={sparklineColor}
               height={300}
               withFill={false}
               sheen

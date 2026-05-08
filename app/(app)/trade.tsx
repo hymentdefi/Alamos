@@ -393,7 +393,7 @@ export default function TradeScreen() {
               <Text
                 style={[
                   s.sideBtnText,
-                  { color: side === "buy" ? c.ink : c.textMuted },
+                  { color: side === "buy" ? c.onColor : c.textMuted },
                 ]}
               >
                 Comprar / Long
@@ -409,7 +409,7 @@ export default function TradeScreen() {
               <Text
                 style={[
                   s.sideBtnText,
-                  { color: side === "sell" ? c.ink : c.textMuted },
+                  { color: side === "sell" ? c.onColor : c.textMuted },
                 ]}
               >
                 Vender / Short
@@ -473,7 +473,7 @@ export default function TradeScreen() {
                       <Text
                         style={[
                           s.levPillText,
-                          { color: active ? c.ink : c.textMuted },
+                          { color: active ? c.onColor : c.textMuted },
                         ]}
                       >
                         {l}x
@@ -591,10 +591,10 @@ export default function TradeScreen() {
             <Text
               style={[
                 s.submitText,
-                /* Texto negro siempre — sea sobre verde brand
-                 * (Comprar) o rojo (Vender). Coherente con el
-                 * resto de CTAs sobre fondos coloridos. */
-                { color: c.ink },
+                /* Texto sobre el bg coloreado (verde brand o red).
+                 * c.onColor cambia con el modo: blanco en light,
+                 * casi-negro en dark. */
+                { color: c.onColor },
               ]}
             >
               {side === "buy" ? "Comprar" : "Vender"}{" "}

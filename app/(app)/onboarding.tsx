@@ -149,7 +149,7 @@ function SlideView({ slide }: { slide: Slide }) {
         <Text
           style={[
             s.titleAccent,
-            { backgroundColor: c.brand, color: c.ink },
+            { backgroundColor: c.brand, color: c.onColor },
           ]}
         >
           {slide.accent}

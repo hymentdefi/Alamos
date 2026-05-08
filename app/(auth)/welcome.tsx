@@ -34,7 +34,7 @@ export default function WelcomeScreen() {
           <Text
             style={[
               s.displayAccent,
-              { backgroundColor: c.brand, color: c.ink },
+              { backgroundColor: c.brand, color: c.onColor },
             ]}
           >
             simples

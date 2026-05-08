@@ -75,7 +75,7 @@ function fireErrorHaptic() {
  *
  * Todo corre en UI thread (useSharedValue + useAnimatedStyle).
  */
-function CrossFadeStatusText({ text }: { text: string }) {
+function CrossFadeStatusText({ text, color }: { text: string; color: string }) {
   const [slots, setSlots] = useState<{ a: string; b: string }>({
     a: text,
     b: "",
@@ -161,8 +161,12 @@ function CrossFadeStatusText({ text }: { text: string }) {
 
   return (
     <View style={cfStyles.wrap}>
-      <Animated.Text style={[cfStyles.slot, aStyle]}>{slots.a}</Animated.Text>
-      <Animated.Text style={[cfStyles.slot, bStyle]}>{slots.b}</Animated.Text>
+      <Animated.Text style={[cfStyles.slot, { color }, aStyle]}>
+        {slots.a}
+      </Animated.Text>
+      <Animated.Text style={[cfStyles.slot, { color }, bStyle]}>
+        {slots.b}
+      </Animated.Text>
     </View>
   );
 }
@@ -278,7 +282,7 @@ export default function ConfirmScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode: themeMode } = useTheme();
   const { width: windowW, height: windowH } = useWindowDimensions();
 
   const asset = assets.find((a) => a.ticker === ticker);
@@ -947,7 +951,11 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="rgba(14,15,12,0.12)"
+                  stroke={
+                    themeMode === "dark"
+                      ? "rgba(14,15,12,0.12)"
+                      : "rgba(255,255,255,0.30)"
+                  }
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                 />
@@ -955,7 +963,7 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="#0E0F0C"
+                  stroke={c.onColor}
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                   strokeLinecap="round"
@@ -984,7 +992,7 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="#0E0F0C"
+                  stroke={c.onColor}
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                 />
@@ -1000,7 +1008,7 @@ export default function ConfirmScreen() {
                 style={{
                   width: logoInnerSize,
                   height: logoInnerSize,
-                  tintColor: "#0E0F0C",
+                  tintColor: c.onColor,
                 }}
                 resizeMode="contain"
               />
@@ -1017,7 +1025,7 @@ export default function ConfirmScreen() {
               >
                 <AnimatedPath
                   d="M5 12 L10 17 L19 7"
-                  stroke="#0E0F0C"
+                  stroke={c.onColor}
                   strokeWidth={3}
                   fill="none"
                   strokeLinecap="round"
@@ -1037,9 +1045,9 @@ export default function ConfirmScreen() {
               El error title sigue en un slot separado porque tiene
               tipografía distinta (28 px vs 34 px). */}
           <View style={s.textContainer}>
-            <CrossFadeStatusText text={statusText} />
+            <CrossFadeStatusText text={statusText} color={c.onColor} />
             <Animated.View style={[s.textSlot, errTitleStyle]}>
-              <Text style={s.errorTitle}>
+              <Text style={[s.errorTitle, { color: c.onColor }]}>
                 No pudimos confirmar tu orden
               </Text>
             </Animated.View>
@@ -1054,7 +1062,19 @@ export default function ConfirmScreen() {
             style={[s.subtitleWrap, errSubStyle]}
             pointerEvents="none"
           >
-            <Text style={s.errorSubtitle}>
+            <Text
+              style={[
+                s.errorSubtitle,
+                /* En light el bg del overlay es verde brand → texto blanco al 85 %
+                 * lee bien. En dark, queda casi-negro al 70 %. */
+                {
+                  color:
+                    themeMode === "dark"
+                      ? "rgba(14,15,12,0.7)"
+                      : "rgba(255,255,255,0.85)",
+                },
+              ]}
+            >
               {bridge
                 ? "Tu conversión quedó comprometida. Podés reintentar o reenviar a otro CBU desde tu portafolio."
                 : "Revisa el estado en tu portafolio"}
@@ -1094,10 +1114,22 @@ export default function ConfirmScreen() {
                   router.back();
                 }
               }}
-              style={s.errorBtn}
+              style={[
+                s.errorBtn,
+                /* La pill del CTA de error es semi-transparente sobre
+                 * el cover de color. En dark el fondo de la pill se
+                 * apoya en negro al 15 %; en light, sobre blanco al
+                 * 22 % para mantener legibilidad. */
+                {
+                  backgroundColor:
+                    themeMode === "dark"
+                      ? "rgba(14,15,12,0.15)"
+                      : "rgba(255,255,255,0.22)",
+                },
+              ]}
               hitSlop={12}
             >
-              <Text style={s.errorBtnText}>
+              <Text style={[s.errorBtnText, { color: c.onColor }]}>
                 {bridge ? "Reenviar a otro CBU" : "Volver"}
               </Text>
             </Pressable>

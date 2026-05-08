@@ -25,7 +25,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
-import { fontFamily, radius } from "../theme";
+import { fontFamily, radius, useTheme } from "../theme";
 
 /* ─── Constantes del gesto (calibradas contra Robinhood) ──────────── */
 
@@ -134,6 +134,11 @@ export function SwipeToSubmit({
   style,
   progressOut,
 }: SwipeToSubmitProps) {
+  /* Color del label/chevron sobre el bg verde brand del pill. En light
+   * el bg de la app es blanco y el texto debe ser blanco también para
+   * el patrón clásico de CTA. En dark, el verde brand sobre fondo
+   * negro lee mejor con texto casi-negro encima. */
+  const { c } = useTheme();
   // progress 0..1: 0 = pill en reposo; 1 = swipe completo.
   const progress = useSharedValue(0);
   // Flag en UI thread para disparar el haptic-medium una sola vez al
@@ -377,16 +382,34 @@ export function SwipeToSubmit({
         onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
         style={[s.pill, { backgroundColor }, pillStyle, style]}
       >
-        {/* Base: chevron + texto atenuados. Siempre visibles. */}
+        {/* Base: chevron + texto atenuados. Siempre visibles.
+         *  En dark el contraste se construye con casi-negro al 72 %;
+         *  en light, con blanco al 72 % sobre el verde brand. */}
         <Animated.View style={chevronStyle}>
           <Feather
             name="chevron-up"
             size={14}
-            color="rgba(255,255,255,0.72)"
+            color={
+              c.onColor === "#FFFFFF"
+                ? "rgba(255,255,255,0.72)"
+                : "rgba(14,15,12,0.72)"
+            }
             style={{ marginBottom: 2 }}
           />
         </Animated.View>
-        <Text style={s.label}>{label}</Text>
+        <Text
+          style={[
+            s.label,
+            {
+              color:
+                c.onColor === "#FFFFFF"
+                  ? "rgba(255,255,255,0.72)"
+                  : "rgba(14,15,12,0.72)",
+            },
+          ]}
+        >
+          {label}
+        </Text>
 
         {/* Shimmer overlay clippeado a la FORMA del chevron+texto via
             MaskedView. El LinearGradient corre en un Animated.View que
@@ -404,10 +427,12 @@ export function SwipeToSubmit({
                   <Feather
                     name="chevron-up"
                     size={14}
-                    color="#FFFFFF"
+                    color={c.onColor}
                     style={{ marginBottom: 2 }}
                   />
-                  <Text style={s.maskLabel}>{label}</Text>
+                  <Text style={[s.maskLabel, { color: c.onColor }]}>
+                    {label}
+                  </Text>
                 </View>
               }
             >
