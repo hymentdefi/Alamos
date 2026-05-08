@@ -453,7 +453,7 @@ const cs = StyleSheet.create({
     justifyContent: "center",
   },
   checkText: {
-    color: "#FFFFFF",
+    color: "#0E0F0C",
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 13,

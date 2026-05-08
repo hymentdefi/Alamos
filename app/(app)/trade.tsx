@@ -584,7 +584,16 @@ export default function TradeScreen() {
               { backgroundColor: side === "buy" ? c.green : c.red },
             ]}
           >
-            <Text style={[s.submitText, { color: "#FFFFFF" }]}>
+            <Text
+              style={[
+                s.submitText,
+                // Texto negro sobre verde brand (en ambos modes,
+                // para mantener consistencia con el resto de los
+                // botones verdes). Sobre rojo, blanco que es lo que
+                // funciona naturalmente.
+                { color: side === "buy" ? c.ink : "#FFFFFF" },
+              ]}
+            >
               {side === "buy" ? "Comprar" : "Vender"}{" "}
               {asset.ticker.split("/")[0]?.replace(".P", "") ?? asset.ticker}
             </Text>
