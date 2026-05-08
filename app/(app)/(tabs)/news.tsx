@@ -795,6 +795,7 @@ function DetailSheet({
   item: NewsItem | null;
   onClose: () => void;
 }) {
+  const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
 
@@ -929,12 +930,15 @@ function DetailSheet({
                   <View style={sheet.tickersRow}>
                     {item.tickers.map((t) => {
                       const change = TICKER_CHANGE.get(t) ?? null;
+                      /* tone respeta el theme: c.text para neutral,
+                       * c.brand (#00C805 en ambos modos) para change up,
+                       * c.red (naranja del down state) para change down. */
                       const tone =
                         change == null
-                          ? "#0E0F0C"
+                          ? c.text
                           : change >= 0
-                          ? "#00C805"
-                          : "#EB5D2A";
+                          ? c.brand
+                          : c.red;
                       return (
                         <View key={t} style={sheet.tickerPill}>
                           <Text style={[sheet.tickerText, { color: tone }]}>
