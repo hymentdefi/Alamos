@@ -3,7 +3,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   useWindowDimensions,
   View,
@@ -30,15 +29,6 @@ interface Props {
   /** Si el chart considera ingresos/egresos al calcular la curva. */
   considerCashflow: boolean;
   onChangeConsiderCashflow: (next: boolean) => void;
-  /** Privacy mode — oculta los montos del home con `••••.•••`. */
-  hideAmounts: boolean;
-  onChangeHideAmounts: (next: boolean) => void;
-  /** Línea de referencia horizontal en el inicio del periodo. */
-  referenceLine: boolean;
-  onChangeReferenceLine: (next: boolean) => void;
-  /** Suavizado del trazo del chart (smooth bezier vs stepped). */
-  smoothChart: boolean;
-  onChangeSmoothChart: (next: boolean) => void;
   onClose: () => void;
 }
 
@@ -55,12 +45,6 @@ export function ChartSettingsSheet({
   visible,
   considerCashflow,
   onChangeConsiderCashflow,
-  hideAmounts,
-  onChangeHideAmounts,
-  referenceLine,
-  onChangeReferenceLine,
-  smoothChart,
-  onChangeSmoothChart,
   onClose,
 }: Props) {
   const { c } = useTheme();
@@ -214,37 +198,6 @@ export function ChartSettingsSheet({
             />
           </View>
 
-          {/* Toggles compactos — el resto de los settings. */}
-          <Text style={[s.eyebrow, { color: c.textMuted, marginTop: 18 }]}>
-            PREFERENCIAS
-          </Text>
-          <View
-            style={[
-              s.toggleList,
-              { backgroundColor: c.surface, borderColor: c.border },
-            ]}
-          >
-            <ToggleRow
-              label="Modo privacidad"
-              description="Oculta los montos como ••••"
-              value={hideAmounts}
-              onChange={onChangeHideAmounts}
-              divider
-            />
-            <ToggleRow
-              label="Línea de referencia"
-              description="Horizontal al inicio del periodo"
-              value={referenceLine}
-              onChange={onChangeReferenceLine}
-              divider
-            />
-            <ToggleRow
-              label="Suavizar el trazo"
-              description="Curva continua en vez de líneas filosas"
-              value={smoothChart}
-              onChange={onChangeSmoothChart}
-            />
-          </View>
         </Animated.View>
       </GestureDetector>
     </Modal>
@@ -319,50 +272,6 @@ function OptionCard({
   );
 }
 
-function ToggleRow({
-  label,
-  description,
-  value,
-  onChange,
-  divider,
-}: {
-  label: string;
-  description: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-  divider?: boolean;
-}) {
-  const { c } = useTheme();
-  return (
-    <View
-      style={[
-        ts.row,
-        divider && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: c.border,
-        },
-      ]}
-    >
-      <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text style={[ts.label, { color: c.text }]}>{label}</Text>
-        <Text style={[ts.description, { color: c.textMuted }]}>
-          {description}
-        </Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={(next) => {
-          Haptics.selectionAsync().catch(() => {});
-          onChange(next);
-        }}
-        trackColor={{ false: c.surfaceSunken, true: c.brand }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor={c.surfaceSunken}
-      />
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -412,12 +321,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  toggleList: {
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-  },
 });
 
 const cs = StyleSheet.create({
@@ -466,22 +369,3 @@ const cs = StyleSheet.create({
   },
 });
 
-const ts = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  label: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-    marginBottom: 2,
-  },
-  description: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.05,
-  },
-});
