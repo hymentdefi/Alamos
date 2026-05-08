@@ -118,7 +118,7 @@ export default function AssetAlertsScreen() {
         {tab === "price" ? (
           alertsForAsset.length === 0 ? (
             <EmptyState
-              illustration={<AlertBellIllustration size={130} />}
+              illustration={<AlertBellIllustration size={160} />}
               text="Creá tus propios umbrales de precio. Te notificamos cuando el activo los cruza."
             />
           ) : (

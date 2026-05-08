@@ -88,16 +88,21 @@ const dark = {
   textMuted: "#848E9C",
   textFaint: "#5E6673",
 
+  /* Verdes dark mode — TODOS al brand canónico (#00C805). Antes
+   * action/positive/green/greenDark variaban (#4FB833 / #02A05C),
+   * lo que hacía que en dark mode los charts y deltas se vieran
+   * de un verde distinto al brand del logo / action buttons /
+   * briefing. Unificar a #00C805 elimina esa inconsistencia. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.18)",
-  action: "#4FB833",
-  actionDim: "rgba(79,184,51,0.16)",
-  positive: "#02A05C",
-  positiveDim: "rgba(2,160,92,0.16)",
+  action: "#00C805",
+  actionDim: "rgba(0,200,5,0.18)",
+  positive: "#00C805",
+  positiveDim: "rgba(0,200,5,0.18)",
 
-  green: "#4FB833",
-  greenDark: "#02A05C",
-  greenDim: "rgba(2,160,92,0.16)",
+  green: "#00C805",
+  greenDark: "#00C805",
+  greenDim: "rgba(0,200,5,0.18)",
 
   // Naranja "down" en dark — un toque más saturado que en light
   // para mantener legibilidad sobre fondo OLED.
