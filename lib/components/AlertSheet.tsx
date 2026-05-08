@@ -105,6 +105,18 @@ const QUICK_CHIPS: { pct: number; opacity: number }[] = [
  * el valor que el usuario ingresó por keypad). */
 const SLIDER_RANGE = 30;
 
+/* Límites HARD del threshold de la alerta — más allá de esto
+ * tampoco aceptamos. Evita que el user se mande una alerta a +500 %
+ * (que probablemente sea un typo o nunca dispare) o a -99 %
+ * (precio rozando 0). El backend va a hacer su propia validación
+ * cuando lo conectemos.
+ *
+ *   PCT_MIN = -90  → threshold ≥ price * 0.10
+ *   PCT_MAX = +100 → threshold ≤ price * 2.00
+ */
+const ALERT_PCT_MIN = -90;
+const ALERT_PCT_MAX = 100;
+
 export function AlertSheet({
   visible,
   asset,
@@ -236,6 +248,24 @@ export function AlertSheet({
     if (!isFinite(value) || value <= 0) {
       setErrorMsg("Ingresá un precio válido mayor a 0.");
       return;
+    }
+    /* Validación de rango: el delta del threshold respecto al precio
+     * actual debe estar dentro de [-90 %, +100 %]. Fuera de eso no
+     * tiene sentido como alerta de precio (typo o nunca dispara).
+     * El error se muestra inline en el form. */
+    if (asset.price > 0) {
+      const pct = (value / asset.price - 1) * 100;
+      if (pct < ALERT_PCT_MIN || pct > ALERT_PCT_MAX) {
+        const minPrice = asset.price * (1 + ALERT_PCT_MIN / 100);
+        const maxPrice = asset.price * (1 + ALERT_PCT_MAX / 100);
+        setErrorMsg(
+          `El precio tiene que estar entre ${formatMoney(minPrice, currency)} y ${formatMoney(maxPrice, currency)}.`,
+        );
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Warning,
+        ).catch(() => {});
+        return;
+      }
     }
     // Dirección derivada del threshold vs precio actual — sin
     // segmented selector. Empate → 'above' por convención.
