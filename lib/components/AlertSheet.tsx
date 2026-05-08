@@ -336,7 +336,7 @@ export function AlertSheet({
    *     guardamos como string formateado, lo que dispara la sincro
    *     hacia el field display + keypad.
    *   - el threshold escrito a mano por keypad también se refleja
-   *     hacia atrás al slider via `currentPct` (memo abajo). */
+   *     hacia atrás al slider via `sliderPct` (memo abajo). */
   const handleSliderChange = useCallback(
     (pct: number) => {
       if (!asset.price) return;
@@ -349,17 +349,24 @@ export function AlertSheet({
     [asset.price, currency],
   );
 
-  /* pct derivado del threshold actual — el slider lo usa como `value`
-   * cuando NO está siendo arrastrado (o sea, cuando el threshold
-   * cambia desde keypad/chip/edit). Se clampea al rango del slider
-   * pero el threshold subyacente puede estar fuera (el user puede
-   * tipear un precio arbitrario). */
-  const currentPct = useMemo(() => {
+  /* Dos pcts derivados del threshold:
+   *   - actualPct: SIN clamp, refleja el delta real (puede ser
+   *     +120 % si el user tipea un precio muy lejos del actual).
+   *     Se muestra inline al lado del precio.
+   *   - sliderPct: clampeado a [-30, +30] para la posición visual
+   *     del thumb. El slider no puede mostrar valores fuera de su
+   *     rango — si el actual está afuera, el thumb queda en el
+   *     extremo correspondiente. */
+  const actualPct = useMemo(() => {
     const v = parseFloat(threshold.replace(",", "."));
     if (!isFinite(v) || v <= 0 || asset.price <= 0) return 0;
-    const pct = (v / asset.price - 1) * 100;
-    return Math.max(-SLIDER_RANGE, Math.min(SLIDER_RANGE, pct));
+    return (v / asset.price - 1) * 100;
   }, [threshold, asset.price]);
+
+  const sliderPct = useMemo(
+    () => Math.max(-SLIDER_RANGE, Math.min(SLIDER_RANGE, actualPct)),
+    [actualPct],
+  );
 
   /* Diferencia exacta para mostrar arriba del slider: precio actual
    * + delta absoluto (precio target en moneda nativa) + signo. */
@@ -537,7 +544,7 @@ export function AlertSheet({
                       precio, no pill. Verde si sube, naranja si baja.
                       Se omite cuando el threshold está vacío o vale
                       el precio actual exacto (delta = 0). */}
-                  {targetValue != null && Math.abs(currentPct) >= 0.05 ? (
+                  {targetValue != null && Math.abs(actualPct) >= 0.05 ? (
                     <Text
                       style={[
                         s.fieldDeltaInline,
@@ -546,8 +553,8 @@ export function AlertSheet({
                         },
                       ]}
                     >
-                      {currentPct >= 0 ? "+" : ""}
-                      {currentPct.toFixed(1)}%
+                      {actualPct >= 0 ? "+" : ""}
+                      {actualPct.toFixed(1)}%
                     </Text>
                   ) : null}
                 </View>
@@ -557,7 +564,7 @@ export function AlertSheet({
                   Mover acá actualiza el threshold; tipear en el
                   keypad mueve el thumb del slider. */}
               <PercentRangeSlider
-                value={currentPct}
+                value={sliderPct}
                 onChange={handleSliderChange}
                 positiveColor={c.brand}
                 negativeColor={c.red}
