@@ -180,10 +180,13 @@ const cfStyles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: "center",
-    // Typography del spec: 34 px, weight 600, blanco, letter-spacing -0.3.
+    // Typography del spec: 34 px, weight 600, ink (#0E0F0C),
+    // letter-spacing -0.3. Texto negro sobre el overlay de
+    // color (verde brand o rojo) — coherente con el resto de
+    // los CTAs sobre fondos coloridos de la app.
     fontFamily: "PlusJakartaSans_600SemiBold",
     fontSize: 34,
-    color: "#FFFFFF",
+    color: "#0E0F0C",
     letterSpacing: -0.3,
   },
 });
@@ -944,7 +947,7 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="rgba(255,255,255,0.12)"
+                  stroke="rgba(14,15,12,0.12)"
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                 />
@@ -952,7 +955,7 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="#FFFFFF"
+                  stroke="#0E0F0C"
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                   strokeLinecap="round"
@@ -981,7 +984,7 @@ export default function ConfirmScreen() {
                   cx="50"
                   cy="50"
                   r="44"
-                  stroke="#FFFFFF"
+                  stroke="#0E0F0C"
                   strokeWidth={ringStrokeViewBox}
                   fill="none"
                 />
@@ -997,7 +1000,7 @@ export default function ConfirmScreen() {
                 style={{
                   width: logoInnerSize,
                   height: logoInnerSize,
-                  tintColor: "#FFFFFF",
+                  tintColor: "#0E0F0C",
                 }}
                 resizeMode="contain"
               />
@@ -1014,7 +1017,7 @@ export default function ConfirmScreen() {
               >
                 <AnimatedPath
                   d="M5 12 L10 17 L19 7"
-                  stroke="#FFFFFF"
+                  stroke="#0E0F0C"
                   strokeWidth={3}
                   fill="none"
                   strokeLinecap="round"
@@ -1280,7 +1283,7 @@ const s = StyleSheet.create({
   statusText: {
     fontFamily: fontFamily[600],
     fontSize: 34,
-    color: "#FFFFFF",
+    color: "#0E0F0C",
     letterSpacing: -0.3,
     textAlign: "center",
     lineHeight: 40,
@@ -1288,7 +1291,7 @@ const s = StyleSheet.create({
   errorTitle: {
     fontFamily: fontFamily[600],
     fontSize: 28,
-    color: "#FFFFFF",
+    color: "#0E0F0C",
     letterSpacing: -0.3,
     textAlign: "center",
     lineHeight: 34,
@@ -1302,7 +1305,7 @@ const s = StyleSheet.create({
   errorSubtitle: {
     fontFamily: fontFamily[400],
     fontSize: 15,
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(14,15,12,0.7)",
     textAlign: "center",
   },
   errorBtnWrap: {
@@ -1312,7 +1315,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   errorBtn: {
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(14,15,12,0.15)",
     paddingVertical: 16,
     paddingHorizontal: 48,
     borderCurve: "continuous",
@@ -1321,6 +1324,6 @@ const s = StyleSheet.create({
   errorBtnText: {
     fontFamily: fontFamily[600],
     fontSize: 17,
-    color: "#FFFFFF",
+    color: "#0E0F0C",
   },
 });

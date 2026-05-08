@@ -409,7 +409,7 @@ export default function TradeScreen() {
               <Text
                 style={[
                   s.sideBtnText,
-                  { color: side === "sell" ? "#FFFFFF" : c.textMuted },
+                  { color: side === "sell" ? c.ink : c.textMuted },
                 ]}
               >
                 Vender / Short
@@ -591,11 +591,10 @@ export default function TradeScreen() {
             <Text
               style={[
                 s.submitText,
-                // Texto negro sobre verde brand (en ambos modes,
-                // para mantener consistencia con el resto de los
-                // botones verdes). Sobre rojo, blanco que es lo que
-                // funciona naturalmente.
-                { color: side === "buy" ? c.ink : "#FFFFFF" },
+                /* Texto negro siempre — sea sobre verde brand
+                 * (Comprar) o rojo (Vender). Coherente con el
+                 * resto de CTAs sobre fondos coloridos. */
+                { color: c.ink },
               ]}
             >
               {side === "buy" ? "Comprar" : "Vender"}{" "}

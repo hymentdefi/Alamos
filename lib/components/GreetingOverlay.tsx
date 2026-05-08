@@ -247,7 +247,7 @@ export function GreetingOverlay({ onEnd }: Props) {
                   cx={RING_VIEWBOX / 2}
                   cy={RING_VIEWBOX / 2}
                   r={RING_RADIUS}
-                  stroke="#FFFFFF"
+                  stroke="#0E0F0C"
                   strokeWidth={RING_STROKE}
                   fill="none"
                   strokeLinecap="round"

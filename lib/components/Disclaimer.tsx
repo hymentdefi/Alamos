@@ -306,7 +306,7 @@ export function DisclaimerOnboarding({
               ]}
             >
               {checked ? (
-                <Feather name="check" size={14} color="#FFFFFF" />
+                <Feather name="check" size={14} color="#0E0F0C" />
               ) : null}
             </View>
             <Text style={[styles.checkLabel, { color: c.text }]}>

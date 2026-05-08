@@ -251,7 +251,7 @@ export default function ChatScreen() {
 
         {urgent ? (
           <View style={[s.urgentPill, { backgroundColor: c.red }]}>
-            <Feather name="alert-triangle" size={10} color="#FFFFFF" />
+            <Feather name="alert-triangle" size={10} color="#0E0F0C" />
             <Text style={s.urgentPillText}>URGENTE</Text>
           </View>
         ) : (
@@ -549,7 +549,9 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
   },
   urgentPillText: {
-    color: "#FFFFFF",
+    /* Negro sobre el rojo del urgent pill — mismo lenguaje
+     * que los CTAs de la app sobre fondos coloridos. */
+    color: "#0E0F0C",
     fontFamily: fontFamily[800],
     fontSize: 9,
     letterSpacing: 0.6,
