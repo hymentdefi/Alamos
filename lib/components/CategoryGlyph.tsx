@@ -61,7 +61,7 @@ const PALETTE: Record<CategorySlug, { stroke: string; tint: string }> = {
   "ar-letras": { stroke: "#A16207", tint: "#EAB308" },
   "ar-ons": { stroke: "#EA580C", tint: "#FB923C" },
   "ar-opciones": { stroke: "#DB2777", tint: "#F472B6" },
-  "ar-futuros": { stroke: "#00B864", tint: "#00E676" },
+  "ar-futuros": { stroke: "#00B864", tint: "#00C805" },
   "ar-fci": { stroke: "#059669", tint: "#34D399" },
   "ar-cauciones": { stroke: "#A16207", tint: "#EAB308" },
   "ar-mep": { stroke: "#2563EB", tint: "#60A5FA" },

@@ -11,7 +11,7 @@ import { Tap } from "./Tap";
  *   - icono: dos flechas convertibles + texto, ambos en brand green
  *
  * El verde usado es brand.green (#00C805) — el canónico de la marca.
- * El brand pack usa un verde más claro (#00E676) en los SVGs de
+ * El brand pack usa un verde más claro (#00C805) en los SVGs de
  * referencia, pero la regla del proyecto es no inventar otros verdes.
  */
 

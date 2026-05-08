@@ -10,7 +10,7 @@ interface Props {
  * en el SVG B7 del brand pack. Tilt -6° + bandeo lateral con dots,
  * badano dorado abajo, sparkles flotantes alrededor.
  *
- * Paleta: brand vivid (#00E676), brand dark (#018A09), ink-green
+ * Paleta: brand (#00C805), brand dark (#018A09), ink-green
  * (#0E4310 stroke), gold (#FFB300) y blanco. Pensada para usarse
  * en el empty state de la pantalla de Custom alerts.
  */
@@ -26,7 +26,7 @@ export function AlertBellIllustration({ size = 220 }: Props) {
           cy={48}
           rx={14}
           ry={10}
-          fill="#00E676"
+          fill="#00C805"
           stroke="#0E4310"
           strokeWidth={2.4}
         />
@@ -42,7 +42,7 @@ export function AlertBellIllustration({ size = 220 }: Props) {
         {/* Cuello de la campana */}
         <Path
           d="M 138 62 L 162 62 L 166 82 L 134 82 Z"
-          fill="#00E676"
+          fill="#00C805"
           stroke="#0E4310"
           strokeWidth={2.4}
           strokeLinejoin="round"
@@ -54,7 +54,7 @@ export function AlertBellIllustration({ size = 220 }: Props) {
         {/* Cuerpo de la campana — outline + sombra a la derecha */}
         <Path
           d="M 150 80 C 108 80 80 118 78 174 L 74 214 Q 72 230 90 230 L 210 230 Q 228 230 226 214 L 222 174 C 220 118 192 80 150 80 Z"
-          fill="#00E676"
+          fill="#00C805"
           stroke="#0E4310"
           strokeWidth={2.6}
           strokeLinejoin="round"
@@ -91,7 +91,7 @@ export function AlertBellIllustration({ size = 220 }: Props) {
         />
       </G>
       {/* Sparkles decorativos */}
-      <Circle cx={50} cy={90} r={3} fill="#00E676" />
+      <Circle cx={50} cy={90} r={3} fill="#00C805" />
       <Circle cx={250} cy={110} r={2.4} fill="#FFB300" />
       <Path
         d="M 256 196 l 3 -8 l 3 8 l 8 3 l -8 3 l -3 8 l -3 -8 l -8 -3 z"

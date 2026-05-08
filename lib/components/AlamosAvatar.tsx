@@ -116,7 +116,7 @@ export const AVATAR_SCHEMES: AvatarScheme[] = [
     bgLight: "#2C333D",
     bgDeep: "#0A0D12",
     glow: "rgba(120,220,150,0.28)",
-    accent: "#00E676",
+    accent: "#00C805",
     ink: "#E8EAED",
   },
   {
