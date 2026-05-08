@@ -77,22 +77,22 @@ import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
 
-type Range = "live" | "1H" | "1D" | "1S" | "1M" | "3M" | "YTD";
+type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
 
-const ranges: Range[] = ["live", "1H", "1D", "1S", "1M", "3M", "YTD"];
+const ranges: Range[] = ["1D", "7D", "1M", "3M", "1A", "YTD", "MAX"];
 
 /** Variación % por rango — determina el trend y color del chart. */
 const rangeChanges: Record<Range, number> = {
-  live: 0.08,
-  "1H": 0.42,
   "1D": 1.96,
-  "1S": 3.24,
+  "7D": 3.24,
   "1M": -2.1,
   "3M": 8.45,
+  "1A": 22.8,
   YTD: 15.3,
+  MAX: 64.2,
 };
 
 export default function HomeScreen() {
@@ -160,25 +160,18 @@ function BaseHome() {
   const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
   // Setting cards principales — considerar movimientos de plata.
   const [considerCashflow, setConsiderCashflow] = useState(true);
-  // Toggles compactos.
-  const [referenceLine, setReferenceLine] = useState(false);
-  const [smoothChart, setSmoothChart] = useState(false);
+  /* Línea de referencia y suavizado del trazo: SIEMPRE prendidos.
+   * Decisión de producto — no le damos al usuario la opción de
+   * editarlos. La línea horizontal del inicio del periodo es parte
+   * de la lectura del chart (te dice si estás arriba o abajo del
+   * punto de partida) y el smooth bezier es como Álamos quiere que
+   * se vea su data, no jagged. */
 
   // Carga inicial de las preferencias persistidas.
   useEffect(() => {
     SecureStore.getItemAsync("home:chart_consider_cashflow")
       .then((v) => {
         if (v === "0") setConsiderCashflow(false);
-      })
-      .catch(() => {});
-    SecureStore.getItemAsync("home:chart_reference_line")
-      .then((v) => {
-        if (v === "1") setReferenceLine(true);
-      })
-      .catch(() => {});
-    SecureStore.getItemAsync("home:chart_smooth")
-      .then((v) => {
-        if (v === "1") setSmoothChart(true);
       })
       .catch(() => {});
   }, []);
@@ -189,19 +182,6 @@ function BaseHome() {
       "home:chart_consider_cashflow",
       next ? "1" : "0",
     ).catch(() => {});
-  }, []);
-  const onChangeReferenceLine = useCallback((next: boolean) => {
-    setReferenceLine(next);
-    SecureStore.setItemAsync(
-      "home:chart_reference_line",
-      next ? "1" : "0",
-    ).catch(() => {});
-  }, []);
-  const onChangeSmoothChart = useCallback((next: boolean) => {
-    setSmoothChart(next);
-    SecureStore.setItemAsync("home:chart_smooth", next ? "1" : "0").catch(
-      () => {},
-    );
   }, []);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -279,17 +259,6 @@ function BaseHome() {
   // chart del período (la serie de puntos se genera en base a este).
   const total = arsTotal + usdTotal * USD_RATE + usdtTotal * USD_RATE;
 
-  // Tick para el modo Live: cada ~3s rotamos el seed y forzamos
-  // re-render para que el chart "respire" y el último punto se mueva.
-  // Solo corre cuando estás en Inicio + range==="live" — pausa al
-  // cambiar de tab o de rango para no quemar batería.
-  const [liveTick, setLiveTick] = useState(0);
-  useEffect(() => {
-    if (range !== "live" || !isFocused) return;
-    const id = setInterval(() => setLiveTick((t) => t + 1), 3000);
-    return () => clearInterval(id);
-  }, [range, isFocused]);
-
   const series = useMemo(() => {
     // Cuando "considerar movimientos" está apagado, el chart sólo
     // refleja el rendimiento del activo: bajamos la amplitud del
@@ -299,39 +268,9 @@ function BaseHome() {
     // realidad del balance.
     const ampMult = considerCashflow ? 1 : 0.55;
     const seedSuffix = considerCashflow ? "" : "-pure";
-    const seed =
-      range === "live"
-        ? `home-live-${liveTick}${seedSuffix}`
-        : `home-${range}${seedSuffix}`;
+    const seed = `home-${range}${seedSuffix}`;
     return generateSeries(total, rangeChanges[range] * ampMult, seed);
-  }, [total, range, liveTick, considerCashflow]);
-
-  // Pulse continuo del puntito de Live — corre solo cuando hace falta.
-  const livePulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (range !== "live") {
-      livePulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(livePulse, {
-          toValue: 0.35,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(livePulse, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [range, livePulse]);
+  }, [total, range, considerCashflow]);
 
   // Respiración del botón de regalo: scale 1 → 1.10 → 1 con pausa de 1.5s
   // entre breaths. Suficiente para llamar la atención sin distraer.
@@ -359,16 +298,7 @@ function BaseHome() {
     return () => loop.stop();
   }, [isFocused, giftPulse]);
 
-  // En modo live, el % no es constante — oscila por liveTick para
-  // simular movimiento real de mercado (a veces sube, a veces baja).
-  // El chartColor sigue este pct, así que en ticks "rojos" la línea
-  // y el delta del hero se vuelven rojos en tiempo real.
-  const livePct = useMemo(() => {
-    // Pseudo random walk determinístico: combina dos sinusoides de
-    // frecuencias distintas para no ser predecible. Rango ~ ±0.6%.
-    return Math.sin(liveTick * 1.7) * 0.45 + Math.sin(liveTick * 0.4) * 0.18;
-  }, [liveTick]);
-  const rangePct = range === "live" ? livePct : rangeChanges[range];
+  const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
   const trendColor = isUp ? c.brand : c.red;
   // Color del trazo del chart + timeline: usa el verde-action (mismo
@@ -606,23 +536,9 @@ function BaseHome() {
               {formatPct(displayPct)}
             </Text>
             <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-            {range === "live" && scrubIndex == null ? (
-              <View style={s.liveLabelInline}>
-                <Animated.View
-                  style={[
-                    s.liveDot,
-                    { backgroundColor: trendColor, opacity: livePulse },
-                  ]}
-                />
-                <Text style={[s.timeLabel, { color: c.textMuted }]}>
-                  en vivo
-                </Text>
-              </View>
-            ) : (
-              <Text style={[s.timeLabel, { color: c.textMuted }]}>
-                {timeLabel}
-              </Text>
-            )}
+            <Text style={[s.timeLabel, { color: c.textMuted }]}>
+              {timeLabel}
+            </Text>
           </View>
 
           <View style={[s.chartWrap, { marginTop: 18 }]}>
@@ -632,10 +548,9 @@ function BaseHome() {
               height={300}
               withFill={false}
               sheen
-              live={range === "live"}
-              referenceLine={referenceLine}
+              referenceLine
               strokeWidth={1}
-              mode={smoothChart ? "line" : "step"}
+              mode="line"
               onScrub={onScrub}
               onScrubEnd={onScrubEnd}
             />
@@ -658,9 +573,7 @@ function BaseHome() {
                   ]}
                   hitSlop={8}
                 >
-                  <Text style={[s.rangeText, { color: fg }]}>
-                    {r === "live" ? "LIVE" : r}
-                  </Text>
+                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
                 </Pressable>
               );
             })}
@@ -692,12 +605,6 @@ function BaseHome() {
         visible={chartSettingsOpen}
         considerCashflow={considerCashflow}
         onChangeConsiderCashflow={onChangeConsiderCashflow}
-        hideAmounts={hideAmounts}
-        onChangeHideAmounts={setHideAmounts}
-        referenceLine={referenceLine}
-        onChangeReferenceLine={onChangeReferenceLine}
-        smoothChart={smoothChart}
-        onChangeSmoothChart={onChangeSmoothChart}
         onClose={() => setChartSettingsOpen(false)}
       />
     </View>
@@ -768,45 +675,33 @@ function generateSeries(total: number, pct: number, seed: string): number[] {
 
 function rangeSubtitle(r: Range): string {
   switch (r) {
-    case "live":
-      return "en vivo";
-    case "1H":
-      return "última hora";
     case "1D":
       return "hoy";
-    case "1S":
-      return "esta semana";
+    case "7D":
+      return "últimos 7 días";
     case "1M":
       return "este mes";
     case "3M":
       return "3 meses";
+    case "1A":
+      return "12 meses";
     case "YTD":
       return "en el año";
+    case "MAX":
+      return "histórico";
   }
 }
 
 function indexLabel(r: Range, index: number, length: number): string {
   const t = 1 - index / (length - 1);
   switch (r) {
-    case "live": {
-      const s = Math.round(t * 60);
-      if (s === 0) return "ahora";
-      if (s === 1) return "hace 1s";
-      return `hace ${s}s`;
-    }
-    case "1H": {
-      const m = Math.round(t * 60);
-      if (m === 0) return "ahora";
-      if (m === 1) return "hace 1m";
-      return `hace ${m}m`;
-    }
     case "1D": {
       const h = Math.round(t * 24);
       if (h === 0) return "ahora";
       if (h === 1) return "hace 1h";
       return `hace ${h}h`;
     }
-    case "1S": {
+    case "7D": {
       const d = Math.round(t * 7);
       if (d === 0) return "hoy";
       if (d === 1) return "hace 1 día";
@@ -823,12 +718,24 @@ function indexLabel(r: Range, index: number, length: number): string {
       if (w === 1) return "hace 1 sem";
       return `hace ${w} sem`;
     }
-    case "YTD": {
-      // Hoy es abril, así que 0-3 meses atrás cubren el YTD.
-      const m = Math.round(t * 4);
+    case "1A": {
+      const m = Math.round(t * 12);
       if (m === 0) return "hoy";
       if (m === 1) return "hace 1 mes";
       return `hace ${m} meses`;
+    }
+    case "YTD": {
+      // Hoy es mayo (2026-05-08), así que 0-4 meses atrás cubren YTD.
+      const m = Math.round(t * 5);
+      if (m === 0) return "hoy";
+      if (m === 1) return "hace 1 mes";
+      return `hace ${m} meses`;
+    }
+    case "MAX": {
+      const y = Math.round(t * 5);
+      if (y === 0) return "hoy";
+      if (y === 1) return "hace 1 año";
+      return `hace ${y} años`;
     }
   }
 }
@@ -1772,17 +1679,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.4,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderCurve: "continuous",
-    borderRadius: 3,
-  },
-  liveLabelInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
   },
   row: {
     flexDirection: "row",
