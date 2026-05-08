@@ -118,7 +118,7 @@ export default function AssetAlertsScreen() {
         {tab === "price" ? (
           alertsForAsset.length === 0 ? (
             <EmptyState
-              illustration={<AlertBellIllustration size={220} />}
+              illustration={<AlertBellIllustration size={130} />}
               text="Creá tus propios umbrales de precio. Te notificamos cuando el activo los cruza."
             />
           ) : (
@@ -362,15 +362,17 @@ const s = StyleSheet.create({
   },
 
   /* Empty state */
+  /* Empty state — bell + copy posicionados en el tercio superior
+   * del espacio disponible, mismo balance que Robinhood (bell
+   * compacta arriba con bastante aire abajo antes del CTA). */
   emptyWrap: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 32,
-    paddingTop: 24,
+    paddingTop: 64,
   },
   emptyIllustration: {
-    marginBottom: 18,
+    marginBottom: 22,
   },
   emptyText: {
     fontFamily: fontFamily[500],
