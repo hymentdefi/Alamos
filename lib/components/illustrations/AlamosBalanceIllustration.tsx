@@ -26,7 +26,7 @@ interface Props {
  * Truco: 19 textos "$" superpuestos con offset progresivo en x/y
  * generan la sensación de profundidad. Las 18 capas inferiores
  * son verde medium con stroke verde oscuro (efecto "edge"). El "$"
- * top va en verde vivid (#00E676) con stroke ink — pop frontal.
+ * top va en verde vivid (#00C805) con stroke ink — pop frontal.
  *
  * Animación de "salto":
  *   - La pila ($) hace un translateY hacia arriba con curva de
@@ -162,7 +162,7 @@ export function AlamosBalanceIllustration({ size = 220, play = false }: Props) {
             <SvgText
               x={110}
               y={170}
-              fill="#00E676"
+              fill="#00C805"
               stroke="#0E0F0C"
               strokeWidth={2.5}
               paintOrder="stroke"

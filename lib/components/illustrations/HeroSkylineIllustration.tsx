@@ -16,7 +16,7 @@ interface Props {
  *
  * Geometría 1:1 con el brand pack (assets/icons/hero/{light,dark}/
  * alamos-skyline.svg) — solo cambia el verde a c.brand canónico
- * (#00C805) en lugar del #00E676 del export.
+ * (#00C805) en lugar del #00C805 del export.
  *
  * Cada isotipo es:
  *   triángulo trasero:  38,26 16,86 60,86
