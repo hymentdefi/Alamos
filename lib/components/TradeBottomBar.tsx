@@ -146,10 +146,11 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const isEmpty = balance <= 0;
 
   const accent = assetColor ? assetColor.color : c.text;
-  /* Texto negro siempre sobre el accent del botón — sea verde
-   * brand o rojo/naranja del down state, c.ink (#0E0F0C / #000)
-   * lee bien y es coherente con el resto de los CTAs de la app. */
-  const ctaTextColor = c.ink;
+  /* Texto sobre el accent del botón (verde brand o naranja/rojo
+   * del down state). Usa c.onColor: blanco en light, casi-negro
+   * en dark. En dark, el negro sobre el verde vivo le da peso al
+   * CTA; en light el blanco sobre el color es el patrón clásico. */
+  const ctaTextColor = c.onColor;
 
   const isMarketClosed = useMemo(() => {
     const reason = closedReasonFor(asset);

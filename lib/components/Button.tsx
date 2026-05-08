@@ -48,6 +48,8 @@ export default function Button({
       ? c.bg
       : variant === "ghost"
       ? c.text
+      : variant === "accent"
+      ? c.onColor /* texto sobre verde brand: blanco en light, negro en dark */
       : c.ink;
   const hasBorder = variant === "secondary";
   const border = hasBorder ? c.border : undefined;
