@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -23,6 +23,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { fontFamily, radius, useTheme } from "../theme";
 import { Tap } from "./Tap";
+import { PercentRangeSlider } from "./PercentRangeSlider";
 import {
   type Asset,
   type AssetCurrency,
@@ -83,7 +84,26 @@ const KEYS = [
 // activo. Tap → setea threshold = price * (1 + pct/100). La dirección
 // (subir/bajar) se infiere del threshold vs precio actual al crear,
 // no la elige el usuario explícitamente.
-const QUICK_PCTS = [-25, -10, -5, 5, 10, 25] as const;
+//
+// Valores y opacidad: cada chip tiene un peso visual proporcional a
+// la magnitud (cerca del 0 = más translúcido, lejos = sólido).
+//   ±25% → 100 % de opacidad
+//   ±10% → 70  %
+//   ± 5% → 40  %
+const QUICK_CHIPS: { pct: number; opacity: number }[] = [
+  { pct: -25, opacity: 1 },
+  { pct: -10, opacity: 0.7 },
+  { pct: -5, opacity: 0.4 },
+  { pct: 5, opacity: 0.4 },
+  { pct: 10, opacity: 0.7 },
+  { pct: 25, opacity: 1 },
+];
+
+/* Rango del slider — coincide con PercentRangeSlider. Valores fuera
+ * de este rango en la UI se manejan como "fuera de rango" (slider
+ * en su extremo + clamp visual; el threshold puede seguir teniendo
+ * el valor que el usuario ingresó por keypad). */
+const SLIDER_RANGE = 30;
 
 export function AlertSheet({
   visible,
@@ -93,7 +113,10 @@ export function AlertSheet({
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowH } = useWindowDimensions();
+  const { width: windowW, height: windowH } = useWindowDimensions();
+  /* Ancho del slider: el sheet tiene paddingHorizontal 24 a cada
+   * lado. El slider rellena de borde a borde del padding. */
+  const SLIDER_WIDTH = windowW - 48;
   const { activeForAsset, create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
   /* CTA SIEMPRE en brand canónico (#00C805) — antes el accent venía
@@ -313,6 +336,51 @@ export function AlertSheet({
     Haptics.selectionAsync().catch(() => {});
   };
 
+  /* Slider drives:
+   *   - el slider llama onChange(pct) durante el drag con un valor
+   *     continuo en [-30, +30].
+   *   - convertimos a threshold con price * (1 + pct/100) y lo
+   *     guardamos como string formateado, lo que dispara la sincro
+   *     hacia el field display + keypad.
+   *   - el threshold escrito a mano por keypad también se refleja
+   *     hacia atrás al slider via `currentPct` (memo abajo). */
+  const handleSliderChange = useCallback(
+    (pct: number) => {
+      if (!asset.price) return;
+      const decimals = currency === "USDT" ? 4 : 2;
+      const target = asset.price * (1 + pct / 100);
+      if (!isFinite(target) || target <= 0) return;
+      setThreshold(target.toFixed(decimals));
+      setErrorMsg(null);
+    },
+    [asset.price, currency],
+  );
+
+  /* pct derivado del threshold actual — el slider lo usa como `value`
+   * cuando NO está siendo arrastrado (o sea, cuando el threshold
+   * cambia desde keypad/chip/edit). Se clampea al rango del slider
+   * pero el threshold subyacente puede estar fuera (el user puede
+   * tipear un precio arbitrario). */
+  const currentPct = useMemo(() => {
+    const v = parseFloat(threshold.replace(",", "."));
+    if (!isFinite(v) || v <= 0 || asset.price <= 0) return 0;
+    const pct = (v / asset.price - 1) * 100;
+    return Math.max(-SLIDER_RANGE, Math.min(SLIDER_RANGE, pct));
+  }, [threshold, asset.price]);
+
+  /* Diferencia exacta para mostrar arriba del slider: precio actual
+   * + delta absoluto (precio target en moneda nativa) + signo. */
+  const targetValue = useMemo(() => {
+    const v = parseFloat(threshold.replace(",", "."));
+    if (!isFinite(v) || v <= 0) return null;
+    return v;
+  }, [threshold]);
+
+  const direction: AlertDirection = useMemo(() => {
+    if (targetValue == null) return "above";
+    return targetValue >= asset.price ? "above" : "below";
+  }, [targetValue, asset.price]);
+
   // Splitea el threshold en parte entera (con separador de miles
   // estilo es-AR) y decimales — para renderear los decimales en
   // chico/gris al estilo del precio del stock detail.
@@ -413,9 +481,25 @@ export function AlertSheet({
                 {isEditing ? "Editando" : "Nueva alerta"}
               </Text>
 
+              {/* Banner del precio actual — referencia fija arriba
+                  del slider para que el user vea qué es 0% y a qué
+                  variación está apuntando con el threshold. */}
+              <View
+                style={[
+                  s.priceRefRow,
+                  { backgroundColor: c.surfaceHover, borderColor: c.border },
+                ]}
+              >
+                <Text style={[s.priceRefLabel, { color: c.textMuted }]}>
+                  Precio actual
+                </Text>
+                <Text style={[s.priceRefValue, { color: c.text }]}>
+                  {formatMoney(asset.price, allCurrencies[0])}
+                </Text>
+              </View>
+
               {/* Display del precio — read-only, alimentado por el
-                  keypad in-app de abajo. La pill de moneda queda
-                  fija (única opción según mercado del activo). */}
+                  slider, los chips o el keypad in-app de abajo. */}
               <View
                 style={[
                   s.field,
@@ -430,6 +514,40 @@ export function AlertSheet({
                     Precio objetivo
                   </Text>
                   <View style={s.currencyRow}>
+                    {targetValue != null ? (
+                      <View
+                        style={[
+                          s.deltaChip,
+                          {
+                            backgroundColor:
+                              direction === "above" ? c.brandDim : c.redDim,
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name={
+                            direction === "above"
+                              ? "trending-up"
+                              : "trending-down"
+                          }
+                          size={11}
+                          color={direction === "above" ? c.brand : c.red}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          style={[
+                            s.deltaChipText,
+                            {
+                              color:
+                                direction === "above" ? c.brand : c.red,
+                            },
+                          ]}
+                        >
+                          {currentPct >= 0 ? "+" : ""}
+                          {currentPct.toFixed(currentPct === 0 ? 0 : 1)}%
+                        </Text>
+                      </View>
+                    ) : null}
                     {allCurrencies.map((cu) => (
                       <View
                         key={cu}
@@ -473,27 +591,45 @@ export function AlertSheet({
                 </View>
               </View>
 
-              {/* Quick % chips — aplican price * (1 + pct/100) y
-                  autoflippean dirección según signo. */}
+              {/* Slider -30% / +30% — sincronizado con el threshold.
+                  Mover acá actualiza el threshold; tipear en el
+                  keypad mueve el thumb del slider. */}
+              <PercentRangeSlider
+                value={currentPct}
+                onChange={handleSliderChange}
+                positiveColor={c.brand}
+                negativeColor={c.red}
+                width={SLIDER_WIDTH}
+              />
+
+              {/* Quick % chips — naranja del lado negativo, verde del
+                  positivo, con opacidad progresiva (más cerca del 0
+                  → más translúcido). Tap aplica price * (1 + pct/100)
+                  y sincroniza el slider. */}
               <View style={s.quickRow}>
-                {QUICK_PCTS.map((pct) => (
-                  <Tap
-                    key={pct}
-                    style={[
-                      s.quickChip,
-                      {
-                        backgroundColor: c.surface,
-                        borderColor: c.border,
-                      },
-                    ]}
-                    haptic="selection"
-                    onPress={() => applyPct(pct)}
-                  >
-                    <Text style={[s.quickText, { color: c.text }]}>
-                      {pct > 0 ? `+${pct}%` : `${pct}%`}
-                    </Text>
-                  </Tap>
-                ))}
+                {QUICK_CHIPS.map(({ pct, opacity }) => {
+                  const isNeg = pct < 0;
+                  const tone = isNeg ? c.red : c.brand;
+                  return (
+                    <Tap
+                      key={pct}
+                      style={[
+                        s.quickChip,
+                        {
+                          backgroundColor: tone,
+                          borderColor: tone,
+                          opacity,
+                        },
+                      ]}
+                      haptic="selection"
+                      onPress={() => applyPct(pct)}
+                    >
+                      <Text style={[s.quickText, { color: c.onColor }]}>
+                        {pct > 0 ? `+${pct}%` : `${pct}%`}
+                      </Text>
+                    </Tap>
+                  );
+                })}
               </View>
 
               {/* Keypad in-app — mismo layout que buy.tsx. */}
@@ -646,6 +782,40 @@ const s = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 18,
   },
+  priceRefRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: "continuous",
+  },
+  priceRefLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  priceRefValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
+  },
+  deltaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderCurve: "continuous",
+  },
+  deltaChipText: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
   fieldHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -678,7 +848,8 @@ const s = StyleSheet.create({
   },
   currencyRow: {
     flexDirection: "row",
-    gap: 6,
+    alignItems: "center",
+    gap: 8,
   },
   quickRow: {
     flexDirection: "row",

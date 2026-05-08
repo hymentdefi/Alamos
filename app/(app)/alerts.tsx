@@ -208,6 +208,8 @@ function labelFor(status: AlertStatus): string {
   switch (status) {
     case "active":
       return "Activa";
+    case "paused":
+      return "En pausa";
     case "triggered":
       return "Disparada";
     case "cancelled":

@@ -11,6 +11,7 @@ import {
   createAlert as apiCreate,
   deleteAlert as apiDelete,
   updateAlert as apiUpdate,
+  setAlertPaused as apiSetPaused,
   getAllAlerts,
   getAlertsForAsset,
   AlertApiError,
@@ -37,12 +38,18 @@ import { useAuth } from "../auth/context";
  */
 
 interface AlertsContextValue {
-  /** Todas las alertas conocidas para el user (active + triggered). */
+  /** Todas las alertas conocidas para el user (active + paused +
+   *  triggered + cancelled). El consumer filtra por status según
+   *  necesite. */
   alerts: PriceAlert[];
-  /** Alertas active de un activo puntual. Lectura sincrónica. */
+  /** Alertas active O paused de un activo puntual — las que
+   *  todavía no dispararon, sigan armadas o silenciadas. */
   activeForAsset: (assetId: string) => PriceAlert[];
-  /** True si el activo tiene alguna alerta active. Atajo para
-   *  decidir el estado del ícono en el header. */
+  /** Alertas triggered de un activo, ordenadas más recientes
+   *  primero. Para la sección de historial. */
+  triggeredForAsset: (assetId: string) => PriceAlert[];
+  /** True si el activo tiene alguna alerta active (no cuenta paused).
+   *  Para decidir si la campana del header se prende. */
   hasActiveForAsset: (assetId: string) => boolean;
   /** ¿Estamos cargando la lista inicial? */
   isLoading: boolean;
@@ -56,6 +63,8 @@ interface AlertsContextValue {
     alertId: string,
     patch: { threshold: number; direction: AlertDirection },
   ) => Promise<PriceAlert>;
+  /** Pausar o reactivar una alerta. */
+  setPaused: (alertId: string, paused: boolean) => Promise<void>;
   /** Borrar una alerta. */
   remove: (alertId: string) => Promise<void>;
   /** Refresh de toda la lista — útil al pull-to-refresh en
@@ -99,8 +108,20 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const activeForAsset = useCallback(
     (assetId: string) =>
       alerts.filter(
-        (a) => a.assetId === assetId && a.status === "active",
+        (a) =>
+          a.assetId === assetId &&
+          (a.status === "active" || a.status === "paused"),
       ),
+    [alerts],
+  );
+
+  const triggeredForAsset = useCallback(
+    (assetId: string) =>
+      alerts
+        .filter((a) => a.assetId === assetId && a.status === "triggered")
+        .sort((a, b) =>
+          (b.triggeredAt ?? "").localeCompare(a.triggeredAt ?? ""),
+        ),
     [alerts],
   );
 
@@ -134,6 +155,28 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const setPaused = useCallback(async (alertId: string, paused: boolean) => {
+    /* Optimistic — flippeamos el status local ya, después confirmamos.
+     * Si el server falla, revertimos. */
+    const previous = alerts.find((a) => a.id === alertId);
+    if (!previous) return;
+    setAlerts((prev) =>
+      prev.map((a) =>
+        a.id === alertId
+          ? { ...a, status: paused ? "paused" : "active" }
+          : a,
+      ),
+    );
+    try {
+      await apiSetPaused(alertId, paused);
+    } catch (e) {
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === alertId ? previous : a)),
+      );
+      throw e;
+    }
+  }, [alerts]);
 
   const remove = useCallback(async (alertId: string) => {
     // Optimistic — sacamos de la caché ya. Si el delete falla,
@@ -174,20 +217,24 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     () => ({
       alerts,
       activeForAsset,
+      triggeredForAsset,
       hasActiveForAsset,
       isLoading,
       create,
       update,
+      setPaused,
       remove,
       refresh,
     }),
     [
       alerts,
       activeForAsset,
+      triggeredForAsset,
       hasActiveForAsset,
       isLoading,
       create,
       update,
+      setPaused,
       remove,
       refresh,
     ],
