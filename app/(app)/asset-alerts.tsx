@@ -25,9 +25,11 @@ import { fontFamily, radius, useTheme } from "../../lib/theme";
 import {
   assets,
   formatMoney,
+  formatPct,
   assetCurrency,
   type Asset,
 } from "../../lib/data/assets";
+import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { useAlerts } from "../../lib/alerts/context";
 import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
@@ -102,11 +104,16 @@ export default function AssetAlertsScreen() {
   if (!asset) {
     return (
       <View style={[s.root, { backgroundColor: c.bg }]}>
-        <Header
-          ticker={ticker ?? ""}
-          insetsTop={insets.top}
-          onClose={() => router.back()}
-        />
+        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={s.iconBtn}
+          >
+            <Feather name="x" size={26} color={c.text} />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+        </View>
         <View style={s.fallback}>
           <Text style={{ color: c.textMuted }}>Activo no encontrado.</Text>
         </View>
@@ -137,28 +144,56 @@ export default function AssetAlertsScreen() {
     }
   };
 
+  /* Hero del header — mismo patrón que stock detail: ticker (eyebrow),
+   * nombre (display), precio grande, delta del día. El delta usa el
+   * `change` que ya viene en el modelo del asset (% del día). El
+   * color del delta sigue brand canónico para el up, red para down. */
+  const cur = assetCurrency(asset);
+  const dayUp = asset.change >= 0;
+  const deltaAbs = (asset.price * asset.change) / 100;
+  const deltaColor = dayUp ? c.brand : c.red;
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      <Header
-        ticker={asset.ticker}
-        insetsTop={insets.top}
-        onClose={() => router.back()}
-      />
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            router.back();
+          }}
+          hitSlop={12}
+          style={s.iconBtn}
+        >
+          <Feather name="x" size={26} color={c.text} />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+      </View>
 
-      {/* Banner del precio actual — referencia fija arriba de las
-          tabs. El user siempre ve dónde está el activo aunque haya
-          scrolleado por la lista. */}
-      <View
-        style={[
-          s.priceBanner,
-          { backgroundColor: c.surfaceHover, borderColor: c.border },
-        ]}
-      >
-        <Text style={[s.priceBannerLabel, { color: c.textMuted }]}>
-          Precio actual
+      <View style={s.heroBlock}>
+        <Text style={[s.heroTicker, { color: c.textMuted }]}>
+          {asset.ticker}
         </Text>
-        <Text style={[s.priceBannerValue, { color: c.text }]}>
-          {formatMoney(asset.price, assetCurrency(asset))}
+        <Text style={[s.heroName, { color: c.text }]} numberOfLines={2}>
+          {asset.name}
+        </Text>
+        <View style={s.heroPriceRow}>
+          <AmountDisplay value={asset.price} size={52} currency={cur} />
+        </View>
+        <View style={s.deltaRow}>
+          <Text style={[s.deltaTri, { color: deltaColor }]}>
+            {dayUp ? "▲" : "▼"}
+          </Text>
+          <Text style={[s.deltaText, { color: deltaColor }]}>
+            {formatMoney(Math.abs(deltaAbs), cur)}
+          </Text>
+          <Text style={[s.deltaText, { color: deltaColor }]}>
+            ({formatPct(asset.change)})
+          </Text>
+          <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
+          <Text style={[s.deltaSubtle, { color: c.textMuted }]}>hoy</Text>
+        </View>
+        <Text style={[s.alertsSubtitle, { color: c.textMuted }]}>
+          Te avisamos como máximo una vez al día por cada alerta.
         </Text>
       </View>
 
@@ -306,39 +341,7 @@ export default function AssetAlertsScreen() {
   );
 }
 
-/* ─── Header ───────────────────────────────────────────────────── */
-
-function Header({
-  ticker,
-  insetsTop,
-  onClose,
-}: {
-  ticker: string;
-  insetsTop: number;
-  onClose: () => void;
-}) {
-  const { c } = useTheme();
-  return (
-    <View style={[s.header, { paddingTop: insetsTop + 12 }]}>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          onClose();
-        }}
-        hitSlop={12}
-        style={s.closeBtn}
-      >
-        <Feather name="x" size={26} color={c.text} />
-      </Pressable>
-      <Text style={[s.title, { color: c.text }]}>
-        {ticker} · Alertas custom
-      </Text>
-      <Text style={[s.subtitle, { color: c.textMuted }]}>
-        Te avisamos como máximo una vez al día por cada alerta.
-      </Text>
-    </View>
-  );
-}
+/* ─── Tabs ─────────────────────────────────────────────────────── */
 
 function TabPill({
   label,
@@ -738,53 +741,79 @@ function formatTriggeredDate(iso: string): string {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: {
+
+  /* Top bar + hero — mismo lenguaje que stock detail (detail.tsx).
+   * Sin sticky overlay porque la pantalla suele ser más corta y no
+   * vale la complejidad. */
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroBlock: {
     paddingHorizontal: 24,
+    paddingTop: 8,
     paddingBottom: 14,
   },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  title: {
-    fontFamily: fontFamily[800],
-    fontSize: 28,
-    letterSpacing: -1,
-    marginTop: 4,
-  },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    marginTop: 6,
-  },
-  priceBanner: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginHorizontal: 24,
-    marginBottom: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: "continuous",
-  },
-  priceBannerLabel: {
-    fontFamily: fontFamily[500],
+  heroTicker: {
+    fontFamily: fontFamily[700],
     fontSize: 12,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  priceBannerValue: {
+  heroName: {
     fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
+    fontSize: 30,
+    letterSpacing: -0.7,
+    lineHeight: 34,
+    marginTop: 2,
   },
+  heroPriceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 12,
+  },
+  deltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+  },
+  deltaTri: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+  },
+  deltaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  deltaSep: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+  },
+  deltaSubtle: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  alertsSubtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.1,
+    marginTop: 14,
+  },
+
   tabsRow: {
     flexDirection: "row",
     gap: 8,
