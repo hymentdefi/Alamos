@@ -10,9 +10,11 @@ import {
 import {
   createAlert as apiCreate,
   deleteAlert as apiDelete,
+  updateAlert as apiUpdate,
   getAllAlerts,
   getAlertsForAsset,
   AlertApiError,
+  type AlertDirection,
   type CreateAlertInput,
   type PriceAlert,
 } from "../api/alerts";
@@ -48,6 +50,12 @@ interface AlertsContextValue {
    *  duplicado, lanza AlertApiError code='duplicate'. El caller
    *  decide cómo mostrarlo (la AlertSheet lo hace inline, no toast). */
   create: (input: CreateAlertInput) => Promise<PriceAlert>;
+  /** Editar una alerta — solo threshold + direction. La currency y
+   *  el asset no se cambian. Mismo manejo de errores que create. */
+  update: (
+    alertId: string,
+    patch: { threshold: number; direction: AlertDirection },
+  ) => Promise<PriceAlert>;
   /** Borrar una alerta. */
   remove: (alertId: string) => Promise<void>;
   /** Refresh de toda la lista — útil al pull-to-refresh en
@@ -113,6 +121,20 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const update = useCallback(
+    async (
+      alertId: string,
+      patch: { threshold: number; direction: AlertDirection },
+    ) => {
+      const updated = await apiUpdate(alertId, patch);
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === alertId ? updated : a)),
+      );
+      return updated;
+    },
+    [],
+  );
+
   const remove = useCallback(async (alertId: string) => {
     // Optimistic — sacamos de la caché ya. Si el delete falla,
     // re-fetchamos para volver al estado real.
@@ -155,10 +177,20 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       hasActiveForAsset,
       isLoading,
       create,
+      update,
       remove,
       refresh,
     }),
-    [alerts, activeForAsset, hasActiveForAsset, isLoading, create, remove, refresh],
+    [
+      alerts,
+      activeForAsset,
+      hasActiveForAsset,
+      isLoading,
+      create,
+      update,
+      remove,
+      refresh,
+    ],
   );
 
   return (
