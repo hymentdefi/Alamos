@@ -154,7 +154,7 @@ export default function RendimientoScreen() {
   const ganancia = current - startVal;
   const gananciaPct = startVal > 0 ? (ganancia / startVal) * 100 : 0;
   const up = ganancia >= 0;
-  const color = up ? c.greenDark : c.red;
+  const color = up ? c.dataGreen : c.red;
   const fmt = (n: number) => formatMoney(n, currency);
 
   // Stats fijas (independientes del range).
@@ -336,7 +336,7 @@ export default function RendimientoScreen() {
                 style={[s.attribBody, { color: c.textSecondary }]}
               >
                 De tu rendimiento total de{" "}
-                <Text style={{ color: c.greenDark }}>
+                <Text style={{ color: c.dataGreen }}>
                   {formatPct(rangePct)}
                 </Text>
                 ,{" "}

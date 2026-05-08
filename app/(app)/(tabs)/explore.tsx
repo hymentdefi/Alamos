@@ -21,9 +21,9 @@ import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 
-// Verde de acción primaria — usar `c.action` del theme. Esta constante
+// Verde de acción primaria — usar `c.brand` del theme. Esta constante
 // quedó como literal sólo para que no rompa style.create() — donde sí
-// resolvemos vía `c.action` es en los componentes que lo usan.
+// resolvemos vía `c.brand` es en los componentes que lo usan.
 
 const FAVS_FILTER_KEY = "explore:only_favs";
 const MARKET_TAB_KEY = "explore:market_tab";
@@ -470,7 +470,7 @@ function MarketGlyph({
   // Como el bg ya es verde brand, no necesita el tint extra.
   return (
     <View
-      style={[gs.cryptoBadge, { backgroundColor: c.greenDark }]}
+      style={[gs.cryptoBadge, { backgroundColor: c.dataGreen }]}
     >
       <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
     </View>
@@ -654,7 +654,7 @@ function MarketBody({
                           asset.iconTone === "dark"
                             ? c.ink
                             : asset.iconTone === "accent"
-                              ? c.green
+                              ? c.brand
                               : c.surfaceSunken,
                       },
                     ]}
@@ -685,7 +685,7 @@ function MarketBody({
                     <Text
                       style={[
                         s.trendingDelta,
-                        { color: up ? c.positive : c.red },
+                        { color: up ? c.dataGreen : c.red },
                       ]}
                     >
                       {up ? "▲ " : "▼ "}
@@ -799,7 +799,7 @@ function MarketBody({
                       {asset.ticker}
                     </Text>
                     {fav ? (
-                      <Ionicons name="star" size={12} color={c.greenDark} />
+                      <Ionicons name="star" size={12} color={c.dataGreen} />
                     ) : null}
                   </View>
                   <Text style={[s.rowSub, { color: c.textMuted }]}>
@@ -813,7 +813,7 @@ function MarketBody({
                       60,
                       asset.change >= 0 ? "up" : "down",
                     )}
-                    color={asset.change >= 0 ? c.greenDark : c.red}
+                    color={asset.change >= 0 ? c.dataGreen : c.red}
                   />
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
@@ -824,14 +824,14 @@ function MarketBody({
                     /* FCI: mostramos TNA (o rendimiento 12M para RV)
                        en vez del % del día — mucho más representativo
                        para el usuario cuando mira un fondo. */
-                    <Text style={[s.rowYield, { color: c.greenDark }]}>
+                    <Text style={[s.rowYield, { color: c.dataGreen }]}>
                       TNA {formatPct(asset.annualYield)}
                     </Text>
                   ) : (
                     <Text
                       style={[
                         s.rowChange,
-                        { color: asset.change >= 0 ? c.positive : c.red },
+                        { color: asset.change >= 0 ? c.dataGreen : c.red },
                       ]}
                     >
                       {asset.change >= 0 ? "▲ " : "▼ "}

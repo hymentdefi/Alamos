@@ -188,14 +188,14 @@ export default function NotificationsScreen() {
                   style={[
                     s.itemIcon,
                     {
-                      backgroundColor: n.unread ? c.greenDim : c.surfaceHover,
+                      backgroundColor: n.unread ? c.dataGreenDim : c.surfaceHover,
                     },
                   ]}
                 >
                   <Feather
                     name={n.icon}
                     size={16}
-                    color={n.unread ? c.greenDark : c.text}
+                    color={n.unread ? c.dataGreen : c.text}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -204,7 +204,7 @@ export default function NotificationsScreen() {
                       {n.title}
                     </Text>
                     {n.unread ? (
-                      <View style={[s.unreadDot, { backgroundColor: c.green }]} />
+                      <View style={[s.unreadDot, { backgroundColor: c.brand }]} />
                     ) : null}
                   </View>
                   <Text style={[s.itemBody, { color: c.textMuted }]}>

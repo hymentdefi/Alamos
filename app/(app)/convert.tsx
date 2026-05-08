@@ -268,9 +268,9 @@ export default function ConvertScreen() {
             { borderColor: c.border, backgroundColor: c.surface },
           ]}
         >
-          <Feather name="trending-up" size={13} color={c.positive} />
+          <Feather name="trending-up" size={13} color={c.dataGreen} />
           <Text
-            style={[s.rateText, { color: c.positive }]}
+            style={[s.rateText, { color: c.dataGreen }]}
             numberOfLines={1}
           >
             1 {from.currency} = {formatRate(rate, to.currency)}{" "}
@@ -299,7 +299,7 @@ export default function ConvertScreen() {
               style={[
                 s.swapBtn,
                 {
-                  backgroundColor: c.action,
+                  backgroundColor: c.brand,
                   borderColor: c.bg,
                 },
               ]}
@@ -567,7 +567,7 @@ function AccountPickerSheet({
                     <Feather
                       name="check"
                       size={18}
-                      color={c.positive}
+                      color={c.dataGreen}
                       style={{ marginLeft: 10 }}
                     />
                   ) : null}
@@ -606,7 +606,7 @@ function CurrencyCard({
   // Borde + sombra cambian cuando el card está activo (recibe input
   // del keypad). En light queda un acento sutil; en dark más
   // marcado para que se note bien sobre el bg negro.
-  const borderColor = active ? c.action : c.border;
+  const borderColor = active ? c.brand : c.border;
   const borderWidth = active ? 1.5 : StyleSheet.hairlineWidth;
 
   return (

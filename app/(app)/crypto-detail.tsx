@@ -105,13 +105,13 @@ export default function CryptoDetailScreen() {
               minimumFractionDigits: 1,
               maximumFractionDigits: 1,
             })}%`}
-            valueColor={c.greenDark}
+            valueColor={c.dataGreen}
           />
           <View style={[s.rowDivider, { backgroundColor: c.border }]} />
           <MetricRow
             label="Rendimiento mensual estimado"
             value={`+ ${formatARS(monthlyEstimate)}`}
-            valueColor={c.greenDark}
+            valueColor={c.dataGreen}
           />
           <View style={[s.rowDivider, { backgroundColor: c.border }]} />
           <MetricRow label="Activos" value={`${cryptoAccounts.length}`} />
@@ -142,7 +142,7 @@ export default function CryptoDetailScreen() {
                     <View
                       style={[s.yieldBadge, { backgroundColor: c.surfaceHover }]}
                     >
-                      <Text style={[s.yieldText, { color: c.greenDark }]}>
+                      <Text style={[s.yieldText, { color: c.dataGreen }]}>
                         {a.yield.pct.toLocaleString("es-AR", {
                           minimumFractionDigits: 1,
                         })}
@@ -160,7 +160,7 @@ export default function CryptoDetailScreen() {
                 <View style={s.chartCol}>
                   <MiniSparkline
                     series={seriesFromSeed(a.id, 60, "up")}
-                    color={c.greenDark}
+                    color={c.dataGreen}
                   />
                 </View>
                 <View style={{ alignItems: "flex-end" }}>

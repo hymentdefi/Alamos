@@ -89,7 +89,7 @@ export function AlertSheet({ visible, asset, onClose }: Props) {
   const { show: showToast } = useToast();
   const assetColor = useAssetColorOptional();
 
-  const accent = assetColor ? assetColor.color : c.greenDark;
+  const accent = assetColor ? assetColor.color : c.dataGreen;
 
   const activeAlerts = useMemo(
     () => activeForAsset(asset.ticker),

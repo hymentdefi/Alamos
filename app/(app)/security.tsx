@@ -71,8 +71,8 @@ export default function SecurityScreen() {
           ]}
         >
           <View style={s.scoreHead}>
-            <View style={[s.scoreIcon, { backgroundColor: c.greenDim }]}>
-              <Feather name="shield" size={18} color={c.greenDark} />
+            <View style={[s.scoreIcon, { backgroundColor: c.dataGreenDim }]}>
+              <Feather name="shield" size={18} color={c.dataGreen} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.scoreLabel, { color: c.text }]}>
@@ -87,7 +87,7 @@ export default function SecurityScreen() {
             <View
               style={[
                 s.progressFg,
-                { backgroundColor: c.greenDark, width: "75%" },
+                { backgroundColor: c.dataGreen, width: "75%" },
               ]}
             />
           </View>
@@ -168,8 +168,8 @@ export default function SecurityScreen() {
                       {sess.device}
                     </Text>
                     {sess.current ? (
-                      <View style={[s.currentBadge, { backgroundColor: c.greenDim }]}>
-                        <Text style={[s.currentBadgeText, { color: c.greenDark }]}>
+                      <View style={[s.currentBadge, { backgroundColor: c.dataGreenDim }]}>
+                        <Text style={[s.currentBadgeText, { color: c.dataGreen }]}>
                           Esta sesión
                         </Text>
                       </View>

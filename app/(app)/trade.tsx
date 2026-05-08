@@ -60,7 +60,7 @@ export default function TradeScreen() {
   const fav = isFavorite(asset.ticker);
   const isFutures = asset.category === "futuros";
   const up = asset.change >= 0;
-  const trendColor = up ? c.green : c.red;
+  const trendColor = up ? c.dataGreen : c.red;
 
   const series = useMemo(
     () => seriesFromSeed(`trade-${asset.ticker}-${tf}`, 260, up ? "up" : "down"),
@@ -148,8 +148,8 @@ export default function TradeScreen() {
         <View style={s.topCenter}>
           <Text style={[s.topTicker, { color: c.text }]}>{asset.ticker}</Text>
           {isFutures ? (
-            <View style={[s.perpBadge, { backgroundColor: c.greenDim }]}>
-              <Text style={[s.perpBadgeText, { color: c.greenDark }]}>
+            <View style={[s.perpBadge, { backgroundColor: c.dataGreenDim }]}>
+              <Text style={[s.perpBadgeText, { color: c.dataGreen }]}>
                 {asset.maxLeverage}x
               </Text>
             </View>
@@ -236,7 +236,7 @@ export default function TradeScreen() {
                   <View
                     style={[
                       s.tfUnderline,
-                      { backgroundColor: c.greenDark },
+                      { backgroundColor: c.dataGreen },
                     ]}
                   />
                 ) : null}
@@ -323,12 +323,12 @@ export default function TradeScreen() {
                   style={[
                     s.depthBar,
                     {
-                      backgroundColor: c.greenDim,
+                      backgroundColor: c.dataGreenDim,
                       width: `${(row.total / maxDepth) * 100}%`,
                     },
                   ]}
                 />
-                <Text style={[s.bookPrice, { color: c.green }]}>
+                <Text style={[s.bookPrice, { color: c.dataGreen }]}>
                   {row.price.toLocaleString("en-US", {
                     maximumFractionDigits: row.price < 1 ? 4 : 2,
                   })}
@@ -357,7 +357,7 @@ export default function TradeScreen() {
                 <Text
                   style={[
                     s.tradePrice,
-                    { color: t.side === "buy" ? c.green : c.red },
+                    { color: t.side === "buy" ? c.dataGreen : c.red },
                   ]}
                 >
                   {t.price.toLocaleString("en-US", {
@@ -383,7 +383,7 @@ export default function TradeScreen() {
               onPress={() => setSide("buy")}
               style={[
                 s.sideBtn,
-                side === "buy" && { backgroundColor: c.green },
+                side === "buy" && { backgroundColor: c.brand },
               ]}
             >
               <Text
@@ -458,10 +458,10 @@ export default function TradeScreen() {
                         s.levPill,
                         {
                           backgroundColor: active
-                            ? c.greenDark
+                            ? c.dataGreen
                             : "transparent",
                           borderColor: active
-                            ? c.greenDark
+                            ? c.dataGreen
                             : c.border,
                         },
                       ]}
@@ -581,7 +581,7 @@ export default function TradeScreen() {
             onPress={submit}
             style={[
               s.submitBtn,
-              { backgroundColor: side === "buy" ? c.green : c.red },
+              { backgroundColor: side === "buy" ? c.brand : c.red },
             ]}
           >
             <Text

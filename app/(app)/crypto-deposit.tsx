@@ -395,7 +395,7 @@ function AddressView({
             style={[
               s.addressAction,
               {
-                backgroundColor: copied ? c.greenDim : c.surface,
+                backgroundColor: copied ? c.dataGreenDim : c.surface,
                 borderColor: c.border,
               },
             ]}
@@ -403,9 +403,9 @@ function AddressView({
             <Feather
               name={copied ? "check" : "copy"}
               size={16}
-              color={c.greenDark}
+              color={c.dataGreen}
             />
-            <Text style={[s.addressActionText, { color: c.greenDark }]}>
+            <Text style={[s.addressActionText, { color: c.dataGreen }]}>
               {copied ? "Copiada" : "Copiar"}
             </Text>
           </Tap>
@@ -417,8 +417,8 @@ function AddressView({
               { backgroundColor: c.surface, borderColor: c.border },
             ]}
           >
-            <Feather name="share" size={16} color={c.greenDark} />
-            <Text style={[s.addressActionText, { color: c.greenDark }]}>
+            <Feather name="share" size={16} color={c.dataGreen} />
+            <Text style={[s.addressActionText, { color: c.dataGreen }]}>
               Compartir
             </Text>
           </Tap>

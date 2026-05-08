@@ -276,7 +276,7 @@ export default function SuccessScreen() {
           onLayout={onCheckLayout}
           style={[
             s.checkCircle,
-            { backgroundColor: c.positive },
+            { backgroundColor: c.dataGreen },
             checkAnimStyle,
           ]}
         >

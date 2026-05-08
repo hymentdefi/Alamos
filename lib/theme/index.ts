@@ -61,25 +61,19 @@ const light = {
   textMuted: "#737373",
   textFaint: "#A3A3A3",
 
-  /* Roles de verde — UN solo brand (#00C805 idéntico en light +
-   * dark) y UN solo data green (#5AC53A). El brand vive en el
-   * logo, CTAs, action buttons y briefing. El data green va en
-   * charts, sparklines, deltas, % positivos — verde más suave
-   * para no machacar el ojo. Sin distinción light/dark. */
+  /* Sistema de verdes — DOS tokens semánticos, idénticos en
+   * light y dark mode:
+   *
+   *   c.brand     #00C805 — identity, CTAs, action buttons,
+   *                         briefing tone, asset-up no-data,
+   *                         notifications, success, badges.
+   *   c.dataGreen #5AC53A — charts, sparklines, deltas %,
+   *                         contextos de lectura continua donde
+   *                         el brand machaca el ojo. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.14)",
-  /* Aliases del brand — el código histórico usaba `action` para
-   * CTAs verdes; lo redirigimos al brand. */
-  action: "#00C805",
-  actionDim: "rgba(0,200,5,0.14)",
-  /* Aliases del data green — `positive` y `greenDark` históric-
-   * amente eran "verde data" (charts + deltas), redirigimos los
-   * tres al mismo #5AC53A. */
-  positive: "#5AC53A",
-  positiveDim: "rgba(90,197,58,0.14)",
-  green: "#5AC53A",
-  greenDark: "#5AC53A",
-  greenDim: "rgba(90,197,58,0.14)",
+  dataGreen: "#5AC53A",
+  dataGreenDim: "rgba(90,197,58,0.14)",
 
   // Token "down" para activos: naranja cálido #EB5D2A en vez de rojo
   // puro. El rojo cargado se leía como error/warning en una pantalla
@@ -110,18 +104,12 @@ const dark = {
   textMuted: "#848E9C",
   textFaint: "#5E6673",
 
-  /* Mismo sistema que light: brand (#00C805) para identity, data
-   * green (#5AC53A) para charts/deltas. Sin distinción light/dark
-   * — los dos hex resuelven igual en ambos modos. */
+  /* Mismo sistema que light: brand (#00C805) + dataGreen
+   * (#5AC53A), idénticos a los de light mode. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.18)",
-  action: "#00C805",
-  actionDim: "rgba(0,200,5,0.18)",
-  positive: "#5AC53A",
-  positiveDim: "rgba(90,197,58,0.18)",
-  green: "#5AC53A",
-  greenDark: "#5AC53A",
-  greenDim: "rgba(90,197,58,0.18)",
+  dataGreen: "#5AC53A",
+  dataGreenDim: "rgba(90,197,58,0.18)",
 
   // Naranja "down" en dark — un toque más saturado que en light
   // para mantener legibilidad sobre fondo OLED.
@@ -145,17 +133,12 @@ export interface ThemeColors {
   textSecondary: string;
   textMuted: string;
   textFaint: string;
-  /* Verdes semánticos. */
+  /* Verdes semánticos — sólo dos tokens. brand para identity y
+   * CTAs; dataGreen para charts y deltas. */
   brand: string;
   brandDim: string;
-  action: string;
-  actionDim: string;
-  positive: string;
-  positiveDim: string;
-  /* Aliases legacy — apuntan a `action` y `positive`. */
-  green: string;
-  greenDark: string;
-  greenDim: string;
+  dataGreen: string;
+  dataGreenDim: string;
   red: string;
   redDim: string;
   ink: string;

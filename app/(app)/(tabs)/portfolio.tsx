@@ -168,7 +168,7 @@ export default function PortfolioScreen() {
   const yesterdayArs = totalArs - daySumArs;
   const dayPct = yesterdayArs > 0 ? (daySumArs / yesterdayArs) * 100 : 0;
   const dayUp = daySumArs >= 0;
-  const color = dayUp ? c.greenDark : c.red;
+  const color = dayUp ? c.dataGreen : c.red;
 
   // Mejor / peor del día por % de change.
   const bestOfDay = useMemo<Holding | null>(() => {
@@ -606,7 +606,7 @@ export default function PortfolioScreen() {
               <View style={s.firstBlockInfoCol}>
                 <InfoRow
                   eyebrow="Mejor del día"
-                  eyebrowColor={c.greenDark}
+                  eyebrowColor={c.dataGreen}
                   primary={bestOfDay?.asset.ticker ?? "—"}
                   trailing={
                     bestOfDay
@@ -615,7 +615,7 @@ export default function PortfolioScreen() {
                   }
                   trailingColor={
                     bestOfDay && bestOfDay.asset.change >= 0
-                      ? c.greenDark
+                      ? c.dataGreen
                       : c.red
                   }
                   c={c}
@@ -631,7 +631,7 @@ export default function PortfolioScreen() {
                   }
                   trailingColor={
                     worstOfDay && worstOfDay.asset.change >= 0
-                      ? c.greenDark
+                      ? c.dataGreen
                       : c.red
                   }
                   c={c}
@@ -649,7 +649,7 @@ export default function PortfolioScreen() {
                 <InfoRow
                   eyebrow="Rendimiento"
                   primary={formatPct(12.4)}
-                  primaryColor={c.greenDark}
+                  primaryColor={c.dataGreen}
                   arrow
                   onPress={() =>
                     router.push("/(app)/rendimiento" as never)
@@ -852,7 +852,7 @@ function InfoRow({
             <Feather
               name="arrow-up-right"
               size={14}
-              color={c.greenDark}
+              color={c.dataGreen}
             />
           </View>
         ) : null}
@@ -1064,7 +1064,7 @@ function SegGlyph({
     return <FlagIcon code={id} size={18} />;
   }
   if (id === "CRYPTO") {
-    const bg = active ? c.bg : c.greenDark;
+    const bg = active ? c.bg : c.dataGreen;
     const fg = active ? color : c.bg;
     return (
       <View style={[s.segBadge, { backgroundColor: bg }]}>

@@ -213,7 +213,7 @@ export default function ChatScreen() {
                     selectedAgent.tone === "ink"
                       ? c.ink
                       : selectedAgent.tone === "green"
-                      ? c.green
+                      ? c.brand
                       : selectedAgent.tone === "warm"
                       ? "#E8B84A"
                       : "#4A7DFF",
@@ -235,7 +235,7 @@ export default function ChatScreen() {
             <View
               style={[
                 s.headerOnlineDot,
-                { backgroundColor: c.greenDark, borderColor: c.bg },
+                { backgroundColor: c.dataGreen, borderColor: c.bg },
               ]}
             />
           </View>

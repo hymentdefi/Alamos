@@ -9,7 +9,7 @@ import { useTheme } from "../theme";
  * rerenderean con la paleta correspondiente.
  *
  * Estados:
- *   - "up"   variación rango ≥ 0%  → verde Álamos (greenDark)
+ *   - "up"   variación rango ≥ 0%  → verde data Álamos (#5AC53A)
  *   - "down" variación rango < 0%  → naranja cálido (red token = #EB5D2A)
  *
  * No hay "flat" — variación 0.00% defaultea a up.
@@ -41,11 +41,11 @@ export function AssetColorProvider({
   const value = useMemo<AssetColorValue>(
     () => ({
       state: up ? "up" : "down",
-      color: up ? c.greenDark : c.red,
-      dim: up ? c.greenDim : c.redDim,
+      color: up ? c.dataGreen : c.red,
+      dim: up ? c.dataGreenDim : c.redDim,
       onColor: "#FFFFFF",
     }),
-    [up, c.greenDark, c.red, c.greenDim, c.redDim],
+    [up, c.dataGreen, c.red, c.dataGreenDim, c.redDim],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

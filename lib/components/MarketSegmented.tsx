@@ -116,7 +116,7 @@ function MarketGlyph({
   }
   if (id === "CRYPTO") {
     return (
-      <View style={[gs.cryptoBadge, { backgroundColor: c.greenDark }]}>
+      <View style={[gs.cryptoBadge, { backgroundColor: c.dataGreen }]}>
         <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
       </View>
     );

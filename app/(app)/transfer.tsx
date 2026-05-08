@@ -365,8 +365,8 @@ export function BankDepositCard({
               Share.share({ message: data.alias }).catch(() => {});
             }}
           >
-            <Feather name="share" size={16} color={c.greenDark} />
-            <Text style={[s.shareAliasText, { color: c.greenDark }]}>
+            <Feather name="share" size={16} color={c.dataGreen} />
+            <Text style={[s.shareAliasText, { color: c.dataGreen }]}>
               Compartir alias
             </Text>
           </Tap>
@@ -588,7 +588,7 @@ function CopyRow({
         style={[
           s.copyBtn,
           {
-            backgroundColor: copied ? c.greenDim : c.surfaceHover,
+            backgroundColor: copied ? c.dataGreenDim : c.surfaceHover,
           },
         ]}
         hitSlop={8}
@@ -596,7 +596,7 @@ function CopyRow({
         <Feather
           name={copied ? "check" : "copy"}
           size={16}
-          color={c.greenDark}
+          color={c.dataGreen}
         />
       </Tap>
     </View>
@@ -629,8 +629,8 @@ function LinkedAccountRow({
       </View>
       {/* Flechita al tocar: dispara el sub-flow de ingresar desde
           esta cuenta. */}
-      <View style={[s.linkedArrow, { backgroundColor: c.greenDim }]}>
-        <Feather name="arrow-down-left" size={16} color={c.greenDark} />
+      <View style={[s.linkedArrow, { backgroundColor: c.dataGreenDim }]}>
+        <Feather name="arrow-down-left" size={16} color={c.dataGreen} />
       </View>
     </Tap>
   );
@@ -1059,7 +1059,7 @@ export function SendSuccess({
   return (
     <View style={[s.root, { backgroundColor: c.bg, paddingTop: insets.top + 24 }]}>
       <View style={s.successBlock}>
-        <View style={[s.checkCircle, { backgroundColor: c.green }]}>
+        <View style={[s.checkCircle, { backgroundColor: c.brand }]}>
           <Feather name="check" size={32} color={c.ink} />
         </View>
         <Text style={[s.successTitle, { color: c.text }]}>Enviado</Text>
@@ -1159,7 +1159,7 @@ export function DepositFromAccount({
     return (
       <View style={[s.root, { backgroundColor: c.bg, paddingTop: insets.top + 24 }]}>
         <View style={s.successBlock}>
-          <View style={[s.checkCircle, { backgroundColor: c.green }]}>
+          <View style={[s.checkCircle, { backgroundColor: c.brand }]}>
             <Feather name="check" size={32} color={c.ink} />
           </View>
           <Text style={[s.successTitle, { color: c.text }]}>

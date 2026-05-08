@@ -178,8 +178,8 @@ export function AppearanceSheet({ visible, onClose }: Props) {
                   style={[
                     s.radio,
                     {
-                      borderColor: selected ? c.greenDark : c.border,
-                      backgroundColor: selected ? c.greenDark : "transparent",
+                      borderColor: selected ? c.dataGreen : c.border,
+                      backgroundColor: selected ? c.dataGreen : "transparent",
                     },
                   ]}
                 >

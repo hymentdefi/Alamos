@@ -186,7 +186,7 @@ export default function SupportScreen() {
             style={[s.chatCta, { backgroundColor: c.ink }]}
           >
             <View style={s.chatCtaLeft}>
-              <View style={[s.chatCtaIcon, { backgroundColor: c.green }]}>
+              <View style={[s.chatCtaIcon, { backgroundColor: c.brand }]}>
                 <Feather name="zap" size={18} color={c.ink} />
               </View>
               <View style={{ flex: 1 }}>

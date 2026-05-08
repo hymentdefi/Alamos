@@ -267,7 +267,7 @@ function OptionCard({
   previewTrend: "up" | "flat";
 }) {
   const { c } = useTheme();
-  const accent = c.action;
+  const accent = c.brand;
   const series = seriesFromSeed(previewSeed, 24, previewTrend);
 
   return (
@@ -355,7 +355,7 @@ function ToggleRow({
           Haptics.selectionAsync().catch(() => {});
           onChange(next);
         }}
-        trackColor={{ false: c.surfaceSunken, true: c.action }}
+        trackColor={{ false: c.surfaceSunken, true: c.brand }}
         thumbColor="#FFFFFF"
         ios_backgroundColor={c.surfaceSunken}
       />

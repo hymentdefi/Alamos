@@ -25,13 +25,13 @@ export default function WelcomeScreen() {
 
       <View style={s.center}>
         <View style={[s.eyebrow, { backgroundColor: c.surfaceHover, borderColor: c.border }]}>
-          <View style={[s.eyebrowDot, { backgroundColor: c.green }]} />
+          <View style={[s.eyebrowDot, { backgroundColor: c.brand }]} />
           <Text style={[s.eyebrowText, { color: c.textSecondary }]}>Lanzamiento 2026</Text>
         </View>
 
         <Text style={[s.display, { color: c.text }]}>
           Inversiones,{" "}
-          <Text style={[s.displayAccent, { backgroundColor: c.green }]}>simples</Text>
+          <Text style={[s.displayAccent, { backgroundColor: c.brand }]}>simples</Text>
           {"\n"}y transparentes.
         </Text>
 

@@ -39,7 +39,7 @@ export default function Button({
     variant === "primary"
       ? c.ink
       : variant === "accent"
-      ? c.green
+      ? c.brand
       : variant === "secondary"
       ? c.surfaceHover
       : "transparent";

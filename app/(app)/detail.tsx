@@ -188,7 +188,7 @@ export default function DetailScreen() {
   // posición, los movimientos, todo va en US$. No mezclamos con peso.
   const cur = assetCurrency(asset);
   const rangeUp = pctForRange >= 0;
-  const color = rangeUp ? c.greenDark : c.red;
+  const color = rangeUp ? c.dataGreen : c.red;
 
   const current = scrubIndex != null ? series[scrubIndex] : series[series.length - 1];
   const rangeStart = series[0];
@@ -1015,14 +1015,14 @@ function PositionCard({
         label="Resultado del día"
         amount={`${todayUp ? "+" : "−"}${fmt(Math.abs(pos.todayDelta))}`}
         pct={formatPct(pos.todayPct)}
-        color={todayUp ? c.greenDark : c.red}
+        color={todayUp ? c.dataGreen : c.red}
         c={c}
       />
       <ReturnRow
         label="Resultado total"
         amount={`${totalUp ? "+" : "−"}${fmt(Math.abs(pos.totalDelta))}`}
         pct={formatPct(pos.totalPct)}
-        color={totalUp ? c.greenDark : c.red}
+        color={totalUp ? c.dataGreen : c.red}
         c={c}
         isLast
       />
@@ -1318,7 +1318,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
   const actDiff = active.actual - active.expected;
   const actDiffPct =
     active.expected !== 0 ? (actDiff / Math.abs(active.expected)) * 100 : 0;
-  const actDiffColor = actBeat ? c.greenDark : c.red;
+  const actDiffColor = actBeat ? c.dataGreen : c.red;
   const actDiffSign = actDiff >= 0 ? "+" : "−";
   const next = useMemo(() => mockNextEarning(asset.ticker), [asset.ticker]);
 
@@ -1400,7 +1400,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
                 const x = padX + i * xStep;
                 const beat = d.actual >= d.expected;
                 const isSelected = isHolding && i === activeIdx;
-                const actualColor = beat ? c.greenDark : c.red;
+                const actualColor = beat ? c.dataGreen : c.red;
                 // Split del label "Q3 FY24" → ["Q3", "FY24"] para
                 // renderearlo en 2 líneas en el eje X.
                 const [quarter, fy] = d.label.split(" ");
@@ -1505,7 +1505,7 @@ function EarningsCard({ asset, c }: { asset: Asset; c: ColorMap }) {
                 // todavía no se sabe si va a ser positivo o negativo.
                 <SplitDot
                   size={10}
-                  leftColor={c.greenDark}
+                  leftColor={c.dataGreen}
                   rightColor={c.red}
                   idSuffix={`info-${asset.ticker}`}
                 />
@@ -1576,7 +1576,7 @@ function RelatedCarousel({
       >
         {items.map((a) => {
           const up = a.change >= 0;
-          const tone = up ? c.greenDark : c.red;
+          const tone = up ? c.dataGreen : c.red;
           return (
             <Tap
               key={a.ticker}
@@ -1757,7 +1757,7 @@ function HistoryCard({ asset, c }: { asset: Asset; c: ColorMap }) {
         const isBuy = h.side === "buy";
         const isSell = h.side === "sell";
         const isDiv = h.side === "dividend";
-        const sideColor = isDiv ? c.greenDark : isSell ? c.red : c.text;
+        const sideColor = isDiv ? c.dataGreen : isSell ? c.red : c.text;
         return (
           <View
             key={h.id}
