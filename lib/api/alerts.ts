@@ -30,7 +30,10 @@ const MOCK_LATENCY_MIN = 100;
 const MOCK_LATENCY_MAX = 280;
 
 export type AlertDirection = "above" | "below";
-export type AlertStatus = "active" | "triggered" | "cancelled";
+/* paused: el user la silenció pero queremos preservarla para que pueda
+ * reactivarla. Distinto de cancelled (borrado explícito) y de triggered
+ * (ya disparó y vive en historial). */
+export type AlertStatus = "active" | "paused" | "triggered" | "cancelled";
 
 export interface PriceAlert {
   id: string;
@@ -42,6 +45,10 @@ export interface PriceAlert {
   status: AlertStatus;
   createdAt: string;
   triggeredAt?: string;
+  /** Precio del activo al momento exacto del disparo. Lo guardamos
+   *  para que el historial muestre "se cumplió a $X" sin tener que
+   *  re-fetchear el precio histórico cada vez. */
+  triggeredPrice?: number;
 }
 
 export interface CreateAlertInput {
@@ -233,10 +240,96 @@ export async function updateAlert(
   throw new AlertApiError("updateAlert no implementado");
 }
 
-/* ─── Helpers para tests / dev ──────────────────────────────── */
+/** PATCH /alerts/:id/status — Pausa o reactiva una alerta. Sólo
+ *  válido entre 'active' y 'paused'. Si la alerta ya disparó o fue
+ *  cancelada el backend rechaza con invalid. */
+export async function setAlertPaused(
+  alertId: string,
+  paused: boolean,
+  _accessToken?: string,
+): Promise<PriceAlert> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const idx = _mockStore.findIndex((a) => a.id === alertId);
+    if (idx === -1) {
+      throw new AlertApiError("Alerta no encontrada.", "invalid");
+    }
+    const current = _mockStore[idx];
+    if (current.status === "triggered" || current.status === "cancelled") {
+      throw new AlertApiError(
+        "No se puede pausar una alerta finalizada.",
+        "invalid",
+      );
+    }
+    const updated: PriceAlert = {
+      ...current,
+      status: paused ? "paused" : "active",
+    };
+    _mockStore[idx] = updated;
+    return updated;
+  }
+  throw new AlertApiError("setAlertPaused no implementado");
+}
+
+/* ─── Helpers para tests / dev — sembrar alertas mock con histórico
+ *     para que las pantallas de historial no se vean vacías al
+ *     abrirlas la primera vez. ──────────────────────────────────── */
+
+/** Inyecta una alerta ya disparada (para el historial). Útil para
+ *  el seed inicial del mock store. */
+export function _seedTriggeredAlert(alert: Omit<PriceAlert, "id" | "userId">): PriceAlert {
+  const seeded: PriceAlert = {
+    id: `alert-${_idSeq++}`,
+    userId: MOCK_USER_ID,
+    ...alert,
+  };
+  _mockStore.push(seeded);
+  return seeded;
+}
 
 /** Reset del store mock — útil sólo para dev/storybook. */
 export function _resetMockAlerts(): void {
   _mockStore.length = 0;
   _idSeq = 1;
+}
+
+/* ─── Seed inicial — alertas disparadas para que el historial no
+ *     se vea vacío en demos. Sólo corre una vez en MOCK_MODE.
+ *     Cuando conectemos backend real, este bloque desaparece. */
+if (MOCK_MODE && _mockStore.length === 0) {
+  const now = new Date();
+  const hoursAgo = (h: number) =>
+    new Date(now.getTime() - h * 3600 * 1000).toISOString();
+  const daysAgo = (d: number) =>
+    new Date(now.getTime() - d * 24 * 3600 * 1000).toISOString();
+  _seedTriggeredAlert({
+    assetId: "AAPL",
+    threshold: 220,
+    direction: "above",
+    currency: "USD",
+    status: "triggered",
+    createdAt: daysAgo(3),
+    triggeredAt: hoursAgo(8),
+    triggeredPrice: 221.45,
+  });
+  _seedTriggeredAlert({
+    assetId: "BTC",
+    threshold: 95000,
+    direction: "above",
+    currency: "USDT",
+    status: "triggered",
+    createdAt: daysAgo(7),
+    triggeredAt: daysAgo(2),
+    triggeredPrice: 95342,
+  });
+  _seedTriggeredAlert({
+    assetId: "GGAL",
+    threshold: 8500,
+    direction: "below",
+    currency: "ARS",
+    status: "triggered",
+    createdAt: daysAgo(5),
+    triggeredAt: daysAgo(1),
+    triggeredPrice: 8412,
+  });
 }

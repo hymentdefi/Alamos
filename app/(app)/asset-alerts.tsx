@@ -8,6 +8,17 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../lib/theme";
@@ -24,22 +35,24 @@ import { AlertSheet } from "../../lib/components/AlertSheet";
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
 
 type Tab = "price" | "indicator";
+type Sort = "proximity" | "createdAt";
 
 /**
  * Pantalla de Alertas custom de un activo. Se abre desde la
  * campana del header en stock detail.
  *
- * Layout (mismo lenguaje que el reference de Robinhood pero
- * Alamos-styled):
+ * Layout:
  *   - Header: X (close) + título "[TICKER] · Alertas custom" +
  *     subtítulo de frecuencia.
- *   - Tabs: "Precio" / "Indicadores" (segundo tab placeholder
- *     hasta que tengamos signals técnicos).
- *   - Empty state: AlertBellIllustration grande + copy +
- *     "Próximamente" si la tab es indicador.
- *   - Lista de alertas existentes (si hay) con delete.
- *   - CTA bottom-fixed "Agregar alerta" → abre el AlertSheet
- *     con el form de creación.
+ *   - Banner del precio actual — referencia fija.
+ *   - Tabs: "Precio" / "Indicadores".
+ *   - Sort control (Por proximidad / Por fecha).
+ *   - Lista de alertas activas (active + paused) con distancia
+ *     al precio actual, toggle de pausa, swipe gestures.
+ *   - Historial (alertas que ya dispararon) con fecha/precio
+ *     al disparo.
+ *   - CTA bottom-fixed "Agregar alerta" → abre AlertSheet.
+ *   - Tap en una alerta → AlertSheet en modo edit.
  */
 export default function AssetAlertsScreen() {
   const router = useRouter();
@@ -54,18 +67,36 @@ export default function AssetAlertsScreen() {
   );
 
   const [tab, setTab] = useState<Tab>("price");
+  const [sort, setSort] = useState<Sort>("proximity");
   const [createOpen, setCreateOpen] = useState(false);
-  /* Si !== null, abrimos la AlertSheet en modo EDIT con esta alerta.
-   * Coexiste con createOpen — son flujos exclusivos: o creás (sheet
-   * sin editingAlert) o editás una existente (sheet con la alerta). */
-  const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(
-    null,
-  );
+  const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
 
-  const { activeForAsset, remove } = useAlerts();
+  const { activeForAsset, triggeredForAsset, setPaused, remove } = useAlerts();
+
   const alertsForAsset = useMemo(
     () => (asset ? activeForAsset(asset.ticker) : []),
     [asset, activeForAsset],
+  );
+
+  const sortedAlerts = useMemo(() => {
+    if (!asset) return [];
+    const copy = [...alertsForAsset];
+    if (sort === "proximity") {
+      // Distancia al precio actual — la más cercana arriba.
+      copy.sort(
+        (a, b) =>
+          Math.abs(a.threshold - asset.price) -
+          Math.abs(b.threshold - asset.price),
+      );
+    } else {
+      copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    return copy;
+  }, [alertsForAsset, sort, asset]);
+
+  const triggeredAlerts = useMemo(
+    () => (asset ? triggeredForAsset(asset.ticker) : []),
+    [asset, triggeredForAsset],
   );
 
   if (!asset) {
@@ -93,6 +124,19 @@ export default function AssetAlertsScreen() {
     }
   };
 
+  const handleTogglePause = async (alert: PriceAlert) => {
+    const willPause = alert.status === "active";
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      await setPaused(alert.id, willPause);
+      show(willPause ? "Alerta en pausa" : "Alerta reactivada", {
+        variant: "neutral",
+      });
+    } catch {
+      show("No pudimos actualizar la alerta", { variant: "error" });
+    }
+  };
+
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <Header
@@ -100,6 +144,23 @@ export default function AssetAlertsScreen() {
         insetsTop={insets.top}
         onClose={() => router.back()}
       />
+
+      {/* Banner del precio actual — referencia fija arriba de las
+          tabs. El user siempre ve dónde está el activo aunque haya
+          scrolleado por la lista. */}
+      <View
+        style={[
+          s.priceBanner,
+          { backgroundColor: c.surfaceHover, borderColor: c.border },
+        ]}
+      >
+        <Text style={[s.priceBannerLabel, { color: c.textMuted }]}>
+          Precio actual
+        </Text>
+        <Text style={[s.priceBannerValue, { color: c.text }]}>
+          {formatMoney(asset.price, assetCurrency(asset))}
+        </Text>
+      </View>
 
       <View style={[s.tabsRow, { paddingHorizontal: 24 }]}>
         <TabPill
@@ -122,28 +183,71 @@ export default function AssetAlertsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {tab === "price" ? (
-          alertsForAsset.length === 0 ? (
-            <EmptyState
-              illustration={<AlertBellIllustration size={160} />}
-              text="Creá tus propios umbrales de precio. Te notificamos cuando el activo los cruza."
-            />
-          ) : (
-            <View style={s.list}>
-              {alertsForAsset.map((alert, i) => (
-                <AlertRow
-                  key={alert.id}
-                  alert={alert}
-                  asset={asset}
-                  withTopDivider={i > 0}
-                  onEdit={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setEditingAlert(alert);
-                  }}
-                  onDelete={() => handleDelete(alert)}
-                />
-              ))}
-            </View>
-          )
+          <>
+            {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
+              <EmptyState
+                illustration={<AlertBellIllustration size={160} />}
+                text="Creá tus propios umbrales de precio. Te notificamos cuando el activo los cruza."
+              />
+            ) : null}
+
+            {sortedAlerts.length > 0 ? (
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <Text style={[s.sectionTitle, { color: c.text }]}>
+                    Activas ({sortedAlerts.length})
+                  </Text>
+                  <SortToggle
+                    sort={sort}
+                    onChange={(next) => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setSort(next);
+                    }}
+                  />
+                </View>
+                <View style={s.list}>
+                  {sortedAlerts.map((alert, i) => (
+                    <SwipableAlertRow
+                      key={alert.id}
+                      alert={alert}
+                      asset={asset}
+                      withTopDivider={i > 0}
+                      onEdit={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setEditingAlert(alert);
+                      }}
+                      onDelete={() => handleDelete(alert)}
+                      onTogglePause={() => handleTogglePause(alert)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {triggeredAlerts.length > 0 ? (
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <Text style={[s.sectionTitle, { color: c.text }]}>
+                    Historial
+                  </Text>
+                  <Text style={[s.sectionMeta, { color: c.textMuted }]}>
+                    {triggeredAlerts.length} disparada
+                    {triggeredAlerts.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+                <View style={s.list}>
+                  {triggeredAlerts.map((alert, i) => (
+                    <TriggeredRow
+                      key={alert.id}
+                      alert={alert}
+                      asset={asset}
+                      withTopDivider={i > 0}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
         ) : (
           <EmptyState
             illustration={<AlertBellIllustration size={220} />}
@@ -152,9 +256,6 @@ export default function AssetAlertsScreen() {
         )}
       </ScrollView>
 
-      {/* CTA bottom-fixed. Sólo en la tab de Precio — la de
-          Indicadores está en placeholder y no hay nada que
-          crear todavía. */}
       {tab === "price" ? (
         <View
           style={[
@@ -166,10 +267,10 @@ export default function AssetAlertsScreen() {
             style={({ pressed }) => [
               s.cta,
               {
-                /* CTA en brand canónico — coherencia con el resto
-                 * de los CTAs verdes de la app (ingresar, comprar,
-                 * crear alerta dentro del sheet). */
-                backgroundColor: c.brand,
+                /* Botón principal — ink/text neutro. El brand verde
+                 * lo reservamos para el CTA del AlertSheet (la
+                 * confirmación final). */
+                backgroundColor: c.text,
                 opacity: pressed ? 0.86 : 1,
               },
             ]}
@@ -178,14 +279,13 @@ export default function AssetAlertsScreen() {
               setCreateOpen(true);
             }}
           >
-            <Text style={[s.ctaText, { color: c.onColor }]}>
+            <Text style={[s.ctaText, { color: c.bg }]}>
               Agregar alerta
             </Text>
           </Pressable>
         </View>
       ) : null}
 
-      {/* Sheet de creación — sin editingAlert. */}
       <AlertSheet
         key={`create-${asset.ticker}`}
         visible={createOpen}
@@ -193,9 +293,6 @@ export default function AssetAlertsScreen() {
         onClose={() => setCreateOpen(false)}
       />
 
-      {/* Sheet de edición — montada sólo cuando hay una alerta para
-       *  editar. La key incluye el id del alert para que cada edición
-       *  sea un mount fresco con su threshold precargado. */}
       {editingAlert ? (
         <AlertSheet
           key={`edit-${editingAlert.id}`}
@@ -208,6 +305,8 @@ export default function AssetAlertsScreen() {
     </View>
   );
 }
+
+/* ─── Header ───────────────────────────────────────────────────── */
 
 function Header({
   ticker,
@@ -279,6 +378,71 @@ function TabPill({
   );
 }
 
+/* ─── Sort segmented (Proximidad / Fecha) ──────────────────────── */
+
+function SortToggle({
+  sort,
+  onChange,
+}: {
+  sort: Sort;
+  onChange: (next: Sort) => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        s.sortSeg,
+        { backgroundColor: c.surfaceHover, borderColor: c.border },
+      ]}
+    >
+      <Pressable
+        onPress={() => onChange("proximity")}
+        style={[
+          s.sortSegBtn,
+          sort === "proximity" && { backgroundColor: c.bg },
+        ]}
+        hitSlop={4}
+      >
+        <Text
+          style={[
+            s.sortSegText,
+            {
+              color: sort === "proximity" ? c.text : c.textMuted,
+              fontFamily:
+                sort === "proximity" ? fontFamily[700] : fontFamily[500],
+            },
+          ]}
+        >
+          Proximidad
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => onChange("createdAt")}
+        style={[
+          s.sortSegBtn,
+          sort === "createdAt" && { backgroundColor: c.bg },
+        ]}
+        hitSlop={4}
+      >
+        <Text
+          style={[
+            s.sortSegText,
+            {
+              color: sort === "createdAt" ? c.text : c.textMuted,
+              fontFamily:
+                sort === "createdAt" ? fontFamily[700] : fontFamily[500],
+            },
+          ]}
+        >
+          Recientes
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/* ─── Empty state ──────────────────────────────────────────────── */
+
 function EmptyState({
   illustration,
   text,
@@ -295,82 +459,288 @@ function EmptyState({
   );
 }
 
-function AlertRow({
+/* ─── Row de alerta activa con swipe gestures ──────────────────── */
+
+const SWIPE_REVEAL = 84; // ancho del action expuesto al hacer swipe
+const SWIPE_TRIGGER = 40; // px mínimos para considerar swipe válido
+
+function SwipableAlertRow({
   alert,
   asset,
   withTopDivider,
   onEdit,
   onDelete,
+  onTogglePause,
 }: {
   alert: PriceAlert;
   asset: Asset;
   withTopDivider: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onTogglePause: () => void;
 }) {
   const { c } = useTheme();
   const cur = assetCurrency(asset);
+  const isPaused = alert.status === "paused";
   const dirIcon = alert.direction === "above" ? "arrow-up" : "arrow-down";
   const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
-  /* Toda la fila (excepto el botón de borrar) es tappeable y abre la
-   * AlertSheet en modo edit. El delete queda separado a la derecha
-   * con su propio Pressable para que el tap target del edit no
-   * compita con el del delete. */
+
+  const distAbs = alert.threshold - asset.price;
+  const distPct = asset.price > 0 ? (distAbs / asset.price) * 100 : 0;
+  const distSign = distAbs > 0 ? "+" : distAbs < 0 ? "" : "";
+  const distColor =
+    Math.abs(distPct) < 0.1 ? c.textMuted : distAbs > 0 ? c.brand : c.red;
+
+  /* Swipe shared values: translateX positivo expone "Pausar" a la
+   * izquierda; negativo expone "Eliminar" a la derecha. */
+  const tx = useSharedValue(0);
+  const startX = useSharedValue(0);
+
+  const triggerPause = () => {
+    onTogglePause();
+    tx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
+  };
+  const triggerDelete = () => {
+    onDelete();
+    tx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
+  };
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-12, 12])
+    .onBegin(() => {
+      "worklet";
+      startX.value = tx.value;
+    })
+    .onUpdate((e) => {
+      "worklet";
+      const next = startX.value + e.translationX;
+      // Clamp — no permitimos arrastrar más allá de SWIPE_REVEAL.
+      tx.value = Math.max(
+        -SWIPE_REVEAL * 1.4,
+        Math.min(SWIPE_REVEAL * 1.4, next),
+      );
+    })
+    .onEnd((e) => {
+      "worklet";
+      const final = startX.value + e.translationX;
+      if (final < -SWIPE_TRIGGER) {
+        // Swipe izquierda → DELETE
+        tx.value = withTiming(-400, { duration: 220 }, (finished) => {
+          "worklet";
+          if (finished) runOnJS(triggerDelete)();
+        });
+      } else if (final > SWIPE_TRIGGER) {
+        // Swipe derecha → PAUSE/RESUME
+        tx.value = withTiming(0, { duration: 220 }, (finished) => {
+          "worklet";
+          if (finished) runOnJS(triggerPause)();
+        });
+      } else {
+        tx.value = withTiming(0, { duration: 200 });
+      }
+    });
+
+  const rowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }],
+  }));
+
+  const leftActionStyle = useAnimatedStyle(() => ({
+    /* Pausar action: opacity proporcional al swipe-right. */
+    opacity: Math.min(1, Math.max(0, tx.value / SWIPE_TRIGGER)),
+  }));
+
+  const rightActionStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, -tx.value / SWIPE_TRIGGER)),
+  }));
+
   return (
     <View
       style={[
-        s.alertRow,
+        s.swipeRoot,
         withTopDivider && {
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
       ]}
     >
-      <Pressable
-        onPress={onEdit}
-        style={({ pressed }) => [
-          s.alertRowTap,
-          { opacity: pressed ? 0.7 : 1 },
+      {/* Action layers debajo de la row — quedan revelados al
+          arrastrar. Pausar a la izquierda (azul/ink), eliminar a
+          la derecha (rojo). */}
+      <Animated.View
+        style={[
+          s.swipeLeftAction,
+          { backgroundColor: c.surfaceSunken },
+          leftActionStyle,
         ]}
-        accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
       >
-        <View
-          style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}
-        >
-          <Feather name={dirIcon} size={16} color={c.text} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.alertLabel, { color: c.textMuted }]}>
-            {dirLabel}
-          </Text>
-          <Text style={[s.alertPrice, { color: c.text }]}>
-            {formatMoney(alert.threshold, cur)}
-          </Text>
-        </View>
         <Feather
-          name="chevron-right"
+          name={isPaused ? "play" : "pause"}
           size={18}
-          color={c.textMuted}
-          style={{ marginRight: 8 }}
+          color={c.text}
         />
-      </Pressable>
-      <Pressable
-        hitSlop={10}
-        onPress={onDelete}
-        style={[s.deleteBtn, { backgroundColor: c.surfaceHover }]}
-        accessibilityLabel="Eliminar alerta"
+        <Text style={[s.swipeActionText, { color: c.text }]}>
+          {isPaused ? "Reactivar" : "Pausar"}
+        </Text>
+      </Animated.View>
+      <Animated.View
+        style={[
+          s.swipeRightAction,
+          { backgroundColor: c.red },
+          rightActionStyle,
+        ]}
       >
-        <Feather name="trash-2" size={16} color={c.textMuted} />
-      </Pressable>
+        <Feather name="trash-2" size={18} color={c.onColor} />
+        <Text style={[s.swipeActionText, { color: c.onColor }]}>
+          Eliminar
+        </Text>
+      </Animated.View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            s.alertRow,
+            { backgroundColor: c.bg },
+            rowStyle,
+          ]}
+        >
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertRowTap,
+              {
+                opacity: pressed ? 0.7 : isPaused ? 0.55 : 1,
+              },
+            ]}
+            accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
+          >
+            <View style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}>
+              <Feather name={dirIcon} size={16} color={c.text} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={s.alertTopRow}>
+                <Text style={[s.alertLabel, { color: c.textMuted }]}>
+                  {dirLabel}
+                </Text>
+                {isPaused ? (
+                  <View style={[s.pausedPill, { backgroundColor: c.surfaceSunken }]}>
+                    <Text style={[s.pausedPillText, { color: c.textMuted }]}>
+                      EN PAUSA
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[s.alertPrice, { color: c.text }]}>
+                {formatMoney(alert.threshold, cur)}
+              </Text>
+              <Text style={[s.alertDistance, { color: distColor }]}>
+                {distSign}
+                {distPct.toFixed(2)}% · {distSign}
+                {formatMoney(Math.abs(distAbs), cur)} del actual
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            hitSlop={10}
+            onPress={onTogglePause}
+            style={[
+              s.toggleBtn,
+              {
+                backgroundColor: isPaused ? c.surfaceSunken : c.brandDim,
+                borderColor: isPaused ? c.border : c.brand,
+              },
+            ]}
+            accessibilityLabel={isPaused ? "Reactivar alerta" : "Pausar alerta"}
+          >
+            <Feather
+              name={isPaused ? "play" : "pause"}
+              size={14}
+              color={isPaused ? c.textMuted : c.brand}
+            />
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
+}
+
+/* ─── Row de alerta disparada (historial) ──────────────────────── */
+
+function TriggeredRow({
+  alert,
+  asset,
+  withTopDivider,
+}: {
+  alert: PriceAlert;
+  asset: Asset;
+  withTopDivider: boolean;
+}) {
+  const { c } = useTheme();
+  const cur = assetCurrency(asset);
+  const dirIcon = alert.direction === "above" ? "arrow-up" : "arrow-down";
+  const dirLabel = alert.direction === "above" ? "Subió a" : "Bajó a";
+  const triggeredOn = alert.triggeredAt
+    ? formatTriggeredDate(alert.triggeredAt)
+    : "—";
+  const triggeredAtPrice = alert.triggeredPrice ?? alert.threshold;
+  return (
+    <View
+      style={[
+        s.alertRow,
+        s.triggeredRow,
+        { backgroundColor: c.bg, opacity: 0.78 },
+        withTopDivider && {
+          borderTopColor: c.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+        },
+      ]}
+    >
+      <View style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}>
+        <Feather name={dirIcon} size={16} color={c.textMuted} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.alertLabel, { color: c.textMuted }]}>
+          {dirLabel} · {triggeredOn}
+        </Text>
+        <Text style={[s.alertPrice, { color: c.text }]}>
+          {formatMoney(alert.threshold, cur)}
+        </Text>
+        <Text style={[s.alertDistance, { color: c.textMuted }]}>
+          Disparada a {formatMoney(triggeredAtPrice, cur)}
+        </Text>
+      </View>
+      <View
+        style={[s.checkBubble, { backgroundColor: c.brandDim }]}
+      >
+        <Feather name="check" size={14} color={c.brand} />
+      </View>
+    </View>
+  );
+}
+
+function formatTriggeredDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    const hh = d.getHours().toString().padStart(2, "0");
+    const mm = d.getMinutes().toString().padStart(2, "0");
+    return `Hoy ${hh}:${mm}`;
+  }
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  return `${day}/${month}`;
 }
 
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     paddingHorizontal: 24,
-    paddingBottom: 18,
+    paddingBottom: 14,
   },
   closeBtn: {
     width: 36,
@@ -392,6 +762,29 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 6,
   },
+  priceBanner: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginHorizontal: 24,
+    marginBottom: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: "continuous",
+  },
+  priceBannerLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  priceBannerValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
+  },
   tabsRow: {
     flexDirection: "row",
     gap: 8,
@@ -410,15 +803,31 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
+  /* Sort segmented */
+  sortSeg: {
+    flexDirection: "row",
+    padding: 3,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: "continuous",
+  },
+  sortSegBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderCurve: "continuous",
+  },
+  sortSegText: {
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
+
   /* Empty state */
-  /* Empty state — bell + copy posicionados en el tercio superior
-   * del espacio disponible, mismo balance que Robinhood (bell
-   * compacta arriba con bastante aire abajo antes del CTA). */
   emptyWrap: {
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 32,
-    paddingTop: 64,
+    paddingTop: 48,
   },
   emptyIllustration: {
     marginBottom: 22,
@@ -437,10 +846,65 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
+  /* Sections (active list, history) */
+  section: {
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  sectionMeta: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+  },
+
   /* Lista */
   list: {
     paddingHorizontal: 24,
-    paddingTop: 8,
+  },
+  swipeRoot: {
+    position: "relative",
+    overflow: "hidden",
+  },
+  swipeLeftAction: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: SWIPE_REVEAL,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 8,
+    flexDirection: "row",
+    gap: 6,
+  },
+  swipeRightAction: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: SWIPE_REVEAL,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingRight: 8,
+    flexDirection: "row",
+    gap: 6,
+  },
+  swipeActionText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.05,
   },
   alertRow: {
     flexDirection: "row",
@@ -448,11 +912,19 @@ const s = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
   },
+  triggeredRow: {
+    paddingVertical: 12,
+  },
   alertRowTap: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
+  },
+  alertTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   dirBadge: {
     width: 36,
@@ -473,13 +945,39 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
     marginTop: 2,
   },
-  deleteBtn: {
-    width: 36,
-    height: 36,
+  alertDistance: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+  pausedPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderCurve: "continuous",
+  },
+  pausedPillText: {
+    fontFamily: fontFamily[700],
+    fontSize: 9,
+    letterSpacing: 0.6,
+  },
+  toggleBtn: {
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
     borderCurve: "continuous",
-    borderRadius: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  checkBubble: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderCurve: "continuous",
   },
 
   /* CTA bottom */

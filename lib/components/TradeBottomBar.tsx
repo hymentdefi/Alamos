@@ -110,8 +110,12 @@ const PILL_WIDTH = 200;
  * y cuadradas como estaban con height 52 + radius 18). */
 const PILL_HEIGHT = 48;
 const PILL_GAP = 8;
-const STAGGER_MS = 50;
-const DUR = 280;
+/* Tiempos calibrados para que el tap del Operar se sienta snappy:
+ * DUR + STAGGER * 2 ≈ 250ms total. Antes (280 + 50*2 = 380ms) se
+ * sentía pesado. Easing out-cubic para que arranque rápido y
+ * desacelere al asentar. */
+const STAGGER_MS = 35;
+const DUR = 180;
 /* Dim en 2 niveles:
  *   - STRONG (arriba del bar) → 0.55 — el resto de la pantalla
  *     se difumina fuerte, foco va a las pills.
@@ -211,7 +215,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setExpanded(true);
     dimProgress.value = withTiming(1, {
-      duration: 200,
+      duration: 140,
       easing: Easing.out(Easing.cubic),
     });
     // Bottom-up stagger: la pill más cercana al CTA aparece primero.
@@ -246,22 +250,22 @@ export const TradeBottomBar = memo(function TradeBottomBar({
      * (top-down) para que se "doblen" hacia el origen como un
      * stack de cartas que cae. */
     optionsProgress.value = withTiming(0, {
-      duration: 200,
+      duration: 140,
       easing: Easing.in(Easing.cubic),
     });
     buyProgress.value = withDelay(
       STAGGER_MS,
-      withTiming(0, { duration: 200, easing: Easing.in(Easing.cubic) }),
+      withTiming(0, { duration: 140, easing: Easing.in(Easing.cubic) }),
     );
     if (hasPosition) {
       sellProgress.value = withDelay(
         STAGGER_MS * 2,
-        withTiming(0, { duration: 200, easing: Easing.in(Easing.cubic) }),
+        withTiming(0, { duration: 140, easing: Easing.in(Easing.cubic) }),
       );
     }
     dimProgress.value = withTiming(
       0,
-      { duration: 240, easing: Easing.in(Easing.cubic) },
+      { duration: 160, easing: Easing.in(Easing.cubic) },
       (finished) => {
         "worklet";
         if (finished) {
