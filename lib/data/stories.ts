@@ -10,7 +10,7 @@ export const CRYPTO_STORY: StoryConfig = {
   id: "crypto",
   bgTop: "#0E0F0C",
   bgBottom: "#0D2818",
-  accent: "#5ac43e",
+  accent: "#00C805",
   slides: [
     {
       emoji: "⚡",
@@ -34,7 +34,7 @@ export const US_MARKET_STORY: StoryConfig = {
   id: "us-market",
   bgTop: "#0E0F0C",
   bgBottom: "#1B2A4E",
-  accent: "#5ac43e",
+  accent: "#00C805",
   slides: [
     {
       emoji: "🏛️",

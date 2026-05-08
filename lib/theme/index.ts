@@ -1,9 +1,25 @@
 import { createContext, useContext } from "react";
 
-/* ─── Brand constants (from brand-assets README) ─── */
+/* ─── Brand constants ───────────────────────────────────────
+ *
+ * SISTEMA DE VERDES (rige toda la app):
+ *
+ *   green     #00C805 — BRAND. Logo, CTAs, action buttons,
+ *                       briefing tone, asset-up en contextos
+ *                       NO data (pills, badges, tabs).
+ *   greenData #5AC53A — DATA. Charts, sparklines, deltas %,
+ *                       "up" en contextos data. Verde más suave
+ *                       para no machacar el ojo en lecturas
+ *                       continuas. Mismo en light + dark.
+ *
+ * Los demás tokens del theme (action, positive, greenDark,
+ * green) son ALIASES de uno de estos dos según su semántica
+ * histórica — ver light/dark en lib/theme/index.ts. */
 export const brand = {
   green: "#00C805",
-  greenDark: "#00A304",
+  greenData: "#5AC53A",
+  /* @deprecated alias de greenData — usá greenData o c.greenDark */
+  greenDark: "#5AC53A",
   ink: "#0E0F0C",
   bg: "#FFFFFF",
 } as const;
@@ -45,19 +61,25 @@ const light = {
   textMuted: "#737373",
   textFaint: "#A3A3A3",
 
-  /* Roles de verde — semánticos. */
+  /* Roles de verde — UN solo brand (#00C805 idéntico en light +
+   * dark) y UN solo data green (#5AC53A). El brand vive en el
+   * logo, CTAs, action buttons y briefing. El data green va en
+   * charts, sparklines, deltas, % positivos — verde más suave
+   * para no machacar el ojo. Sin distinción light/dark. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.14)",
-  action: "#5ac43e",
-  actionDim: "rgba(90,196,62,0.14)",
-  positive: "#00A304",
-  positiveDim: "rgba(0,163,4,0.14)",
-
-  /* Aliases legacy: mantienen el código viejo funcionando y mapean
-   * a la semántica que históricamente usaron. */
-  green: "#5ac43e",
-  greenDark: "#00A304",
-  greenDim: "rgba(0,163,4,0.14)",
+  /* Aliases del brand — el código histórico usaba `action` para
+   * CTAs verdes; lo redirigimos al brand. */
+  action: "#00C805",
+  actionDim: "rgba(0,200,5,0.14)",
+  /* Aliases del data green — `positive` y `greenDark` históric-
+   * amente eran "verde data" (charts + deltas), redirigimos los
+   * tres al mismo #5AC53A. */
+  positive: "#5AC53A",
+  positiveDim: "rgba(90,197,58,0.14)",
+  green: "#5AC53A",
+  greenDark: "#5AC53A",
+  greenDim: "rgba(90,197,58,0.14)",
 
   // Token "down" para activos: naranja cálido #EB5D2A en vez de rojo
   // puro. El rojo cargado se leía como error/warning en una pantalla
@@ -88,21 +110,18 @@ const dark = {
   textMuted: "#848E9C",
   textFaint: "#5E6673",
 
-  /* Verdes dark mode — TODOS al brand canónico (#00C805). Antes
-   * action/positive/green/greenDark variaban (#4FB833 / #02A05C),
-   * lo que hacía que en dark mode los charts y deltas se vieran
-   * de un verde distinto al brand del logo / action buttons /
-   * briefing. Unificar a #00C805 elimina esa inconsistencia. */
+  /* Mismo sistema que light: brand (#00C805) para identity, data
+   * green (#5AC53A) para charts/deltas. Sin distinción light/dark
+   * — los dos hex resuelven igual en ambos modos. */
   brand: "#00C805",
   brandDim: "rgba(0,200,5,0.18)",
   action: "#00C805",
   actionDim: "rgba(0,200,5,0.18)",
-  positive: "#00C805",
-  positiveDim: "rgba(0,200,5,0.18)",
-
-  green: "#00C805",
-  greenDark: "#00C805",
-  greenDim: "rgba(0,200,5,0.18)",
+  positive: "#5AC53A",
+  positiveDim: "rgba(90,197,58,0.18)",
+  green: "#5AC53A",
+  greenDark: "#5AC53A",
+  greenDim: "rgba(90,197,58,0.18)",
 
   // Naranja "down" en dark — un toque más saturado que en light
   // para mantener legibilidad sobre fondo OLED.

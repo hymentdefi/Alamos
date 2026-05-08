@@ -91,13 +91,19 @@ interface Holding {
   ars: number;
 }
 
+/* Paleta del ladrillo 3D — multi-color por diseño (cada slice
+ * pide un tono distinto para distinción visual). El sexto entry
+ * es el data green canónico de la app (#5AC53A); los otros
+ * verdes (#00E676 vivid mint, #7EE9A6 pale, #00B864 medium) son
+ * artísticos para shading y permanecen sin alinear al sistema
+ * de tokens — no representan estado de activo. */
 const BRICK_PALETTE = [
   "#00E676",
   "#0E0F0C",
   "#7EE9A6",
   "#00B864",
   "#94A3B8",
-  "#5ac43e",
+  "#5AC53A",
   "#6B6C66",
 ];
 

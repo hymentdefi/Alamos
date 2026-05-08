@@ -31,8 +31,10 @@ import {
 const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
-// Mismo verde que usa la pill activa del nav bar (ver app/(app)/(tabs)/_layout.tsx).
-const BRAND_GREEN = "#5ac43e";
+// Verde brand canónico (#00C805 — mismo que el isotipo + el
+// nav bar). Antes usábamos #5ac43e que era el data green; el
+// rename de la variable lo deja consistente con su nombre.
+const BRAND_GREEN = "#00C805";
 
 /* ─── Texto corto inline (para detalle, card en activo, etc.) ─── */
 

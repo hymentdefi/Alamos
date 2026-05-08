@@ -6,7 +6,11 @@ import { useTheme, fontFamily } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
 
 const BAR_CONTENT_HEIGHT = 68;
-const ACTIVE_COLOR = "#5ac43e";
+/* Verde brand canónico — el tab activo lleva la identidad
+ * Alamos (#00C805 idéntico en light + dark). Antes usábamos
+ * #5ac43e (data green) acá; lo reemplazamos por brand para que
+ * el tab bar matche el isotipo del logo. */
+const ACTIVE_COLOR = "#00C805";
 
 type TabRoute = {
   name: string;
