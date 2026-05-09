@@ -463,12 +463,12 @@ export function AlertSheet({
               />
             </View>
 
+            {/* Header del sheet — solo título, alineado izquierda. El
+             *  subtítulo "Apple · AAPL.US" desapareció (vive en el
+             *  header del screen). */}
             <View style={s.header}>
               <Text style={[s.title, { color: c.text }]}>
                 {isEditing ? "Editar alerta" : "Nueva alerta de precio"}
-              </Text>
-              <Text style={[s.subtitle, { color: c.textMuted }]}>
-                {asset.name} · {asset.ticker}
               </Text>
             </View>
 
@@ -504,77 +504,41 @@ export function AlertSheet({
             ) : null}
 
             <View style={s.form}>
-              <Text style={[s.eyebrow, { color: c.textMuted }]}>
-                {isEditing ? "Editando" : "Nueva alerta"}
-              </Text>
-
-              {/* Display del precio — read-only, alimentado por el
-                  slider, los chips o el keypad. El banner de "precio
-                  actual" desapareció (vive en el header, era
-                  redundante). El % delta se integra como texto
-                  secundario al lado del precio, no como pill. */}
-              <View
-                style={[
-                  s.field,
-                  {
-                    backgroundColor: c.surface,
-                    borderColor: errorMsg ? c.red : c.border,
-                  },
-                ]}
-              >
-                <View style={s.fieldHeader}>
-                  <Text style={[s.fieldLabel, { color: c.textMuted }]}>
-                    Precio objetivo
+              {/* Bloque del precio objetivo — sin card, sin border,
+               *  flota directo sobre el bg del sheet (Robinhood-style).
+               *  Jerarquía: label small → número hero + delta inline →
+               *  línea contextual del precio actual. Todo izquierda. */}
+              <View style={s.priceBlock}>
+                <View style={s.priceLabelRow}>
+                  <Text style={[s.priceLabel, { color: c.textMuted }]}>
+                    PRECIO OBJETIVO
                   </Text>
-                  <View style={s.currencyRow}>
-                    {allCurrencies.map((cu) => (
-                      <View
-                        key={cu}
-                        style={[
-                          s.currencyChip,
-                          {
-                            backgroundColor: c.text,
-                            borderColor: c.text,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.currencyText, { color: c.bg }]}>
-                          {cu}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  <Text style={[s.priceLabelCurrency, { color: c.textFaint }]}>
+                    {allCurrencies[0]}
+                  </Text>
                 </View>
-                <View style={s.fieldDisplayRow}>
+                <View style={s.priceHeroRow}>
                   <Text
                     style={[
-                      s.fieldDisplayInteger,
+                      s.priceHero,
                       {
                         color: threshold ? c.text : c.textFaint,
                       },
                     ]}
                     numberOfLines={1}
+                    adjustsFontSizeToFit
                   >
                     {thresholdParts.integer}
+                    {thresholdParts.decimals !== null ? (
+                      <Text style={[s.priceHeroDecimals, { color: c.textMuted }]}>
+                        ,{thresholdParts.decimals}
+                      </Text>
+                    ) : null}
                   </Text>
-                  {thresholdParts.decimals !== null ? (
-                    <Text
-                      style={[
-                        s.fieldDisplayDecimals,
-                        { color: c.textMuted },
-                      ]}
-                    >
-                      ,{thresholdParts.decimals}
-                    </Text>
-                  ) : null}
-                  {/* Delta inline — texto secundario al lado del
-                      precio, no pill. Verde si sube, naranja si baja.
-                      Se omite cuando el threshold está vacío o vale
-                      el precio actual exacto (delta = 0). */}
                   {targetValue != null && Math.abs(actualPct) >= 0.05 ? (
                     <Text
                       style={[
-                        s.fieldDeltaInline,
+                        s.priceHeroDelta,
                         {
                           color: direction === "above" ? c.brand : c.red,
                         },
@@ -585,18 +549,25 @@ export function AlertSheet({
                     </Text>
                   ) : null}
                 </View>
+                <Text style={[s.priceContextual, { color: c.textMuted }]}>
+                  Precio actual: {formatMoney(asset.price, allCurrencies[0])}
+                </Text>
               </View>
 
               {/* Slider -30% / +30% — sincronizado con el threshold.
                   Mover acá actualiza el threshold; tipear en el
-                  keypad mueve el thumb del slider. */}
-              <PercentRangeSlider
-                value={sliderPct}
-                onChange={handleSliderChange}
-                positiveColor={c.brand}
-                negativeColor={c.red}
-                width={SLIDER_WIDTH}
-              />
+                  keypad mueve el thumb del slider. marginTop extra
+                  para alcanzar los ~32 px pedidos entre la línea
+                  contextual y el slider (24 del form gap + 8). */}
+              <View style={{ marginTop: 8 }}>
+                <PercentRangeSlider
+                  value={sliderPct}
+                  onChange={handleSliderChange}
+                  positiveColor={c.brand}
+                  negativeColor={c.red}
+                  width={SLIDER_WIDTH}
+                />
+              </View>
 
               {/* Quick % chips — naranja del lado negativo, verde del
                   positivo, con opacidad progresiva (más cerca del 0
@@ -724,20 +695,17 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
+  /* Header del sheet — sólo título, sin subtítulo (vive en el header
+   * del screen). Alineado izquierda. Padding bottom genera el >24px
+   * de gap entre título y label "PRECIO OBJETIVO". */
   header: {
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingTop: 6,
+    paddingBottom: 28,
   },
   title: {
-    fontFamily: fontFamily[800],
-    fontSize: 26,
-    letterSpacing: -0.9,
-  },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    marginTop: 4,
-    letterSpacing: -0.1,
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
   activeList: {
     gap: 8,
@@ -765,67 +733,74 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Form gap aumentado para que la pantalla respire — el banner
-   * de "precio actual" desapareció y el espacio liberado se reparte
-   * acá, separando precio objetivo / slider / chips / keypad. */
+  /* Form: gap GENERAL entre módulos (precio block, slider, chips,
+   * keypad, CTA) cuando no se override por marginTop específico. */
   form: {
-    paddingTop: 4,
+    paddingTop: 0,
     gap: 24,
   },
-  eyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  field: {
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 18,
-  },
-  fieldHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  fieldLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-  fieldDisplayRow: {
-    flexDirection: "row",
+  /* Bloque del precio objetivo — sin card, sin border. El número
+   * flota directo sobre el bg del sheet (Robinhood-style). Alineado
+   * izquierda. paddingBottom 0 — el form gap se encarga del
+   * separador con el slider. */
+  priceBlock: {
     alignItems: "flex-start",
   },
-  fieldDisplayInteger: {
-    fontFamily: fontFamily[700],
-    fontSize: 36,
-    letterSpacing: -0.9,
-    lineHeight: 38,
+  priceLabelRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
   },
-  fieldDisplayDecimals: {
+  priceLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.3,
-    lineHeight: 22,
-    marginTop: 6,
-    marginLeft: 2,
+    fontSize: 11,
+    letterSpacing: 1.4,
   },
-  /* Delta inline al lado del precio — texto secundario coloreado
-   * por signo. NO es una pill, NO es una chip; es parte del display
-   * tipográfico del precio para que se sienta integrado. */
-  fieldDeltaInline: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.2,
-    lineHeight: 22,
-    marginLeft: 10,
+  /* Currency al lado del label, NO como pill — gris muy tenue chico
+   * para que no robe protagonismo al hero. Da contexto sin gritar. */
+  priceLabelCurrency: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  /* Hero — número del precio objetivo. Heavy weight, 56 px, izquierda. */
+  priceHeroRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 12,
     marginTop: 8,
   },
+  priceHero: {
+    fontFamily: fontFamily[800],
+    fontSize: 56,
+    letterSpacing: -1.6,
+    lineHeight: 60,
+    flexShrink: 1,
+  },
+  priceHeroDecimals: {
+    fontFamily: fontFamily[700],
+    fontSize: 26,
+    letterSpacing: -0.5,
+  },
+  /* Delta inline al lado del precio — verde si sube, naranja si
+   * baja. Texto integrado, no pill. */
+  priceHeroDelta: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.2,
+  },
+  /* Línea contextual debajo del hero — referencia del precio
+   * actual del activo, gris tenue al ~50 % opacidad. */
+  priceContextual: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 8,
+    opacity: 0.7,
+  },
+  /* Margen TOP del slider — el form gap (24) ya lo separa del
+   * priceBlock; le agregamos un toque más para llegar a ~32 px
+   * pedido entre la línea contextual y el slider. */
   currencyRow: {
     flexDirection: "row",
     alignItems: "center",
