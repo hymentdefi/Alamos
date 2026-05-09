@@ -11,17 +11,6 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Gesture,
-  GestureDetector,
-} from "react-native-gesture-handler";
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../lib/theme";
@@ -586,10 +575,7 @@ function EmptyState({
   );
 }
 
-/* ─── Row de alerta activa con swipe gestures ──────────────────── */
-
-const SWIPE_REVEAL = 84; // ancho del action expuesto al hacer swipe
-const SWIPE_TRIGGER = 40; // px mínimos para considerar swipe válido
+/* ─── Row de alerta activa ─────────────────────────────────────── */
 
 function SwipableAlertRow({
   alert,
@@ -604,7 +590,7 @@ function SwipableAlertRow({
   asset: Asset;
   withTopDivider: boolean;
   /** Formato del valor de distancia: "%" muestra +X.XX%, "$"
-   *  muestra +X,XX (currency). Lo elige el segmented del header. */
+   *  muestra +X,XX (currency). Lo elige el toggle del header. */
   distFormat: "%" | "$";
   onEdit: () => void;
   onDelete: () => void;
@@ -614,8 +600,6 @@ function SwipableAlertRow({
   const cur = assetCurrency(asset);
   const isPaused = alert.status === "paused";
   const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
-  /* "Sube a" verde brand, "Baja a" red/naranja. Cuando está pausada,
-   * todo el texto va a 40 % opacity (incluyendo el verbo coloreado). */
   const dirColor = alert.direction === "above" ? c.brand : c.red;
 
   const distAbs = alert.threshold - asset.price;
@@ -623,122 +607,69 @@ function SwipableAlertRow({
   const distSign = distAbs > 0 ? "+" : "";
   const rowOpacity = isPaused ? 0.4 : 1;
 
-  /* Swipe sólo a la izquierda → DELETE. El pause/resume vive en el
-   * toggle iOS de la columna 4. */
-  const tx = useSharedValue(0);
-  const startX = useSharedValue(0);
-
-  const triggerDelete = () => {
-    onDelete();
-    tx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
-  };
-
-  const pan = Gesture.Pan()
-    .activeOffsetX([-12, 12])
-    .failOffsetY([-12, 12])
-    .onBegin(() => {
-      "worklet";
-      startX.value = tx.value;
-    })
-    .onUpdate((e) => {
-      "worklet";
-      // Sólo permitimos arrastrar hacia la izquierda (translationX < 0).
-      const next = startX.value + e.translationX;
-      tx.value = Math.max(-SWIPE_REVEAL * 1.4, Math.min(0, next));
-    })
-    .onEnd((e) => {
-      "worklet";
-      const final = startX.value + e.translationX;
-      if (final < -SWIPE_TRIGGER) {
-        tx.value = withTiming(-400, { duration: 220 }, (finished) => {
-          "worklet";
-          if (finished) runOnJS(triggerDelete)();
-        });
-      } else {
-        tx.value = withTiming(0, { duration: 200 });
-      }
-    });
-
-  const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tx.value }],
-  }));
-
-  const rightActionStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, -tx.value / SWIPE_TRIGGER)),
-  }));
-
   return (
     <View
       style={[
-        s.swipeRoot,
+        s.alertRow,
         withTopDivider && {
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
       ]}
     >
-      {/* Action layer — eliminar a la derecha (queda revelado al
-       *  arrastrar la fila hacia la izquierda). */}
-      <Animated.View
-        style={[
-          s.swipeRightAction,
-          { backgroundColor: c.red },
-          rightActionStyle,
+      {/* Cols 1-2 dentro de un Pressable que abre el editor. El
+          toggle y el botón de eliminar viven afuera para que sus
+          taps no disparen el editor. */}
+      <Pressable
+        onPress={onEdit}
+        style={({ pressed }) => [
+          s.alertRowMain,
+          { opacity: pressed ? 0.7 : rowOpacity },
         ]}
+        accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
       >
-        <Feather name="trash-2" size={18} color={c.onColor} />
-        <Text style={[s.swipeActionText, { color: c.onColor }]}>
-          Eliminar
-        </Text>
-      </Animated.View>
-
-      <GestureDetector gesture={pan}>
-        <Animated.View
-          style={[s.alertRow, { backgroundColor: c.bg }, rowStyle]}
+        {/* Col 1: dirección + precio objetivo en blanco (c.text). */}
+        <Text
+          style={[s.alertLeft, { color: c.text }]}
+          numberOfLines={1}
         >
-          {/* Cols 1-3 dentro de un Pressable que abre el editor.
-              El toggle (col 4) vive AFUERA del Pressable para que su
-              tap no dispare el editor. */}
-          <Pressable
-            onPress={onEdit}
-            style={({ pressed }) => [
-              s.alertRowMain,
-              { opacity: pressed ? 0.7 : rowOpacity },
-            ]}
-            accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
-          >
-            {/* Col 1: dirección + precio objetivo en BLANCO (c.text).
-             *  El color para indicar dirección lo lleva la columna
-             *  de distancia. 16 / 600. */}
-            <Text
-              style={[s.alertLeft, { color: c.text }]}
-              numberOfLines={1}
-            >
-              {dirLabel} {formatMoney(alert.threshold, cur)}
-            </Text>
-            {/* Col 2: distancia al objetivo en el formato del header
-             *  (% o $) y en el color de la dirección (verde si sube,
-             *  naranja si baja). 14 / 600. */}
-            <Text
-              style={[s.alertDist, { color: dirColor }]}
-              numberOfLines={1}
-            >
-              {distFormat === "%"
-                ? `${distSign}${distPct.toFixed(2)}%`
-                : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
-            </Text>
-          </Pressable>
-          {/* Col 4: toggle iOS-style. ON = activa, OFF = pausada. */}
-          <Switch
-            value={!isPaused}
-            onValueChange={() => onTogglePause()}
-            trackColor={{ false: c.surfaceHover, true: c.brand }}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor={c.surfaceHover}
-            style={s.alertToggle}
-          />
-        </Animated.View>
-      </GestureDetector>
+          {dirLabel} {formatMoney(alert.threshold, cur)}
+        </Text>
+        {/* Col 2: distancia al objetivo en color de dirección. */}
+        <Text
+          style={[s.alertDist, { color: dirColor }]}
+          numberOfLines={1}
+        >
+          {distFormat === "%"
+            ? `${distSign}${distPct.toFixed(2)}%`
+            : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
+        </Text>
+      </Pressable>
+      {/* Col 3: toggle iOS-style. ON = activa, OFF = pausada. */}
+      <Switch
+        value={!isPaused}
+        onValueChange={() => onTogglePause()}
+        trackColor={{ false: c.surfaceHover, true: c.brand }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor={c.surfaceHover}
+        style={s.alertToggle}
+      />
+      {/* Col 4: botón trash directo. Sin swipe, sin confirmación
+       *  modal — la eliminación es un tap explícito y haptic light
+       *  alcanza como ack. */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+            () => {},
+          );
+          onDelete();
+        }}
+        hitSlop={10}
+        style={s.alertDeleteBtn}
+        accessibilityLabel="Eliminar alerta"
+      >
+        <Feather name="trash-2" size={16} color={c.textMuted} />
+      </Pressable>
     </View>
   );
 }
@@ -929,9 +860,12 @@ const s = StyleSheet.create({
      * empuje el ícono de sort a la derecha. */
     minWidth: 110,
   },
+  /* Toggle del header — 13 / 500, no compite con el título
+   * "Alertas activas (N)" (16 / 700) ni con la data del row
+   * (16 / 600). */
   distFormatText: {
     fontFamily: fontFamily[500],
-    fontSize: 14,
+    fontSize: 13,
     letterSpacing: -0.1,
   },
   sortIconBtn: {
@@ -1035,26 +969,15 @@ const s = StyleSheet.create({
   list: {
     paddingHorizontal: 24,
   },
-  swipeRoot: {
-    position: "relative",
-    overflow: "hidden",
-  },
-  swipeRightAction: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: SWIPE_REVEAL,
+  /* Botón trash a la derecha del toggle — tap = elimina la alerta.
+   * Reemplaza al swipe-to-delete anterior. Ícono chico gris tenue
+   * para que no domine la fila. */
+  alertDeleteBtn: {
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
-    paddingRight: 8,
-    flexDirection: "row",
-    gap: 6,
-  },
-  swipeActionText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.05,
+    marginLeft: 4,
   },
   /* Row de alerta — 4 columnas: ticker+dir+precio | % | $ | toggle.
    * Sin cards, sin íconos circulares. Filas separadas por hairline
@@ -1076,12 +999,10 @@ const s = StyleSheet.create({
   triggeredRow: {
     paddingVertical: 12,
   },
-  /* Col 1: dirección + precio objetivo. 16 / 500 — peso regular
-   * para que el row no compita con el título "Alertas activas (N)"
-   * (que sí va en bold). */
+  /* Col 1: dirección + precio objetivo. 16 / 600. */
   alertLeft: {
     flex: 1,
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.3,
   },
