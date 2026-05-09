@@ -767,9 +767,14 @@ export default function PortfolioScreen() {
                 Rendimiento
               </Text>
               <View style={s.linkRowTrailing}>
-                <Text style={[s.linkRowValue, { color: c.brand }]}>
-                  ▲ {fmtPctAbs(12.4)}
-                </Text>
+                <View style={s.linkRowValueStack}>
+                  <Text style={[s.linkRowValue, { color: c.brand }]}>
+                    ▲ {fmtPctAbs(12.4)}
+                  </Text>
+                  <Text style={[s.linkRowValueSub, { color: c.textMuted }]}>
+                    hoy
+                  </Text>
+                </View>
                 <Feather
                   name="chevron-right"
                   size={18}
@@ -819,6 +824,9 @@ export default function PortfolioScreen() {
                   params: { ticker },
                 })
               }
+              onSeeAll={() =>
+                router.push("/(app)/posiciones" as never)
+              }
               c={c}
             />
           ) : (
@@ -856,6 +864,7 @@ export default function PortfolioScreen() {
           {hasHoldings && bestOfDay && worstOfDay ? (
             <View style={s.moversBlock}>
               <MoverCard
+                variant="best"
                 eyebrow="Mejor del día"
                 asset={bestOfDay.asset}
                 onPress={() =>
@@ -867,6 +876,7 @@ export default function PortfolioScreen() {
                 c={c}
               />
               <MoverCard
+                variant="worst"
                 eyebrow="Peor del día"
                 asset={worstOfDay.asset}
                 onPress={() =>
@@ -1134,14 +1144,13 @@ function MarketFlag({
   return <BitcoinFlag size={size} />;
 }
 
-/** Bandera AR — celeste profundo + Sol de Mayo grande (dorado fuerte
- *  con 16 rayos rectos). El sol ocupa ~70 % del alto, dominante. */
+/** Bandera AR — celeste profundo + Sol de Mayo CHICO al centro
+ *  (rayos cortos, disco compacto). El sol acompaña, no domina. */
 function ArgentinaBoldFlag({ size }: { size: number }) {
   const CELESTE = "#3F8CC9";
   const WHITE = "#FFFFFF";
   const SUN_RAY = "#F4B400";
   const SUN_DISC = "#FFC72C";
-  const SUN_FACE = "#A66A00";
   return (
     <View
       style={[
@@ -1156,36 +1165,27 @@ function ArgentinaBoldFlag({ size }: { size: number }) {
           </ClipPath>
         </Defs>
         <G clipPath="url(#arBoldClip)">
-          {/* Bandas más dramáticas — 12 / 16 / 12 (no 1/3 igual) */}
+          {/* Bandas — 12 / 16 / 12 (banda blanca un poco más ancha
+              para que el sol respire). */}
           <Rect x={0} y={0} width={40} height={12} fill={CELESTE} />
           <Rect x={0} y={12} width={40} height={16} fill={WHITE} />
           <Rect x={0} y={28} width={40} height={12} fill={CELESTE} />
 
-          {/* Sol de Mayo — 16 rayos rectos (versión simplificada de
-              los 32 oficiales). Cada rayo es un triángulo isósceles. */}
+          {/* Sol de Mayo compacto — 16 rayos cortos (de y=15 a y=18,
+              triángulos angostos) + disco r=2.4. Total radius ~5,
+              chico y centrado dentro de la banda blanca. */}
           {Array.from({ length: 16 }).map((_, i) => {
             const deg = (i * 360) / 16;
             return (
               <Polygon
                 key={i}
-                points="20,4 21.4,12 18.6,12"
+                points="20,15 20.55,18 19.45,18"
                 fill={SUN_RAY}
                 transform={`rotate(${deg} 20 20)`}
               />
             );
           })}
-          {/* Disco central + cara estilizada (2 puntos por ojos +
-              mini arco por sonrisa). */}
-          <Circle cx={20} cy={20} r={5.6} fill={SUN_DISC} />
-          <Circle cx={18} cy={19} r={0.55} fill={SUN_FACE} />
-          <Circle cx={22} cy={19} r={0.55} fill={SUN_FACE} />
-          <SvgPath
-            d="M 18 21.6 Q 20 22.8 22 21.6"
-            stroke={SUN_FACE}
-            strokeWidth={0.6}
-            fill="none"
-            strokeLinecap="round"
-          />
+          <Circle cx={20} cy={20} r={2.4} fill={SUN_DISC} />
         </G>
         {/* Borde sutil para definir el círculo sobre fondos claros */}
         <Circle
@@ -1268,10 +1268,11 @@ function BetsyRossFlag({ size }: { size: number }) {
   );
 }
 
-/** Bandera Bitcoin — campo full Bitcoin orange con ₿ blanco grande,
- *  tilteado 14° como el logo oficial. */
+/** Bandera Crypto — campo full brand verde de Álamos con ₿ blanco
+ *  grande tilteado 14° (mismo lenguaje que el logo de Bitcoin pero
+ *  en la cromática de la app, no naranja). */
 function BitcoinFlag({ size }: { size: number }) {
-  const ORANGE = "#F7931A";
+  const ALAMOS_GREEN = "#00C805";
   return (
     <View
       style={[
@@ -1280,7 +1281,7 @@ function BitcoinFlag({ size }: { size: number }) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: ORANGE,
+          backgroundColor: ALAMOS_GREEN,
           alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
@@ -1776,16 +1777,34 @@ function PositionsList({
   holdings,
   currency,
   onTap,
+  onSeeAll,
   c,
 }: {
   holdings: Holding[];
   currency: Currency;
   onTap: (ticker: string) => void;
+  /** Tap en el chevron verde al lado del título "Posiciones" → abre
+   *  la pantalla dedicada con las posiciones agrupadas por categoría. */
+  onSeeAll?: () => void;
   c: ColorMap;
 }) {
   return (
     <View style={s.positionsBlock}>
-      <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
+      {onSeeAll ? (
+        <Pressable
+          onPress={onSeeAll}
+          hitSlop={8}
+          style={({ pressed }) => [
+            s.positionsHead,
+            { opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
+          <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
+          <Feather name="chevron-right" size={22} color={c.brand} />
+        </Pressable>
+      ) : (
+        <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
+      )}
       {holdings.map((h, i) => {
         const displayValue =
           currency === "ARS"
@@ -1874,18 +1893,27 @@ function PositionsList({
  * Tap → /(app)/detail. Bg c.surface con borde sutil c.border. */
 
 function MoverCard({
+  variant,
   eyebrow,
   asset,
   onPress,
   c,
 }: {
+  /** "best" → eyebrow + delta en verde brand. "worst" → naranja red.
+   *  Los 2 colores cromáticos de Álamos, mismo lenguaje que el resto
+   *  de la app (subir/bajar). */
+  variant: "best" | "worst";
   eyebrow: string;
   asset: Asset;
   onPress: () => void;
   c: ColorMap;
 }) {
   const up = asset.change >= 0;
-  const tone = up ? c.brand : c.red;
+  // El cromado del eyebrow va por VARIANT, no por dirección del día —
+  // el "Mejor del día" siempre verde, el "Peor del día" siempre naranja.
+  const eyebrowTone = variant === "best" ? c.brand : c.red;
+  // El delta sigue por dirección real, igual que en el resto del app.
+  const deltaTone = up ? c.brand : c.red;
   const cleanTicker = shortCryptoTicker(asset.ticker);
   const spark = useMemo(
     () => seriesFromSeed(asset.ticker, 40, up ? "up" : "down"),
@@ -1903,7 +1931,9 @@ function MoverCard({
         },
       ]}
     >
-      <Text style={[s.moverCardEyebrow, { color: c.textMuted }]}>
+      {/* Eyebrow display — misma fuente / sizing que el "Briefing"
+          del stock detail (fontFamily[800], display weight). */}
+      <Text style={[s.moverCardEyebrow, { color: eyebrowTone }]}>
         {eyebrow}
       </Text>
       <View style={s.moverCardHead}>
@@ -1923,13 +1953,13 @@ function MoverCard({
       <View style={s.moverCardSpark}>
         <MiniSparkline
           series={spark}
-          color={tone}
+          color={deltaTone}
           width={120}
           height={28}
           strokeWidth={1.6}
         />
       </View>
-      <Text style={[s.moverCardDelta, { color: tone }]}>
+      <Text style={[s.moverCardDelta, { color: deltaTone }]}>
         {up ? "▲" : "▼"} {fmtPctAbs(asset.change)}
       </Text>
     </Pressable>
@@ -3718,6 +3748,15 @@ const s = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 24,
   },
+  /* Header de Posiciones — title + chevron verde a la derecha
+   * (Robinhood-style "see all"). Toda la fila es un Pressable. */
+  positionsHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: 4,
+    marginBottom: 8,
+  },
   positionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -3782,11 +3821,14 @@ const s = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
+  /* Eyebrow display — misma fuente que el "Briefing" del stock
+   * detail (fontFamily[800], fontSize 18, letterSpacing -0.4). NO
+   * uppercase, NO caps tracked. Sentence case y con cromática
+   * contextual (verde "Mejor", naranja "Peor"). */
   moverCardEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+    fontFamily: fontFamily[800],
+    fontSize: 18,
+    letterSpacing: -0.4,
   },
   moverCardHead: {
     gap: 2,
@@ -3839,6 +3881,19 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
+    textAlign: "right",
+  },
+  /* Stack vertical para % + "hoy" debajo. Alineado a la derecha
+   * para que el % y el chevron queden bien separados. */
+  linkRowValueStack: {
+    alignItems: "flex-end",
+  },
+  linkRowValueSub: {
+    fontFamily: fontFamily[600],
+    fontSize: 10,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    marginTop: 1,
   },
   /* Badge del glyph (Crypto / Todo) — círculo de 18 que aloja el
    * símbolo ₿ o el isotipo Alamos. Bg/fg flipean en active. */
