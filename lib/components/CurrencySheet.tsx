@@ -24,6 +24,7 @@ import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../theme";
 import { formatMoney } from "../data/assets";
 import { convertAmount } from "../data/accounts";
+import { AlamosBalanceIllustration } from "./illustrations/AlamosBalanceIllustration";
 
 type Currency = "ARS" | "USD";
 
@@ -173,6 +174,9 @@ export function CurrencySheet({
           </View>
 
           <View style={s.content}>
+            <View style={s.heroWrap}>
+              <AlamosBalanceIllustration size={140} play={visible} />
+            </View>
             <Text style={[s.title, { color: c.text }]}>
               Cómo ver tu portfolio
             </Text>
@@ -296,8 +300,12 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
   content: {
-    paddingTop: 16,
+    paddingTop: 8,
     paddingHorizontal: 6,
+  },
+  heroWrap: {
+    alignItems: "center",
+    marginBottom: 8,
   },
   title: {
     fontFamily: fontFamily[800],
