@@ -85,18 +85,15 @@ const KEYS = [
 // (subir/bajar) se infiere del threshold vs precio actual al crear,
 // no la elige el usuario explícitamente.
 //
-// Opacity ramp continua: la magnitud del chip mapea linealmente a la
-// opacidad. ±5 → 35 %, ±10 → 65 %, ±25 → 100 %. Da sensación de
-// "escala" en vez de "botones individuales sueltos".
-//
+// TODOS los chips al 100 % de opacidad — sin jerarquía entre ellos.
 // Naranja del lado negativo, verde del positivo.
-const QUICK_CHIPS: { pct: number; opacity: number }[] = [
-  { pct: -25, opacity: 1 },
-  { pct: -10, opacity: 0.65 },
-  { pct: -5, opacity: 0.35 },
-  { pct: 5, opacity: 0.35 },
-  { pct: 10, opacity: 0.65 },
-  { pct: 25, opacity: 1 },
+const QUICK_CHIPS: { pct: number }[] = [
+  { pct: -25 },
+  { pct: -10 },
+  { pct: -5 },
+  { pct: 5 },
+  { pct: 10 },
+  { pct: 25 },
 ];
 
 /* Rango del slider — coincide con PercentRangeSlider. Valores fuera
@@ -506,8 +503,8 @@ export function AlertSheet({
             <View style={s.form}>
               {/* Bloque del precio objetivo — sin card, sin border,
                *  flota directo sobre el bg del sheet (Robinhood-style).
-               *  Jerarquía: label small → número hero + delta inline →
-               *  línea contextual del precio actual. Todo izquierda. */}
+               *  Jerarquía: label small → número hero + USD + delta
+               *  inline → línea contextual del precio actual. */}
               <View style={s.priceBlock}>
                 <Text style={[s.priceLabel, { color: c.textMuted }]}>
                   PRECIO OBJETIVO
@@ -524,11 +521,12 @@ export function AlertSheet({
                     adjustsFontSizeToFit
                   >
                     {thresholdParts.integer}
-                    {thresholdParts.decimals !== null ? (
-                      <Text style={[s.priceHeroDecimals, { color: c.textMuted }]}>
-                        ,{thresholdParts.decimals}
-                      </Text>
-                    ) : null}
+                    {thresholdParts.decimals !== null
+                      ? `,${thresholdParts.decimals}`
+                      : ""}
+                  </Text>
+                  <Text style={[s.priceHeroCurrency, { color: c.textMuted }]}>
+                    {allCurrencies[0]}
                   </Text>
                   {targetValue != null && Math.abs(actualPct) >= 0.05 ? (
                     <Text
@@ -545,7 +543,12 @@ export function AlertSheet({
                   ) : null}
                 </View>
                 <Text style={[s.priceContextual, { color: c.textMuted }]}>
-                  Precio actual: {formatMoney(asset.price, allCurrencies[0])}
+                  Precio actual:{" "}
+                  {asset.price.toLocaleString("es-AR", {
+                    minimumFractionDigits: allCurrencies[0] === "USDT" ? 4 : 2,
+                    maximumFractionDigits: allCurrencies[0] === "USDT" ? 4 : 2,
+                  })}{" "}
+                  {allCurrencies[0]}
                 </Text>
               </View>
 
@@ -569,7 +572,7 @@ export function AlertSheet({
                   → más translúcido). Tap aplica price * (1 + pct/100)
                   y sincroniza el slider. */}
               <View style={s.quickRow}>
-                {QUICK_CHIPS.map(({ pct, opacity }) => {
+                {QUICK_CHIPS.map(({ pct }) => {
                   const isNeg = pct < 0;
                   const tone = isNeg ? c.red : c.brand;
                   return (
@@ -580,7 +583,6 @@ export function AlertSheet({
                         {
                           backgroundColor: tone,
                           borderColor: tone,
-                          opacity,
                         },
                       ]}
                       haptic="selection"
@@ -745,13 +747,13 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.4,
   },
-  /* Hero — número del precio objetivo. 42 px heavy. La currency va
-   * en la línea contextual de abajo (formatMoney la incluye), no
-   * acá — el label arriba ya es suficiente contexto. */
+  /* Hero — número del precio objetivo. 42 px heavy, dígitos uniformes
+   * (entero y decimales mismo tamaño). USD a la derecha en peso más
+   * tenue. */
   priceHeroRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 10,
+    gap: 8,
     marginTop: 8,
   },
   priceHero: {
@@ -761,12 +763,12 @@ const s = StyleSheet.create({
     lineHeight: 46,
     flexShrink: 1,
   },
-  /* Decimales notablemente más chicos que la parte entera, alineados
-   * a la baseline — mismo tratamiento que un precio en góndola. */
-  priceHeroDecimals: {
-    fontFamily: fontFamily[700],
-    fontSize: 24,
-    letterSpacing: -0.4,
+  /* Currency a la derecha del número — peso medio, color gris para
+   * que no compita visualmente con el precio. */
+  priceHeroCurrency: {
+    fontFamily: fontFamily[600],
+    fontSize: 18,
+    letterSpacing: -0.2,
   },
   /* Delta inline al lado del precio — proporcional al hero más
    * chico. Verde si sube, naranja si baja. Texto integrado, no pill. */
@@ -774,6 +776,7 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.15,
+    marginLeft: 4,
   },
   /* Línea contextual debajo del hero — referencia del precio
    * actual del activo, gris tenue al ~50 % opacidad. */
