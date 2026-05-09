@@ -721,25 +721,56 @@ export default function PortfolioScreen() {
                   />
                 ) : null}
               </View>
-              <Text style={[s.allocCaption, { color: c.textMuted }]}>
-                {marketAllocation.arPct > 0
-                  ? `${marketAllocation.arPct.toFixed(0)}% AR`
-                  : null}
-                {marketAllocation.arPct > 0 && marketAllocation.usPct > 0
-                  ? " · "
-                  : ""}
-                {marketAllocation.usPct > 0
-                  ? `${marketAllocation.usPct.toFixed(0)}% US`
-                  : null}
-                {(marketAllocation.arPct > 0 ||
-                  marketAllocation.usPct > 0) &&
-                marketAllocation.cryptoPct > 0
-                  ? " · "
-                  : ""}
-                {marketAllocation.cryptoPct > 0
-                  ? `${marketAllocation.cryptoPct.toFixed(0)}% Crypto`
-                  : null}
-              </Text>
+              {/* Caption stacked: cada label (% + nombre del mercado)
+               *  vive en un slot con el mismo flex que su segmento de
+               *  la barra de arriba. Resultado: cada texto queda
+               *  centrado debajo de su porción correspondiente. */}
+              <View style={s.allocCaptionRow}>
+                {marketAllocation.arPct > 0 ? (
+                  <View style={{ flex: marketAllocation.arPct }}>
+                    <Text
+                      style={[s.allocCaption, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {marketAllocation.arPct.toFixed(0)}% Argentina
+                    </Text>
+                  </View>
+                ) : null}
+                {marketAllocation.usPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.usPct,
+                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
+                    }}
+                  >
+                    <Text
+                      style={[s.allocCaption, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {marketAllocation.usPct.toFixed(0)}% Estados Unidos
+                    </Text>
+                  </View>
+                ) : null}
+                {marketAllocation.cryptoPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.cryptoPct,
+                      marginLeft:
+                        marketAllocation.arPct > 0 ||
+                        marketAllocation.usPct > 0
+                          ? 2
+                          : 0,
+                    }}
+                  >
+                    <Text
+                      style={[s.allocCaption, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {marketAllocation.cryptoPct.toFixed(0)}% Crypto
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
           ) : null}
 
@@ -2556,11 +2587,18 @@ const s = StyleSheet.create({
     borderRadius: 3,
     overflow: "hidden",
   },
+  /* Caption stacked: row con un slot por segmento, cada uno con
+   * el mismo flex que la barra de arriba — el label queda centrado
+   * bajo su porción. */
+  allocCaptionRow: {
+    flexDirection: "row",
+    marginTop: 8,
+  },
   allocCaption: {
     fontFamily: fontFamily[500],
     fontSize: 11,
     letterSpacing: 0,
-    marginTop: 8,
+    textAlign: "center",
   },
 
   /* Dots row — compacto, justo debajo del saldo. Siempre renderizado
