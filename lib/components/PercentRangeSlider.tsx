@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import {
   Gesture,
@@ -6,7 +6,6 @@ import {
 } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
-  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -122,18 +121,18 @@ export function PercentRangeSlider({
   const dragging = useSharedValue(false);
   const lastHapticStep = useSharedValue(Math.round(value / STEP));
 
-  /* Cuando value cambia desde afuera, animamos el thumb a la nueva
-   * posición — pero sólo si NO estamos en medio de un drag. */
-  useAnimatedReaction(
-    () => value,
-    (cur, prev) => {
-      "worklet";
-      if (dragging.value) return;
-      if (cur === prev) return;
-      drag.value = withTiming(cur, { duration: 220 });
-    },
-    [value],
-  );
+  /* Cuando `value` cambia desde afuera (keypad, chip, shortcut de
+   * "Precio actual"), animamos el thumb a la nueva posición — pero
+   * sólo si NO estamos en medio de un drag (sino el thumb pelearía
+   * contra el dedo). useEffect en JS thread + asignación directa
+   * al sharedValue es más confiable que useAnimatedReaction acá:
+   * useAnimatedReaction tenía un timing raro y a veces no enganchaba
+   * el cambio del prop, dejando el thumb desfasado del threshold. */
+  useEffect(() => {
+    if (dragging.value) return;
+    drag.value = withTiming(value, { duration: 220 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   const setValueJS = useCallback(
     (v: number) => {
