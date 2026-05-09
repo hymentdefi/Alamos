@@ -680,6 +680,72 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
+          {/* Selector Pie/Ladrillo — arriba de la allocation bar,
+           *  alineado a la derecha. Controla la viz del chart que
+           *  vive abajo. */}
+          {hasHoldings ? (
+            <View style={s.heroSelectorRow}>
+              <View
+                style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
+              >
+                <Tap
+                  onPress={() => setViz("pie")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "pie" && { backgroundColor: c.bg },
+                  ]}
+                >
+                  <PieGlyph
+                    color={viz === "pie" ? c.text : c.textMuted}
+                    size={14}
+                  />
+                  <Text
+                    style={[
+                      s.vizSegLabel,
+                      {
+                        color: viz === "pie" ? c.text : c.textMuted,
+                        fontFamily:
+                          viz === "pie" ? fontFamily[700] : fontFamily[500],
+                      },
+                    ]}
+                  >
+                    Pie
+                  </Text>
+                </Tap>
+                <Tap
+                  onPress={() => setViz("brick")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "brick" && { backgroundColor: c.bg },
+                  ]}
+                >
+                  <BrickGlyph
+                    color={viz === "brick" ? c.text : c.textMuted}
+                    size={14}
+                  />
+                  <Text
+                    style={[
+                      s.vizSegLabel,
+                      {
+                        color: viz === "brick" ? c.text : c.textMuted,
+                        fontFamily:
+                          viz === "brick" ? fontFamily[700] : fontFamily[500],
+                      },
+                    ]}
+                  >
+                    Ladrillo
+                  </Text>
+                </Tap>
+              </View>
+            </View>
+          ) : null}
+
           {/* Allocation stacked bar — un solo color (c.brand) con
            *  gaps de 2 px entre segmentos. Robinhood/Alamos-styled:
            *  el verde brand identifica TODO el portfolio como Álamos,
@@ -775,9 +841,8 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* ─── Chart pie / brick — directo bajo la allocation bar
-              del hero. Sin título, sin chrome. El selector
-              Pie/Ladrillo va DEBAJO del chart, alineado a la derecha. */}
+          {/* ─── Chart pie / brick — sin selector adentro (vive
+              arriba en el hero, sobre la allocation bar). */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
               <View style={s.chartCanvas}>
@@ -797,69 +862,6 @@ export default function PortfolioScreen() {
                     onHoldChange={setBrickHolding}
                   />
                 )}
-              </View>
-              <View style={s.chartSelectorRow}>
-                <View
-                  style={[
-                    s.vizSeg,
-                    { backgroundColor: c.surfaceHover },
-                  ]}
-                >
-                  <Tap
-                    onPress={() => setViz("pie")}
-                    haptic="selection"
-                    pressScale={0.95}
-                    hitSlop={4}
-                    style={[
-                      s.vizSegBtn,
-                      viz === "pie" && { backgroundColor: c.bg },
-                    ]}
-                  >
-                    <PieGlyph
-                      color={viz === "pie" ? c.text : c.textMuted}
-                      size={14}
-                    />
-                    <Text
-                      style={[
-                        s.vizSegLabel,
-                        {
-                          color: viz === "pie" ? c.text : c.textMuted,
-                          fontFamily:
-                            viz === "pie" ? fontFamily[700] : fontFamily[500],
-                        },
-                      ]}
-                    >
-                      Pie
-                    </Text>
-                  </Tap>
-                  <Tap
-                    onPress={() => setViz("brick")}
-                    haptic="selection"
-                    pressScale={0.95}
-                    hitSlop={4}
-                    style={[
-                      s.vizSegBtn,
-                      viz === "brick" && { backgroundColor: c.bg },
-                    ]}
-                  >
-                    <BrickGlyph
-                      color={viz === "brick" ? c.text : c.textMuted}
-                      size={14}
-                    />
-                    <Text
-                      style={[
-                        s.vizSegLabel,
-                        {
-                          color: viz === "brick" ? c.text : c.textMuted,
-                          fontFamily:
-                            viz === "brick" ? fontFamily[700] : fontFamily[500],
-                        },
-                      ]}
-                    >
-                      Ladrillo
-                    </Text>
-                  </Tap>
-                </View>
               </View>
             </View>
           ) : null}
@@ -2623,10 +2625,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 8,
   },
-  chartSelectorRow: {
+  /* Selector Pie/Ladrillo en el hero — vive ARRIBA de la
+   * allocation bar, alineado a la derecha. Controla la viz del
+   * chart que vive abajo del hero. */
+  heroSelectorRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 8,
+    marginTop: 16,
   },
   /* Segmented Pie/Ladrillo — pill estilo iOS. Activo con bg c.bg
    * y texto bold; inactivo translúcido con texto muted. */
