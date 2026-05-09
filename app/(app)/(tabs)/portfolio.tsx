@@ -924,14 +924,13 @@ export default function PortfolioScreen() {
           ) : null}
 
           {hasHoldings ? (
-            <PosicionesCard
-              groups={groupedByCategory}
-              allocations={categoryAllocations}
-              positionsCount={holdingsSorted.length}
-              onTap={(slug) =>
+            <PositionsList
+              holdings={holdingsSorted}
+              currency={currency}
+              onTap={(ticker) =>
                 router.push({
-                  pathname: "/(app)/market-category",
-                  params: { slug },
+                  pathname: "/(app)/detail",
+                  params: { ticker },
                 })
               }
               c={c}
@@ -1261,12 +1260,9 @@ function MarketRow({
           </Text>
         </View>
         <View style={s.marketRowBottom}>
-          <Text
-            style={[s.marketSubtitle, { color: c.textMuted }]}
-            numberOfLines={1}
-          >
-            {subtitle}
-          </Text>
+          {/* Solo el delta a la derecha — sin subtitle de positions
+           *  count + cash. La data secundaria vive en /(app)/market-
+           *  category cuando el user drilla. Más calmo. */}
           {!empty ? (
             <Text
               style={[s.marketDelta, { color: deltaColor }]}
@@ -1623,6 +1619,87 @@ function PosicionesCard({
               size={18}
               color={c.textFaint}
             />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── PositionsList — lista plana de holdings individuales ─────────
+ *
+ * Robinhood-style: sin card, sin border, sin chevrons, sin swatches,
+ * sin agrupar por categoría. Cada row es una posición individual
+ * ordenada por valor (ARS) descendente, con ticker bold + nombre
+ * muted a la izquierda + valor + delta del día a la derecha.
+ * Hairline divider entre rows. Tap → /(app)/detail del ticker. */
+
+function PositionsList({
+  holdings,
+  currency,
+  onTap,
+  c,
+}: {
+  holdings: Holding[];
+  currency: Currency;
+  onTap: (ticker: string) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View style={s.positionsBlock}>
+      <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
+      {holdings.map((h, i) => {
+        /* Valor en la moneda del pager — ARS o convertido. Si el
+         * activo está en USDT/USD y el currency del pager es USDT,
+         * mostramos en native; sino convertimos a la display
+         * currency para mantener todos los montos comparables. */
+        const displayValue =
+          currency === "ARS"
+            ? h.ars
+            : convertAmount(h.ars, "ARS", currency);
+        const dayUp = h.asset.change >= 0;
+        const deltaColor = dayUp ? c.brand : c.red;
+        return (
+          <Pressable
+            key={h.asset.ticker}
+            onPress={() => onTap(h.asset.ticker)}
+            style={({ pressed }) => [
+              s.positionRow,
+              i > 0 && {
+                borderTopColor: c.border,
+                borderTopWidth: StyleSheet.hairlineWidth,
+              },
+              { opacity: pressed ? 0.6 : 1 },
+            ]}
+          >
+            <View style={s.positionLeft}>
+              <Text
+                style={[s.positionTicker, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {h.asset.ticker}
+              </Text>
+              <Text
+                style={[s.positionName, { color: c.textMuted }]}
+                numberOfLines={1}
+              >
+                {h.asset.name}
+              </Text>
+            </View>
+            <View style={s.positionRight}>
+              <Text
+                style={[s.positionValue, { color: c.text }]}
+                numberOfLines={1}
+              >
+                {formatMoney(displayValue, currency)}
+              </Text>
+              <Text
+                style={[s.positionDelta, { color: deltaColor }]}
+                numberOfLines={1}
+              >
+                {dayUp ? "▲" : "▼"} {fmtPctAbs(h.asset.change)}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -2842,8 +2919,7 @@ const s = StyleSheet.create({
   marketRowBottom: {
     flexDirection: "row",
     alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 12,
+    justifyContent: "flex-end",
     marginTop: 4,
   },
   cryptoGlyph: {
@@ -2912,6 +2988,49 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
+  /* PositionsList — lista plana de holdings individuales. Sin card,
+   * sin border, sin chevrons, sin swatches. Section title arriba +
+   * rows separadas por hairlines. */
+  positionsBlock: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+  },
+  positionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    gap: 12,
+  },
+  positionLeft: {
+    flex: 1,
+  },
+  positionTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  positionName: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+  positionRight: {
+    alignItems: "flex-end",
+  },
+  positionValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  positionDelta: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+
   /* Movers del día — bloque al fondo de la pantalla. 2 filas
    * (Mejor / Peor) con label izquierda + ticker + delta a la
    * derecha. Sin section title — son rows individuales separadas
