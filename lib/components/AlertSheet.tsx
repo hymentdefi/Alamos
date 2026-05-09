@@ -100,7 +100,7 @@ const QUICK_CHIPS: { pct: number }[] = [
  * de este rango en la UI se manejan como "fuera de rango" (slider
  * en su extremo + clamp visual; el threshold puede seguir teniendo
  * el valor que el usuario ingresó por keypad). */
-const SLIDER_RANGE = 30;
+const SLIDER_RANGE = 50;
 
 /* Límites HARD del threshold de la alerta — más allá de esto
  * tampoco aceptamos. El piso es > 0 (ya validado en isFinite); el
@@ -125,14 +125,9 @@ export function AlertSheet({
   /* Ancho del slider: el sheet tiene paddingHorizontal 24 a cada
    * lado. El slider rellena de borde a borde del padding. */
   const SLIDER_WIDTH = windowW - 48;
-  const { activeForAsset, create, update, remove } = useAlerts();
+  const { create, update } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
-
-  const activeAlerts = useMemo(
-    () => activeForAsset(asset.ticker),
-    [activeForAsset, asset.ticker],
-  );
 
   // Form state — se resetea cada vez que se abre la sheet con un
   // activo nuevo (key del padre asegura remount). En modo edit
@@ -303,15 +298,6 @@ export function AlertSheet({
     }
   };
 
-  const handleDelete = async (alert: PriceAlert) => {
-    try {
-      await remove(alert.id);
-      showToast("Alerta eliminada", { variant: "neutral" });
-    } catch {
-      showToast("No pudimos eliminar la alerta", { variant: "error" });
-    }
-  };
-
   /* ─── Keypad handlers — mismo patrón que buy.tsx (in-app
        teclado, sin keyboard nativo). USDT permite 4 decimales,
        ARS/USD se quedan en 2. ─── */
@@ -469,37 +455,6 @@ export function AlertSheet({
               </Text>
             </View>
 
-            {!isEditing && activeAlerts.length > 0 ? (
-              <View style={s.activeList}>
-                {activeAlerts.map((a) => (
-                  <View
-                    key={a.id}
-                    style={[
-                      s.activeRow,
-                      { backgroundColor: c.surfaceHover, borderColor: c.border },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.activeText, { color: c.text }]}>
-                        {a.direction === "above" ? "Sube a" : "Baja a"}{" "}
-                        <Text style={[s.activeStrong, { color: c.text }]}>
-                          {formatMoney(a.threshold, a.currency)}
-                        </Text>
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => handleDelete(a)}
-                      hitSlop={10}
-                      style={s.deleteBtn}
-                      accessibilityLabel="Eliminar alerta"
-                    >
-                      <Feather name="x" size={18} color={c.textMuted} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
             <View style={s.form}>
               {/* Bloque del precio objetivo — sin card, sin border,
                *  flota directo sobre el bg del sheet (Robinhood-style).
@@ -567,7 +522,7 @@ export function AlertSheet({
                 </Pressable>
               </View>
 
-              {/* Slider -30% / +30% — sincronizado con el threshold.
+              {/* Slider -50% / +50% — sincronizado con el threshold.
                   Mover acá actualiza el threshold; tipear en el
                   keypad mueve el thumb del slider. marginTop extra
                   para alcanzar los ~32 px pedidos entre la línea
@@ -718,32 +673,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
-  },
-  activeList: {
-    gap: 8,
-    paddingBottom: 14,
-  },
-  activeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  activeText: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  activeStrong: {
-    fontFamily: fontFamily[700],
-  },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
   },
   /* Form: gap GENERAL entre módulos (precio block, slider, chips,
    * keypad, CTA) cuando no se override por marginTop específico. */
