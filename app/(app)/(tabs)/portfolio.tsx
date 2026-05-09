@@ -863,112 +863,123 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Rendimiento — link de una sola línea al detalle. */}
+          {/* ─── Rendimiento — sección con heading + 2 sub-stats
+              (Mejor / Peor del día). Robinhood-style: el heading
+              tiene jerarquía con su propio % y chevron al detalle;
+              las sub-stats viven debajo como related metrics, mismo
+              padding pero font más chico. Hairline arriba sólo. */}
           {hasHoldings ? (
-            <Pressable
-              onPress={() => router.push("/(app)/rendimiento" as never)}
-              style={({ pressed }) => [
-                s.linkRow,
-                {
-                  borderTopColor: c.border,
-                  opacity: pressed ? 0.6 : 1,
-                },
-              ]}
-            >
-              <Text style={[s.linkRowLabel, { color: c.text }]}>
-                Rendimiento
-              </Text>
-              <View style={s.linkRowTrailing}>
-                <Text style={[s.linkRowValue, { color: c.brand }]}>
-                  ▲ {fmtPctAbs(12.4)}
-                </Text>
-                <Feather
-                  name="chevron-right"
-                  size={18}
-                  color={c.textMuted}
-                />
-              </View>
-            </Pressable>
-          ) : null}
-
-          {/* ─── Mejor / Peor del día — dos columnas Robinhood-style.
-              Eyebrow caps + ticker + delta coloreado. Hairline arriba
-              que las separa del Rendimiento link. Tap → detail del
-              asset. */}
-          {hasHoldings && bestOfDay && worstOfDay ? (
             <View
               style={[
-                s.bestWorstBlock,
+                s.rendimientoBlock,
                 { borderTopColor: c.border },
               ]}
             >
+              {/* Heading — Rendimiento + delta + chevron al detalle. */}
               <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/(app)/detail",
-                    params: { ticker: bestOfDay.asset.ticker },
-                  })
-                }
+                onPress={() => router.push("/(app)/rendimiento" as never)}
                 style={({ pressed }) => [
-                  s.bestWorstCol,
+                  s.rendimientoHeading,
                   { opacity: pressed ? 0.6 : 1 },
                 ]}
               >
-                <Text style={[s.bestWorstEyebrow, { color: c.textMuted }]}>
-                  MEJOR DEL DÍA
+                <Text style={[s.rendimientoHeadingLabel, { color: c.text }]}>
+                  Rendimiento
                 </Text>
-                <Text style={[s.bestWorstTicker, { color: c.text }]}>
-                  {bestOfDay.asset.ticker}
-                </Text>
-                <Text
-                  style={[
-                    s.bestWorstDelta,
-                    {
-                      color:
-                        bestOfDay.asset.change >= 0 ? c.brand : c.red,
-                    },
-                  ]}
-                >
-                  {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                  {fmtPctAbs(bestOfDay.asset.change)}
-                </Text>
+                <View style={s.rendimientoHeadingTrailing}>
+                  <Text
+                    style={[s.rendimientoHeadingValue, { color: c.brand }]}
+                  >
+                    ▲ {fmtPctAbs(12.4)}
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={c.textMuted}
+                  />
+                </View>
               </Pressable>
 
-              <View
-                style={[s.bestWorstDivider, { backgroundColor: c.border }]}
-              />
-
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/(app)/detail",
-                    params: { ticker: worstOfDay.asset.ticker },
-                  })
-                }
-                style={({ pressed }) => [
-                  s.bestWorstCol,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={[s.bestWorstEyebrow, { color: c.textMuted }]}>
-                  PEOR DEL DÍA
-                </Text>
-                <Text style={[s.bestWorstTicker, { color: c.text }]}>
-                  {worstOfDay.asset.ticker}
-                </Text>
-                <Text
-                  style={[
-                    s.bestWorstDelta,
-                    {
-                      color:
-                        worstOfDay.asset.change >= 0 ? c.brand : c.red,
-                    },
+              {/* Sub-stats: Mejor / Peor del día. Tap → detail del asset. */}
+              {bestOfDay ? (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/detail",
+                      params: { ticker: bestOfDay.asset.ticker },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    s.rendimientoStat,
+                    { opacity: pressed ? 0.6 : 1 },
                   ]}
                 >
-                  {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                  {fmtPctAbs(worstOfDay.asset.change)}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[s.rendimientoStatLabel, { color: c.textMuted }]}
+                  >
+                    Mejor del día
+                  </Text>
+                  <View style={s.rendimientoStatTrailing}>
+                    <Text
+                      style={[s.rendimientoStatTicker, { color: c.text }]}
+                    >
+                      {bestOfDay.asset.ticker}
+                    </Text>
+                    <Text
+                      style={[
+                        s.rendimientoStatDelta,
+                        {
+                          color:
+                            bestOfDay.asset.change >= 0 ? c.brand : c.red,
+                        },
+                      ]}
+                    >
+                      {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                      {fmtPctAbs(bestOfDay.asset.change)}
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
+
+              {worstOfDay ? (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/detail",
+                      params: { ticker: worstOfDay.asset.ticker },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    s.rendimientoStat,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
+                >
+                  <Text
+                    style={[s.rendimientoStatLabel, { color: c.textMuted }]}
+                  >
+                    Peor del día
+                  </Text>
+                  <View style={s.rendimientoStatTrailing}>
+                    <Text
+                      style={[s.rendimientoStatTicker, { color: c.text }]}
+                    >
+                      {worstOfDay.asset.ticker}
+                    </Text>
+                    <Text
+                      style={[
+                        s.rendimientoStatDelta,
+                        {
+                          color:
+                            worstOfDay.asset.change >= 0 ? c.brand : c.red,
+                        },
+                      ]}
+                    >
+                      {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                      {fmtPctAbs(worstOfDay.asset.change)}
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
@@ -2884,43 +2895,67 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Mejor / Peor del día — bloque de 2 columnas Robinhood-style.
-   * Hairline divider arriba (lo separa del Rendimiento link),
-   * line vertical entre columnas. Cada col tiene eyebrow caps +
-   * ticker grande + delta coloreado por signo. Tap navega a
-   * /(app)/detail del asset. */
-  bestWorstBlock: {
-    flexDirection: "row",
+  /* ─── Sección Rendimiento — heading principal + 2 sub-stats
+   * (Mejor / Peor del día). Hairline divider arriba que la separa
+   * de la allocation bar; el heading tiene jerarquía con font
+   * grande, las sub-stats viven debajo más chicas. Sin dividers
+   * entre las filas internas — son related stats de la misma
+   * sección. */
+  rendimientoBlock: {
     paddingHorizontal: 24,
-    paddingVertical: 18,
-    marginTop: 4,
+    marginTop: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  bestWorstCol: {
-    flex: 1,
-    alignItems: "flex-start",
+  rendimientoHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
   },
-  bestWorstDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: "stretch",
-    marginHorizontal: 16,
-  },
-  bestWorstEyebrow: {
+  rendimientoHeadingLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 0.6,
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
-  bestWorstTicker: {
+  rendimientoHeadingTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rendimientoHeadingValue: {
     fontFamily: fontFamily[700],
-    fontSize: 18,
-    letterSpacing: -0.4,
-    marginTop: 6,
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
-  bestWorstDelta: {
+  rendimientoStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  rendimientoStatLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  rendimientoStatTrailing: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+  },
+  rendimientoStatTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  rendimientoStatDelta: {
     fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
-    marginTop: 4,
+    minWidth: 64,
+    textAlign: "right",
   },
 
   /* Link row (Rendimiento histórico) — una sola línea con label
