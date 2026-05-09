@@ -775,15 +775,30 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* ─── Composición — chart pie / brick con toggle explícito.
-              Va PRIMERO, después del hero — el chart es el centerpiece
-              visual de la pantalla. Sin card. */}
+          {/* ─── Chart pie / brick — directo bajo la allocation bar
+              del hero. Sin título, sin chrome. El selector
+              Pie/Ladrillo va DEBAJO del chart, alineado a la derecha. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
-              <View style={s.chartHeader}>
-                <Text style={[s.sectionTitle, { color: c.text, marginBottom: 0 }]}>
-                  Composición
-                </Text>
+              <View style={s.chartCanvas}>
+                {viz === "pie" ? (
+                  <FloorPie
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    currency={currency}
+                    groupBy="category"
+                    onHoldChange={setBrickHolding}
+                  />
+                ) : (
+                  <FloorBrick
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    groupBy="category"
+                    onHoldChange={setBrickHolding}
+                  />
+                )}
+              </View>
+              <View style={s.chartSelectorRow}>
                 <View
                   style={[
                     s.vizSeg,
@@ -846,31 +861,40 @@ export default function PortfolioScreen() {
                   </Tap>
                 </View>
               </View>
-              <View style={s.chartCanvas}>
-                {viz === "pie" ? (
-                  <FloorPie
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
-                    currency={currency}
-                    groupBy="category"
-                    onHoldChange={setBrickHolding}
-                  />
-                ) : (
-                  <FloorBrick
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
-                    groupBy="category"
-                    onHoldChange={setBrickHolding}
-                  />
-                )}
-              </View>
             </View>
           ) : null}
 
-          {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
-              monto en moneda nativa + delta del día + posiciones +
-              cash disponible. Va DESPUÉS del chart — el chart es la
-              visualización agregada, los Mercados son el detalle. */}
+          {/* ─── Rendimiento — link de una sola línea al detalle.
+              Va inmediatamente debajo del chart + selector. */}
+          {hasHoldings ? (
+            <Pressable
+              onPress={() => router.push("/(app)/rendimiento" as never)}
+              style={({ pressed }) => [
+                s.linkRow,
+                {
+                  borderTopColor: c.border,
+                  opacity: pressed ? 0.6 : 1,
+                },
+              ]}
+            >
+              <Text style={[s.linkRowLabel, { color: c.text }]}>
+                Rendimiento histórico
+              </Text>
+              <View style={s.linkRowTrailing}>
+                <Text style={[s.linkRowValue, { color: c.brand }]}>
+                  {formatPct(12.4)}
+                </Text>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={c.textMuted}
+                />
+              </View>
+            </Pressable>
+          ) : null}
+
+          {/* ─── Mercados — los 3 buckets de Álamos. Detalle por
+              mercado: monto + delta + posiciones + cash. */}
           {hasHoldings ? (
             <View style={s.marketsBlock}>
               <Text style={[s.sectionTitle, { color: c.text }]}>
@@ -897,34 +921,6 @@ export default function PortfolioScreen() {
                 divider
               />
             </View>
-          ) : null}
-
-          {/* ─── Rendimiento — link de una sola línea al detalle. */}
-          {hasHoldings ? (
-            <Pressable
-              onPress={() => router.push("/(app)/rendimiento" as never)}
-              style={({ pressed }) => [
-                s.linkRow,
-                {
-                  borderTopColor: c.border,
-                  opacity: pressed ? 0.6 : 1,
-                },
-              ]}
-            >
-              <Text style={[s.linkRowLabel, { color: c.text }]}>
-                Rendimiento histórico
-              </Text>
-              <View style={s.linkRowTrailing}>
-                <Text style={[s.linkRowValue, { color: c.brand }]}>
-                  {formatPct(12.4)}
-                </Text>
-                <Feather
-                  name="chevron-right"
-                  size={18}
-                  color={c.textMuted}
-                />
-              </View>
-            </Pressable>
           ) : null}
 
           {hasHoldings ? (
@@ -2620,17 +2616,17 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  /* Chart block — full width, sin card. Header con title izquierda
-   * + segmented Pie/Ladrillo a la derecha. */
+  /* Chart block — full width, sin card. Sin título ni header — el
+   * chart se rendea directo bajo la allocation bar del hero. El
+   * selector Pie/Ladrillo va DEBAJO del chart alineado a la derecha. */
   chartBlock: {
     paddingHorizontal: 24,
-    marginTop: 28,
+    marginTop: 8,
   },
-  chartHeader: {
+  chartSelectorRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
+    justifyContent: "flex-end",
+    marginTop: 8,
   },
   /* Segmented Pie/Ladrillo — pill estilo iOS. Activo con bg c.bg
    * y texto bold; inactivo translúcido con texto muted. */
