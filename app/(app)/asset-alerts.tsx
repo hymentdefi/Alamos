@@ -217,8 +217,9 @@ export default function AssetAlertsScreen() {
           <>
             {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
               <EmptyState
+                title="Alertas de precio"
                 illustration={<AlertBellIllustration size={160} />}
-                text="Creá tus propios umbrales de precio. Te notificamos cuando el activo los cruza."
+                text="Te notificamos cuando el activo cruza tu precio objetivo."
               />
             ) : null}
 
@@ -387,24 +388,18 @@ function SortToggle({
   onChange: (next: Sort) => void;
 }) {
   const { c } = useTheme();
+  /* Segmented sutil — sin pill ni borde. Solo dos labels chicos
+   * separados por un dot, el activo en el color del texto, el otro
+   * en muted. Un toque debajo del título de la sección. */
   return (
-    <View
-      style={[
-        s.sortSeg,
-        { backgroundColor: c.surfaceHover, borderColor: c.border },
-      ]}
-    >
+    <View style={s.sortRow}>
       <Pressable
         onPress={() => onChange("proximity")}
-        style={[
-          s.sortSegBtn,
-          sort === "proximity" && { backgroundColor: c.bg },
-        ]}
-        hitSlop={4}
+        hitSlop={6}
       >
         <Text
           style={[
-            s.sortSegText,
+            s.sortText,
             {
               color: sort === "proximity" ? c.text : c.textMuted,
               fontFamily:
@@ -415,17 +410,14 @@ function SortToggle({
           Proximidad
         </Text>
       </Pressable>
+      <Text style={[s.sortDot, { color: c.textFaint }]}>·</Text>
       <Pressable
         onPress={() => onChange("createdAt")}
-        style={[
-          s.sortSegBtn,
-          sort === "createdAt" && { backgroundColor: c.bg },
-        ]}
-        hitSlop={4}
+        hitSlop={6}
       >
         <Text
           style={[
-            s.sortSegText,
+            s.sortText,
             {
               color: sort === "createdAt" ? c.text : c.textMuted,
               fontFamily:
@@ -444,14 +436,19 @@ function SortToggle({
 
 function EmptyState({
   illustration,
+  title,
   text,
 }: {
   illustration: React.ReactNode;
+  title?: string;
   text: string;
 }) {
   const { c } = useTheme();
   return (
     <View style={s.emptyWrap}>
+      {title ? (
+        <Text style={[s.emptyTitle, { color: c.text }]}>{title}</Text>
+      ) : null}
       <View style={s.emptyIllustration}>{illustration}</View>
       <Text style={[s.emptyText, { color: c.textMuted }]}>{text}</Text>
     </View>
@@ -481,14 +478,20 @@ function SwipableAlertRow({
   const { c } = useTheme();
   const cur = assetCurrency(asset);
   const isPaused = alert.status === "paused";
-  const dirIcon = alert.direction === "above" ? "arrow-up" : "arrow-down";
   const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
+  /* Color base de la fila — verde si "sube a", naranja/rojo si
+   * "baja a". Cuando está pausada, todo se desatura a un gris al
+   * 40 % opacity. Sin íconos circulares ni cards. */
+  const baseColor = alert.direction === "above" ? c.brand : c.red;
 
   const distAbs = alert.threshold - asset.price;
   const distPct = asset.price > 0 ? (distAbs / asset.price) * 100 : 0;
-  const distSign = distAbs > 0 ? "+" : distAbs < 0 ? "" : "";
-  const distColor =
-    Math.abs(distPct) < 0.1 ? c.textMuted : distAbs > 0 ? c.brand : c.red;
+  const distSign = distAbs > 0 ? "+" : "";
+
+  const leftColor = isPaused ? c.text : baseColor;
+  const centerColor = isPaused ? c.text : baseColor;
+  const rightColor = c.textMuted;
+  const rowOpacity = isPaused ? 0.4 : 1;
 
   /* Swipe shared values: translateX positivo expone "Pausar" a la
    * izquierda; negativo expone "Eliminar" a la derecha. */
@@ -514,7 +517,6 @@ function SwipableAlertRow({
     .onUpdate((e) => {
       "worklet";
       const next = startX.value + e.translationX;
-      // Clamp — no permitimos arrastrar más allá de SWIPE_REVEAL.
       tx.value = Math.max(
         -SWIPE_REVEAL * 1.4,
         Math.min(SWIPE_REVEAL * 1.4, next),
@@ -524,13 +526,11 @@ function SwipableAlertRow({
       "worklet";
       const final = startX.value + e.translationX;
       if (final < -SWIPE_TRIGGER) {
-        // Swipe izquierda → DELETE
         tx.value = withTiming(-400, { duration: 220 }, (finished) => {
           "worklet";
           if (finished) runOnJS(triggerDelete)();
         });
       } else if (final > SWIPE_TRIGGER) {
-        // Swipe derecha → PAUSE/RESUME
         tx.value = withTiming(0, { duration: 220 }, (finished) => {
           "worklet";
           if (finished) runOnJS(triggerPause)();
@@ -545,7 +545,6 @@ function SwipableAlertRow({
   }));
 
   const leftActionStyle = useAnimatedStyle(() => ({
-    /* Pausar action: opacity proporcional al swipe-right. */
     opacity: Math.min(1, Math.max(0, tx.value / SWIPE_TRIGGER)),
   }));
 
@@ -558,14 +557,14 @@ function SwipableAlertRow({
       style={[
         s.swipeRoot,
         withTopDivider && {
+          /* Hairline divider sutil — gris al 15 % opacity. Sin
+           * cards ni bordes pesados. */
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
       ]}
     >
-      {/* Action layers debajo de la row — quedan revelados al
-          arrastrar. Pausar a la izquierda (azul/ink), eliminar a
-          la derecha (rojo). */}
+      {/* Action layers — pausar a la izquierda, eliminar a la derecha. */}
       <Animated.View
         style={[
           s.swipeLeftAction,
@@ -596,66 +595,46 @@ function SwipableAlertRow({
       </Animated.View>
 
       <GestureDetector gesture={pan}>
-        <Animated.View
-          style={[
-            s.alertRow,
-            { backgroundColor: c.bg },
-            rowStyle,
-          ]}
-        >
+        <Animated.View style={[{ backgroundColor: c.bg }, rowStyle]}>
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
-              s.alertRowTap,
+              s.alertRow,
               {
-                opacity: pressed ? 0.7 : isPaused ? 0.55 : 1,
+                opacity: pressed ? 0.7 : rowOpacity,
               },
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            <View style={[s.dirBadge, { backgroundColor: c.surfaceHover }]}>
-              <Feather name={dirIcon} size={16} color={c.text} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={s.alertTopRow}>
-                <Text style={[s.alertLabel, { color: c.textMuted }]}>
-                  {dirLabel}
-                </Text>
-                {isPaused ? (
-                  <View style={[s.pausedPill, { backgroundColor: c.surfaceSunken }]}>
-                    <Text style={[s.pausedPillText, { color: c.textMuted }]}>
-                      EN PAUSA
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={[s.alertPrice, { color: c.text }]}>
-                {formatMoney(alert.threshold, cur)}
+            {/* Col izquierda: dirección + precio objetivo (16 / 600).
+                Crece para empujar el % y el delta a la derecha. */}
+            <Text
+              style={[s.alertLeft, { color: leftColor }]}
+              numberOfLines={1}
+            >
+              {dirLabel} {formatMoney(alert.threshold, cur)}
+            </Text>
+            {/* Col centro: distancia % (14, mismo color). */}
+            <Text
+              style={[s.alertCenter, { color: centerColor }]}
+              numberOfLines={1}
+            >
+              {distSign}
+              {distPct.toFixed(2)}%
+            </Text>
+            {/* Col derecha: distancia $ (14, gris tenue). */}
+            <Text
+              style={[s.alertRight, { color: rightColor }]}
+              numberOfLines={1}
+            >
+              {distSign}
+              {formatMoney(Math.abs(distAbs), cur)}
+            </Text>
+            {isPaused ? (
+              <Text style={[s.pausedLabel, { color: c.textMuted }]}>
+                Pausada
               </Text>
-              <Text style={[s.alertDistance, { color: distColor }]}>
-                {distSign}
-                {distPct.toFixed(2)}% · {distSign}
-                {formatMoney(Math.abs(distAbs), cur)} del actual
-              </Text>
-            </View>
-          </Pressable>
-          <Pressable
-            hitSlop={10}
-            onPress={onTogglePause}
-            style={[
-              s.toggleBtn,
-              {
-                backgroundColor: isPaused ? c.surfaceSunken : c.brandDim,
-                borderColor: isPaused ? c.border : c.brand,
-              },
-            ]}
-            accessibilityLabel={isPaused ? "Reactivar alerta" : "Pausar alerta"}
-          >
-            <Feather
-              name={isPaused ? "play" : "pause"}
-              size={14}
-              color={isPaused ? c.textMuted : c.brand}
-            />
+            ) : null}
           </Pressable>
         </Animated.View>
       </GestureDetector>
@@ -809,23 +788,18 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Sort segmented */
-  sortSeg: {
+  /* Sort — texto puro con dot separador, sin pill ni borde. */
+  sortRow: {
     flexDirection: "row",
-    padding: 3,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: "continuous",
+    alignItems: "center",
+    gap: 8,
   },
-  sortSegBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
-  },
-  sortSegText: {
-    fontSize: 11,
+  sortText: {
+    fontSize: 12,
     letterSpacing: -0.05,
+  },
+  sortDot: {
+    fontSize: 12,
   },
 
   /* Empty state */
@@ -833,10 +807,17 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 32,
-    paddingTop: 48,
+    paddingTop: 32,
+  },
+  emptyTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.5,
+    marginBottom: 16,
+    textAlign: "center",
   },
   emptyIllustration: {
-    marginBottom: 22,
+    marginBottom: 18,
   },
   emptyText: {
     fontFamily: fontFamily[500],
@@ -912,70 +893,49 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.05,
   },
+  /* Row de alerta — 3 columnas en una sola fila. Sin cards, sin
+   * íconos circulares, sin toggle. Filas separadas por hairline
+   * border (configurado en s.swipeRoot). */
   alertRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    gap: 12,
   },
   triggeredRow: {
     paddingVertical: 12,
   },
-  alertRowTap: {
+  /* Col izquierda: dirección + precio objetivo. Crece para empujar
+   * el resto a la derecha. 16 px / 600. */
+  alertLeft: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  alertTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  dirBadge: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderCurve: "continuous",
-    borderRadius: 18,
-  },
-  alertLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
-  },
-  alertPrice: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.3,
-    marginTop: 2,
   },
-  alertDistance: {
+  /* Col centro: % de distancia, mismo color que la izquierda. */
+  alertCenter: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+    minWidth: 64,
+    textAlign: "right",
+  },
+  /* Col derecha: $ de distancia, gris tenue. */
+  alertRight: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
+    fontSize: 14,
+    letterSpacing: -0.15,
+    minWidth: 90,
+    textAlign: "right",
+  },
+  /* Label "Pausada" — sólo visible cuando está pausada. Va al final
+   * a la derecha del row, gris muy chico. */
+  pausedLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
     letterSpacing: -0.05,
-    marginTop: 2,
-  },
-  pausedPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    borderCurve: "continuous",
-  },
-  pausedPillText: {
-    fontFamily: fontFamily[700],
-    fontSize: 9,
-    letterSpacing: 0.6,
-  },
-  toggleBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderCurve: "continuous",
-    borderRadius: 16,
-    borderWidth: 1,
+    marginLeft: 8,
   },
   checkBubble: {
     width: 28,
