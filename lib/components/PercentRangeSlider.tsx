@@ -5,7 +5,6 @@ import {
   GestureDetector,
 } from "react-native-gesture-handler";
 import Animated, {
-  interpolate,
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -67,6 +66,35 @@ interface Props {
 const RANGE = 50;
 const HALF = RANGE;
 const STEP = 0.5;
+
+/* Curva logarítmica: ±10 % cae al ~65 % del ancho del slider. Los
+ * extremos se comprimen hacia ±50 %, así no perdemos precisión en
+ * el rango útil donde está el 80 % de los usuarios.
+ *
+ *   v = sign(t) · |t|^CURVE · HALF       (forward, position → value)
+ *   t = sign(v) · (|v| / HALF)^(1/CURVE) (inverse, value → position)
+ *
+ * Con CURVE = 3.5 → (0.2)^(1/3.5) ≈ 0.63, o sea ±10 a ~63 % del ancho.
+ * Si subís el exponente, comprimís más los extremos; si lo bajás,
+ * acercás la curva a lineal. */
+const CURVE = 3.5;
+
+/* Helpers de la curva — anotadas como worklets porque se llaman
+ * tanto en el JS thread (memo, render de ticks) como en el UI thread
+ * (gesto del slider, useAnimatedStyle del thumb). */
+function valueToFraction(v: number): number {
+  "worklet";
+  if (v === 0) return 0;
+  const abs = Math.min(HALF, Math.abs(v));
+  return Math.sign(v) * Math.pow(abs / HALF, 1 / CURVE);
+}
+
+function fractionToValue(t: number): number {
+  "worklet";
+  if (t === 0) return 0;
+  const abs = Math.min(1, Math.abs(t));
+  return Math.sign(t) * Math.pow(abs, CURVE) * HALF;
+}
 
 const THUMB_SIZE = 30;
 const TRACK_HEIGHT = 8;
@@ -132,7 +160,9 @@ export function PercentRangeSlider({
       "worklet";
       dragging.value = true;
       const x = Math.max(0, Math.min(usableWidth, e.x - THUMB_SIZE / 2));
-      const v = (x / usableWidth - 0.5) * 2 * HALF;
+      // Posición normalizada en [-1, 1] → valor con curva log.
+      const t = (x / usableWidth - 0.5) * 2;
+      const v = fractionToValue(t);
       drag.value = v;
       const step = Math.round(v / STEP);
       lastHapticStep.value = step;
@@ -141,7 +171,8 @@ export function PercentRangeSlider({
     .onUpdate((e) => {
       "worklet";
       const x = Math.max(0, Math.min(usableWidth, e.x - THUMB_SIZE / 2));
-      const v = (x / usableWidth - 0.5) * 2 * HALF;
+      const t = (x / usableWidth - 0.5) * 2;
+      const v = fractionToValue(t);
       drag.value = v;
       const step = Math.round(v / STEP);
       if (step !== lastHapticStep.value) {
@@ -163,7 +194,8 @@ export function PercentRangeSlider({
   const tap = Gesture.Tap().onEnd((e) => {
     "worklet";
     const x = Math.max(0, Math.min(usableWidth, e.x - THUMB_SIZE / 2));
-    const v = (x / usableWidth - 0.5) * 2 * HALF;
+    const t = (x / usableWidth - 0.5) * 2;
+    const v = fractionToValue(t);
     drag.value = withSpring(v, { damping: 18, stiffness: 200 });
     runOnJS(setValueJS)(v);
     runOnJS(commitJS)(v);
@@ -173,8 +205,13 @@ export function PercentRangeSlider({
 
   /* Animated styles */
 
+  /* Thumb sigue al value vía la inversa de la curva — al value=0 le
+   * corresponde el centro, al ±10 % le corresponde ~65 % del ancho,
+   * al ±50 % los extremos. Usamos valueToFraction (worklet) y mapeo
+   * lineal después para convertir a px. */
   const thumbStyle = useAnimatedStyle(() => {
-    const x = interpolate(drag.value, [-HALF, HALF], [0, usableWidth]);
+    const t = valueToFraction(drag.value);
+    const x = ((t + 1) / 2) * usableWidth;
     return {
       transform: [
         { translateX: x },
@@ -267,10 +304,13 @@ export function PercentRangeSlider({
           ]}
         />
 
-        {/* Tick marks chicos a ±10/±25/±40 */}
+        {/* Tick marks chicos a ±10/±25/±40. Posición usa la inversa
+         *  de la curva para que se acomoden donde realmente caen
+         *  (sino los ticks de ±10 quedarían a 20 % del ancho cuando
+         *  visualmente están a ~65 %). */}
         {tickPositions.map((tick) => {
-          const left =
-            THUMB_SIZE / 2 + ((tick + HALF) / (2 * HALF)) * usableWidth;
+          const t = valueToFraction(tick);
+          const left = THUMB_SIZE / 2 + ((t + 1) / 2) * usableWidth;
           return (
             <View
               key={tick}
