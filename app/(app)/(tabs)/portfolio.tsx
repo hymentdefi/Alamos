@@ -2345,12 +2345,11 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   chartCanvas: {
-    /* FloorPie y FloorBrick miden su parent con onLayout para
-     * calcular el SVG. Necesitan ancho explícito (sino containerW
-     * queda en 0 y nada se rendea). Cap a 280 + centrado para que
-     * full-width en tablets no se vea gigante. */
-    width: 280,
-    alignSelf: "center",
+    /* Chart full-width — ocupa todo el ancho del chartBlock (con
+     * sus padding 24 a cada lado). Pie y brick son cuadrados, así
+     * que el alto sigue al ancho — chart grande y dominante en la
+     * pantalla, en línea con su rol de centerpiece del portfolio. */
+    alignSelf: "stretch",
   },
 
   /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
