@@ -233,7 +233,7 @@ export default function AssetAlertsScreen() {
             {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
               <EmptyState
                 illustration={<AlertBellIllustration size={160} />}
-                text="Definí un precio objetivo y recibí una notificación instantánea cuando el activo lo cruce."
+                text="Definí un precio objetivo y recibí una notificación instantánea en tu celular cuando el activo lo cruce."
               />
             ) : null}
 
@@ -794,15 +794,16 @@ const s = StyleSheet.create({
   },
   screenTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontSize: 28,
+    letterSpacing: -0.9,
+    lineHeight: 32,
   },
   screenSubtitle: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: -0.1,
-    marginTop: 4,
+    marginTop: 6,
   },
 
   tabsRow: {
@@ -837,12 +838,16 @@ const s = StyleSheet.create({
     fontSize: 12,
   },
 
-  /* Empty state */
+  /* Empty state — bell + texto descriptivo viven como una sola
+   * unidad centrada verticalmente en el espacio disponible entre
+   * los tabs y el CTA del bottom. flex 1 + justifyContent center
+   * los pone en el medio del ScrollView (que ya tiene flexGrow 1
+   * desde el container). */
   emptyWrap: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 32,
-    paddingTop: 32,
   },
   emptyTitle: {
     fontFamily: fontFamily[700],
