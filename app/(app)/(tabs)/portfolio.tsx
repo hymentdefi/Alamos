@@ -680,102 +680,10 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          {/* Allocation stacked bar — un solo color (c.brand) con
-           *  gaps de 2 px entre segmentos. Robinhood/Alamos-styled:
-           *  el verde brand identifica TODO el portfolio como Álamos,
-           *  los gaps comunican el split. Caption con el % en brand
-           *  y el nombre en blanco — dos pesos visuales por segmento. */}
-          {hasHoldings ? (
-            <View style={s.allocBlock}>
-              <View
-                style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
-              >
-                {marketAllocation.arPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.arPct,
-                      backgroundColor: c.brand,
-                    }}
-                  />
-                ) : null}
-                {marketAllocation.usPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.usPct,
-                      backgroundColor: c.brand,
-                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
-                    }}
-                  />
-                ) : null}
-                {marketAllocation.cryptoPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.cryptoPct,
-                      backgroundColor: c.brand,
-                      marginLeft:
-                        marketAllocation.arPct > 0 ||
-                        marketAllocation.usPct > 0
-                          ? 2
-                          : 0,
-                    }}
-                  />
-                ) : null}
-              </View>
-              {/* Caption stacked: cada slot tiene el mismo flex que
-               *  su segmento → label centrado debajo de su porción.
-               *  Pct en brand verde + nombre del mercado en blanco. */}
-              <View style={s.allocCaptionRow}>
-                {marketAllocation.arPct > 0 ? (
-                  <View style={{ flex: marketAllocation.arPct }}>
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.arPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> AR</Text>
-                    </Text>
-                  </View>
-                ) : null}
-                {marketAllocation.usPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.usPct,
-                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
-                    }}
-                  >
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.usPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> EE.UU.</Text>
-                    </Text>
-                  </View>
-                ) : null}
-                {marketAllocation.cryptoPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.cryptoPct,
-                      marginLeft:
-                        marketAllocation.arPct > 0 ||
-                        marketAllocation.usPct > 0
-                          ? 2
-                          : 0,
-                    }}
-                  >
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.cryptoPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> Crypto</Text>
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-
-          {/* Selector Pie/Ladrillo — debajo de la allocation bar,
-           *  alineado a la derecha. Controla la viz del chart que
-           *  vive abajo. */}
+          {/* Selector Pie/Ladrillo — debajo del hero, alineado a la
+           *  derecha. Controla la viz del chart que vive abajo. La
+           *  allocation bar se mudó a estar debajo del chart, justo
+           *  arriba del link de Rendimiento. */}
           {hasHoldings ? (
             <View style={s.heroSelectorRow}>
               <View
@@ -841,8 +749,7 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* ─── Chart pie / brick — sin selector adentro (vive
-              arriba en el hero, sobre la allocation bar). */}
+          {/* ─── Chart pie / brick — sin selector adentro. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
               <View style={s.chartCanvas}>
@@ -866,8 +773,97 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Rendimiento — link de una sola línea al detalle.
-              Va inmediatamente debajo del chart + selector. */}
+          {/* ─── Allocation stacked bar — un solo color (c.brand)
+              con gaps de 2 px entre segmentos. Vive justo debajo del
+              chart, arriba del link de Rendimiento — el chart
+              comunica la composición visualmente, la barra la
+              comunica numéricamente. */}
+          {hasHoldings ? (
+            <View style={[s.allocBlock, s.allocBlockStandalone]}>
+              <View
+                style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
+              >
+                {marketAllocation.arPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.arPct,
+                      backgroundColor: c.brand,
+                    }}
+                  />
+                ) : null}
+                {marketAllocation.usPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.usPct,
+                      backgroundColor: c.brand,
+                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
+                    }}
+                  />
+                ) : null}
+                {marketAllocation.cryptoPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.cryptoPct,
+                      backgroundColor: c.brand,
+                      marginLeft:
+                        marketAllocation.arPct > 0 ||
+                        marketAllocation.usPct > 0
+                          ? 2
+                          : 0,
+                    }}
+                  />
+                ) : null}
+              </View>
+              <View style={s.allocCaptionRow}>
+                {marketAllocation.arPct > 0 ? (
+                  <View style={{ flex: marketAllocation.arPct }}>
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.arPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> AR</Text>
+                    </Text>
+                  </View>
+                ) : null}
+                {marketAllocation.usPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.usPct,
+                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
+                    }}
+                  >
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.usPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> EE.UU.</Text>
+                    </Text>
+                  </View>
+                ) : null}
+                {marketAllocation.cryptoPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.cryptoPct,
+                      marginLeft:
+                        marketAllocation.arPct > 0 ||
+                        marketAllocation.usPct > 0
+                          ? 2
+                          : 0,
+                    }}
+                  >
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.cryptoPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> Crypto</Text>
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
+          {/* ─── Rendimiento — link de una sola línea al detalle. */}
           {hasHoldings ? (
             <Pressable
               onPress={() => router.push("/(app)/rendimiento" as never)}
@@ -2587,6 +2583,16 @@ const s = StyleSheet.create({
    * agregar chrome. Caption con los % de cada mercado abajo. */
   allocBlock: {
     marginTop: 16,
+  },
+  /* Cuando la allocBlock vive afuera del heroBlock (debajo del
+   * chart, arriba del Rendimiento) necesita su propio padding
+   * horizontal — el heroBlock lo contenía con su paddingHorizontal
+   * 24. También aumentamos un toque el marginTop para separarla
+   * visualmente del chart. */
+  allocBlockStandalone: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 4,
   },
   allocBar: {
     flexDirection: "row",
