@@ -108,6 +108,14 @@ const BRICK_PALETTE = [
   "#6B6C66",
 ];
 
+/* Mapping CategorySlug → mercado de origen. Se usa para el cross-
+ * highlight bar ↔ chart: cuando el user agarra un segmento de la
+ * allocation bar (AR/US/Crypto), atenuamos las slices del chart
+ * que NO pertenezcan a ese mercado. Inversamente, cuando agarra
+ * una slice del chart, identificamos su mercado y atenuamos los
+ * otros segmentos de la barra. */
+type MarketKey = "AR" | "US" | "CRYPTO";
+
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -369,8 +377,21 @@ export default function PortfolioScreen() {
   // accidentalmente mientras el usuario explora la distribución.
   const [brickHolding, setBrickHolding] = useState(false);
   // Visualización seleccionada — pie chart por default. El usuario
-  // puede alternar con el toggle de glyphs arriba del chart.
-  const [viz, setViz] = useState<"pie" | "brick">("pie");
+  // alterna con el segmented arriba del chart. Pie / Brick /
+  // Ranking (horizontal bars) / Treemap (proportional rects).
+  const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
+    "pie",
+  );
+
+  /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
+   * "highlighted" actualmente — puede venir de:
+   *   - Hold sobre un segmento de la allocation bar (AR/US/Crypto)
+   *   - Hold sobre una slice del chart (su categoría → market)
+   * Cuando !== null, el chart atenúa las slices que NO son de
+   * ese mercado, y la barra atenúa los OTROS segmentos. */
+  const [highlightedMarket, setHighlightedMarket] = useState<
+    MarketKey | null
+  >(null);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -717,6 +738,38 @@ export default function PortfolioScreen() {
                     size={16}
                   />
                 </Tap>
+                <Tap
+                  onPress={() => setViz("ranking")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "ranking" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de ranking"
+                >
+                  <RankingGlyph
+                    color={viz === "ranking" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
+                <Tap
+                  onPress={() => setViz("treemap")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "treemap" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de treemap"
+                >
+                  <TreemapGlyph
+                    color={viz === "treemap" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
               </View>
             </View>
           ) : null}
@@ -734,107 +787,51 @@ export default function PortfolioScreen() {
                     currency={currency}
                     groupBy="category"
                     onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
                   />
-                ) : (
+                ) : viz === "brick" ? (
                   <FloorBrick
                     holdings={holdingsSorted}
                     totalArs={totalArs}
                     groupBy="category"
                     onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                ) : viz === "ranking" ? (
+                  <RankingList
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                ) : (
+                  <Treemap
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
                   />
                 )}
               </View>
             </View>
           ) : null}
 
-          {/* ─── Allocation stacked bar — un solo color (c.brand)
-              con gaps de 2 px entre segmentos. Vive justo debajo del
-              chart, arriba del link de Rendimiento — el chart
-              comunica la composición visualmente, la barra la
-              comunica numéricamente. */}
+          {/* ─── Allocation stacked bar — INTERACTIVA. Cada
+              segmento es un Pressable que en hold setea el
+              highlightedMarket (cross-highlight con el chart).
+              Cuando hay un mercado highlighted, los segmentos que
+              NO son ése bajan a opacity 0.25; los labels también. */}
           {hasHoldings ? (
-            <View style={[s.allocBlock, s.allocBlockStandalone]}>
-              <View
-                style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
-              >
-                {marketAllocation.arPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.arPct,
-                      backgroundColor: c.brand,
-                    }}
-                  />
-                ) : null}
-                {marketAllocation.usPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.usPct,
-                      backgroundColor: c.brand,
-                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
-                    }}
-                  />
-                ) : null}
-                {marketAllocation.cryptoPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.cryptoPct,
-                      backgroundColor: c.brand,
-                      marginLeft:
-                        marketAllocation.arPct > 0 ||
-                        marketAllocation.usPct > 0
-                          ? 2
-                          : 0,
-                    }}
-                  />
-                ) : null}
-              </View>
-              <View style={s.allocCaptionRow}>
-                {marketAllocation.arPct > 0 ? (
-                  <View style={{ flex: marketAllocation.arPct }}>
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.arPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> AR</Text>
-                    </Text>
-                  </View>
-                ) : null}
-                {marketAllocation.usPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.usPct,
-                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
-                    }}
-                  >
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.usPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> EE.UU.</Text>
-                    </Text>
-                  </View>
-                ) : null}
-                {marketAllocation.cryptoPct > 0 ? (
-                  <View
-                    style={{
-                      flex: marketAllocation.cryptoPct,
-                      marginLeft:
-                        marketAllocation.arPct > 0 ||
-                        marketAllocation.usPct > 0
-                          ? 2
-                          : 0,
-                    }}
-                  >
-                    <Text style={s.allocCaption} numberOfLines={1}>
-                      <Text style={{ color: c.brand }}>
-                        {marketAllocation.cryptoPct.toFixed(0)}%
-                      </Text>
-                      <Text style={{ color: c.text }}> Crypto</Text>
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
+            <AllocationBar
+              alloc={marketAllocation}
+              highlightedMarket={highlightedMarket}
+              onHighlight={setHighlightedMarket}
+              c={c}
+            />
           ) : null}
 
           {/* ─── Rendimiento — link de una sola línea al detalle.
@@ -1340,6 +1337,97 @@ function MarketGlyph({
   );
 }
 
+/* ─── AllocationBar — barra stacked AR/US/Crypto con cross-highlight.
+ *
+ * Cada segmento es un Pressable con onPressIn/onPressOut que setea
+ * `highlightedMarket` en el padre. El padre lo usa para atenuar:
+ *   - los segmentos NO highlighted en la barra (acá mismo)
+ *   - las slices del chart que no pertenecen al mercado (en
+ *     FloorPie / FloorBrick via prop dimMarket)
+ *
+ * onLongPress haptic medium para confirmar el "hold mode". El
+ * tap simple también highlightea brevemente. */
+
+function AllocationBar({
+  alloc,
+  highlightedMarket,
+  onHighlight,
+  c,
+}: {
+  alloc: {
+    arPct: number;
+    usPct: number;
+    cryptoPct: number;
+    categoriesCount: number;
+  };
+  highlightedMarket: MarketKey | null;
+  onHighlight: (m: MarketKey | null) => void;
+  c: ColorMap;
+}) {
+  const segments: Array<{ key: MarketKey; pct: number; label: string }> = [
+    { key: "AR", pct: alloc.arPct, label: "AR" },
+    { key: "US", pct: alloc.usPct, label: "EE.UU." },
+    { key: "CRYPTO", pct: alloc.cryptoPct, label: "Crypto" },
+  ].filter((s) => s.pct > 0) as Array<{
+    key: MarketKey;
+    pct: number;
+    label: string;
+  }>;
+
+  /* Helper para opacidad de cada segmento — full cuando no hay
+   * highlight o el segmento es el highlighted; dimmed (0.25) si
+   * hay un highlight en otro mercado. */
+  const opacityFor = (key: MarketKey): number =>
+    highlightedMarket == null || highlightedMarket === key ? 1 : 0.25;
+
+  return (
+    <View style={[s.allocBlock, s.allocBlockStandalone]}>
+      <View
+        style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
+      >
+        {segments.map((seg, i) => (
+          <Pressable
+            key={seg.key}
+            onPressIn={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onHighlight(seg.key);
+            }}
+            onPressOut={() => onHighlight(null)}
+            style={{
+              flex: seg.pct,
+              backgroundColor: c.brand,
+              marginLeft: i > 0 ? 2 : 0,
+              opacity: opacityFor(seg.key),
+            }}
+          />
+        ))}
+      </View>
+      <View style={s.allocCaptionRow}>
+        {segments.map((seg, i) => (
+          <Pressable
+            key={seg.key}
+            onPressIn={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onHighlight(seg.key);
+            }}
+            onPressOut={() => onHighlight(null)}
+            style={{
+              flex: seg.pct,
+              marginLeft: i > 0 ? 2 : 0,
+              opacity: opacityFor(seg.key),
+            }}
+          >
+            <Text style={s.allocCaption} numberOfLines={1}>
+              <Text style={{ color: c.brand }}>{seg.pct.toFixed(0)}%</Text>
+              <Text style={{ color: c.text }}> {seg.label}</Text>
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /* ─── PieGlyph / BrickGlyph — toggle icons del viz selector ─────── */
 
 function PieGlyph({ color, size = 18 }: { color: string; size?: number }) {
@@ -1396,6 +1484,49 @@ function BrickGlyph({ color, size = 18 }: { color: string; size?: number }) {
         y2={14}
         stroke={color}
         strokeWidth={1.2}
+      />
+    </Svg>
+  );
+}
+
+function RankingGlyph({
+  color,
+  size = 18,
+}: {
+  color: string;
+  size?: number;
+}) {
+  // 3 horizontal bars, descending width — el clásico ranking icon.
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18">
+      <SvgPath
+        d="M 3 5 H 14 M 3 9 H 11 M 3 13 H 7"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+function TreemapGlyph({
+  color,
+  size = 18,
+}: {
+  color: string;
+  size?: number;
+}) {
+  // Outer rect + 2 internal divisions — treemap mini.
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18">
+      <SvgPath
+        d="M 3 3 H 15 V 15 H 3 Z M 3 9 H 15 M 9 3 V 9 M 11 9 V 15"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fill="none"
       />
     </Svg>
   );
@@ -1834,6 +1965,15 @@ interface FloorPieProps {
   currency: Currency;
   groupBy: "category" | "ticker";
   onHoldChange?: (holding: boolean) => void;
+  /** Cuando !== null, las slices que NO sean de ese mercado se
+   *  rendean a opacity 0.25. Driver: el cross-highlight de la
+   *  allocation bar — cuando el user agarra "AR" en la barra,
+   *  acá atenuamos US y CRYPTO. */
+  dimMarket?: MarketKey | null;
+  /** Cross-highlight inverso (chart → barra) — emite el mercado
+   *  de la slice activa o null al soltar. El padre lo usa para
+   *  setear highlightedMarket y que la barra de arriba espeje. */
+  onActiveMarketChange?: (m: MarketKey | null) => void;
 }
 
 function FloorPie({
@@ -1842,6 +1982,8 @@ function FloorPie({
   currency,
   groupBy,
   onHoldChange,
+  dimMarket,
+  onActiveMarketChange,
 }: FloorPieProps) {
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
@@ -1866,7 +2008,13 @@ function FloorPie({
   const slices = useMemo(() => {
     const byKey = new Map<
       string,
-      { ars: number; rows: Row[]; cat: AssetCategory; name: string }
+      {
+        ars: number;
+        rows: Row[];
+        cat: AssetCategory;
+        name: string;
+        market: MarketKey;
+      }
     >();
     for (const h of holdings) {
       const key = groupBy === "ticker" ? h.asset.ticker : h.asset.category;
@@ -1875,6 +2023,7 @@ function FloorPie({
         rows: [],
         cat: h.asset.category,
         name: h.asset.name,
+        market: assetMarket(h.asset) as MarketKey,
       };
       entry.ars += h.ars;
       entry.rows.push({
@@ -1886,9 +2035,10 @@ function FloorPie({
       byKey.set(key, entry);
     }
     const sorted = Array.from(byKey.entries())
-      .map(([key, { ars, rows, cat, name }]) => ({
+      .map(([key, { ars, rows, cat, name, market }]) => ({
         key,
         cat,
+        market,
         label: groupBy === "ticker" ? name : categoryLabels[cat],
         ars,
         pct: (ars / totalArs) * 100,
@@ -1955,9 +2105,12 @@ function FloorPie({
       if (next === activeIdxRef.current) return;
       activeIdxRef.current = next;
       setActiveIdx(next);
+      onActiveMarketChange?.(
+        next != null ? slicesRef.current[next].market : null,
+      );
       if (next !== null) Haptics.selectionAsync().catch(() => {});
     },
-    [],
+    [onActiveMarketChange],
   );
 
   const activeSlice =
@@ -2015,9 +2168,17 @@ function FloorPie({
             fill="rgba(14,15,12,0.10)"
           />
 
-          {/* Slices del donut. */}
+          {/* Slices del donut. Dimming de 2 fuentes:
+           *   - activeIdx: el slice activo del propio touch del pie.
+           *   - dimMarket: el mercado highlighted desde la barra
+           *     (cross-highlight). Si la slice no es de ese mercado
+           *     se atenúa también. */}
           {slices.map((slice, i) => {
-            const dimmed = activeIdx !== null && activeIdx !== i;
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && slice.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
             const fill = dimmed ? dimmedFill : slice.color;
             return (
               <SvgPath
@@ -2251,6 +2412,12 @@ interface FloorBrickProps {
    *  y false cuando lo suelta. El ScrollView padre lo usa para
    *  bloquearse mientras el usuario está holdeando. */
   onHoldChange?: (holding: boolean) => void;
+  /** Cross-highlight desde la AllocationBar — atenúa los bloques
+   *  cuyo mercado no es el highlighted. */
+  dimMarket?: MarketKey | null;
+  /** Cross-highlight inverso (chart → barra) — emite el mercado
+   *  del bloque activo o null al soltar. */
+  onActiveMarketChange?: (m: MarketKey | null) => void;
 }
 
 function FloorBrick({
@@ -2258,6 +2425,8 @@ function FloorBrick({
   totalArs,
   groupBy,
   onHoldChange,
+  dimMarket,
+  onActiveMarketChange,
 }: FloorBrickProps) {
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
@@ -2282,7 +2451,13 @@ function FloorBrick({
   const blocks = useMemo(() => {
     const byKey = new Map<
       string,
-      { ars: number; rows: Row[]; cat: AssetCategory; name: string }
+      {
+        ars: number;
+        rows: Row[];
+        cat: AssetCategory;
+        name: string;
+        market: MarketKey;
+      }
     >();
     for (const h of holdings) {
       const key =
@@ -2292,6 +2467,7 @@ function FloorBrick({
         rows: [],
         cat: h.asset.category,
         name: h.asset.name,
+        market: assetMarket(h.asset) as MarketKey,
       };
       entry.ars += h.ars;
       entry.rows.push({
@@ -2303,9 +2479,10 @@ function FloorBrick({
       byKey.set(key, entry);
     }
     const sorted = Array.from(byKey.entries())
-      .map(([key, { ars, rows, cat, name }]) => ({
+      .map(([key, { ars, rows, cat, name, market }]) => ({
         key,
         cat,
+        market,
         label: groupBy === "ticker" ? name : categoryLabels[cat],
         ars,
         pct: (ars / totalArs) * 100,
@@ -2342,24 +2519,30 @@ function FloorBrick({
     blocksRef.current = blocks;
   }, [blocks]);
 
-  const handleTouch = useCallback((touchPx: number | null) => {
-    let next: number | null = null;
-    const cW = containerWRef.current;
-    const blks = blocksRef.current;
-    if (touchPx !== null && cW > 0) {
-      const svgX = (touchPx / cW) * W;
-      if (svgX >= xL && svgX <= xL + wallW) {
-        const idx = blks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
-        next = idx >= 0 ? idx : null;
+  const handleTouch = useCallback(
+    (touchPx: number | null) => {
+      let next: number | null = null;
+      const cW = containerWRef.current;
+      const blks = blocksRef.current;
+      if (touchPx !== null && cW > 0) {
+        const svgX = (touchPx / cW) * W;
+        if (svgX >= xL && svgX <= xL + wallW) {
+          const idx = blks.findIndex((b) => svgX >= b.x0 && svgX <= b.x1);
+          next = idx >= 0 ? idx : null;
+        }
       }
-    }
-    if (next === activeIdxRef.current) return;
-    activeIdxRef.current = next;
-    setActiveIdx(next);
-    if (next !== null) Haptics.selectionAsync().catch(() => {});
-    // xL y wallW son constantes locales — no cambian.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      if (next === activeIdxRef.current) return;
+      activeIdxRef.current = next;
+      setActiveIdx(next);
+      onActiveMarketChange?.(
+        next != null ? blocksRef.current[next].market : null,
+      );
+      if (next !== null) Haptics.selectionAsync().catch(() => {});
+      // xL y wallW son constantes locales — no cambian.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [onActiveMarketChange],
+  );
 
   const dimmedFront = c.surfaceSunken;
   const dimmedTop = c.surfaceHover;
@@ -2413,7 +2596,10 @@ function FloorBrick({
             fill="rgba(14,15,12,0.10)"
           />
           {blocks.map((blk, i) => {
-            const dimmed = activeIdx !== null && activeIdx !== i;
+            const dimmedByActive = activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && blk.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
             const front = dimmed ? dimmedFront : blk.color;
             const top = dimmed ? dimmedTop : shadeHex(blk.color, 0.22);
             const labelW = blk.x1 - blk.x0;
@@ -2448,8 +2634,11 @@ function FloorBrick({
             ? (() => {
                 const last = blocks[blocks.length - 1];
                 const lastIdx = blocks.length - 1;
-                const dimmed =
+                const dimmedByActive =
                   activeIdx !== null && activeIdx !== lastIdx;
+                const dimmedByMarket =
+                  dimMarket != null && last.market !== dimMarket;
+                const dimmed = dimmedByActive || dimmedByMarket;
                 const fillR = dimmed
                   ? dimmedRight
                   : shadeHex(last.color, -0.2);
@@ -2596,6 +2785,352 @@ function FloorBrick({
           </View>
         </Animated.View>
       ) : null}
+    </View>
+  );
+}
+
+/* ─── RankingList — barras horizontales ordenadas ────────────────
+ *
+ * Muestra cada categoría como una row con label + pct + barra de
+ * fondo proporcional. Mismo dual-dimming que FloorPie/FloorBrick:
+ *   - Hold sobre una row → highlightea (resto a opacity 0.35).
+ *   - dimMarket → atenúa rows de otros mercados.
+ * onActiveMarketChange espeja al padre.
+ *
+ * Layout: cada row es un Pressable con bg-bar absoluto detrás del
+ * contenido (label + pct). El bg-bar usa color de la paleta + opacity
+ * sólida, así la barra se "ve" del lado izquierdo y se desvanece a
+ * la derecha (efecto de fill horizontal).
+ */
+
+interface RankingListProps {
+  holdings: Holding[];
+  totalArs: number;
+  onHoldChange?: (holding: boolean) => void;
+  dimMarket?: MarketKey | null;
+  onActiveMarketChange?: (m: MarketKey | null) => void;
+}
+
+function RankingList({
+  holdings,
+  totalArs,
+  onHoldChange,
+  dimMarket,
+  onActiveMarketChange,
+}: RankingListProps) {
+  const { c } = useTheme();
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  const rows = useMemo(() => {
+    const byKey = new Map<
+      string,
+      {
+        ars: number;
+        cat: AssetCategory;
+        market: MarketKey;
+        rows: { ticker: string; change: number }[];
+      }
+    >();
+    for (const h of holdings) {
+      const key = h.asset.category;
+      const entry = byKey.get(key) ?? {
+        ars: 0,
+        cat: h.asset.category,
+        market: assetMarket(h.asset) as MarketKey,
+        rows: [],
+      };
+      entry.ars += h.ars;
+      entry.rows.push({ ticker: h.asset.ticker, change: h.asset.change });
+      byKey.set(key, entry);
+    }
+    return Array.from(byKey.entries())
+      .map(([key, v], i) => ({
+        key,
+        cat: v.cat,
+        market: v.market,
+        label: categoryLabels[v.cat],
+        ars: v.ars,
+        pct: (v.ars / totalArs) * 100,
+        color: BRICK_PALETTE[i % BRICK_PALETTE.length],
+        tickers: v.rows.length,
+      }))
+      .sort((a, b) => b.pct - a.pct)
+      .map((r, i) => ({ ...r, color: BRICK_PALETTE[i % BRICK_PALETTE.length] }));
+  }, [holdings, totalArs]);
+
+  const handleHold = useCallback(
+    (idx: number | null) => {
+      setActiveIdx(idx);
+      onHoldChange?.(idx !== null);
+      onActiveMarketChange?.(idx != null ? rows[idx].market : null);
+      if (idx !== null) Haptics.selectionAsync().catch(() => {});
+    },
+    [onHoldChange, onActiveMarketChange, rows],
+  );
+
+  return (
+    <View style={s.rankingWrap}>
+      {rows.map((r, i) => {
+        const dimmedByActive = activeIdx !== null && activeIdx !== i;
+        const dimmedByMarket =
+          dimMarket != null && r.market !== dimMarket;
+        const dimmed = dimmedByActive || dimmedByMarket;
+        const widthPct = Math.max(2, Math.min(100, r.pct));
+        return (
+          <Pressable
+            key={r.key}
+            onPressIn={() => handleHold(i)}
+            onPressOut={() => handleHold(null)}
+            style={[
+              s.rankingRow,
+              { opacity: dimmed ? 0.35 : 1 },
+            ]}
+          >
+            <View
+              style={[
+                s.rankingBar,
+                {
+                  backgroundColor: r.color,
+                  width: `${widthPct}%`,
+                  opacity: 0.22,
+                },
+              ]}
+            />
+            <View style={s.rankingContent}>
+              <View style={s.rankingLeft}>
+                <View
+                  style={[
+                    s.rankingDot,
+                    { backgroundColor: r.color },
+                  ]}
+                />
+                <Text
+                  style={[s.rankingLabel, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {r.label}
+                </Text>
+              </View>
+              <View style={s.rankingRight}>
+                <Text style={[s.rankingTickers, { color: c.textMuted }]}>
+                  {r.tickers}
+                </Text>
+                <Text style={[s.rankingPct, { color: c.text }]}>
+                  {formatTooltipPct(r.pct)}
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Treemap — rectángulos proporcionales (slice-and-dice) ──────
+ *
+ * Algoritmo simple alternando cortes vertical/horizontal por nivel.
+ * Para nuestro N (3-7 categorías) es overkill un squarified, así que
+ * vamos con el clásico slice-and-dice: el rect más grande arriba a
+ * la izquierda, los siguientes adyacentes, alternando eje. Cada rect
+ * es un Pressable independiente, con dual-dim igual que el ranking.
+ *
+ * Aspect ratio del canvas: 16:9 (340×190 viewBox). Mismo gesture
+ * model: hold para highlightear, soltar para resetear. Gap de 2px
+ * entre rects para distinción visual.
+ */
+
+interface TreemapProps {
+  holdings: Holding[];
+  totalArs: number;
+  onHoldChange?: (holding: boolean) => void;
+  dimMarket?: MarketKey | null;
+  onActiveMarketChange?: (m: MarketKey | null) => void;
+}
+
+function Treemap({
+  holdings,
+  totalArs,
+  onHoldChange,
+  dimMarket,
+  onActiveMarketChange,
+}: TreemapProps) {
+  const { c } = useTheme();
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [containerW, setContainerW] = useState(0);
+
+  const aspect = 16 / 10; // wide-ish, ocupa el ancho sin ser muy alto
+  const W = 340;
+  const H = W / aspect;
+
+  const tiles = useMemo(() => {
+    const byKey = new Map<
+      string,
+      {
+        ars: number;
+        cat: AssetCategory;
+        market: MarketKey;
+      }
+    >();
+    for (const h of holdings) {
+      const key = h.asset.category;
+      const entry = byKey.get(key) ?? {
+        ars: 0,
+        cat: h.asset.category,
+        market: assetMarket(h.asset) as MarketKey,
+      };
+      entry.ars += h.ars;
+      byKey.set(key, entry);
+    }
+    const sorted = Array.from(byKey.entries())
+      .map(([key, v]) => ({
+        key,
+        cat: v.cat,
+        market: v.market,
+        label: categoryLabels[v.cat],
+        ars: v.ars,
+      }))
+      .sort((a, b) => b.ars - a.ars);
+
+    const total = sorted.reduce((acc, t) => acc + t.ars, 0) || 1;
+
+    // Squarified-ish layout: para cada item, decidir si cortar el
+    // rect remanente vertical u horizontal según cuál ratio queda más
+    // cerca de 1. Para items pequeños (< 8% del total) los apilamos
+    // verticalmente en el rect remanente para que no terminen siendo
+    // tiras finitas.
+    type Rect = { x: number; y: number; w: number; h: number };
+    const layout: Array<Rect & (typeof sorted)[number] & { color: string }> = [];
+    let remaining: Rect = { x: 0, y: 0, w: W, h: H };
+
+    for (let i = 0; i < sorted.length; i++) {
+      const isLast = i === sorted.length - 1;
+      const t = sorted[i];
+      const remainingArs = sorted.slice(i).reduce((acc, t) => acc + t.ars, 0);
+      const frac = t.ars / remainingArs;
+
+      let rect: Rect;
+      if (isLast) {
+        rect = { ...remaining };
+        remaining = { x: 0, y: 0, w: 0, h: 0 };
+      } else if (remaining.w >= remaining.h) {
+        // cortar vertical (left slice)
+        const w = remaining.w * frac;
+        rect = {
+          x: remaining.x,
+          y: remaining.y,
+          w,
+          h: remaining.h,
+        };
+        remaining = {
+          x: remaining.x + w,
+          y: remaining.y,
+          w: remaining.w - w,
+          h: remaining.h,
+        };
+      } else {
+        // cortar horizontal (top slice)
+        const h = remaining.h * frac;
+        rect = {
+          x: remaining.x,
+          y: remaining.y,
+          w: remaining.w,
+          h,
+        };
+        remaining = {
+          x: remaining.x,
+          y: remaining.y + h,
+          w: remaining.w,
+          h: remaining.h - h,
+        };
+      }
+
+      layout.push({
+        ...t,
+        ...rect,
+        color: BRICK_PALETTE[i % BRICK_PALETTE.length],
+      });
+      // total no se usa después de aquí pero lo dejamos por claridad
+      void total;
+    }
+    return layout;
+  }, [holdings, W, H]);
+
+  const handleHold = useCallback(
+    (idx: number | null) => {
+      setActiveIdx(idx);
+      onHoldChange?.(idx !== null);
+      onActiveMarketChange?.(idx != null ? tiles[idx].market : null);
+      if (idx !== null) Haptics.selectionAsync().catch(() => {});
+    },
+    [onHoldChange, onActiveMarketChange, tiles],
+  );
+
+  // Total para % en labels
+  const totalArsAll = totalArs;
+
+  return (
+    <View
+      style={[s.treemapWrap, { aspectRatio: aspect }]}
+      onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+    >
+      {containerW > 0
+        ? tiles.map((t, i) => {
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && t.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            const scale = containerW / W;
+            const pct = (t.ars / totalArsAll) * 100;
+            const showLabel = t.w * scale > 60 && t.h * scale > 36;
+            const showPct = t.w * scale > 40 && t.h * scale > 22;
+            return (
+              <Pressable
+                key={t.key}
+                onPressIn={() => handleHold(i)}
+                onPressOut={() => handleHold(null)}
+                style={{
+                  position: "absolute",
+                  left: t.x * scale + 1,
+                  top: t.y * scale + 1,
+                  width: t.w * scale - 2,
+                  height: t.h * scale - 2,
+                  backgroundColor: dimmed ? c.surfaceSunken : t.color,
+                  borderCurve: "continuous",
+                  borderRadius: 6,
+                  padding: 8,
+                  justifyContent: "flex-end",
+                  opacity: dimmed ? 0.6 : 1,
+                }}
+              >
+                {showLabel ? (
+                  <Text
+                    style={[
+                      s.treemapLabel,
+                      { color: textOnHex(t.color) },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {t.label}
+                  </Text>
+                ) : null}
+                {showPct ? (
+                  <Text
+                    style={[
+                      s.treemapPct,
+                      { color: textOnHex(t.color) },
+                    ]}
+                  >
+                    {pct >= 10
+                      ? Math.round(pct).toString() + "%"
+                      : pct.toFixed(1).replace(".", ",") + "%"}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })
+        : null}
     </View>
   );
 }
@@ -3351,5 +3886,87 @@ const s = StyleSheet.create({
     height: 8,
     marginBottom: -4,
     transform: [{ rotate: "45deg" }],
+  },
+
+  /* Ranking — barras horizontales ordenadas. Cada row es un Pressable
+   * con barra de fondo absoluta + contenido (label + pct). */
+  rankingWrap: {
+    paddingHorizontal: 4,
+    gap: 6,
+  },
+  rankingRow: {
+    position: "relative",
+    height: 44,
+    borderCurve: "continuous",
+    borderRadius: 10,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  rankingBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderCurve: "continuous",
+    borderRadius: 10,
+  },
+  rankingContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  rankingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  rankingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  rankingLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+    flexShrink: 1,
+  },
+  rankingRight: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+  },
+  rankingTickers: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
+  },
+  rankingPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 14,
+    letterSpacing: -0.3,
+    minWidth: 48,
+    textAlign: "right",
+  },
+
+  /* Treemap — canvas con tiles absolutamente posicionados. */
+  treemapWrap: {
+    position: "relative",
+    width: "100%",
+    overflow: "hidden",
+  },
+  treemapLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.15,
+  },
+  treemapPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 13,
+    letterSpacing: -0.3,
+    marginTop: 2,
   },
 });
