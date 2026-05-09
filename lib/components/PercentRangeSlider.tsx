@@ -67,17 +67,17 @@ const RANGE = 50;
 const HALF = RANGE;
 const STEP = 0.5;
 
-/* Curva logarítmica: ±10 % cae al ~65 % del ancho del slider. Los
- * extremos se comprimen hacia ±50 %, así no perdemos precisión en
- * el rango útil donde está el 80 % de los usuarios.
+/* Curva NO lineal — sutil, da más resolución en el rango útil sin
+ * comprimir los extremos como una log agresiva.
  *
  *   v = sign(t) · |t|^CURVE · HALF       (forward, position → value)
  *   t = sign(v) · (|v| / HALF)^(1/CURVE) (inverse, value → position)
  *
- * Con CURVE = 3.5 → (0.2)^(1/3.5) ≈ 0.63, o sea ±10 a ~63 % del ancho.
- * Si subís el exponente, comprimís más los extremos; si lo bajás,
- * acercás la curva a lineal. */
-const CURVE = 3.5;
+ * Con CURVE = 2 → (0.2)^(1/2) ≈ 0.447, o sea ±10 cae al ~45 % del
+ * ancho del slider. Es ~2× la resolución lineal en el rango útil
+ * (donde la mitad ±10..±50 ocupa la otra mitad del ancho), pero
+ * sin sentirse "comprimido" en los extremos. */
+const CURVE = 2;
 
 /* Helpers de la curva — anotadas como worklets porque se llaman
  * tanto en el JS thread (memo, render de ticks) como en el UI thread
