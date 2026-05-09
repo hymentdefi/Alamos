@@ -238,13 +238,10 @@ export default function BuyScreen() {
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
       ).catch(() => {});
-      showToast(
-        isSell ? "Venta programada" : "Compra programada",
-        { variant: "success" },
-      );
-      // Volvemos al detail; el user ya recibió confirmación por
-      // toast. Si quiere ver la orden, va a "Órdenes pendientes"
-      // desde el perfil.
+      // Sin toast de confirmación — el haptic + el router.back() al
+      // detail (con la orden en "Pendientes" si quiere verla)
+      // alcanzan como feedback. Errores sí siguen tirando toast
+      // porque el navigate-back no informa qué falló.
       router.back();
     } catch (e) {
       const msg =

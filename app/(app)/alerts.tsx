@@ -53,9 +53,9 @@ export default function AlertsScreen() {
 
   const handleDelete = useCallback(
     async (alert: PriceAlert) => {
+      // Sin toast de confirmación — la fila desaparece del listado.
       try {
         await remove(alert.id);
-        showToast("Alerta eliminada", { variant: "neutral" });
       } catch {
         showToast("No pudimos eliminar la alerta", { variant: "error" });
       }

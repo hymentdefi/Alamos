@@ -86,14 +86,10 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       try {
         if (wasWatched) await removeFromWatchlist(user.id, assetId);
         else await addToWatchlist(user.id, assetId);
-        // Toast de confirmación — la spec lo pide explícitamente
-        // ("Toast confirmando: 'Agregado a watchlist' / 'Removido
-        // de watchlist'"). Variant neutral porque no es éxito de
-        // transacción, sólo confirmación de un toggle.
-        showToast(
-          wasWatched ? "Removido de favoritos" : "Agregado a favoritos",
-          { variant: "neutral" },
-        );
+        // Sin toast de confirmación — el ícono del corazón ya cambia
+        // al toggle (filled / outline). Eso comunica el estado.
+        // Errores sí mantienen toast porque sino el revert del
+        // optimistic se vería silencioso.
       } catch {
         // Revertir optimistic update si falla.
         setItems((prev) => {

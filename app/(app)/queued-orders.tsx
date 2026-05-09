@@ -49,9 +49,9 @@ export default function QueuedOrdersScreen() {
 
   const handleCancel = useCallback(
     async (order: QueuedOrder) => {
+      // Sin toast — la orden desaparece del listado al cancelarse.
       try {
         await cancel(order.id);
-        showToast("Orden cancelada", { variant: "neutral" });
       } catch {
         showToast("No pudimos cancelar la orden", { variant: "error" });
       }
