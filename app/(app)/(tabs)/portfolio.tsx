@@ -2345,8 +2345,12 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   chartCanvas: {
-    alignItems: "center",
-    justifyContent: "center",
+    /* FloorPie y FloorBrick miden su parent con onLayout para
+     * calcular el SVG. Necesitan ancho explícito (sino containerW
+     * queda en 0 y nada se rendea). Cap a 280 + centrado para que
+     * full-width en tablets no se vea gigante. */
+    width: 280,
+    alignSelf: "center",
   },
 
   /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
