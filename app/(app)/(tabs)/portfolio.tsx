@@ -23,11 +23,14 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, {
   Circle,
+  ClipPath,
+  Defs,
   Ellipse,
   G,
   Line,
   Path as SvgPath,
   Polygon,
+  Rect,
   Text as SvgText,
 } from "react-native-svg";
 import { useRouter } from "expo-router";
@@ -55,6 +58,11 @@ import {
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
+import { CurrencySheet } from "../../../lib/components/CurrencySheet";
+import {
+  MiniSparkline,
+  seriesFromSeed,
+} from "../../../lib/components/Sparkline";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
@@ -82,8 +90,6 @@ import { registerTabTap } from "../../../lib/tabs/activeTap";
 
 type Currency = "ARS" | "USD";
 
-/** Orden canónico del pager y los dots del hero. */
-const CURRENCY_ORDER: readonly Currency[] = ["ARS", "USD"];
 type ColorMap = ReturnType<typeof useTheme>["c"];
 
 interface Holding {
@@ -116,6 +122,14 @@ const BRICK_PALETTE = [
  * otros segmentos de la barra. */
 type MarketKey = "AR" | "US" | "CRYPTO";
 
+/** Label completo del mercado para chrome del chart (centro del pie,
+ *  overlays). Más expresivo que el "AR" / "US" del segmento. */
+function marketLabelFull(m: MarketKey): string {
+  if (m === "AR") return "Argentina";
+  if (m === "US") return "Estados Unidos";
+  return "Crypto";
+}
+
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -123,13 +137,10 @@ export default function PortfolioScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
   const [infoOpen, setInfoOpen] = useState(false);
-  const [pagerW, setPagerW] = useState(0);
-
-  /* Sin filtro de mercado en esta pantalla — los 3 mercados son
-   * la narrativa principal y se muestran todos juntos en la
-   * sección "Mercados". El usuario sigue pudiendo swipear ARS↔USD
-   * en el hero (no hay lockedCurrency derivada de un filtro). */
-  const lockedCurrency: Currency | null = null;
+  /* Sheet de selección de moneda — se abre desde la pill debajo del
+   * balance. Cambiar moneda ahora es un acto deliberado: tap pill →
+   * elegir card → confirma. NO hay swipe horizontal del balance. */
+  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   /* ─── Holdings (todos, sin filtrar) ─── */
 
@@ -370,7 +381,6 @@ export default function PortfolioScreen() {
   /* ─── Refs + tab tap + refresh ─── */
 
   const scrollRef = useRef<ScrollView | null>(null);
-  const pagerRef = useRef<ScrollView | null>(null);
 
   // Holding del ladrillo — mientras finger está apoyado, el ScrollView
   // se bloquea (scrollEnabled=false) para que el dedo no scrollee
@@ -416,23 +426,6 @@ export default function PortfolioScreen() {
     // stickyScrollY es shared value — su .value cambia sin re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, onRefresh]);
-
-  // Cuando el filtro impone una moneda fija (AR / US / CRYPTO), forza
-  // currency a ese valor. En "all" no toca la state — el usuario
-  // mantiene su última elección entre ARS / USD / USDT.
-  useEffect(() => {
-    if (lockedCurrency) {
-      setCurrency(lockedCurrency);
-      if (pagerW > 0) {
-        const idx = CURRENCY_ORDER.indexOf(lockedCurrency);
-        pagerRef.current?.scrollTo({
-          x: idx * pagerW,
-          y: 0,
-          animated: false,
-        });
-      }
-    }
-  }, [lockedCurrency, pagerW]);
 
   /* ─── Display values en moneda actual ─── */
 
@@ -553,80 +546,12 @@ export default function PortfolioScreen() {
             <Text style={[s.heroTitle, { color: c.text }]}>Portfolio</Text>
 
           <View style={s.heroPagerRow}>
-            <View
-              style={{ flex: 1 }}
-              onLayout={(e) => setPagerW(e.nativeEvent.layout.width)}
-            >
-              {lockedCurrency ? (
-                /* Filtro fija la moneda → render single AmountDisplay,
-                   sin pager. AR=ARS, US/CRYPTO=USD. */
-                <AmountDisplay
-                  value={
-                    (lockedCurrency === "ARS"
-                      ? totalArs
-                      : convertAmount(totalArs, "ARS", "USD")) *
-                    tickerProgress
-                  }
-                  size={42}
-                  currency={lockedCurrency}
-                />
-              ) : pagerW > 0 ? (
-                /* "Todo" → pager swipeable ARS / USD / USDT. */
-                <ScrollView
-                  ref={pagerRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  decelerationRate="normal"
-                  directionalLockEnabled
-                  alwaysBounceVertical={false}
-                  bounces={false}
-                  contentOffset={{
-                    x: CURRENCY_ORDER.indexOf(currency) * pagerW,
-                    y: 0,
-                  }}
-                  onMomentumScrollEnd={(e) => {
-                    const idx = Math.round(
-                      e.nativeEvent.contentOffset.x / pagerW,
-                    );
-                    const next = CURRENCY_ORDER[idx] ?? "ARS";
-                    if (next !== currency) {
-                      Haptics.selectionAsync().catch(() => {});
-                      setCurrency(next);
-                    }
-                  }}
-                  style={{ flexGrow: 0 }}
-                >
-                  {CURRENCY_ORDER.map((cur) => {
-                    const value =
-                      cur === "ARS"
-                        ? totalArs
-                        : convertAmount(totalArs, "ARS", cur);
-                    return (
-                      <View
-                        key={cur}
-                        style={{
-                          width: pagerW,
-                          justifyContent: "center",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <AmountDisplay
-                          value={value * tickerProgress}
-                          size={42}
-                          currency={cur}
-                        />
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              ) : (
-                <AmountDisplay
-                  value={totalArs * tickerProgress}
-                  size={42}
-                  currency="ARS"
-                />
-              )}
+            <View style={{ flex: 1 }}>
+              <AmountDisplay
+                value={totalDisplay * tickerProgress}
+                size={42}
+                currency={currency}
+              />
             </View>
             <Tap
               hitSlop={10}
@@ -645,43 +570,33 @@ export default function PortfolioScreen() {
             </Tap>
           </View>
 
-          {/* Dots ARS / USD / USDT — SIEMPRE renderizados con la misma
-              altura. En "Todo" son tappable selectors; en AR/US/Crypto
-              son indicadores estáticos del lock contextual. Layout
-              constante entre filtros. */}
-          <View style={s.dotsRow}>
-            {CURRENCY_ORDER.map((cur) => {
-              const active = cur === currency;
-              const interactive = !lockedCurrency;
-              return (
-                <Tap
-                  key={cur}
-                  hitSlop={interactive ? 10 : 0}
-                  haptic={interactive ? "selection" : "none"}
-                  onPress={() => {
-                    if (!interactive) return;
-                    if (cur === currency) return;
-                    setCurrency(cur);
-                    pagerRef.current?.scrollTo({
-                      x: CURRENCY_ORDER.indexOf(cur) * pagerW,
-                      y: 0,
-                      animated: true,
-                    });
-                  }}
-                >
-                  <View
-                    style={[
-                      s.dot,
-                      {
-                        backgroundColor: active ? c.text : c.textFaint,
-                        width: active ? 7 : 5,
-                        height: active ? 7 : 5,
-                      },
-                    ]}
-                  />
-                </Tap>
-              );
-            })}
+          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
+              para cambiar la moneda. Cambio deliberado: no hay swipe
+              horizontal del balance. El sheet aclara que es la misma
+              cartera, sólo distinta valuación. */}
+          <View style={s.currencyPillRow}>
+            <Tap
+              haptic="selection"
+              pressScale={0.96}
+              onPress={() => setCurrencyOpen(true)}
+              style={[
+                s.currencyPill,
+                {
+                  backgroundColor: c.surfaceHover,
+                },
+              ]}
+            >
+              <Text
+                style={[s.currencyPillCode, { color: c.text }]}
+              >
+                {currency}
+              </Text>
+              <Feather
+                name="chevron-down"
+                size={12}
+                color={c.textMuted}
+              />
+            </Tap>
           </View>
 
           <View style={s.deltaRow}>
@@ -934,76 +849,34 @@ export default function PortfolioScreen() {
             </View>
           )}
 
-          {/* ─── Movers del día — al fondo de la pantalla. Eyebrow
-              caps + ticker + delta. Tap → detail del asset. */}
+          {/* ─── Movers del día — 2 cards Robinhood-style al fondo
+              de la pantalla. Cada card: eyebrow caps + ticker bold +
+              mini-sparkline + delta grande, fondo surfaceHover. Tap
+              navega al detail del asset. */}
           {hasHoldings && bestOfDay && worstOfDay ? (
             <View style={s.moversBlock}>
-              <Pressable
+              <MoverCard
+                eyebrow="Mejor del día"
+                asset={bestOfDay.asset}
                 onPress={() =>
                   router.push({
                     pathname: "/(app)/detail",
                     params: { ticker: bestOfDay.asset.ticker },
                   })
                 }
-                style={({ pressed }) => [
-                  s.moverRow,
-                  { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={[s.moverLabel, { color: c.textMuted }]}>
-                  Mejor del día
-                </Text>
-                <View style={s.moverTrailing}>
-                  <Text style={[s.moverTicker, { color: c.text }]}>
-                    {bestOfDay.asset.ticker}
-                  </Text>
-                  <Text
-                    style={[
-                      s.moverDelta,
-                      {
-                        color:
-                          bestOfDay.asset.change >= 0 ? c.brand : c.red,
-                      },
-                    ]}
-                  >
-                    {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                    {fmtPctAbs(bestOfDay.asset.change)}
-                  </Text>
-                </View>
-              </Pressable>
-              <Pressable
+                c={c}
+              />
+              <MoverCard
+                eyebrow="Peor del día"
+                asset={worstOfDay.asset}
                 onPress={() =>
                   router.push({
                     pathname: "/(app)/detail",
                     params: { ticker: worstOfDay.asset.ticker },
                   })
                 }
-                style={({ pressed }) => [
-                  s.moverRow,
-                  { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={[s.moverLabel, { color: c.textMuted }]}>
-                  Peor del día
-                </Text>
-                <View style={s.moverTrailing}>
-                  <Text style={[s.moverTicker, { color: c.text }]}>
-                    {worstOfDay.asset.ticker}
-                  </Text>
-                  <Text
-                    style={[
-                      s.moverDelta,
-                      {
-                        color:
-                          worstOfDay.asset.change >= 0 ? c.brand : c.red,
-                      },
-                    ]}
-                  >
-                    {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                    {fmtPctAbs(worstOfDay.asset.change)}
-                  </Text>
-                </View>
-              </Pressable>
+                c={c}
+              />
             </View>
           ) : null}
         </Animated.ScrollView>
@@ -1011,6 +884,13 @@ export default function PortfolioScreen() {
         <BalanceInfoSheet
           visible={infoOpen}
           onClose={() => setInfoOpen(false)}
+        />
+        <CurrencySheet
+          visible={currencyOpen}
+          onClose={() => setCurrencyOpen(false)}
+          selected={currency}
+          totalArs={totalArs}
+          onSelect={(cur) => setCurrency(cur)}
         />
       </View>
     </AssetColorProvider>
@@ -1180,7 +1060,7 @@ function MarketRow({
       {/* Icono del mercado a la izquierda — Argentina/US flag o
        *  símbolo Crypto. Le da identidad visual a cada bucket. */}
       <View style={s.marketIcon}>
-        <MarketGlyph marketKey={marketKey} size={40} />
+        <MarketFlag marketKey={marketKey} size={40} />
       </View>
 
       <View style={s.marketContent}>
@@ -1219,120 +1099,219 @@ function MarketRow({
   );
 }
 
-/* ─── MarketGlyph — squircle con un símbolo distintivo del mercado.
+/* ─── MarketFlag — bandera real en círculo, variantes con punch.
  *
- * Reemplaza las FlagIcon genéricas (banderas literales SVG) por
- * marks abstractos al estilo Robinhood: una FORMA + COLOR
- * característicos por mercado, dentro de un squircle uniforme.
+ * Volvemos a banderas literales (no glyphs abstractos), pero en
+ * variantes históricas/bold con colores fuertes para que NO se vean
+ * iguales a la bandera genérica que usan todas las apps.
  *
- *   AR     → Sol de Mayo (5 rayos triangulares + círculo central),
- *            gold sobre sky blue. Ícono más reconocible de la
- *            bandera argentina sin ser la bandera literal.
- *   US     → Estrella de 5 puntas, blanco sobre navy. Stars-and-
- *            stripes deconstruido.
- *   CRYPTO → Símbolo ₿, blanco sobre Bitcoin orange (#F7931A — el
- *            color canónico de BTC).
+ *   AR     → Tribar celeste/blanco/celeste con celeste FUERTE
+ *            (#3F8CC9 vs el #74ACDF estándar) y el Sol de Mayo
+ *            grande, dorado vibrante con 16 rayos rectos. Visualmente
+ *            "Argentina" sin lugar a dudas pero más rica.
+ *   US     → Variante Betsy Ross — stripes rojo/blanco igual pero
+ *            con 13 estrellas en círculo en el canton (la bandera
+ *            histórica de 1777). Old Glory red bold + true navy.
+ *   CRYPTO → Bandera de Bitcoin: campo full Bitcoin orange (#F7931A)
+ *            con ₿ blanco grande tilteado 14° (la ₿ "oficial" del
+ *            logo de Bitcoin que va inclinada).
  *
- * Squircle (radius 22 % del tamaño) + borderCurve continuous para
- * el feel iOS. Todos los marks centrados ópticamente. */
-function MarketGlyph({
+ * Forma circular (no squircle) — coherente con el patrón de FlagIcon
+ * y con cómo Robinhood/Coinbase muestran países y assets. */
+function MarketFlag({
   marketKey,
   size = 40,
 }: {
   marketKey: "AR" | "US" | "CRYPTO";
   size?: number;
 }) {
-  const radius = size * 0.22;
-
   if (marketKey === "AR") {
-    /* Sol de Mayo simplificado — círculo central + 8 rayos
-     * triangulares alrededor. Gold sobre sky blue. */
-    return (
-      <View
-        style={[
-          s.glyphSquircle,
-          {
-            width: size,
-            height: size,
-            borderRadius: radius,
-            backgroundColor: "#74ACDF",
-          },
-        ]}
-      >
-        <Svg
-          width={size * 0.7}
-          height={size * 0.7}
-          viewBox="0 0 40 40"
-        >
-          {/* 8 rayos triangulares — uno cada 45° */}
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-            <Polygon
-              key={deg}
-              points="20,4 22,12 18,12"
-              fill="#FCBF00"
-              transform={`rotate(${deg} 20 20)`}
-            />
-          ))}
-          <Circle cx={20} cy={20} r={6} fill="#FCBF00" />
-        </Svg>
-      </View>
-    );
+    return <ArgentinaBoldFlag size={size} />;
   }
-
   if (marketKey === "US") {
-    /* Estrella de 5 puntas. Blanco sobre navy. */
-    return (
-      <View
-        style={[
-          s.glyphSquircle,
-          {
-            width: size,
-            height: size,
-            borderRadius: radius,
-            backgroundColor: "#1F2D5C",
-          },
-        ]}
-      >
-        <Svg
-          width={size * 0.55}
-          height={size * 0.55}
-          viewBox="0 0 24 24"
-        >
-          <Polygon
-            points="12,2 14.6,9.2 22,9.5 16,14.4 18.2,21.5 12,17.4 5.8,21.5 8,14.4 2,9.5 9.4,9.2"
-            fill="#FFFFFF"
-          />
-        </Svg>
-      </View>
-    );
+    return <BetsyRossFlag size={size} />;
   }
+  return <BitcoinFlag size={size} />;
+}
 
-  /* CRYPTO — ₿ blanco sobre Bitcoin orange. */
+/** Bandera AR — celeste profundo + Sol de Mayo grande (dorado fuerte
+ *  con 16 rayos rectos). El sol ocupa ~70 % del alto, dominante. */
+function ArgentinaBoldFlag({ size }: { size: number }) {
+  const CELESTE = "#3F8CC9";
+  const WHITE = "#FFFFFF";
+  const SUN_RAY = "#F4B400";
+  const SUN_DISC = "#FFC72C";
+  const SUN_FACE = "#A66A00";
   return (
     <View
       style={[
-        s.glyphSquircle,
+        s.flagCircle,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}
+    >
+      <Svg width={size} height={size} viewBox="0 0 40 40">
+        <Defs>
+          <ClipPath id="arBoldClip">
+            <Circle cx={20} cy={20} r={20} />
+          </ClipPath>
+        </Defs>
+        <G clipPath="url(#arBoldClip)">
+          {/* Bandas más dramáticas — 12 / 16 / 12 (no 1/3 igual) */}
+          <Rect x={0} y={0} width={40} height={12} fill={CELESTE} />
+          <Rect x={0} y={12} width={40} height={16} fill={WHITE} />
+          <Rect x={0} y={28} width={40} height={12} fill={CELESTE} />
+
+          {/* Sol de Mayo — 16 rayos rectos (versión simplificada de
+              los 32 oficiales). Cada rayo es un triángulo isósceles. */}
+          {Array.from({ length: 16 }).map((_, i) => {
+            const deg = (i * 360) / 16;
+            return (
+              <Polygon
+                key={i}
+                points="20,4 21.4,12 18.6,12"
+                fill={SUN_RAY}
+                transform={`rotate(${deg} 20 20)`}
+              />
+            );
+          })}
+          {/* Disco central + cara estilizada (2 puntos por ojos +
+              mini arco por sonrisa). */}
+          <Circle cx={20} cy={20} r={5.6} fill={SUN_DISC} />
+          <Circle cx={18} cy={19} r={0.55} fill={SUN_FACE} />
+          <Circle cx={22} cy={19} r={0.55} fill={SUN_FACE} />
+          <SvgPath
+            d="M 18 21.6 Q 20 22.8 22 21.6"
+            stroke={SUN_FACE}
+            strokeWidth={0.6}
+            fill="none"
+            strokeLinecap="round"
+          />
+        </G>
+        {/* Borde sutil para definir el círculo sobre fondos claros */}
+        <Circle
+          cx={20}
+          cy={20}
+          r={19.7}
+          fill="none"
+          stroke="rgba(0,0,0,0.10)"
+          strokeWidth={0.6}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/** Bandera US variante Betsy Ross (1777) — 13 estrellas en círculo
+ *  en el canton, 13 stripes rojo/blanco. Old Glory red + true navy. */
+function BetsyRossFlag({ size }: { size: number }) {
+  const RED = "#BF0A30";
+  const WHITE = "#FFFFFF";
+  const NAVY = "#002868";
+  const stripeH = 40 / 13;
+  // 13 estrellas en círculo en el canton
+  const cantonW = 40 * 0.4;
+  const cantonH = stripeH * 7;
+  const ringCx = cantonW / 2;
+  const ringCy = cantonH / 2;
+  const ringR = Math.min(cantonW, cantonH) * 0.32;
+  const starPositions = Array.from({ length: 13 }).map((_, i) => {
+    const angle = (i * 2 * Math.PI) / 13 - Math.PI / 2;
+    return {
+      cx: ringCx + Math.cos(angle) * ringR,
+      cy: ringCy + Math.sin(angle) * ringR,
+    };
+  });
+  return (
+    <View
+      style={[
+        s.flagCircle,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}
+    >
+      <Svg width={size} height={size} viewBox="0 0 40 40">
+        <Defs>
+          <ClipPath id="usBetsyClip">
+            <Circle cx={20} cy={20} r={20} />
+          </ClipPath>
+        </Defs>
+        <G clipPath="url(#usBetsyClip)">
+          <Rect x={0} y={0} width={40} height={40} fill={WHITE} />
+          {[0, 2, 4, 6, 8, 10, 12].map((i) => (
+            <Rect
+              key={i}
+              x={0}
+              y={i * stripeH}
+              width={40}
+              height={stripeH}
+              fill={RED}
+            />
+          ))}
+          <Rect x={0} y={0} width={cantonW} height={cantonH} fill={NAVY} />
+          {/* 13 estrellas circulares (puntos blancos con tamaño justo
+              para leerse a 40 px). En realidad son 5-puntas pero a
+              este tamaño los círculos leen mejor que estrellas
+              poligonales mal renderizadas. */}
+          {starPositions.map((p, i) => (
+            <Circle key={i} cx={p.cx} cy={p.cy} r={0.85} fill={WHITE} />
+          ))}
+        </G>
+        <Circle
+          cx={20}
+          cy={20}
+          r={19.7}
+          fill="none"
+          stroke="rgba(0,0,0,0.10)"
+          strokeWidth={0.6}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/** Bandera Bitcoin — campo full Bitcoin orange con ₿ blanco grande,
+ *  tilteado 14° como el logo oficial. */
+function BitcoinFlag({ size }: { size: number }) {
+  const ORANGE = "#F7931A";
+  return (
+    <View
+      style={[
+        s.flagCircle,
         {
           width: size,
           height: size,
-          borderRadius: radius,
-          backgroundColor: "#F7931A",
+          borderRadius: size / 2,
+          backgroundColor: ORANGE,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
         },
       ]}
     >
       <Text
         style={{
           fontFamily: fontFamily[800],
-          fontSize: size * 0.58,
+          fontSize: size * 0.62,
           color: "#FFFFFF",
           letterSpacing: -0.5,
-          /* El glyph ₿ tiene una metric box rara, lo bajamos un
-           * píxel para que centre ópticamente. */
           marginTop: -size * 0.04,
+          transform: [{ rotate: "-14deg" }],
         }}
       >
         ₿
       </Text>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          borderRadius: size / 2,
+          borderWidth: 0.6,
+          borderColor: "rgba(0,0,0,0.10)",
+        }}
+      />
     </View>
   );
 }
@@ -1808,16 +1787,25 @@ function PositionsList({
     <View style={s.positionsBlock}>
       <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
       {holdings.map((h, i) => {
-        /* Valor en la moneda del pager — ARS o convertido. Si el
-         * activo está en USDT/USD y el currency del pager es USDT,
-         * mostramos en native; sino convertimos a la display
-         * currency para mantener todos los montos comparables. */
         const displayValue =
           currency === "ARS"
             ? h.ars
             : convertAmount(h.ars, "ARS", currency);
         const dayUp = h.asset.change >= 0;
         const deltaColor = dayUp ? c.brand : c.red;
+        // Crypto siempre cotiza contra USDT — limpiamos el "/USDT"
+        // del display ticker. ETH/USDT → ETH. Los pares perpetuos
+        // ".P" se mantienen porque distinguen del spot.
+        const cleanTicker = shortCryptoTicker(h.asset.ticker);
+        // Sparkline determinística — usa el ticker como seed y el
+        // signo del change como tendencia. Da consistencia visual
+        // entre renders y empata con el delta del día (verde sube,
+        // rojo baja).
+        const spark = seriesFromSeed(
+          h.asset.ticker,
+          40,
+          dayUp ? "up" : "down",
+        );
         return (
           <Pressable
             key={h.asset.ticker}
@@ -1836,7 +1824,7 @@ function PositionsList({
                 style={[s.positionTicker, { color: c.text }]}
                 numberOfLines={1}
               >
-                {h.asset.ticker}
+                {cleanTicker}
               </Text>
               <Text
                 style={[s.positionName, { color: c.textMuted }]}
@@ -1844,6 +1832,15 @@ function PositionsList({
               >
                 {h.asset.name}
               </Text>
+            </View>
+            <View style={s.positionSpark}>
+              <MiniSparkline
+                series={spark}
+                color={deltaColor}
+                width={56}
+                height={22}
+                strokeWidth={1.6}
+              />
             </View>
             <View style={s.positionRight}>
               <Text
@@ -1863,6 +1860,79 @@ function PositionsList({
         );
       })}
     </View>
+  );
+}
+
+/* ─── MoverCard — Mejor / Peor del día como cards Robinhood-style ─
+ *
+ * Cada card vive en una grilla de 2 columnas al fondo del portfolio.
+ * Layout (top → bottom):
+ *   - Eyebrow caps muted ("MEJOR DEL DÍA")
+ *   - Ticker bold + nombre muted (1 línea)
+ *   - Mini-sparkline (color brand/red, ocupa el ancho)
+ *   - Delta grande con triángulo + %, cromado por el cambio del día.
+ * Tap → /(app)/detail. Bg c.surface con borde sutil c.border. */
+
+function MoverCard({
+  eyebrow,
+  asset,
+  onPress,
+  c,
+}: {
+  eyebrow: string;
+  asset: Asset;
+  onPress: () => void;
+  c: ColorMap;
+}) {
+  const up = asset.change >= 0;
+  const tone = up ? c.brand : c.red;
+  const cleanTicker = shortCryptoTicker(asset.ticker);
+  const spark = useMemo(
+    () => seriesFromSeed(asset.ticker, 40, up ? "up" : "down"),
+    [asset.ticker, up],
+  );
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.moverCard,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          opacity: pressed ? 0.65 : 1,
+        },
+      ]}
+    >
+      <Text style={[s.moverCardEyebrow, { color: c.textMuted }]}>
+        {eyebrow}
+      </Text>
+      <View style={s.moverCardHead}>
+        <Text
+          style={[s.moverCardTicker, { color: c.text }]}
+          numberOfLines={1}
+        >
+          {cleanTicker}
+        </Text>
+        <Text
+          style={[s.moverCardName, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {asset.name}
+        </Text>
+      </View>
+      <View style={s.moverCardSpark}>
+        <MiniSparkline
+          series={spark}
+          color={tone}
+          width={120}
+          height={28}
+          strokeWidth={1.6}
+        />
+      </View>
+      <Text style={[s.moverCardDelta, { color: tone }]}>
+        {up ? "▲" : "▼"} {fmtPctAbs(asset.change)}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -2117,6 +2187,17 @@ function FloorPie({
     activeIdx !== null ? slices[activeIdx] ?? null : null;
   const dimmedFill = c.surfaceSunken;
 
+  // Cuando el user holdea un mercado en la AllocationBar (dimMarket
+  // != null), reemplazamos el texto del centro por el % agregado del
+  // mercado + su label. La info "balance + Distribución" cede a la
+  // que está en foco — así el chart "responde" al hold de la barra.
+  const dimMarketPct = useMemo(() => {
+    if (dimMarket == null) return null;
+    return slices
+      .filter((sl) => sl.market === dimMarket)
+      .reduce((acc, sl) => acc + sl.pct, 0);
+  }, [dimMarket, slices]);
+
   // Texto del centro — compact balance en neutral, info de slice activa
   // en hold. Renderizado como View+Text para honrar Plus Jakarta.
   const totalDisplay =
@@ -2200,9 +2281,9 @@ function FloorPie({
           })}
         </Svg>
 
-        {/* Center text — siempre constante (balance + 'Distribución').
-            La info dinámica del slice activo vive en el tooltip de
-            abajo, igual que en el ladrillo. */}
+        {/* Center text — por default balance + 'Distribución'. Cuando
+            el user holdea un mercado desde la AllocationBar (dimMarket
+            != null), swapeamos a "X %" grande + nombre del mercado. */}
         {containerW > 0 ? (
           <View
             pointerEvents="none"
@@ -2214,19 +2295,41 @@ function FloorPie({
               },
             ]}
           >
-            <Text
-              style={[s.pieCenterPrimary, { color: c.text }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {formatCenterMoney(totalDisplay, currency)}
-            </Text>
-            <Text
-              style={[s.pieCenterSecondary, { color: c.textMuted }]}
-              numberOfLines={1}
-            >
-              Distribución
-            </Text>
+            {dimMarketPct != null ? (
+              <>
+                <Text
+                  style={[s.pieCenterMarketPct, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {dimMarketPct >= 10
+                    ? Math.round(dimMarketPct).toString()
+                    : dimMarketPct.toFixed(1).replace(".", ",")}
+                  <Text style={{ color: c.textMuted }}>%</Text>
+                </Text>
+                <Text
+                  style={[s.pieCenterMarketLabel, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {marketLabelFull(dimMarket as MarketKey)}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  style={[s.pieCenterPrimary, { color: c.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {formatCenterMoney(totalDisplay, currency)}
+                </Text>
+                <Text
+                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  Distribución
+                </Text>
+              </>
+            )}
           </View>
         ) : null}
       </View>
@@ -2555,6 +2658,24 @@ function FloorBrick({
       ? (((activeBlock.x0 + activeBlock.x1) / 2) / W) * containerW
       : 0;
 
+  // % agregado del mercado highlighted desde la AllocationBar — si
+  // el user holdea AR en la barra, sumamos los pcts de los bloques
+  // de mercado AR para mostrarlo en una pill flotante sobre el chart.
+  const dimMarketPct = useMemo(() => {
+    if (dimMarket == null) return null;
+    return blocks
+      .filter((b) => b.market === dimMarket)
+      .reduce((acc, b) => acc + b.pct, 0);
+  }, [dimMarket, blocks]);
+  const dimMarketLeftPx = useMemo(() => {
+    if (dimMarket == null || containerW === 0) return null;
+    const matching = blocks.filter((b) => b.market === dimMarket);
+    if (matching.length === 0) return null;
+    const x0 = matching[0].x0;
+    const x1 = matching[matching.length - 1].x1;
+    return (((x0 + x1) / 2) / W) * containerW;
+  }, [dimMarket, blocks, containerW]);
+
   return (
     <View
       style={s.brickWrap}
@@ -2680,6 +2801,43 @@ function FloorBrick({
           </G>
         </Svg>
       </View>
+
+      {/* Market summary pill — aparece cuando el user holdea un
+          mercado en la AllocationBar (dimMarket != null). Pill ink
+          flotando sobre el centro del rango de bloques de ese
+          mercado, "Argentina · 65 %". Persistente mientras dura
+          el hold de la barra. */}
+      {dimMarket != null &&
+      dimMarketPct != null &&
+      dimMarketLeftPx != null ? (
+        <Animated.View
+          key={`brick-mkt-${dimMarket}`}
+          entering={FadeInDown.duration(120)}
+          exiting={FadeOutUp.duration(100)}
+          pointerEvents="none"
+          style={[
+            s.tooltipAnchor,
+            {
+              left: dimMarketLeftPx,
+              top: ((yTop + yBot) / 2) * (containerW / W) - 14,
+            },
+          ]}
+        >
+          <View
+            style={[s.marketOverlayPill, { backgroundColor: c.ink }]}
+          >
+            <Text style={[s.marketOverlayLabel, { color: c.bg }]}>
+              {marketLabelFull(dimMarket)}
+            </Text>
+            <Text style={[s.marketOverlayPct, { color: c.brand }]}>
+              {dimMarketPct >= 10
+                ? Math.round(dimMarketPct).toString()
+                : dimMarketPct.toFixed(1).replace(".", ",")}
+              %
+            </Text>
+          </View>
+        </Animated.View>
+      ) : null}
 
       {activeBlock && containerW > 0 ? (
         <Animated.View
@@ -3330,19 +3488,26 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* Dots row — compacto, justo debajo del saldo. Siempre renderizado
-   * con altura constante para que el layout no se mueva al alternar
-   * entre filtros. */
-  dotsRow: {
+  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
+   * CurrencySheet para cambiar moneda con un acto deliberado. */
+  currencyPillRow: {
+    flexDirection: "row",
+    marginTop: 10,
+  },
+  currencyPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    marginTop: 10,
-    height: 8,
-  },
-  dot: {
+    gap: 4,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 4,
     borderCurve: "continuous",
-    borderRadius: 999,
+    borderRadius: radius.pill,
+  },
+  currencyPillCode: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   /* Ladrillo full-bleed — sigue al hero scrollable. Sin
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
@@ -3481,13 +3646,13 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
     marginTop: 4,
   },
-  /* Squircle base de los MarketGlyphs (Sol de Mayo / estrella / ₿).
-   * borderCurve continuous para feel iOS. El radius lo setea el
-   * componente (proporción ~22 % del size). */
-  glyphSquircle: {
+  /* Círculo base de los MarketFlags. Overflow hidden para que el
+   * SVG se clipee al círculo (las banderas se rendean rectangulares
+   * y se cortan por la wrap circular). */
+  flagCircle: {
     alignItems: "center",
     justifyContent: "center",
-    borderCurve: "continuous",
+    overflow: "hidden",
   },
   marketName: {
     fontFamily: fontFamily[700],
@@ -3574,8 +3739,17 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 2,
   },
+  /* Mini-sparkline a la izquierda del precio — 56×22, color
+   * cromático por dirección del día. Visualmente liviano: linea fina
+   * que se "pierde" entre el ticker y el monto. */
+  positionSpark: {
+    width: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   positionRight: {
     alignItems: "flex-end",
+    minWidth: 90,
   },
   positionValue: {
     fontFamily: fontFamily[700],
@@ -3589,42 +3763,54 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* Movers del día — bloque al fondo de la pantalla. 2 filas
-   * (Mejor / Peor) con label izquierda + ticker + delta a la
-   * derecha. Sin section title — son rows individuales separadas
-   * por hairlines. Tap → detail del asset. */
+  /* Movers del día — 2 cards Robinhood-style al fondo. flex 1 cada
+   * una con gap. La grilla vive 24px adentro del horizontal padding
+   * del screen para alinear con el resto del contenido. */
   moversBlock: {
-    marginTop: 8,
-  },
-  moverRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 24,
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  moverLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    letterSpacing: -0.2,
+  moverCard: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 14,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 10,
   },
-  moverTrailing: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 12,
-  },
-  moverTicker: {
+  moverCardEyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
-  moverDelta: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.2,
-    minWidth: 72,
-    textAlign: "right",
+  moverCardHead: {
+    gap: 2,
+  },
+  moverCardTicker: {
+    fontFamily: fontFamily[800],
+    fontSize: 18,
+    letterSpacing: -0.4,
+  },
+  moverCardName: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  moverCardSpark: {
+    height: 28,
+    marginTop: 2,
+    marginBottom: 2,
+    overflow: "hidden",
+  },
+  moverCardDelta: {
+    fontFamily: fontFamily[800],
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
 
   /* Link row (Rendimiento histórico) — una sola línea con label
@@ -3816,6 +4002,23 @@ const s = StyleSheet.create({
     maxWidth: 130,
     textAlign: "center",
   },
+  /* Variante del centro cuando el user holdea un mercado en la
+   * AllocationBar — % grande dominante + label del mercado abajo. */
+  pieCenterMarketPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 30,
+    letterSpacing: -1,
+    lineHeight: 32,
+  },
+  pieCenterMarketLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginTop: 2,
+    maxWidth: 130,
+    textAlign: "center",
+  },
 
   /* Tooltip */
   tooltipAnchor: {
@@ -3830,6 +4033,29 @@ const s = StyleSheet.create({
     paddingVertical: 9,
     borderCurve: "continuous",
     borderRadius: radius.md,
+  },
+  /* Pill flotante del cross-highlight de mercado — más chico que el
+   * tooltip de slice/bloque, pill horizontal con label uppercase + pct
+   * en brand. Se anchorea al centro del rango del mercado en el chart. */
+  marketOverlayPill: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  marketOverlayLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  marketOverlayPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 13,
+    letterSpacing: -0.2,
   },
   tooltipHeader: {
     flexDirection: "row",
