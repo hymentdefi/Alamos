@@ -863,144 +863,34 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Rendimiento — sección con heading + 2 sub-stats
-              (Mejor / Peor del día). Robinhood-style: el heading
-              tiene jerarquía con su propio % y chevron al detalle;
-              las sub-stats viven debajo como related metrics, mismo
-              padding pero font más chico. Hairline arriba sólo. */}
+          {/* ─── Rendimiento — link de una sola línea al detalle.
+              Mejor / Peor del día viven en su propia sección al
+              fondo de la pantalla. */}
           {hasHoldings ? (
-            <View
-              style={[
-                s.rendimientoBlock,
-                { borderTopColor: c.border },
+            <Pressable
+              onPress={() => router.push("/(app)/rendimiento" as never)}
+              style={({ pressed }) => [
+                s.linkRow,
+                {
+                  borderTopColor: c.border,
+                  opacity: pressed ? 0.6 : 1,
+                },
               ]}
             >
-              {/* Heading — Rendimiento + delta + chevron al detalle. */}
-              <Pressable
-                onPress={() => router.push("/(app)/rendimiento" as never)}
-                style={({ pressed }) => [
-                  s.rendimientoHeading,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={[s.rendimientoHeadingLabel, { color: c.text }]}>
-                  Rendimiento
+              <Text style={[s.linkRowLabel, { color: c.text }]}>
+                Rendimiento
+              </Text>
+              <View style={s.linkRowTrailing}>
+                <Text style={[s.linkRowValue, { color: c.brand }]}>
+                  ▲ {fmtPctAbs(12.4)}
                 </Text>
-                <View style={s.rendimientoHeadingTrailing}>
-                  <Text
-                    style={[s.rendimientoHeadingValue, { color: c.brand }]}
-                  >
-                    ▲ {fmtPctAbs(12.4)}
-                  </Text>
-                  <Feather
-                    name="chevron-right"
-                    size={18}
-                    color={c.textMuted}
-                  />
-                </View>
-              </Pressable>
-
-              {/* Sub-stats: 2 columnas en HORIZONTAL — Mejor a la
-               *  izquierda, Peor a la derecha. Eyebrow caps + ticker
-               *  + delta. Sin row labels tipo settings menu. Misma
-               *  sección que el heading (sin hairline separador). */}
-              {bestOfDay && worstOfDay ? (
-                <View style={s.rendimientoMovers}>
-                  <Pressable
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(app)/detail",
-                        params: { ticker: bestOfDay.asset.ticker },
-                      })
-                    }
-                    style={({ pressed }) => [
-                      s.rendimientoMoverCol,
-                      { opacity: pressed ? 0.6 : 1 },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.rendimientoMoverEyebrow,
-                        { color: c.textMuted },
-                      ]}
-                    >
-                      MEJOR DEL DÍA
-                    </Text>
-                    <View style={s.rendimientoMoverValue}>
-                      <Text
-                        style={[
-                          s.rendimientoMoverTicker,
-                          { color: c.text },
-                        ]}
-                      >
-                        {bestOfDay.asset.ticker}
-                      </Text>
-                      <Text
-                        style={[
-                          s.rendimientoMoverDelta,
-                          {
-                            color:
-                              bestOfDay.asset.change >= 0
-                                ? c.brand
-                                : c.red,
-                          },
-                        ]}
-                      >
-                        {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                        {fmtPctAbs(bestOfDay.asset.change)}
-                      </Text>
-                    </View>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(app)/detail",
-                        params: { ticker: worstOfDay.asset.ticker },
-                      })
-                    }
-                    style={({ pressed }) => [
-                      s.rendimientoMoverCol,
-                      s.rendimientoMoverColRight,
-                      { opacity: pressed ? 0.6 : 1 },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.rendimientoMoverEyebrow,
-                        { color: c.textMuted },
-                      ]}
-                    >
-                      PEOR DEL DÍA
-                    </Text>
-                    <View style={s.rendimientoMoverValue}>
-                      <Text
-                        style={[
-                          s.rendimientoMoverTicker,
-                          { color: c.text },
-                        ]}
-                      >
-                        {worstOfDay.asset.ticker}
-                      </Text>
-                      <Text
-                        style={[
-                          s.rendimientoMoverDelta,
-                          {
-                            color:
-                              worstOfDay.asset.change >= 0
-                                ? c.brand
-                                : c.red,
-                          },
-                        ]}
-                      >
-                        {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
-                        {fmtPctAbs(worstOfDay.asset.change)}
-                      </Text>
-                    </View>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={c.textMuted}
+                />
+              </View>
+            </Pressable>
           ) : null}
 
           {/* ─── Mercados — los 3 buckets de Álamos. Detalle por
@@ -1073,6 +963,79 @@ export default function PortfolioScreen() {
               </Tap>
             </View>
           )}
+
+          {/* ─── Movers del día — al fondo de la pantalla. Eyebrow
+              caps + ticker + delta. Tap → detail del asset. */}
+          {hasHoldings && bestOfDay && worstOfDay ? (
+            <View style={s.moversBlock}>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/detail",
+                    params: { ticker: bestOfDay.asset.ticker },
+                  })
+                }
+                style={({ pressed }) => [
+                  s.moverRow,
+                  { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={[s.moverLabel, { color: c.textMuted }]}>
+                  Mejor del día
+                </Text>
+                <View style={s.moverTrailing}>
+                  <Text style={[s.moverTicker, { color: c.text }]}>
+                    {bestOfDay.asset.ticker}
+                  </Text>
+                  <Text
+                    style={[
+                      s.moverDelta,
+                      {
+                        color:
+                          bestOfDay.asset.change >= 0 ? c.brand : c.red,
+                      },
+                    ]}
+                  >
+                    {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                    {fmtPctAbs(bestOfDay.asset.change)}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/detail",
+                    params: { ticker: worstOfDay.asset.ticker },
+                  })
+                }
+                style={({ pressed }) => [
+                  s.moverRow,
+                  { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={[s.moverLabel, { color: c.textMuted }]}>
+                  Peor del día
+                </Text>
+                <View style={s.moverTrailing}>
+                  <Text style={[s.moverTicker, { color: c.text }]}>
+                    {worstOfDay.asset.ticker}
+                  </Text>
+                  <Text
+                    style={[
+                      s.moverDelta,
+                      {
+                        color:
+                          worstOfDay.asset.change >= 0 ? c.brand : c.red,
+                      },
+                    ]}
+                  >
+                    {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                    {fmtPctAbs(worstOfDay.asset.change)}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          ) : null}
         </Animated.ScrollView>
 
         <BalanceInfoSheet
@@ -2949,43 +2912,42 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* Sub-stats Mejor / Peor del día — 2 columnas EN HORIZONTAL,
-   * cada una con eyebrow caps + ticker + delta coloreado. La
-   * disposición horizontal evita el feel "settings menu" que tenía
-   * con label-left + value-right en filas. */
-  rendimientoMovers: {
+  /* Movers del día — bloque al fondo de la pantalla. 2 filas
+   * (Mejor / Peor) con label izquierda + ticker + delta a la
+   * derecha. Sin section title — son rows individuales separadas
+   * por hairlines. Tap → detail del asset. */
+  moversBlock: {
+    marginTop: 8,
+  },
+  moverRow: {
     flexDirection: "row",
-    marginTop: 14,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  rendimientoMoverCol: {
-    flex: 1,
+  moverLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
-  rendimientoMoverColRight: {
-    /* Acerca el contenido del col derecho a la derecha (no expand
-     * full-width) para que el bloque se sienta "agrupado" en vez
-     * de spread out por todo el ancho. */
-    alignItems: "flex-end",
-  },
-  rendimientoMoverEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 10,
-    letterSpacing: 0.6,
-  },
-  rendimientoMoverValue: {
+  moverTrailing: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 8,
-    marginTop: 6,
+    gap: 12,
   },
-  rendimientoMoverTicker: {
+  moverTicker: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
-  rendimientoMoverDelta: {
+  moverDelta: {
     fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 15,
+    letterSpacing: -0.2,
+    minWidth: 72,
+    textAlign: "right",
   },
 
   /* Link row (Rendimiento histórico) — una sola línea con label
