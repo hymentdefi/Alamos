@@ -196,6 +196,18 @@ export default function AssetAlertsScreen() {
         </View>
       </View>
 
+      {/* Título de la pantalla — arriba de los tabs. Bold + subtítulo
+       *  gris tenue. Comunica DE QUÉ va esta pantalla antes de elegir
+       *  Precio / Indicadores. */}
+      <View style={s.screenIntro}>
+        <Text style={[s.screenTitle, { color: c.text }]}>
+          Alertas personalizadas
+        </Text>
+        <Text style={[s.screenSubtitle, { color: c.textMuted }]}>
+          Monitoreamos el mercado por vos, las 24 horas.
+        </Text>
+      </View>
+
       <View style={[s.tabsRow, { paddingHorizontal: 24 }]}>
         <TabPill
           label="Precio"
@@ -220,9 +232,8 @@ export default function AssetAlertsScreen() {
           <>
             {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
               <EmptyState
-                title="Alertas de precio"
                 illustration={<AlertBellIllustration size={160} />}
-                text="Te notificamos cuando el activo cruza tu precio objetivo."
+                text="Definí un precio objetivo y recibí una notificación instantánea cuando el activo lo cruce."
               />
             ) : null}
 
@@ -771,6 +782,27 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: -0.05,
+  },
+
+  /* Intro de pantalla — título bold + subtítulo gris tenue arriba
+   * de los tabs. Padding horizontal 24 para alinear con la lista
+   * y los tabs. */
+  screenIntro: {
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 14,
+  },
+  screenTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
+  },
+  screenSubtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.1,
+    marginTop: 4,
   },
 
   tabsRow: {
