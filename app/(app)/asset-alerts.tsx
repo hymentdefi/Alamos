@@ -248,10 +248,11 @@ export default function AssetAlertsScreen() {
                   <Text style={[s.sectionTitle, { color: c.text }]}>
                     Alertas activas ({sortedAlerts.length})
                   </Text>
-                  {/* Header right: label tappable que alterna el
-                   *  formato de la distancia ("% al objetivo" ↔
-                   *  "$ al objetivo") + ícono de sort que abre el
-                   *  popup anclado debajo del ícono. */}
+                  {/* Header right: estructura espejada del row para
+                   *  que el toggle "% al objetivo ▾" quede ARRIBA de
+                   *  la columna de distancia. Mismo gap (12), mismo
+                   *  ancho de la columna (110), spacer del Switch
+                   *  (~51), y el sortIcon en la posición del trash. */}
                   <View style={s.headerControls}>
                     <Pressable
                       onPress={() => {
@@ -278,6 +279,8 @@ export default function AssetAlertsScreen() {
                         style={{ marginLeft: 2, marginTop: 1 }}
                       />
                     </Pressable>
+                    {/* Spacer en la posición del Switch del row. */}
+                    <View style={s.headerSwitchSpacer} />
                     <Pressable
                       ref={sortBtnRef}
                       onPress={() => {
@@ -628,12 +631,15 @@ function SwipableAlertRow({
         ]}
         accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
       >
-        {/* Col 1: dirección + precio objetivo en blanco (c.text). */}
+        {/* Col 1: el verbo ("Sube a" / "Baja a") va coloreado por
+         *  dirección, el resto del precio queda blanco (c.text). Da
+         *  jerarquía cromática a la dirección sin saturar todo. */}
         <Text
           style={[s.alertLeft, { color: c.text }]}
           numberOfLines={1}
         >
-          {dirLabel} {formatMoney(alert.threshold, cur)}
+          <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
+          {formatMoney(alert.threshold, cur)}
         </Text>
         {/* Col 2: distancia al objetivo en color de dirección. */}
         <Text
@@ -842,23 +848,29 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Header right-side: label tappable que alterna el formato +
-   * ícono de sort que abre el popup anclado. */
+  /* Header right-side: estructura idéntica al row para que el
+   * toggle quede arriba de la col de distancia y el sortIcon
+   * arriba del trash. Mismo gap 12 que alertRow. */
   headerControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 12,
   },
   distFormatBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4,
-    /* minWidth fija del label en el header — matchea el del
-     * alertDist del row para que la columna de distancia (label
-     * arriba + valor abajo) se vea como un bloque centrado y no
-     * empuje el ícono de sort a la derecha. */
+    /* Mismo ancho que alertDist del row (110) — el label queda
+     * exactamente centrado sobre el valor de distancia. */
     minWidth: 110,
+  },
+  /* Spacer en la posición que ocupa el Switch en cada fila. La
+   * Switch nativa de iOS reserva ~51 px de layout (no se achica
+   * con transform: scale). Match exacto = sortIcon y trash quedan
+   * en la misma X. */
+  headerSwitchSpacer: {
+    width: 51,
   },
   /* Toggle del header — 13 / 500, no compite con el título
    * "Alertas activas (N)" (16 / 700) ni con la data del row
@@ -868,12 +880,15 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
   },
+  /* SortIcon ocupa la misma X que el botón trash en cada fila —
+   * mismo width (32) y mismo marginLeft (4) que alertDeleteBtn
+   * para que ambos estén perfectamente alineados verticalmente. */
   sortIconBtn: {
     width: 32,
     height: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: -4,
+    marginLeft: 4,
   },
 
   /* Sort menu (popup que se abre al tocar el ícono de sliders).
