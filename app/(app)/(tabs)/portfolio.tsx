@@ -680,11 +680,11 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          {/* Allocation stacked bar — visualiza el mix AR / US / Crypto
-           *  del portfolio en una barra horizontal segmentada. Le mete
-           *  identidad visual al hero (que era 100% texto) sin
-           *  agregar chrome. Brand a 3 opacidades = un solo color
-           *  con jerarquía por peso. */}
+          {/* Allocation stacked bar — un solo color (c.brand) con
+           *  gaps de 2 px entre segmentos. Robinhood/Alamos-styled:
+           *  el verde brand identifica TODO el portfolio como Álamos,
+           *  los gaps comunican el split. Caption con el % en brand
+           *  y el nombre en blanco — dos pesos visuales por segmento. */}
           {hasHoldings ? (
             <View style={s.allocBlock}>
               <View
@@ -702,7 +702,7 @@ export default function PortfolioScreen() {
                   <View
                     style={{
                       flex: marketAllocation.usPct,
-                      backgroundColor: "rgba(0,200,5,0.55)",
+                      backgroundColor: c.brand,
                       marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
                     }}
                   />
@@ -711,7 +711,7 @@ export default function PortfolioScreen() {
                   <View
                     style={{
                       flex: marketAllocation.cryptoPct,
-                      backgroundColor: "rgba(0,200,5,0.28)",
+                      backgroundColor: c.brand,
                       marginLeft:
                         marketAllocation.arPct > 0 ||
                         marketAllocation.usPct > 0
@@ -721,18 +721,17 @@ export default function PortfolioScreen() {
                   />
                 ) : null}
               </View>
-              {/* Caption stacked: cada label (% + nombre del mercado)
-               *  vive en un slot con el mismo flex que su segmento de
-               *  la barra de arriba. Resultado: cada texto queda
-               *  centrado debajo de su porción correspondiente. */}
+              {/* Caption stacked: cada slot tiene el mismo flex que
+               *  su segmento → label centrado debajo de su porción.
+               *  Pct en brand verde + nombre del mercado en blanco. */}
               <View style={s.allocCaptionRow}>
                 {marketAllocation.arPct > 0 ? (
                   <View style={{ flex: marketAllocation.arPct }}>
-                    <Text
-                      style={[s.allocCaption, { color: c.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {marketAllocation.arPct.toFixed(0)}% Argentina
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.arPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> AR</Text>
                     </Text>
                   </View>
                 ) : null}
@@ -743,11 +742,11 @@ export default function PortfolioScreen() {
                       marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
                     }}
                   >
-                    <Text
-                      style={[s.allocCaption, { color: c.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {marketAllocation.usPct.toFixed(0)}% Estados Unidos
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.usPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> EE.UU.</Text>
                     </Text>
                   </View>
                 ) : null}
@@ -762,11 +761,11 @@ export default function PortfolioScreen() {
                           : 0,
                     }}
                   >
-                    <Text
-                      style={[s.allocCaption, { color: c.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {marketAllocation.cryptoPct.toFixed(0)}% Crypto
+                    <Text style={s.allocCaption} numberOfLines={1}>
+                      <Text style={{ color: c.brand }}>
+                        {marketAllocation.cryptoPct.toFixed(0)}%
+                      </Text>
+                      <Text style={{ color: c.text }}> Crypto</Text>
                     </Text>
                   </View>
                 ) : null}
@@ -2595,9 +2594,9 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   allocCaption: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: 0,
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.05,
     textAlign: "center",
   },
 
