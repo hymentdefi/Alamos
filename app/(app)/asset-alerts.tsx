@@ -921,8 +921,13 @@ const s = StyleSheet.create({
   distFormatBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 4,
+    justifyContent: "center",
     paddingVertical: 4,
+    /* minWidth fija del label en el header — matchea el del
+     * alertDist del row para que la columna de distancia (label
+     * arriba + valor abajo) se vea como un bloque centrado y no
+     * empuje el ícono de sort a la derecha. */
+    minWidth: 110,
   },
   distFormatText: {
     fontFamily: fontFamily[500],
@@ -1071,23 +1076,25 @@ const s = StyleSheet.create({
   triggeredRow: {
     paddingVertical: 12,
   },
-  /* Col 1: dirección + precio objetivo. 16 / 600. Crece para
-   * empujar la distancia y el toggle a la derecha. */
+  /* Col 1: dirección + precio objetivo. 16 / 500 — peso regular
+   * para que el row no compita con el título "Alertas activas (N)"
+   * (que sí va en bold). */
   alertLeft: {
     flex: 1,
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[500],
     fontSize: 16,
     letterSpacing: -0.3,
   },
   /* Col 2: distancia (% o $ según el toggle del header). Color
-   * verde/naranja según dirección, 14 / 600. Alineada a la derecha
-   * contra el toggle. */
+   * verde/naranja según dirección, 14 / 600. Centrada bajo el
+   * label "% al objetivo ▾" / "$ al objetivo ▾" del header —
+   * mismo ancho de columna así forman un bloque alineado. */
   alertDist: {
     fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
-    minWidth: 100,
-    textAlign: "right",
+    minWidth: 110,
+    textAlign: "center",
   },
   /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
    * domine la fila. */
