@@ -745,43 +745,9 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
-              monto en moneda nativa + delta del día + posiciones +
-              cash disponible. Es el corazón narrativo de la pantalla.
-              Hairlines como única división, sin cards. Va PRIMERO
-              (antes del chart) — los números crudos arriba, el
-              chart abajo como confirmación visual. */}
-          {hasHoldings ? (
-            <View style={s.marketsBlock}>
-              <Text style={[s.sectionTitle, { color: c.text }]}>
-                Mercados
-              </Text>
-              <MarketRow
-                label="Argentina"
-                marketKey="AR"
-                bucket={marketBreakdown.AR}
-                c={c}
-              />
-              <MarketRow
-                label="Estados Unidos"
-                marketKey="US"
-                bucket={marketBreakdown.US}
-                c={c}
-                divider
-              />
-              <MarketRow
-                label="Crypto"
-                marketKey="CRYPTO"
-                bucket={marketBreakdown.CRYPTO}
-                c={c}
-                divider
-              />
-            </View>
-          ) : null}
-
           {/* ─── Composición — chart pie / brick con toggle explícito.
-              Va DESPUÉS de Mercados: los números primero, la
-              visualización después como confirmación. Sin card. */}
+              Va PRIMERO, después del hero — el chart es el centerpiece
+              visual de la pantalla. Sin card. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
               <View style={s.chartHeader}>
@@ -868,6 +834,38 @@ export default function PortfolioScreen() {
                   />
                 )}
               </View>
+            </View>
+          ) : null}
+
+          {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
+              monto en moneda nativa + delta del día + posiciones +
+              cash disponible. Va DESPUÉS del chart — el chart es la
+              visualización agregada, los Mercados son el detalle. */}
+          {hasHoldings ? (
+            <View style={s.marketsBlock}>
+              <Text style={[s.sectionTitle, { color: c.text }]}>
+                Mercados
+              </Text>
+              <MarketRow
+                label="Argentina"
+                marketKey="AR"
+                bucket={marketBreakdown.AR}
+                c={c}
+              />
+              <MarketRow
+                label="Estados Unidos"
+                marketKey="US"
+                bucket={marketBreakdown.US}
+                c={c}
+                divider
+              />
+              <MarketRow
+                label="Crypto"
+                marketKey="CRYPTO"
+                bucket={marketBreakdown.CRYPTO}
+                c={c}
+                divider
+              />
             </View>
           ) : null}
 
