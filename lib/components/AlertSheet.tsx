@@ -542,14 +542,29 @@ export function AlertSheet({
                     </Text>
                   ) : null}
                 </View>
-                <Text style={[s.priceContextual, { color: c.textMuted }]}>
-                  Precio actual:{" "}
-                  {asset.price.toLocaleString("es-AR", {
-                    minimumFractionDigits: allCurrencies[0] === "USDT" ? 4 : 2,
-                    maximumFractionDigits: allCurrencies[0] === "USDT" ? 4 : 2,
-                  })}{" "}
-                  {allCurrencies[0]}
-                </Text>
+                {/* Tap → shortcut: setea el threshold al precio actual.
+                 *  Un solo toque para arrancar desde "el precio de
+                 *  hoy" sin tener que tipearlo a mano. */}
+                <Pressable
+                  onPress={() => {
+                    setErrorMsg(null);
+                    const decimals = currency === "USDT" ? 4 : 2;
+                    setThreshold(asset.price.toFixed(decimals));
+                    Haptics.selectionAsync().catch(() => {});
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={[s.priceContextual, { color: c.textMuted }]}>
+                    Precio actual:{" "}
+                    {asset.price.toLocaleString("es-AR", {
+                      minimumFractionDigits:
+                        allCurrencies[0] === "USDT" ? 4 : 2,
+                      maximumFractionDigits:
+                        allCurrencies[0] === "USDT" ? 4 : 2,
+                    })}{" "}
+                    {allCurrencies[0]}
+                  </Text>
+                </Pressable>
               </View>
 
               {/* Slider -30% / +30% — sincronizado con el threshold.
