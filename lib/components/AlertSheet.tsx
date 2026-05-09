@@ -509,14 +509,9 @@ export function AlertSheet({
                *  Jerarquía: label small → número hero + delta inline →
                *  línea contextual del precio actual. Todo izquierda. */}
               <View style={s.priceBlock}>
-                <View style={s.priceLabelRow}>
-                  <Text style={[s.priceLabel, { color: c.textMuted }]}>
-                    PRECIO OBJETIVO
-                  </Text>
-                  <Text style={[s.priceLabelCurrency, { color: c.textFaint }]}>
-                    {allCurrencies[0]}
-                  </Text>
-                </View>
+                <Text style={[s.priceLabel, { color: c.textMuted }]}>
+                  PRECIO OBJETIVO
+                </Text>
                 <View style={s.priceHeroRow}>
                   <Text
                     style={[
@@ -741,53 +736,44 @@ const s = StyleSheet.create({
   },
   /* Bloque del precio objetivo — sin card, sin border. El número
    * flota directo sobre el bg del sheet (Robinhood-style). Alineado
-   * izquierda. paddingBottom 0 — el form gap se encarga del
-   * separador con el slider. */
+   * izquierda. */
   priceBlock: {
     alignItems: "flex-start",
-  },
-  priceLabelRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
   },
   priceLabel: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 1.4,
   },
-  /* Currency al lado del label, NO como pill — gris muy tenue chico
-   * para que no robe protagonismo al hero. Da contexto sin gritar. */
-  priceLabelCurrency: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.6,
-  },
-  /* Hero — número del precio objetivo. Heavy weight, 56 px, izquierda. */
+  /* Hero — número del precio objetivo. 42 px heavy. La currency va
+   * en la línea contextual de abajo (formatMoney la incluye), no
+   * acá — el label arriba ya es suficiente contexto. */
   priceHeroRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 12,
+    gap: 10,
     marginTop: 8,
   },
   priceHero: {
     fontFamily: fontFamily[800],
-    fontSize: 56,
-    letterSpacing: -1.6,
-    lineHeight: 60,
+    fontSize: 42,
+    letterSpacing: -1.2,
+    lineHeight: 46,
     flexShrink: 1,
   },
+  /* Decimales notablemente más chicos que la parte entera, alineados
+   * a la baseline — mismo tratamiento que un precio en góndola. */
   priceHeroDecimals: {
     fontFamily: fontFamily[700],
-    fontSize: 26,
-    letterSpacing: -0.5,
+    fontSize: 24,
+    letterSpacing: -0.4,
   },
-  /* Delta inline al lado del precio — verde si sube, naranja si
-   * baja. Texto integrado, no pill. */
+  /* Delta inline al lado del precio — proporcional al hero más
+   * chico. Verde si sube, naranja si baja. Texto integrado, no pill. */
   priceHeroDelta: {
     fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.2,
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   /* Línea contextual debajo del hero — referencia del precio
    * actual del activo, gris tenue al ~50 % opacidad. */
