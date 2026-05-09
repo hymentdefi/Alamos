@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -70,6 +71,7 @@ export default function AssetAlertsScreen() {
 
   const [tab, setTab] = useState<Tab>("price");
   const [sort, setSort] = useState<Sort>("proximity");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
 
@@ -245,27 +247,24 @@ export default function AssetAlertsScreen() {
                     Alertas activas ({sortedAlerts.length})
                   </Text>
                   {/* Headers de columna alineados con la data —
-                      "%" + "$" en gris tenue, después el ícono de
-                      sort que toggle proximity ↔ recientes. */}
+                      "% al objetivo" + "$ al objetivo" en gris tenue,
+                      después el ícono de sort que abre el menú con
+                      las dos opciones de orden. */}
                   <View style={s.columnHeaders}>
                     <Text style={[s.columnHeaderPct, { color: c.textMuted }]}>
-                      %
+                      % al objetivo
                     </Text>
                     <Text style={[s.columnHeaderDelta, { color: c.textMuted }]}>
-                      $
+                      $ al objetivo
                     </Text>
                     <Pressable
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => {});
-                        setSort(sort === "proximity" ? "createdAt" : "proximity");
+                        setSortMenuOpen(true);
                       }}
                       hitSlop={10}
                       style={s.sortIconBtn}
-                      accessibilityLabel={
-                        sort === "proximity"
-                          ? "Ordenar por más recientes"
-                          : "Ordenar por proximidad"
-                      }
+                      accessibilityLabel="Cambiar orden de la lista"
                     >
                       <Feather name="sliders" size={16} color={c.textMuted} />
                     </Pressable>
@@ -352,6 +351,20 @@ export default function AssetAlertsScreen() {
         </View>
       ) : null}
 
+      <SortMenu
+        visible={sortMenuOpen}
+        sort={sort}
+        onSelect={(next) => {
+          if (next !== sort) {
+            Haptics.selectionAsync().catch(() => {});
+            setSort(next);
+          }
+          setSortMenuOpen(false);
+        }}
+        onClose={() => setSortMenuOpen(false)}
+        topOffset={insets.top + 100}
+      />
+
       <AlertSheet
         key={`create-${asset.ticker}`}
         visible={createOpen}
@@ -412,6 +425,90 @@ function TabPill({
   );
 }
 
+/* ─── Sort menu (popup chico al tocar el ícono de sliders) ──────── */
+
+function SortMenu({
+  visible,
+  sort,
+  onSelect,
+  onClose,
+  topOffset,
+}: {
+  visible: boolean;
+  sort: Sort;
+  onSelect: (next: Sort) => void;
+  onClose: () => void;
+  topOffset: number;
+}) {
+  const { c } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      {/* Backdrop full-screen — tap fuera del menú lo cierra. Sin
+       *  bg dim, queremos un menú "ligero" estilo iOS context menu. */}
+      <Pressable style={s.sortMenuBackdrop} onPress={onClose} />
+
+      {/* Menú anclado top-right cerca del ícono de sliders. */}
+      <View
+        style={[
+          s.sortMenu,
+          {
+            top: topOffset,
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            shadowColor: "#000",
+          },
+        ]}
+      >
+        {(
+          [
+            { key: "proximity", label: "Proximidad al objetivo" },
+            { key: "createdAt", label: "Fecha de creación" },
+          ] as const
+        ).map((opt, i) => {
+          const selected = sort === opt.key;
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => onSelect(opt.key)}
+              style={({ pressed }) => [
+                s.sortMenuItem,
+                i > 0 && {
+                  borderTopColor: c.border,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                },
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text
+                style={[
+                  s.sortMenuLabel,
+                  {
+                    color: c.text,
+                    fontFamily: selected ? fontFamily[700] : fontFamily[500],
+                  },
+                ]}
+              >
+                {opt.label}
+              </Text>
+              {selected ? (
+                <Feather name="check" size={16} color={c.brand} />
+              ) : (
+                <View style={{ width: 16 }} />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+    </Modal>
+  );
+}
 
 /* ─── Empty state ──────────────────────────────────────────────── */
 
@@ -465,7 +562,7 @@ function SwipableAlertRow({
   const { c } = useTheme();
   const cur = assetCurrency(asset);
   const isPaused = alert.status === "paused";
-  const dirLabel = alert.direction === "above" ? "sube a" : "baja a";
+  const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
   /* "Sube a" verde brand, "Baja a" red/naranja. Cuando está pausada,
    * todo el texto va a 40 % opacity (incluyendo el verbo coloreado). */
   const dirColor = alert.direction === "above" ? c.brand : c.red;
@@ -557,19 +654,18 @@ function SwipableAlertRow({
               s.alertRowMain,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
-            accessibilityLabel={`Editar alerta — ${asset.ticker} ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
+            accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            {/* Col 1: ticker + dirección coloreada + precio objetivo.
-             *  Una sola línea que el ojo lee de un tirón. */}
+            {/* Col 1: dirección + precio objetivo, todo en el color
+             *  de la dirección (verde si sube, naranja si baja). Sin
+             *  ticker — el header del screen ya muestra qué activo es. */}
             <Text
-              style={[s.alertLeft, { color: c.text }]}
+              style={[s.alertLeft, { color: dirColor }]}
               numberOfLines={1}
             >
-              {asset.ticker}{" "}
-              <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
-              {formatMoney(alert.threshold, cur)}
+              {dirLabel} {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col 2: % de distancia, verde/red según signo. */}
+            {/* Col 2: % de distancia, mismo color que la dirección. */}
             <Text
               style={[s.alertPct, { color: dirColor }]}
               numberOfLines={1}
@@ -777,21 +873,23 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  /* % header: ancho = al alertPct del row. */
+  /* % header: descriptivo, centrado sobre la col de %. minWidth
+   * matchea el de alertPct (90 — más ancho que antes para acomodar
+   * "% al objetivo"). */
   columnHeaderPct: {
     fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.05,
-    minWidth: 64,
-    textAlign: "right",
-  },
-  /* $ header: ancho = al alertDelta del row. */
-  columnHeaderDelta: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
+    fontSize: 11,
     letterSpacing: -0.05,
     minWidth: 90,
-    textAlign: "right",
+    textAlign: "center",
+  },
+  /* $ header: igual ancho/alineación que % para grilla pareja. */
+  columnHeaderDelta: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    minWidth: 90,
+    textAlign: "center",
   },
   sortIconBtn: {
     width: 32,
@@ -799,6 +897,40 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: -4,
+  },
+
+  /* Sort menu (popup que se abre al tocar el ícono de sliders).
+   * Anclado top-right, fuera del flujo, sin backdrop dim. */
+  sortMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sortMenu: {
+    position: "absolute",
+    right: 16,
+    minWidth: 240,
+    borderRadius: radius.md,
+    borderCurve: "continuous",
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
+    /* Sombra sutil para que se despegue visualmente del bg sin
+     * sentirse pesado. iOS shadow + Android elevation. */
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  sortMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  sortMenuLabel: {
+    fontSize: 14,
+    letterSpacing: -0.15,
+    flex: 1,
   },
 
   /* Empty state — bell + texto descriptivo viven como una sola
@@ -909,21 +1041,21 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.25,
   },
-  /* Col 2: % de distancia, mismo color que la dirección. */
+  /* Col 2: % de distancia, centrada bajo el header "% al objetivo". */
   alertPct: {
     fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
-    minWidth: 64,
-    textAlign: "right",
+    minWidth: 90,
+    textAlign: "center",
   },
-  /* Col 3: $ de distancia, gris tenue. */
+  /* Col 3: $ de distancia, centrada bajo "$ al objetivo". */
   alertDelta: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.15,
     minWidth: 90,
-    textAlign: "right",
+    textAlign: "center",
   },
   /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
    * domine la fila. */
