@@ -56,6 +56,10 @@ import {
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
+import {
+  MiniSparkline,
+  seriesFromSeed,
+} from "../../../lib/components/Sparkline";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
@@ -422,6 +426,44 @@ export default function PortfolioScreen() {
 
   const hasHoldings = holdingsSorted.length > 0 && totalArs > 0;
 
+  /* ─── Hero number ticker ──────────────────────────────────────────
+   *
+   * Animamos el monto del hero AL MONTAR la pantalla — sube de 0
+   * al target en ~700ms con ease-out cubic. JS-side rAF (AmountDisplay
+   * no acepta SharedValue como prop), animamos un PROGRESS 0→1 que
+   * multiplica los montos de todas las monedas del pager para que se
+   * animen juntas.
+   *
+   * El "subtle wow" de Robinhood al abrir un screen viene de
+   * detalles como este — el ojo registra el movimiento aunque no
+   * lo procese conscientemente, y la pantalla "se siente viva". */
+  const [tickerProgress, setTickerProgress] = useState(0);
+  const tickerRafRef = useRef<number | null>(null);
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 700;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setTickerProgress(eased);
+      if (t < 1) {
+        tickerRafRef.current = requestAnimationFrame(tick);
+      } else {
+        tickerRafRef.current = null;
+      }
+    };
+    tickerRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (tickerRafRef.current != null) {
+        cancelAnimationFrame(tickerRafRef.current);
+        tickerRafRef.current = null;
+      }
+    };
+    /* Sólo al montar — no re-animamos en cada cambio de currency
+     *  (el swipe del pager ya tiene su propia animación nativa). */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ─── Render ─── */
 
   return (
@@ -503,9 +545,10 @@ export default function PortfolioScreen() {
                    sin pager. AR=ARS, US/CRYPTO=USD. */
                 <AmountDisplay
                   value={
-                    lockedCurrency === "ARS"
+                    (lockedCurrency === "ARS"
                       ? totalArs
-                      : convertAmount(totalArs, "ARS", "USD")
+                      : convertAmount(totalArs, "ARS", "USD")) *
+                    tickerProgress
                   }
                   size={42}
                   currency={lockedCurrency}
@@ -552,7 +595,7 @@ export default function PortfolioScreen() {
                         }}
                       >
                         <AmountDisplay
-                          value={value}
+                          value={value * tickerProgress}
                           size={42}
                           currency={cur}
                         />
@@ -562,7 +605,7 @@ export default function PortfolioScreen() {
                 </ScrollView>
               ) : (
                 <AmountDisplay
-                  value={totalArs}
+                  value={totalArs * tickerProgress}
                   size={42}
                   currency="ARS"
                 />
@@ -637,6 +680,69 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
+          {/* Allocation stacked bar — visualiza el mix AR / US / Crypto
+           *  del portfolio en una barra horizontal segmentada. Le mete
+           *  identidad visual al hero (que era 100% texto) sin
+           *  agregar chrome. Brand a 3 opacidades = un solo color
+           *  con jerarquía por peso. */}
+          {hasHoldings ? (
+            <View style={s.allocBlock}>
+              <View
+                style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
+              >
+                {marketAllocation.arPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.arPct,
+                      backgroundColor: c.brand,
+                    }}
+                  />
+                ) : null}
+                {marketAllocation.usPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.usPct,
+                      backgroundColor: "rgba(0,200,5,0.55)",
+                      marginLeft: marketAllocation.arPct > 0 ? 2 : 0,
+                    }}
+                  />
+                ) : null}
+                {marketAllocation.cryptoPct > 0 ? (
+                  <View
+                    style={{
+                      flex: marketAllocation.cryptoPct,
+                      backgroundColor: "rgba(0,200,5,0.28)",
+                      marginLeft:
+                        marketAllocation.arPct > 0 ||
+                        marketAllocation.usPct > 0
+                          ? 2
+                          : 0,
+                    }}
+                  />
+                ) : null}
+              </View>
+              <Text style={[s.allocCaption, { color: c.textMuted }]}>
+                {marketAllocation.arPct > 0
+                  ? `${marketAllocation.arPct.toFixed(0)}% AR`
+                  : null}
+                {marketAllocation.arPct > 0 && marketAllocation.usPct > 0
+                  ? " · "
+                  : ""}
+                {marketAllocation.usPct > 0
+                  ? `${marketAllocation.usPct.toFixed(0)}% US`
+                  : null}
+                {(marketAllocation.arPct > 0 ||
+                  marketAllocation.usPct > 0) &&
+                marketAllocation.cryptoPct > 0
+                  ? " · "
+                  : ""}
+                {marketAllocation.cryptoPct > 0
+                  ? `${marketAllocation.cryptoPct.toFixed(0)}% Crypto`
+                  : null}
+              </Text>
+            </View>
+          ) : null}
+
           </View>
 
           {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
@@ -652,17 +758,20 @@ export default function PortfolioScreen() {
               </Text>
               <MarketRow
                 label="Argentina"
+                marketKey="AR"
                 bucket={marketBreakdown.AR}
                 c={c}
               />
               <MarketRow
                 label="Estados Unidos"
+                marketKey="US"
                 bucket={marketBreakdown.US}
                 c={c}
                 divider
               />
               <MarketRow
                 label="Crypto"
+                marketKey="CRYPTO"
                 bucket={marketBreakdown.CRYPTO}
                 c={c}
                 divider
@@ -950,11 +1059,13 @@ interface MarketBucket {
 
 function MarketRow({
   label,
+  marketKey,
   bucket,
   c,
   divider,
 }: {
   label: string;
+  marketKey: "AR" | "US" | "CRYPTO";
   bucket: MarketBucket;
   c: ColorMap;
   divider?: boolean;
@@ -965,9 +1076,8 @@ function MarketRow({
     yesterdayArs > 0 ? (bucket.daySumArs / yesterdayArs) * 100 : 0;
   const dayUp = bucket.daySumArs >= 0;
   const deltaColor = empty ? c.textMuted : dayUp ? c.brand : c.red;
+  const sparkColor = empty ? c.textFaint : dayUp ? c.brand : c.red;
 
-  /* Format del cash en notation compact en la línea de subtítulo. El
-   * monto principal sale del invertido ya formateado en su moneda. */
   const investedDisplay = formatMoney(
     bucket.invested,
     bucket.nativeCurrency,
@@ -984,6 +1094,19 @@ function MarketRow({
     ? `${countLabel} · ${cashDisplay}`
     : countLabel;
 
+  /* Sparkline del intraday del mercado — mock estable por marketKey
+   * + signo del delta. Sirve como ritmo visual al lado del nombre,
+   * comunica de un vistazo si el mercado se movió. */
+  const sparkSeries = useMemo(
+    () =>
+      seriesFromSeed(
+        `market-${marketKey}-${dayUp ? "up" : "down"}`,
+        24,
+        empty ? "flat" : dayUp ? "up" : "down",
+      ),
+    [marketKey, dayUp, empty],
+  );
+
   return (
     <View
       style={[
@@ -994,27 +1117,93 @@ function MarketRow({
         },
       ]}
     >
-      <View style={s.marketRowTop}>
-        <Text style={[s.marketName, { color: c.text }]} numberOfLines={1}>
-          {label}
-        </Text>
-        <Text
-          style={[s.marketAmount, { color: empty ? c.textMuted : c.text }]}
-          numberOfLines={1}
-        >
-          {empty ? "—" : investedDisplay}
-        </Text>
+      {/* Icono del mercado a la izquierda — Argentina/US flag o
+       *  símbolo Crypto. Le da identidad visual a cada bucket. */}
+      <View style={s.marketIcon}>
+        <MarketGlyph marketKey={marketKey} size={28} c={c} />
       </View>
-      <View style={s.marketRowBottom}>
-        <Text style={[s.marketSubtitle, { color: c.textMuted }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-        {!empty ? (
-          <Text style={[s.marketDelta, { color: deltaColor }]} numberOfLines={1}>
-            {dayUp ? "▲" : "▼"} {formatPct(dayPct)}
+
+      <View style={s.marketContent}>
+        <View style={s.marketRowTop}>
+          <Text
+            style={[s.marketName, { color: c.text }]}
+            numberOfLines={1}
+          >
+            {label}
           </Text>
-        ) : null}
+          {!empty ? (
+            <View style={s.marketSpark}>
+              <MiniSparkline
+                series={sparkSeries}
+                color={sparkColor}
+                width={50}
+                height={18}
+                strokeWidth={1.6}
+              />
+            </View>
+          ) : null}
+          <Text
+            style={[
+              s.marketAmount,
+              { color: empty ? c.textMuted : c.text },
+            ]}
+            numberOfLines={1}
+          >
+            {empty ? "—" : investedDisplay}
+          </Text>
+        </View>
+        <View style={s.marketRowBottom}>
+          <Text
+            style={[s.marketSubtitle, { color: c.textMuted }]}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+          {!empty ? (
+            <Text
+              style={[s.marketDelta, { color: deltaColor }]}
+              numberOfLines={1}
+            >
+              {dayUp ? "▲" : "▼"} {formatPct(dayPct)}
+            </Text>
+          ) : null}
+        </View>
       </View>
+    </View>
+  );
+}
+
+/* ─── MarketGlyph — ícono circular del mercado ────────────────────
+ *
+ * AR / US usan FlagIcon (la bandera SVG existente). CRYPTO usa el
+ * símbolo ₿ sobre un círculo brand-tinted, en línea con el lenguaje
+ * visual de Crypto en el resto de la app. */
+function MarketGlyph({
+  marketKey,
+  size = 28,
+  c,
+}: {
+  marketKey: "AR" | "US" | "CRYPTO";
+  size?: number;
+  c: ColorMap;
+}) {
+  if (marketKey === "AR") return <FlagIcon code="AR" size={size} />;
+  if (marketKey === "US") return <FlagIcon code="US" size={size} />;
+  return (
+    <View
+      style={[
+        s.cryptoGlyph,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: c.brandDim,
+        },
+      ]}
+    >
+      <Text style={[s.cryptoGlyphText, { color: c.brand, fontSize: size * 0.5 }]}>
+        ₿
+      </Text>
     </View>
   );
 }
@@ -2356,6 +2545,26 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
+  /* Allocation bar del hero — barra horizontal stacked AR/US/Crypto
+   * en 3 opacidades del brand. Mete identidad visual al hero sin
+   * agregar chrome. Caption con los % de cada mercado abajo. */
+  allocBlock: {
+    marginTop: 16,
+  },
+  allocBar: {
+    flexDirection: "row",
+    height: 6,
+    borderCurve: "continuous",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  allocCaption: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: 0,
+    marginTop: 8,
+  },
+
   /* Dots row — compacto, justo debajo del saldo. Siempre renderizado
    * con altura constante para que el layout no se mueva al alternar
    * entre filtros. */
@@ -2475,12 +2684,32 @@ const s = StyleSheet.create({
   },
   marketRow: {
     paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  marketIcon: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketContent: {
+    flex: 1,
   },
   marketRowTop: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
+  },
+  marketSpark: {
+    /* Spark vive en el medio del top row, entre el nombre del
+     * mercado y el monto. Width fijo, no participa del flex. */
+    width: 50,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   marketRowBottom: {
     flexDirection: "row",
@@ -2488,6 +2717,15 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     marginTop: 4,
+  },
+  cryptoGlyph: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderCurve: "continuous",
+  },
+  cryptoGlyphText: {
+    fontFamily: fontFamily[800],
+    letterSpacing: -0.5,
   },
   marketName: {
     fontFamily: fontFamily[700],
