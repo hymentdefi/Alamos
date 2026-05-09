@@ -46,6 +46,7 @@ import {
   formatPct,
   type Asset,
   type AssetCategory,
+  type AssetCurrency,
 } from "../../../lib/data/assets";
 import { accounts, convertAmount } from "../../../lib/data/accounts";
 import {
@@ -111,34 +112,26 @@ export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { c } = useTheme();
-  const [marketFilter, setMarketFilter] =
-    useState<MarketSegmentedValue>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
   const [infoOpen, setInfoOpen] = useState(false);
   const [pagerW, setPagerW] = useState(0);
 
-  // Moneda lockeada según el filtro:
-  //  - "all"    → null (usuario puede swipear ARS↔USD).
-  //  - "AR"     → ARS (en pesos).
-  //  - "US"     → USD (USD MEP convertido a dólar duro).
-  //  - "CRYPTO" → USD (cripto valuadas en dólar duro).
-  const lockedCurrency: Currency | null =
-    marketFilter === "AR"
-      ? "ARS"
-      : marketFilter === "US" || marketFilter === "CRYPTO"
-        ? "USD"
-        : null;
+  /* Sin filtro de mercado en esta pantalla — los 3 mercados son
+   * la narrativa principal y se muestran todos juntos en la
+   * sección "Mercados". El usuario sigue pudiendo swipear ARS↔USD
+   * en el hero (no hay lockedCurrency derivada de un filtro). */
+  const lockedCurrency: Currency | null = null;
 
-  /* ─── Holdings filtrados ─── */
+  /* ─── Holdings (todos, sin filtrar) ─── */
 
-  const holdings = useMemo<Asset[]>(() => {
-    const all = assets.filter(
-      (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
-    );
-    if (marketFilter === "all") return all;
-    return all.filter((a) => assetMarket(a) === marketFilter);
-  }, [marketFilter]);
+  const holdings = useMemo<Asset[]>(
+    () =>
+      assets.filter(
+        (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+      ),
+    [],
+  );
 
   const holdingsSorted = useMemo<Holding[]>(() => {
     const withVal = holdings.map((a) => {
@@ -250,6 +243,102 @@ export default function PortfolioScreen() {
       categoriesCount: groupedByCategory.length,
     };
   }, [holdingsSorted, groupedByCategory]);
+
+  /* ─── Breakdown por mercado para la sección "Mercados" ────────────
+   *
+   * Por cada mercado (AR / US / CRYPTO) calculamos:
+   *   - invested: total invertido en MONEDA NATIVA del mercado
+   *     (ARS para AR, USD para US/Crypto). Es el equivalente al
+   *     valor visible para el usuario en cada mercado.
+   *   - investedArs: el mismo total pero en pesos, para sumar y
+   *     comparar entre mercados.
+   *   - count: cantidad de posiciones holdeadas en el mercado.
+   *   - dayPct: % de variación del día agregando todas las
+   *     posiciones de ese mercado.
+   *   - cash: efectivo NO invertido en la moneda del mercado.
+   *   - cashLabel: label del yield del cash (ej "10,5% TNA").
+   *
+   * Los 3 mercados son la narrativa central de Álamos — esta
+   * sección los presenta como bloques iguales en jerarquía. */
+  const marketBreakdown = useMemo(() => {
+    const allHeld = assets.filter(
+      (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+    );
+    const buckets: Record<
+      "AR" | "US" | "CRYPTO",
+      {
+        nativeCurrency: AssetCurrency;
+        invested: number;
+        investedArs: number;
+        daySumArs: number;
+        count: number;
+        cash: number;
+        cashLabel: string;
+      }
+    > = {
+      AR: {
+        nativeCurrency: "ARS",
+        invested: 0,
+        investedArs: 0,
+        daySumArs: 0,
+        count: 0,
+        cash: 0,
+        cashLabel: "",
+      },
+      US: {
+        nativeCurrency: "USD",
+        invested: 0,
+        investedArs: 0,
+        daySumArs: 0,
+        count: 0,
+        cash: 0,
+        cashLabel: "",
+      },
+      CRYPTO: {
+        nativeCurrency: "USDT",
+        invested: 0,
+        investedArs: 0,
+        daySumArs: 0,
+        count: 0,
+        cash: 0,
+        cashLabel: "",
+      },
+    };
+    for (const a of allHeld) {
+      const m = assetMarket(a);
+      if (m !== "AR" && m !== "US" && m !== "CRYPTO") continue;
+      const native = a.price * (a.qty ?? 0);
+      const ars = convertAmount(native, assetCurrency(a), "ARS");
+      buckets[m].invested += native;
+      buckets[m].investedArs += ars;
+      buckets[m].daySumArs += (ars * a.change) / 100;
+      buckets[m].count += 1;
+    }
+    /* Cash por moneda — sumamos los balances de las cuentas que
+     * matchean. AR usa ARS, US usa USD, Crypto usa USDT. El label
+     * de yield viene del primer account no vacío. */
+    const sumCash = (
+      cur: AssetCurrency,
+    ): { total: number; label: string } => {
+      const list = accounts.filter((a) => a.currency === cur);
+      const total = list.reduce((acc, a) => acc + a.balance, 0);
+      const lead = list.find((a) => a.balance > 0) ?? list[0];
+      const label = lead
+        ? `${lead.yield.pct.toFixed(1).replace(".", ",")}% ${lead.yield.label.replace("% ", "")}`
+        : "";
+      return { total, label };
+    };
+    const arCash = sumCash("ARS");
+    const usCash = sumCash("USD");
+    const cryptoCash = sumCash("USDT");
+    buckets.AR.cash = arCash.total;
+    buckets.AR.cashLabel = arCash.label;
+    buckets.US.cash = usCash.total;
+    buckets.US.cashLabel = usCash.label;
+    buckets.CRYPTO.cash = cryptoCash.total;
+    buckets.CRYPTO.cashLabel = cryptoCash.label;
+    return buckets;
+  }, []);
 
   /* ─── Sticky overlay scroll-aware (mismo patrón detail.tsx) ─── */
 
@@ -550,214 +639,136 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* First-block — el bloque más importante del portfolio. Two-col:
-              chart (pie/ladrillo seleccionable) a la izquierda, info column
-              a la derecha con Mejor/Peor del día, Invertido, y Rendimiento
-              con arrow al detalle dedicado. */}
+          {/* Chart — full width sobre el bg. La toggle pie/brick va
+              arriba a la derecha del bloque, sutil. Sin card, sin
+              borde, sin info column al costado. Robinhood-style
+              applied: el chart respira y lleva el peso visual. */}
           {hasHoldings ? (
-            <View style={s.firstBlock}>
-              {/* Left col — viz toggle + chart */}
-              <View style={s.firstBlockChartCol}>
-                <View style={s.vizToggleRow}>
-                  <Tap
-                    onPress={() => setViz("pie")}
-                    haptic="selection"
-                    pressScale={0.9}
-                    hitSlop={8}
-                  >
-                    <PieGlyph
-                      color={viz === "pie" ? c.text : c.textFaint}
-                    />
-                  </Tap>
-                  <Tap
-                    onPress={() => setViz("brick")}
-                    haptic="selection"
-                    pressScale={0.9}
-                    hitSlop={8}
-                  >
-                    <BrickGlyph
-                      color={viz === "brick" ? c.text : c.textFaint}
-                    />
-                  </Tap>
-                </View>
+            <View style={s.chartBlock}>
+              <View style={s.vizToggleRow}>
+                <Tap
+                  onPress={() => setViz("pie")}
+                  haptic="selection"
+                  pressScale={0.9}
+                  hitSlop={8}
+                >
+                  <PieGlyph
+                    color={viz === "pie" ? c.text : c.textFaint}
+                  />
+                </Tap>
+                <Tap
+                  onPress={() => setViz("brick")}
+                  haptic="selection"
+                  pressScale={0.9}
+                  hitSlop={8}
+                >
+                  <BrickGlyph
+                    color={viz === "brick" ? c.text : c.textFaint}
+                  />
+                </Tap>
+              </View>
+              <View style={s.chartCanvas}>
                 {viz === "pie" ? (
                   <FloorPie
                     holdings={holdingsSorted}
                     totalArs={totalArs}
                     currency={currency}
-                    groupBy={
-                      marketFilter === "CRYPTO" ? "ticker" : "category"
-                    }
+                    groupBy="category"
                     onHoldChange={setBrickHolding}
                   />
                 ) : (
                   <FloorBrick
                     holdings={holdingsSorted}
                     totalArs={totalArs}
-                    groupBy={
-                      marketFilter === "CRYPTO" ? "ticker" : "category"
-                    }
+                    groupBy="category"
                     onHoldChange={setBrickHolding}
                   />
                 )}
               </View>
-
-              {/* Right col — 4 info rows */}
-              <View style={s.firstBlockInfoCol}>
-                <InfoRow
-                  eyebrow="Mejor del día"
-                  eyebrowColor={c.brand}
-                  primary={bestOfDay?.asset.ticker ?? "—"}
-                  trailing={
-                    bestOfDay
-                      ? formatPct(bestOfDay.asset.change)
-                      : undefined
-                  }
-                  trailingColor={
-                    bestOfDay && bestOfDay.asset.change >= 0
-                      ? c.brand
-                      : c.red
-                  }
-                  c={c}
-                />
-                <InfoRow
-                  eyebrow="Peor del día"
-                  eyebrowColor={c.red}
-                  primary={worstOfDay?.asset.ticker ?? "—"}
-                  trailing={
-                    worstOfDay
-                      ? formatPct(worstOfDay.asset.change)
-                      : undefined
-                  }
-                  trailingColor={
-                    worstOfDay && worstOfDay.asset.change >= 0
-                      ? c.brand
-                      : c.red
-                  }
-                  c={c}
-                />
-                <InfoRow
-                  eyebrow="Invertido"
-                  primary={formatCenterMoney(
-                    currency === "ARS"
-                      ? totalArs / (1 + 12.4 / 100)
-                      : convertAmount(totalArs / (1 + 12.4 / 100), "ARS", currency),
-                    currency,
-                  )}
-                  c={c}
-                />
-                <InfoRow
-                  eyebrow="Rendimiento"
-                  primary={formatPct(12.4)}
-                  primaryColor={c.brand}
-                  arrow
-                  onPress={() =>
-                    router.push("/(app)/rendimiento" as never)
-                  }
-                  c={c}
-                />
-              </View>
             </View>
           ) : null}
 
-          {/* Cash disponible — chips con saldos no invertidos por
-              moneda + yield (TNA / APY). Filtrado por market: en Todo
-              las 3 monedas, en AR solo pesos, etc. Chips tappable a
-              futuro para invertir más. */}
+          {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
+              monto en moneda nativa + delta del día + posiciones +
+              cash disponible. Es el corazón narrativo de la pantalla.
+              Hairlines como única división, sin cards. */}
           {hasHoldings ? (
-            <CashCard marketFilter={marketFilter} c={c} />
-          ) : null}
-
-          {/* ─── Filtro de mercado — pills sueltas (sin container).
-              Active filled con el color contextual del día (greenDark/
-              red); el glyph del Crypto/Todo flippea bg/fg en active
-              para mantener legibilidad sobre el fondo sólido. */}
-          <View style={s.segRow}>
-            {(
-              [
-                { id: "all", label: "Todo" },
-                { id: "AR", label: "AR" },
-                { id: "US", label: "EE.UU." },
-                { id: "CRYPTO", label: "Crypto" },
-              ] as const
-            ).map((t) => {
-              const active = t.id === marketFilter;
-              return (
-                <Tap
-                  key={t.id}
-                  onPress={() => setMarketFilter(t.id)}
-                  haptic="selection"
-                  pressScale={0.96}
-                  rippleContained
-                  style={[
-                    s.segPill,
-                    active && { backgroundColor: color },
-                  ]}
-                >
-                  <SegGlyph id={t.id} active={active} color={color} c={c} />
-                  <Text
-                    style={[
-                      s.segLabel,
-                      {
-                        color: active ? c.bg : c.textMuted,
-                        fontFamily: active
-                          ? fontFamily[800]
-                          : fontFamily[600],
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {t.label}
-                  </Text>
-                </Tap>
-              );
-            })}
-          </View>
-
-          {hasHoldings ? (
-            <>
-              {/* El first-block ya tiene Mejor/Peor/Invertido/Rendimiento
-                  arriba (above the fold). Acá abajo solo van las cards
-                  secundarias: posiciones por categoría + distribución
-                  por mercado. El chart histórico de Rendimiento vive
-                  en /(app)/rendimiento, accesible desde el arrow del
-                  InfoRow. */}
-              <PosicionesCard
-                groups={groupedByCategory}
-                allocations={categoryAllocations}
-                positionsCount={holdingsSorted.length}
-                onTap={(slug) =>
-                  router.push({
-                    pathname: "/(app)/market-category",
-                    params: { slug },
-                  })
-                }
+            <View style={s.marketsBlock}>
+              <Text style={[s.sectionTitle, { color: c.text }]}>
+                Mercados
+              </Text>
+              <MarketRow
+                label="Argentina"
+                bucket={marketBreakdown.AR}
                 c={c}
               />
-              <DistribucionCard alloc={marketAllocation} c={c} />
-            </>
+              <MarketRow
+                label="Estados Unidos"
+                bucket={marketBreakdown.US}
+                c={c}
+                divider
+              />
+              <MarketRow
+                label="Crypto"
+                bucket={marketBreakdown.CRYPTO}
+                c={c}
+                divider
+              />
+            </View>
+          ) : null}
+
+          {/* ─── Rendimiento — link de una sola línea al detalle.
+              Reemplaza al InfoRow del antiguo bloque info-column. */}
+          {hasHoldings ? (
+            <Pressable
+              onPress={() => router.push("/(app)/rendimiento" as never)}
+              style={({ pressed }) => [
+                s.linkRow,
+                {
+                  borderTopColor: c.border,
+                  opacity: pressed ? 0.6 : 1,
+                },
+              ]}
+            >
+              <Text style={[s.linkRowLabel, { color: c.text }]}>
+                Rendimiento histórico
+              </Text>
+              <View style={s.linkRowTrailing}>
+                <Text style={[s.linkRowValue, { color: c.brand }]}>
+                  {formatPct(12.4)}
+                </Text>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={c.textMuted}
+                />
+              </View>
+            </Pressable>
+          ) : null}
+
+          {hasHoldings ? (
+            <PosicionesCard
+              groups={groupedByCategory}
+              allocations={categoryAllocations}
+              positionsCount={holdingsSorted.length}
+              onTap={(slug) =>
+                router.push({
+                  pathname: "/(app)/market-category",
+                  params: { slug },
+                })
+              }
+              c={c}
+            />
           ) : (
             /* Empty state accionable — el doc lo destaca: "empty
                states son una oportunidad de activación, no un mensaje
                de error". Copy específico por filtro + CTA al Mercado. */
             <View style={[s.card, { paddingTop: 24 }]}>
               <Text style={[s.emptyTitle, { color: c.text }]}>
-                {marketFilter === "all"
-                  ? "Empezá con $1.000"
-                  : marketFilter === "AR"
-                    ? "Sin posiciones en pesos"
-                    : marketFilter === "US"
-                      ? "Sin posiciones en dólares"
-                      : "Sin crypto en cartera"}
+                Empezá con $1.000
               </Text>
               <Text style={[s.emptyBody, { color: c.textMuted }]}>
-                {marketFilter === "all"
-                  ? "Comprá tu primer CEDEAR en 30 segundos y arrancá tu cartera."
-                  : marketFilter === "AR"
-                    ? "Acciones argentinas, bonos en pesos y FCI te esperan."
-                    : marketFilter === "US"
-                      ? "CEDEARs y acciones de EE.UU. en una sola cuenta."
-                      : "BTC, ETH y stablecoins disponibles 24/7."}
+                Comprá tu primer CEDEAR en 30 segundos y arrancá tu cartera.
               </Text>
               <Tap
                 haptic="medium"
@@ -872,6 +883,96 @@ function InfoRow({
     );
   }
   return <View style={s.infoRow}>{content}</View>;
+}
+
+/* ─── MarketRow — fila de un mercado en la sección "Mercados" ─────
+ *
+ * Layout 2-líneas con la misma jerarquía en cada mercado:
+ *   line 1: nombre del mercado          monto en moneda nativa
+ *   line 2: N posiciones · cash         delta del día
+ *
+ * Sin cards, sin íconos de chart, sin chrome — sólo texto y un
+ * hairline divider arriba si no es el primero. */
+
+interface MarketBucket {
+  nativeCurrency: AssetCurrency;
+  invested: number;
+  investedArs: number;
+  daySumArs: number;
+  count: number;
+  cash: number;
+  cashLabel: string;
+}
+
+function MarketRow({
+  label,
+  bucket,
+  c,
+  divider,
+}: {
+  label: string;
+  bucket: MarketBucket;
+  c: ColorMap;
+  divider?: boolean;
+}) {
+  const empty = bucket.count === 0 && bucket.cash === 0;
+  const yesterdayArs = bucket.investedArs - bucket.daySumArs;
+  const dayPct =
+    yesterdayArs > 0 ? (bucket.daySumArs / yesterdayArs) * 100 : 0;
+  const dayUp = bucket.daySumArs >= 0;
+  const deltaColor = empty ? c.textMuted : dayUp ? c.brand : c.red;
+
+  /* Format del cash en notation compact en la línea de subtítulo. El
+   * monto principal sale del invertido ya formateado en su moneda. */
+  const investedDisplay = formatMoney(
+    bucket.invested,
+    bucket.nativeCurrency,
+  );
+  const cashDisplay =
+    bucket.cash > 0
+      ? `${formatMoney(bucket.cash, bucket.nativeCurrency)} libres`
+      : null;
+  const countLabel =
+    bucket.count === 0
+      ? "Sin posiciones"
+      : `${bucket.count} ${bucket.count === 1 ? "posición" : "posiciones"}`;
+  const subtitle = cashDisplay
+    ? `${countLabel} · ${cashDisplay}`
+    : countLabel;
+
+  return (
+    <View
+      style={[
+        s.marketRow,
+        divider && {
+          borderTopColor: c.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+        },
+      ]}
+    >
+      <View style={s.marketRowTop}>
+        <Text style={[s.marketName, { color: c.text }]} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text
+          style={[s.marketAmount, { color: empty ? c.textMuted : c.text }]}
+          numberOfLines={1}
+        >
+          {empty ? "—" : investedDisplay}
+        </Text>
+      </View>
+      <View style={s.marketRowBottom}>
+        <Text style={[s.marketSubtitle, { color: c.textMuted }]} numberOfLines={1}>
+          {subtitle}
+        </Text>
+        {!empty ? (
+          <Text style={[s.marketDelta, { color: deltaColor }]} numberOfLines={1}>
+            {dayUp ? "▲" : "▼"} {formatPct(dayPct)}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
 }
 
 /* ─── PieGlyph / BrickGlyph — toggle icons del viz selector ─────── */
@@ -2231,31 +2332,25 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  /* First-block — bloque hero con chart 2-col + info column. Domina
-   * la primera pantalla del portfolio (above the fold). */
-  firstBlock: {
-    flexDirection: "row",
+  /* Chart block — full width, sin card. La toggle pie/brick va
+   * arriba a la derecha alineada con el padding del screen. */
+  chartBlock: {
     paddingHorizontal: 24,
     marginTop: 24,
-    gap: 16,
   },
-  firstBlockChartCol: {
-    flex: 1,
-  },
-  firstBlockInfoCol: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-
-  /* Toggle viz pie/brick — fila de 2 glyphs arriba del chart. */
   vizToggleRow: {
     flexDirection: "row",
     gap: 14,
-    marginBottom: 8,
+    alignSelf: "flex-end",
+    marginBottom: 12,
+  },
+  chartCanvas: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  /* InfoRow — fila del info column. Eyebrow + primary + opcional
-   * trailing/arrow. Compacto vertical (4 rows entran en altura del pie). */
+  /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
+   * pero ya no se usa en el JSX principal. */
   infoRow: {
     paddingVertical: 4,
   },
@@ -2290,63 +2385,85 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  /* Cash card — chips de saldos no invertidos por moneda. Vive justo
-   * debajo del pie chart. Eyebrow chico muted + row de chips flex:1. */
-  cashCard: {
+  /* ─── Mercados ──────────────────────────────────────────────────
+   *
+   * Bloque de los 3 buckets (AR / US / Crypto). Hairlines como
+   * única división, sin cards. El sectionTitle abre la sección. */
+  marketsBlock: {
+    marginTop: 28,
     paddingHorizontal: 24,
-    marginTop: 8,
   },
-  cashEyebrow: {
+  sectionTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginBottom: 10,
+    fontSize: 18,
+    letterSpacing: -0.4,
+    marginBottom: 12,
   },
-  cashRow: {
+  marketRow: {
+    paddingVertical: 14,
+  },
+  marketRowTop: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  cashChip: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
+  marketRowBottom: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 4,
   },
-  cashAmount: {
+  marketName: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontSize: 17,
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  marketAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 17,
     letterSpacing: -0.3,
   },
-  cashYield: {
+  marketSubtitle: {
     fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    marginTop: 3,
-  },
-
-  /* Filtro de mercado — 4 pills sueltas (sin container). Active pill
-   * filled del color contextual del día; inactivas son transparentes. */
-  segRow: {
-    flexDirection: "row",
-    marginTop: 24,
-    marginHorizontal: 24,
-    gap: 4,
-  },
-  segPill: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 8,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  segLabel: {
     fontSize: 13,
     letterSpacing: -0.1,
+    flexShrink: 1,
+  },
+  marketDelta: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+
+  /* Link row (Rendimiento histórico) — una sola línea con label
+   * izquierda + valor coloreado + chevron derecha. Sin card, sólo
+   * un hairline arriba que lo separa de la sección Mercados. */
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  linkRowLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  linkRowTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  linkRowValue: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   /* Badge del glyph (Crypto / Todo) — círculo de 18 que aloja el
    * símbolo ₿ o el isotipo Alamos. Bg/fg flipean en active. */
