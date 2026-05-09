@@ -639,59 +639,12 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* Chart — full width sobre el bg. La toggle pie/brick va
-              arriba a la derecha del bloque, sutil. Sin card, sin
-              borde, sin info column al costado. Robinhood-style
-              applied: el chart respira y lleva el peso visual. */}
-          {hasHoldings ? (
-            <View style={s.chartBlock}>
-              <View style={s.vizToggleRow}>
-                <Tap
-                  onPress={() => setViz("pie")}
-                  haptic="selection"
-                  pressScale={0.9}
-                  hitSlop={8}
-                >
-                  <PieGlyph
-                    color={viz === "pie" ? c.text : c.textFaint}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("brick")}
-                  haptic="selection"
-                  pressScale={0.9}
-                  hitSlop={8}
-                >
-                  <BrickGlyph
-                    color={viz === "brick" ? c.text : c.textFaint}
-                  />
-                </Tap>
-              </View>
-              <View style={s.chartCanvas}>
-                {viz === "pie" ? (
-                  <FloorPie
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
-                    currency={currency}
-                    groupBy="category"
-                    onHoldChange={setBrickHolding}
-                  />
-                ) : (
-                  <FloorBrick
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
-                    groupBy="category"
-                    onHoldChange={setBrickHolding}
-                  />
-                )}
-              </View>
-            </View>
-          ) : null}
-
           {/* ─── Mercados — los 3 buckets de Álamos. Cada uno con su
               monto en moneda nativa + delta del día + posiciones +
               cash disponible. Es el corazón narrativo de la pantalla.
-              Hairlines como única división, sin cards. */}
+              Hairlines como única división, sin cards. Va PRIMERO
+              (antes del chart) — los números crudos arriba, el
+              chart abajo como confirmación visual. */}
           {hasHoldings ? (
             <View style={s.marketsBlock}>
               <Text style={[s.sectionTitle, { color: c.text }]}>
@@ -717,8 +670,99 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
 
-          {/* ─── Rendimiento — link de una sola línea al detalle.
-              Reemplaza al InfoRow del antiguo bloque info-column. */}
+          {/* ─── Composición — chart pie / brick con toggle explícito.
+              Va DESPUÉS de Mercados: los números primero, la
+              visualización después como confirmación. Sin card. */}
+          {hasHoldings ? (
+            <View style={s.chartBlock}>
+              <View style={s.chartHeader}>
+                <Text style={[s.sectionTitle, { color: c.text, marginBottom: 0 }]}>
+                  Composición
+                </Text>
+                <View
+                  style={[
+                    s.vizSeg,
+                    { backgroundColor: c.surfaceHover },
+                  ]}
+                >
+                  <Tap
+                    onPress={() => setViz("pie")}
+                    haptic="selection"
+                    pressScale={0.95}
+                    hitSlop={4}
+                    style={[
+                      s.vizSegBtn,
+                      viz === "pie" && { backgroundColor: c.bg },
+                    ]}
+                  >
+                    <PieGlyph
+                      color={viz === "pie" ? c.text : c.textMuted}
+                      size={14}
+                    />
+                    <Text
+                      style={[
+                        s.vizSegLabel,
+                        {
+                          color: viz === "pie" ? c.text : c.textMuted,
+                          fontFamily:
+                            viz === "pie" ? fontFamily[700] : fontFamily[500],
+                        },
+                      ]}
+                    >
+                      Pie
+                    </Text>
+                  </Tap>
+                  <Tap
+                    onPress={() => setViz("brick")}
+                    haptic="selection"
+                    pressScale={0.95}
+                    hitSlop={4}
+                    style={[
+                      s.vizSegBtn,
+                      viz === "brick" && { backgroundColor: c.bg },
+                    ]}
+                  >
+                    <BrickGlyph
+                      color={viz === "brick" ? c.text : c.textMuted}
+                      size={14}
+                    />
+                    <Text
+                      style={[
+                        s.vizSegLabel,
+                        {
+                          color: viz === "brick" ? c.text : c.textMuted,
+                          fontFamily:
+                            viz === "brick" ? fontFamily[700] : fontFamily[500],
+                        },
+                      ]}
+                    >
+                      Ladrillo
+                    </Text>
+                  </Tap>
+                </View>
+              </View>
+              <View style={s.chartCanvas}>
+                {viz === "pie" ? (
+                  <FloorPie
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    currency={currency}
+                    groupBy="category"
+                    onHoldChange={setBrickHolding}
+                  />
+                ) : (
+                  <FloorBrick
+                    holdings={holdingsSorted}
+                    totalArs={totalArs}
+                    groupBy="category"
+                    onHoldChange={setBrickHolding}
+                  />
+                )}
+              </View>
+            </View>
+          ) : null}
+
+          {/* ─── Rendimiento — link de una sola línea al detalle. */}
           {hasHoldings ? (
             <Pressable
               onPress={() => router.push("/(app)/rendimiento" as never)}
@@ -2332,17 +2376,44 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  /* Chart block — full width, sin card. La toggle pie/brick va
-   * arriba a la derecha alineada con el padding del screen. */
+  /* Chart block — full width, sin card. Header con title izquierda
+   * + segmented Pie/Ladrillo a la derecha. */
   chartBlock: {
     paddingHorizontal: 24,
-    marginTop: 24,
+    marginTop: 28,
   },
+  chartHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  /* Segmented Pie/Ladrillo — pill estilo iOS. Activo con bg c.bg
+   * y texto bold; inactivo translúcido con texto muted. */
+  vizSeg: {
+    flexDirection: "row",
+    padding: 3,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  vizSegBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  vizSegLabel: {
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  /* Toggle viejo (vizToggleRow) — kept para compatibilidad si algo
+   * todavía lo referencia. No se usa en el JSX actual. */
   vizToggleRow: {
     flexDirection: "row",
     gap: 14,
-    alignSelf: "flex-end",
-    marginBottom: 12,
   },
   chartCanvas: {
     /* Chart full-width — ocupa todo el ancho del chartBlock (con
