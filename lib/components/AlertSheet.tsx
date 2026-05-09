@@ -523,19 +523,16 @@ export function AlertSheet({
               </View>
 
               {/* Slider -50% / +50% — sincronizado con el threshold.
-                  Mover acá actualiza el threshold; tipear en el
-                  keypad mueve el thumb del slider. marginTop extra
-                  para alcanzar los ~32 px pedidos entre la línea
-                  contextual y el slider (24 del form gap + 8). */}
-              <View style={{ marginTop: 8 }}>
-                <PercentRangeSlider
-                  value={sliderPct}
-                  onChange={handleSliderChange}
-                  positiveColor={c.brand}
-                  negativeColor={c.red}
-                  width={SLIDER_WIDTH}
-                />
-              </View>
+               *  Sin wrapper marginTop: el form gap de 24 px ya
+               *  separa todos los módulos (precio block / slider /
+               *  chips / keypad / CTA) parejo. */}
+              <PercentRangeSlider
+                value={sliderPct}
+                onChange={handleSliderChange}
+                positiveColor={c.brand}
+                negativeColor={c.red}
+                width={SLIDER_WIDTH}
+              />
 
               {/* Quick % chips — naranja del lado negativo, verde del
                   positivo, con opacidad progresiva (más cerca del 0
