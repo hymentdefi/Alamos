@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -60,6 +61,7 @@ type Sort = "proximity" | "createdAt";
 export default function AssetAlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: windowW } = useWindowDimensions();
   const { c } = useTheme();
   const { show } = useToast();
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
@@ -73,11 +75,18 @@ export default function AssetAlertsScreen() {
   const [sort, setSort] = useState<Sort>("proximity");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   /* Formato de la columna de distancia: % al objetivo (default) o
-   * $. Lo elige un mini segmented en el header de la sección y se
-   * aplica a todas las filas. */
+   * $. El usuario lo alterna tappeando el label "% al objetivo ▾"
+   * en el header. Se aplica a todas las filas. */
   const [distFormat, setDistFormat] = useState<"%" | "$">("%");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
+  /* Ancla del popup de sort — medimos la posición exacta del ícono
+   *  de sliders al abrir el menú así el popup sale pegado debajo. */
+  const sortBtnRef = useRef<View>(null);
+  const [sortAnchor, setSortAnchor] = useState<{
+    top: number;
+    right: number;
+  }>({ top: 100, right: 24 });
 
   const { activeForAsset, triggeredForAsset, setPaused, remove } = useAlerts();
 
@@ -250,85 +259,49 @@ export default function AssetAlertsScreen() {
                   <Text style={[s.sectionTitle, { color: c.text }]}>
                     Alertas activas ({sortedAlerts.length})
                   </Text>
-                  {/* Mini segmented "% / $" + ícono de sort.
-                   *  Mismo lenguaje visual que los tabs Precio/
-                   *  Indicadores pero en miniatura. El segmented
-                   *  decide qué muestra la col de distancia en cada
-                   *  fila (porcentaje o monto en moneda nativa). */}
+                  {/* Header right: label tappable que alterna el
+                   *  formato de la distancia ("% al objetivo" ↔
+                   *  "$ al objetivo") + ícono de sort que abre el
+                   *  popup anclado debajo del ícono. */}
                   <View style={s.headerControls}>
-                    <View
-                      style={[
-                        s.distSeg,
-                        { backgroundColor: c.surfaceHover },
-                      ]}
-                    >
-                      <Pressable
-                        onPress={() => {
-                          if (distFormat !== "%") {
-                            Haptics.selectionAsync().catch(() => {});
-                            setDistFormat("%");
-                          }
-                        }}
-                        style={[
-                          s.distSegBtn,
-                          distFormat === "%" && {
-                            backgroundColor: c.surfaceSunken,
-                          },
-                        ]}
-                        hitSlop={4}
-                      >
-                        <Text
-                          style={[
-                            s.distSegText,
-                            {
-                              color:
-                                distFormat === "%" ? c.text : c.textMuted,
-                              fontFamily:
-                                distFormat === "%"
-                                  ? fontFamily[700]
-                                  : fontFamily[600],
-                            },
-                          ]}
-                        >
-                          %
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          if (distFormat !== "$") {
-                            Haptics.selectionAsync().catch(() => {});
-                            setDistFormat("$");
-                          }
-                        }}
-                        style={[
-                          s.distSegBtn,
-                          distFormat === "$" && {
-                            backgroundColor: c.surfaceSunken,
-                          },
-                        ]}
-                        hitSlop={4}
-                      >
-                        <Text
-                          style={[
-                            s.distSegText,
-                            {
-                              color:
-                                distFormat === "$" ? c.text : c.textMuted,
-                              fontFamily:
-                                distFormat === "$"
-                                  ? fontFamily[700]
-                                  : fontFamily[600],
-                            },
-                          ]}
-                        >
-                          $
-                        </Text>
-                      </Pressable>
-                    </View>
                     <Pressable
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => {});
-                        setSortMenuOpen(true);
+                        setDistFormat(distFormat === "%" ? "$" : "%");
+                      }}
+                      hitSlop={6}
+                      style={s.distFormatBtn}
+                      accessibilityLabel={
+                        distFormat === "%"
+                          ? "Cambiar a distancia en monto"
+                          : "Cambiar a distancia en porcentaje"
+                      }
+                    >
+                      <Text
+                        style={[s.distFormatText, { color: c.textMuted }]}
+                      >
+                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
+                      </Text>
+                      <Feather
+                        name="chevron-down"
+                        size={14}
+                        color={c.textMuted}
+                        style={{ marginLeft: 2, marginTop: 1 }}
+                      />
+                    </Pressable>
+                    <Pressable
+                      ref={sortBtnRef}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        sortBtnRef.current?.measureInWindow(
+                          (x, y, width, height) => {
+                            setSortAnchor({
+                              top: y + height + 6,
+                              right: Math.max(8, windowW - (x + width)),
+                            });
+                            setSortMenuOpen(true);
+                          },
+                        );
                       }}
                       hitSlop={10}
                       style={s.sortIconBtn}
@@ -431,7 +404,7 @@ export default function AssetAlertsScreen() {
           setSortMenuOpen(false);
         }}
         onClose={() => setSortMenuOpen(false)}
-        topOffset={insets.top + 100}
+        anchor={sortAnchor}
       />
 
       <AlertSheet
@@ -501,13 +474,15 @@ function SortMenu({
   sort,
   onSelect,
   onClose,
-  topOffset,
+  anchor,
 }: {
   visible: boolean;
   sort: Sort;
   onSelect: (next: Sort) => void;
   onClose: () => void;
-  topOffset: number;
+  /** Posición absoluta donde aparece el popup — top + right desde
+   *  el viewport. Calculada midiendo el ícono que lo dispara. */
+  anchor: { top: number; right: number };
 }) {
   const { c } = useTheme();
   if (!visible) return null;
@@ -523,12 +498,15 @@ function SortMenu({
        *  bg dim, queremos un menú "ligero" estilo iOS context menu. */}
       <Pressable style={s.sortMenuBackdrop} onPress={onClose} />
 
-      {/* Menú anclado top-right cerca del ícono de sliders. */}
+      {/* Menú anclado debajo del ícono de sliders — top + right en
+       *  coordenadas de viewport, calculados con measureInWindow al
+       *  abrir el popup. */}
       <View
         style={[
           s.sortMenu,
           {
-            top: topOffset,
+            top: anchor.top,
+            right: anchor.right,
             backgroundColor: c.surface,
             borderColor: c.border,
             shadowColor: "#000",
@@ -729,19 +707,20 @@ function SwipableAlertRow({
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            {/* Col 1: dirección + precio objetivo en el color de la
-             *  dirección (verde si sube, naranja si baja). 16 / 600. */}
+            {/* Col 1: dirección + precio objetivo en BLANCO (c.text).
+             *  El color para indicar dirección lo lleva la columna
+             *  de distancia. 16 / 600. */}
             <Text
-              style={[s.alertLeft, { color: dirColor }]}
+              style={[s.alertLeft, { color: c.text }]}
               numberOfLines={1}
             >
               {dirLabel} {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col 2 (única): distancia al objetivo en el formato
-             *  elegido por el segmented del header (% o $). Gris
-             *  tenue, 14 px. */}
+            {/* Col 2: distancia al objetivo en el formato del header
+             *  (% o $) y en el color de la dirección (verde si sube,
+             *  naranja si baja). 14 / 600. */}
             <Text
-              style={[s.alertDist, { color: c.textMuted }]}
+              style={[s.alertDist, { color: dirColor }]}
               numberOfLines={1}
             >
               {distFormat === "%"
@@ -932,32 +911,23 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Header right-side: mini segmented "% | $" + ícono sort. Mismo
-   * lenguaje visual que los tabs Precio/Indicadores pero ~60 px
-   * total de ancho (chico). */
+  /* Header right-side: label tappable que alterna el formato +
+   * ícono de sort que abre el popup anclado. */
   headerControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
-  distSeg: {
+  distFormatBtn: {
     flexDirection: "row",
-    padding: 2,
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
-  },
-  distSegBtn: {
-    minWidth: 28,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
-  distSegText: {
-    fontSize: 12,
-    letterSpacing: 0,
+  distFormatText: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.1,
   },
   sortIconBtn: {
     width: 32,
@@ -974,7 +944,6 @@ const s = StyleSheet.create({
   },
   sortMenu: {
     position: "absolute",
-    right: 16,
     minWidth: 240,
     borderRadius: radius.md,
     borderCurve: "continuous",
@@ -1110,10 +1079,11 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.3,
   },
-  /* Col 2: distancia (% o $ según el segmented del header). Gris
-   * tenue, 14 px. Alineada a la derecha contra el toggle. */
+  /* Col 2: distancia (% o $ según el toggle del header). Color
+   * verde/naranja según dirección, 14 / 600. Alineada a la derecha
+   * contra el toggle. */
   alertDist: {
-    fontFamily: fontFamily[500],
+    fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
     minWidth: 100,
