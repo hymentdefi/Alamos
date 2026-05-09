@@ -3,6 +3,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -241,15 +242,34 @@ export default function AssetAlertsScreen() {
               <View style={s.section}>
                 <View style={s.sectionHeader}>
                   <Text style={[s.sectionTitle, { color: c.text }]}>
-                    Activas ({sortedAlerts.length})
+                    Alertas activas ({sortedAlerts.length})
                   </Text>
-                  <SortToggle
-                    sort={sort}
-                    onChange={(next) => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setSort(next);
-                    }}
-                  />
+                  {/* Headers de columna alineados con la data —
+                      "%" + "$" en gris tenue, después el ícono de
+                      sort que toggle proximity ↔ recientes. */}
+                  <View style={s.columnHeaders}>
+                    <Text style={[s.columnHeaderPct, { color: c.textMuted }]}>
+                      %
+                    </Text>
+                    <Text style={[s.columnHeaderDelta, { color: c.textMuted }]}>
+                      $
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setSort(sort === "proximity" ? "createdAt" : "proximity");
+                      }}
+                      hitSlop={10}
+                      style={s.sortIconBtn}
+                      accessibilityLabel={
+                        sort === "proximity"
+                          ? "Ordenar por más recientes"
+                          : "Ordenar por proximidad"
+                      }
+                    >
+                      <Feather name="sliders" size={16} color={c.textMuted} />
+                    </Pressable>
+                  </View>
                 </View>
                 <View style={s.list}>
                   {sortedAlerts.map((alert, i) => (
@@ -392,59 +412,6 @@ function TabPill({
   );
 }
 
-/* ─── Sort segmented (Proximidad / Fecha) ──────────────────────── */
-
-function SortToggle({
-  sort,
-  onChange,
-}: {
-  sort: Sort;
-  onChange: (next: Sort) => void;
-}) {
-  const { c } = useTheme();
-  /* Segmented sutil — sin pill ni borde. Solo dos labels chicos
-   * separados por un dot, el activo en el color del texto, el otro
-   * en muted. Un toque debajo del título de la sección. */
-  return (
-    <View style={s.sortRow}>
-      <Pressable
-        onPress={() => onChange("proximity")}
-        hitSlop={6}
-      >
-        <Text
-          style={[
-            s.sortText,
-            {
-              color: sort === "proximity" ? c.text : c.textMuted,
-              fontFamily:
-                sort === "proximity" ? fontFamily[700] : fontFamily[500],
-            },
-          ]}
-        >
-          Proximidad
-        </Text>
-      </Pressable>
-      <Text style={[s.sortDot, { color: c.textFaint }]}>·</Text>
-      <Pressable
-        onPress={() => onChange("createdAt")}
-        hitSlop={6}
-      >
-        <Text
-          style={[
-            s.sortText,
-            {
-              color: sort === "createdAt" ? c.text : c.textMuted,
-              fontFamily:
-                sort === "createdAt" ? fontFamily[700] : fontFamily[500],
-            },
-          ]}
-        >
-          Recientes
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
 
 /* ─── Empty state ──────────────────────────────────────────────── */
 
@@ -498,30 +465,21 @@ function SwipableAlertRow({
   const { c } = useTheme();
   const cur = assetCurrency(asset);
   const isPaused = alert.status === "paused";
-  const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
-  /* Color base de la fila — verde si "sube a", naranja/rojo si
-   * "baja a". Cuando está pausada, todo se desatura a un gris al
-   * 40 % opacity. Sin íconos circulares ni cards. */
-  const baseColor = alert.direction === "above" ? c.brand : c.red;
+  const dirLabel = alert.direction === "above" ? "sube a" : "baja a";
+  /* "Sube a" verde brand, "Baja a" red/naranja. Cuando está pausada,
+   * todo el texto va a 40 % opacity (incluyendo el verbo coloreado). */
+  const dirColor = alert.direction === "above" ? c.brand : c.red;
 
   const distAbs = alert.threshold - asset.price;
   const distPct = asset.price > 0 ? (distAbs / asset.price) * 100 : 0;
   const distSign = distAbs > 0 ? "+" : "";
-
-  const leftColor = isPaused ? c.text : baseColor;
-  const centerColor = isPaused ? c.text : baseColor;
-  const rightColor = c.textMuted;
   const rowOpacity = isPaused ? 0.4 : 1;
 
-  /* Swipe shared values: translateX positivo expone "Pausar" a la
-   * izquierda; negativo expone "Eliminar" a la derecha. */
+  /* Swipe sólo a la izquierda → DELETE. El pause/resume vive en el
+   * toggle iOS de la columna 4. */
   const tx = useSharedValue(0);
   const startX = useSharedValue(0);
 
-  const triggerPause = () => {
-    onTogglePause();
-    tx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
-  };
   const triggerDelete = () => {
     onDelete();
     tx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
@@ -536,11 +494,9 @@ function SwipableAlertRow({
     })
     .onUpdate((e) => {
       "worklet";
+      // Sólo permitimos arrastrar hacia la izquierda (translationX < 0).
       const next = startX.value + e.translationX;
-      tx.value = Math.max(
-        -SWIPE_REVEAL * 1.4,
-        Math.min(SWIPE_REVEAL * 1.4, next),
-      );
+      tx.value = Math.max(-SWIPE_REVEAL * 1.4, Math.min(0, next));
     })
     .onEnd((e) => {
       "worklet";
@@ -550,11 +506,6 @@ function SwipableAlertRow({
           "worklet";
           if (finished) runOnJS(triggerDelete)();
         });
-      } else if (final > SWIPE_TRIGGER) {
-        tx.value = withTiming(0, { duration: 220 }, (finished) => {
-          "worklet";
-          if (finished) runOnJS(triggerPause)();
-        });
       } else {
         tx.value = withTiming(0, { duration: 200 });
       }
@@ -562,10 +513,6 @@ function SwipableAlertRow({
 
   const rowStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }],
-  }));
-
-  const leftActionStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, tx.value / SWIPE_TRIGGER)),
   }));
 
   const rightActionStyle = useAnimatedStyle(() => ({
@@ -577,30 +524,13 @@ function SwipableAlertRow({
       style={[
         s.swipeRoot,
         withTopDivider && {
-          /* Hairline divider sutil — gris al 15 % opacity. Sin
-           * cards ni bordes pesados. */
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
       ]}
     >
-      {/* Action layers — pausar a la izquierda, eliminar a la derecha. */}
-      <Animated.View
-        style={[
-          s.swipeLeftAction,
-          { backgroundColor: c.surfaceSunken },
-          leftActionStyle,
-        ]}
-      >
-        <Feather
-          name={isPaused ? "play" : "pause"}
-          size={18}
-          color={c.text}
-        />
-        <Text style={[s.swipeActionText, { color: c.text }]}>
-          {isPaused ? "Reactivar" : "Pausar"}
-        </Text>
-      </Animated.View>
+      {/* Action layer — eliminar a la derecha (queda revelado al
+       *  arrastrar la fila hacia la izquierda). */}
       <Animated.View
         style={[
           s.swipeRightAction,
@@ -615,47 +545,56 @@ function SwipableAlertRow({
       </Animated.View>
 
       <GestureDetector gesture={pan}>
-        <Animated.View style={[{ backgroundColor: c.bg }, rowStyle]}>
+        <Animated.View
+          style={[s.alertRow, { backgroundColor: c.bg }, rowStyle]}
+        >
+          {/* Cols 1-3 dentro de un Pressable que abre el editor.
+              El toggle (col 4) vive AFUERA del Pressable para que su
+              tap no dispare el editor. */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
-              s.alertRow,
-              {
-                opacity: pressed ? 0.7 : rowOpacity,
-              },
+              s.alertRowMain,
+              { opacity: pressed ? 0.7 : rowOpacity },
             ]}
-            accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
+            accessibilityLabel={`Editar alerta — ${asset.ticker} ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            {/* Col izquierda: dirección + precio objetivo (16 / 600).
-                Crece para empujar el % y el delta a la derecha. */}
+            {/* Col 1: ticker + dirección coloreada + precio objetivo.
+             *  Una sola línea que el ojo lee de un tirón. */}
             <Text
-              style={[s.alertLeft, { color: leftColor }]}
+              style={[s.alertLeft, { color: c.text }]}
               numberOfLines={1}
             >
-              {dirLabel} {formatMoney(alert.threshold, cur)}
+              {asset.ticker}{" "}
+              <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
+              {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col centro: distancia % (14, mismo color). */}
+            {/* Col 2: % de distancia, verde/red según signo. */}
             <Text
-              style={[s.alertCenter, { color: centerColor }]}
+              style={[s.alertPct, { color: dirColor }]}
               numberOfLines={1}
             >
               {distSign}
               {distPct.toFixed(2)}%
             </Text>
-            {/* Col derecha: distancia $ (14, gris tenue). */}
+            {/* Col 3: $ de distancia, gris tenue. */}
             <Text
-              style={[s.alertRight, { color: rightColor }]}
+              style={[s.alertDelta, { color: c.textMuted }]}
               numberOfLines={1}
             >
               {distSign}
               {formatMoney(Math.abs(distAbs), cur)}
             </Text>
-            {isPaused ? (
-              <Text style={[s.pausedLabel, { color: c.textMuted }]}>
-                Pausada
-              </Text>
-            ) : null}
           </Pressable>
+          {/* Col 4: toggle iOS-style. ON = activa, OFF = pausada. */}
+          <Switch
+            value={!isPaused}
+            onValueChange={() => onTogglePause()}
+            trackColor={{ false: c.surfaceHover, true: c.brand }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor={c.surfaceHover}
+            style={s.alertToggle}
+          />
         </Animated.View>
       </GestureDetector>
     </View>
@@ -830,18 +769,36 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Sort — texto puro con dot separador, sin pill ni borde. */
-  sortRow: {
+  /* Column headers — alineados con la data: % | $ | sort icon.
+   * minWidth de cada uno coincide con el de las cols del row para
+   * que la grilla se vea pareja. */
+  columnHeaders: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
   },
-  sortText: {
+  /* % header: ancho = al alertPct del row. */
+  columnHeaderPct: {
+    fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.05,
+    minWidth: 64,
+    textAlign: "right",
   },
-  sortDot: {
+  /* $ header: ancho = al alertDelta del row. */
+  columnHeaderDelta: {
+    fontFamily: fontFamily[600],
     fontSize: 12,
+    letterSpacing: -0.05,
+    minWidth: 90,
+    textAlign: "right",
+  },
+  sortIconBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: -4,
   },
 
   /* Empty state — bell + texto descriptivo viven como una sola
@@ -908,18 +865,6 @@ const s = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
-  swipeLeftAction: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: SWIPE_REVEAL,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingLeft: 8,
-    flexDirection: "row",
-    gap: 6,
-  },
   swipeRightAction: {
     position: "absolute",
     right: 0,
@@ -937,49 +882,82 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.05,
   },
-  /* Row de alerta — 3 columnas en una sola fila. Sin cards, sin
-   * íconos circulares, sin toggle. Filas separadas por hairline
+  /* Row de alerta — 4 columnas: ticker+dir+precio | % | $ | toggle.
+   * Sin cards, sin íconos circulares. Filas separadas por hairline
    * border (configurado en s.swipeRoot). */
   alertRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  /* Pressable que envuelve cols 1-3 — su tap abre el editor. El
+   * Switch (col 4) queda afuera para no compartir gesto. */
+  alertRowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   triggeredRow: {
     paddingVertical: 12,
   },
-  /* Col izquierda: dirección + precio objetivo. Crece para empujar
-   * el resto a la derecha. 16 px / 600. */
+  /* Col 1: ticker + dirección + precio objetivo. 15 / 600. Crece. */
   alertLeft: {
     flex: 1,
     fontFamily: fontFamily[600],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    letterSpacing: -0.25,
   },
-  /* Col centro: % de distancia, mismo color que la izquierda. */
-  alertCenter: {
+  /* Col 2: % de distancia, mismo color que la dirección. */
+  alertPct: {
     fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
     minWidth: 64,
     textAlign: "right",
   },
-  /* Col derecha: $ de distancia, gris tenue. */
-  alertRight: {
+  /* Col 3: $ de distancia, gris tenue. */
+  alertDelta: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.15,
     minWidth: 90,
     textAlign: "right",
   },
-  /* Label "Pausada" — sólo visible cuando está pausada. Va al final
-   * a la derecha del row, gris muy chico. */
-  pausedLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
+  /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
+   * domine la fila. */
+  alertToggle: {
+    transform: [{ scale: 0.85 }],
+  },
+
+  /* Estilos del TriggeredRow (sección histórico) — layout viejo de
+   * 2 líneas con dirBadge + label/precio/distance. Distinto del row
+   * activo, así que mantienen sus propios styles. */
+  dirBadge: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderCurve: "continuous",
+    borderRadius: 18,
+  },
+  alertLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
     letterSpacing: -0.05,
-    marginLeft: 8,
+  },
+  alertPrice: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+    marginTop: 2,
+  },
+  alertDistance: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
   },
   checkBubble: {
     width: 28,
