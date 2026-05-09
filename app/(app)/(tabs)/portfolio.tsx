@@ -1205,7 +1205,7 @@ function MarketRow({
       {/* Icono del mercado a la izquierda — Argentina/US flag o
        *  símbolo Crypto. Le da identidad visual a cada bucket. */}
       <View style={s.marketIcon}>
-        <MarketGlyph marketKey={marketKey} size={28} c={c} />
+        <MarketGlyph marketKey={marketKey} size={40} />
       </View>
 
       <View style={s.marketContent}>
@@ -1244,35 +1244,118 @@ function MarketRow({
   );
 }
 
-/* ─── MarketGlyph — ícono circular del mercado ────────────────────
+/* ─── MarketGlyph — squircle con un símbolo distintivo del mercado.
  *
- * AR / US usan FlagIcon (la bandera SVG existente). CRYPTO usa el
- * símbolo ₿ sobre un círculo brand-tinted, en línea con el lenguaje
- * visual de Crypto en el resto de la app. */
+ * Reemplaza las FlagIcon genéricas (banderas literales SVG) por
+ * marks abstractos al estilo Robinhood: una FORMA + COLOR
+ * característicos por mercado, dentro de un squircle uniforme.
+ *
+ *   AR     → Sol de Mayo (5 rayos triangulares + círculo central),
+ *            gold sobre sky blue. Ícono más reconocible de la
+ *            bandera argentina sin ser la bandera literal.
+ *   US     → Estrella de 5 puntas, blanco sobre navy. Stars-and-
+ *            stripes deconstruido.
+ *   CRYPTO → Símbolo ₿, blanco sobre Bitcoin orange (#F7931A — el
+ *            color canónico de BTC).
+ *
+ * Squircle (radius 22 % del tamaño) + borderCurve continuous para
+ * el feel iOS. Todos los marks centrados ópticamente. */
 function MarketGlyph({
   marketKey,
-  size = 28,
-  c,
+  size = 40,
 }: {
   marketKey: "AR" | "US" | "CRYPTO";
   size?: number;
-  c: ColorMap;
 }) {
-  if (marketKey === "AR") return <FlagIcon code="AR" size={size} />;
-  if (marketKey === "US") return <FlagIcon code="US" size={size} />;
+  const radius = size * 0.22;
+
+  if (marketKey === "AR") {
+    /* Sol de Mayo simplificado — círculo central + 8 rayos
+     * triangulares alrededor. Gold sobre sky blue. */
+    return (
+      <View
+        style={[
+          s.glyphSquircle,
+          {
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: "#74ACDF",
+          },
+        ]}
+      >
+        <Svg
+          width={size * 0.7}
+          height={size * 0.7}
+          viewBox="0 0 40 40"
+        >
+          {/* 8 rayos triangulares — uno cada 45° */}
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+            <Polygon
+              key={deg}
+              points="20,4 22,12 18,12"
+              fill="#FCBF00"
+              transform={`rotate(${deg} 20 20)`}
+            />
+          ))}
+          <Circle cx={20} cy={20} r={6} fill="#FCBF00" />
+        </Svg>
+      </View>
+    );
+  }
+
+  if (marketKey === "US") {
+    /* Estrella de 5 puntas. Blanco sobre navy. */
+    return (
+      <View
+        style={[
+          s.glyphSquircle,
+          {
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: "#1F2D5C",
+          },
+        ]}
+      >
+        <Svg
+          width={size * 0.55}
+          height={size * 0.55}
+          viewBox="0 0 24 24"
+        >
+          <Polygon
+            points="12,2 14.6,9.2 22,9.5 16,14.4 18.2,21.5 12,17.4 5.8,21.5 8,14.4 2,9.5 9.4,9.2"
+            fill="#FFFFFF"
+          />
+        </Svg>
+      </View>
+    );
+  }
+
+  /* CRYPTO — ₿ blanco sobre Bitcoin orange. */
   return (
     <View
       style={[
-        s.cryptoGlyph,
+        s.glyphSquircle,
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
-          backgroundColor: c.brandDim,
+          borderRadius: radius,
+          backgroundColor: "#F7931A",
         },
       ]}
     >
-      <Text style={[s.cryptoGlyphText, { color: c.brand, fontSize: size * 0.5 }]}>
+      <Text
+        style={{
+          fontFamily: fontFamily[800],
+          fontSize: size * 0.58,
+          color: "#FFFFFF",
+          letterSpacing: -0.5,
+          /* El glyph ₿ tiene una metric box rara, lo bajamos un
+           * píxel para que centre ópticamente. */
+          marginTop: -size * 0.04,
+        }}
+      >
         ₿
       </Text>
     </View>
@@ -2861,8 +2944,12 @@ const s = StyleSheet.create({
     gap: 14,
   },
   marketIcon: {
-    width: 32,
-    height: 32,
+    /* 40 px — el ícono spans verticalmente las 2 líneas de
+     * contenido (name + delta) lo que centra visualmente el
+     * nombre del mercado contra el ícono. Más balanceado que
+     * antes con el ícono más chico. */
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2881,14 +2968,13 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
     marginTop: 4,
   },
-  cryptoGlyph: {
+  /* Squircle base de los MarketGlyphs (Sol de Mayo / estrella / ₿).
+   * borderCurve continuous para feel iOS. El radius lo setea el
+   * componente (proporción ~22 % del size). */
+  glyphSquircle: {
     alignItems: "center",
     justifyContent: "center",
     borderCurve: "continuous",
-  },
-  cryptoGlyphText: {
-    fontFamily: fontFamily[800],
-    letterSpacing: -0.5,
   },
   marketName: {
     fontFamily: fontFamily[700],
