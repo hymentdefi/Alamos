@@ -122,9 +122,12 @@ export default function AssetAlertsScreen() {
 
   const handleDelete = async (alert: PriceAlert) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    /* Sin toast de confirmación — la fila desaparece del listado y
+     * eso ya comunica que el delete pasó. Sólo mostramos toast en
+     * caso de error porque sino el revert del optimistic se vería
+     * silencioso y el user no sabría qué falló. */
     try {
       await remove(alert.id);
-      show("Alerta eliminada", { variant: "neutral" });
     } catch {
       show("No pudimos eliminar la alerta", { variant: "error" });
     }
@@ -133,11 +136,11 @@ export default function AssetAlertsScreen() {
   const handleTogglePause = async (alert: PriceAlert) => {
     const willPause = alert.status === "active";
     Haptics.selectionAsync().catch(() => {});
+    /* Sin toast de confirmación — la fila pasa a 40 % opacity con
+     * label "Pausada" (o vuelve a la apariencia normal). Esa
+     * transición ya comunica el cambio de estado. */
     try {
       await setPaused(alert.id, willPause);
-      show(willPause ? "Alerta en pausa" : "Alerta reactivada", {
-        variant: "neutral",
-      });
     } catch {
       show("No pudimos actualizar la alerta", { variant: "error" });
     }

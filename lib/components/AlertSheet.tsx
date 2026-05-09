@@ -266,7 +266,6 @@ export function AlertSheet({
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
-        showToast("Alerta actualizada", { variant: "success" });
       } else {
         await create({
           assetId: asset.ticker,
@@ -277,7 +276,6 @@ export function AlertSheet({
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
-        showToast("Alerta creada", { variant: "success" });
       }
       dismiss();
     } catch (e) {
