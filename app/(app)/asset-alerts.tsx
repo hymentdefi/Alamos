@@ -72,6 +72,10 @@ export default function AssetAlertsScreen() {
   const [tab, setTab] = useState<Tab>("price");
   const [sort, setSort] = useState<Sort>("proximity");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  /* Formato de la columna de distancia: % al objetivo (default) o
+   * $. Lo elige un mini segmented en el header de la sección y se
+   * aplica a todas las filas. */
+  const [distFormat, setDistFormat] = useState<"%" | "$">("%");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
 
@@ -246,17 +250,81 @@ export default function AssetAlertsScreen() {
                   <Text style={[s.sectionTitle, { color: c.text }]}>
                     Alertas activas ({sortedAlerts.length})
                   </Text>
-                  {/* Headers de columna alineados con la data —
-                      "% al objetivo" + "$ al objetivo" en gris tenue,
-                      después el ícono de sort que abre el menú con
-                      las dos opciones de orden. */}
-                  <View style={s.columnHeaders}>
-                    <Text style={[s.columnHeaderPct, { color: c.textMuted }]}>
-                      % al objetivo
-                    </Text>
-                    <Text style={[s.columnHeaderDelta, { color: c.textMuted }]}>
-                      $ al objetivo
-                    </Text>
+                  {/* Mini segmented "% / $" + ícono de sort.
+                   *  Mismo lenguaje visual que los tabs Precio/
+                   *  Indicadores pero en miniatura. El segmented
+                   *  decide qué muestra la col de distancia en cada
+                   *  fila (porcentaje o monto en moneda nativa). */}
+                  <View style={s.headerControls}>
+                    <View
+                      style={[
+                        s.distSeg,
+                        { backgroundColor: c.surfaceHover },
+                      ]}
+                    >
+                      <Pressable
+                        onPress={() => {
+                          if (distFormat !== "%") {
+                            Haptics.selectionAsync().catch(() => {});
+                            setDistFormat("%");
+                          }
+                        }}
+                        style={[
+                          s.distSegBtn,
+                          distFormat === "%" && {
+                            backgroundColor: c.surfaceSunken,
+                          },
+                        ]}
+                        hitSlop={4}
+                      >
+                        <Text
+                          style={[
+                            s.distSegText,
+                            {
+                              color:
+                                distFormat === "%" ? c.text : c.textMuted,
+                              fontFamily:
+                                distFormat === "%"
+                                  ? fontFamily[700]
+                                  : fontFamily[600],
+                            },
+                          ]}
+                        >
+                          %
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          if (distFormat !== "$") {
+                            Haptics.selectionAsync().catch(() => {});
+                            setDistFormat("$");
+                          }
+                        }}
+                        style={[
+                          s.distSegBtn,
+                          distFormat === "$" && {
+                            backgroundColor: c.surfaceSunken,
+                          },
+                        ]}
+                        hitSlop={4}
+                      >
+                        <Text
+                          style={[
+                            s.distSegText,
+                            {
+                              color:
+                                distFormat === "$" ? c.text : c.textMuted,
+                              fontFamily:
+                                distFormat === "$"
+                                  ? fontFamily[700]
+                                  : fontFamily[600],
+                            },
+                          ]}
+                        >
+                          $
+                        </Text>
+                      </Pressable>
+                    </View>
                     <Pressable
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => {});
@@ -277,6 +345,7 @@ export default function AssetAlertsScreen() {
                       alert={alert}
                       asset={asset}
                       withTopDivider={i > 0}
+                      distFormat={distFormat}
                       onEdit={() => {
                         Haptics.selectionAsync().catch(() => {});
                         setEditingAlert(alert);
@@ -548,6 +617,7 @@ function SwipableAlertRow({
   alert,
   asset,
   withTopDivider,
+  distFormat,
   onEdit,
   onDelete,
   onTogglePause,
@@ -555,6 +625,9 @@ function SwipableAlertRow({
   alert: PriceAlert;
   asset: Asset;
   withTopDivider: boolean;
+  /** Formato del valor de distancia: "%" muestra +X.XX%, "$"
+   *  muestra +X,XX (currency). Lo elige el segmented del header. */
+  distFormat: "%" | "$";
   onEdit: () => void;
   onDelete: () => void;
   onTogglePause: () => void;
@@ -656,30 +729,24 @@ function SwipableAlertRow({
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            {/* Col 1: dirección + precio objetivo, todo en el color
-             *  de la dirección (verde si sube, naranja si baja). Sin
-             *  ticker — el header del screen ya muestra qué activo es. */}
+            {/* Col 1: dirección + precio objetivo en el color de la
+             *  dirección (verde si sube, naranja si baja). 16 / 600. */}
             <Text
               style={[s.alertLeft, { color: dirColor }]}
               numberOfLines={1}
             >
               {dirLabel} {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col 2: % de distancia, mismo color que la dirección. */}
+            {/* Col 2 (única): distancia al objetivo en el formato
+             *  elegido por el segmented del header (% o $). Gris
+             *  tenue, 14 px. */}
             <Text
-              style={[s.alertPct, { color: dirColor }]}
+              style={[s.alertDist, { color: c.textMuted }]}
               numberOfLines={1}
             >
-              {distSign}
-              {distPct.toFixed(2)}%
-            </Text>
-            {/* Col 3: $ de distancia, gris tenue. */}
-            <Text
-              style={[s.alertDelta, { color: c.textMuted }]}
-              numberOfLines={1}
-            >
-              {distSign}
-              {formatMoney(Math.abs(distAbs), cur)}
+              {distFormat === "%"
+                ? `${distSign}${distPct.toFixed(2)}%`
+                : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
             </Text>
           </Pressable>
           {/* Col 4: toggle iOS-style. ON = activa, OFF = pausada. */}
@@ -865,31 +932,32 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Column headers — alineados con la data: % | $ | sort icon.
-   * minWidth de cada uno coincide con el de las cols del row para
-   * que la grilla se vea pareja. */
-  columnHeaders: {
+  /* Header right-side: mini segmented "% | $" + ícono sort. Mismo
+   * lenguaje visual que los tabs Precio/Indicadores pero ~60 px
+   * total de ancho (chico). */
+  headerControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
-  /* % header: descriptivo, centrado sobre la col de %. minWidth
-   * matchea el de alertPct (90 — más ancho que antes para acomodar
-   * "% al objetivo"). */
-  columnHeaderPct: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    minWidth: 90,
-    textAlign: "center",
+  distSeg: {
+    flexDirection: "row",
+    padding: 2,
+    borderRadius: radius.pill,
+    borderCurve: "continuous",
   },
-  /* $ header: igual ancho/alineación que % para grilla pareja. */
-  columnHeaderDelta: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    minWidth: 90,
-    textAlign: "center",
+  distSegBtn: {
+    minWidth: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  distSegText: {
+    fontSize: 12,
+    letterSpacing: 0,
   },
   sortIconBtn: {
     width: 32,
@@ -1034,28 +1102,22 @@ const s = StyleSheet.create({
   triggeredRow: {
     paddingVertical: 12,
   },
-  /* Col 1: ticker + dirección + precio objetivo. 15 / 600. Crece. */
+  /* Col 1: dirección + precio objetivo. 16 / 600. Crece para
+   * empujar la distancia y el toggle a la derecha. */
   alertLeft: {
     flex: 1,
     fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.25,
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
-  /* Col 2: % de distancia, centrada bajo el header "% al objetivo". */
-  alertPct: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
-    minWidth: 90,
-    textAlign: "center",
-  },
-  /* Col 3: $ de distancia, centrada bajo "$ al objetivo". */
-  alertDelta: {
+  /* Col 2: distancia (% o $ según el segmented del header). Gris
+   * tenue, 14 px. Alineada a la derecha contra el toggle. */
+  alertDist: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.15,
-    minWidth: 90,
-    textAlign: "center",
+    minWidth: 100,
+    textAlign: "right",
   },
   /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
    * domine la fila. */
