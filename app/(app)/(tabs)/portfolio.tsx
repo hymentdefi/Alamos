@@ -694,23 +694,12 @@ export default function PortfolioScreen() {
                     s.vizSegBtn,
                     viz === "pie" && { backgroundColor: c.bg },
                   ]}
+                  accessibilityLabel="Vista de torta"
                 >
                   <PieGlyph
                     color={viz === "pie" ? c.text : c.textMuted}
-                    size={14}
+                    size={16}
                   />
-                  <Text
-                    style={[
-                      s.vizSegLabel,
-                      {
-                        color: viz === "pie" ? c.text : c.textMuted,
-                        fontFamily:
-                          viz === "pie" ? fontFamily[700] : fontFamily[500],
-                      },
-                    ]}
-                  >
-                    Pie
-                  </Text>
                 </Tap>
                 <Tap
                   onPress={() => setViz("brick")}
@@ -721,23 +710,12 @@ export default function PortfolioScreen() {
                     s.vizSegBtn,
                     viz === "brick" && { backgroundColor: c.bg },
                   ]}
+                  accessibilityLabel="Vista de ladrillo"
                 >
                   <BrickGlyph
                     color={viz === "brick" ? c.text : c.textMuted}
-                    size={14}
+                    size={16}
                   />
-                  <Text
-                    style={[
-                      s.vizSegLabel,
-                      {
-                        color: viz === "brick" ? c.text : c.textMuted,
-                        fontFamily:
-                          viz === "brick" ? fontFamily[700] : fontFamily[500],
-                      },
-                    ]}
-                  >
-                    Ladrillo
-                  </Text>
                 </Tap>
               </View>
             </View>
