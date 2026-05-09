@@ -509,7 +509,7 @@ export default function PortfolioScreen() {
             </Text>
             <Text style={[s.stickyDot, { color: c.textMuted }]}>·</Text>
             <Text style={[s.stickyPct, { color }]}>
-              {formatPct(dayPct)}
+              {dayUp ? "▲" : "▼"} {fmtPctAbs(dayPct)}
             </Text>
           </View>
         </Animated.View>
@@ -675,7 +675,7 @@ export default function PortfolioScreen() {
               {formatMoney(Math.abs(daySumDisplay), currency)}
             </Text>
             <Text style={[s.deltaText, { color }]}>
-              ({formatPct(dayPct)})
+              ({fmtPctAbs(dayPct)})
             </Text>
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
@@ -880,11 +880,11 @@ export default function PortfolioScreen() {
               ]}
             >
               <Text style={[s.linkRowLabel, { color: c.text }]}>
-                Rendimiento histórico
+                Rendimiento
               </Text>
               <View style={s.linkRowTrailing}>
                 <Text style={[s.linkRowValue, { color: c.brand }]}>
-                  {formatPct(12.4)}
+                  ▲ {fmtPctAbs(12.4)}
                 </Text>
                 <Feather
                   name="chevron-right"
@@ -1083,6 +1083,13 @@ interface MarketBucket {
   cashLabel: string;
 }
 
+/* Helper: % en abs sin signo +/-. La dirección la comunica el ▲/▼
+ * que va antes del valor. La pantalla del portfolio nunca muestra
+ * signos +/-, sólo flechitas. */
+function fmtPctAbs(n: number): string {
+  return `${Math.abs(n).toFixed(2).replace(".", ",")}%`;
+}
+
 function MarketRow({
   label,
   marketKey,
@@ -1102,7 +1109,11 @@ function MarketRow({
     yesterdayArs > 0 ? (bucket.daySumArs / yesterdayArs) * 100 : 0;
   const dayUp = bucket.daySumArs >= 0;
   const deltaColor = empty ? c.textMuted : dayUp ? c.brand : c.red;
-  const sparkColor = empty ? c.textFaint : dayUp ? c.brand : c.red;
+  /* Sparkline color = el verde data del chart de stock detail
+   * (c.dataGreen — #00C805 light, #5AC53A más suave en dark) y el
+   * red token canónico para down. Match exacto con el chart line
+   * del activo individual. */
+  const sparkColor = empty ? c.textFaint : dayUp ? c.dataGreen : c.red;
 
   const investedDisplay = formatMoney(
     bucket.invested,
@@ -1190,7 +1201,7 @@ function MarketRow({
               style={[s.marketDelta, { color: deltaColor }]}
               numberOfLines={1}
             >
-              {dayUp ? "▲" : "▼"} {formatPct(dayPct)}
+              {dayUp ? "▲" : "▼"} {fmtPctAbs(dayPct)}
             </Text>
           ) : null}
         </View>
@@ -1936,12 +1947,12 @@ function FloorPie({
                         color:
                           activeSlice.rows[0].change >= 0
                             ? c.brand
-                            : "#FF6E5C",
+                            : c.red,
                       },
                     ]}
                   >
                     {activeSlice.rows[0].change >= 0 ? "▲ " : "▼ "}
-                    {formatPct(activeSlice.rows[0].change, false)}
+                    {fmtPctAbs(activeSlice.rows[0].change)}
                   </Text>
                 </View>
               </>
@@ -1967,12 +1978,12 @@ function FloorPie({
                       style={[
                         s.tooltipChange,
                         {
-                          color: r.change >= 0 ? c.brand : "#FF6E5C",
+                          color: r.change >= 0 ? c.brand : c.red,
                         },
                       ]}
                     >
                       {r.change >= 0 ? "▲ " : "▼ "}
-                      {formatPct(r.change, false)}
+                      {fmtPctAbs(r.change)}
                     </Text>
                   </View>
                 ))}
@@ -2356,12 +2367,12 @@ function FloorBrick({
                         color:
                           activeBlock.rows[0].change >= 0
                             ? c.brand
-                            : "#FF6E5C",
+                            : c.red,
                       },
                     ]}
                   >
                     {activeBlock.rows[0].change >= 0 ? "▲ " : "▼ "}
-                    {formatPct(activeBlock.rows[0].change, false)}
+                    {fmtPctAbs(activeBlock.rows[0].change)}
                   </Text>
                 </View>
               </>
@@ -2386,11 +2397,11 @@ function FloorBrick({
                     <Text
                       style={[
                         s.tooltipChange,
-                        { color: r.change >= 0 ? c.brand : "#FF6E5C" },
+                        { color: r.change >= 0 ? c.brand : c.red },
                       ]}
                     >
                       {r.change >= 0 ? "▲ " : "▼ "}
-                      {formatPct(r.change, false)}
+                      {fmtPctAbs(r.change)}
                     </Text>
                   </View>
                 ))}
