@@ -248,11 +248,10 @@ export default function AssetAlertsScreen() {
                   <Text style={[s.sectionTitle, { color: c.text }]}>
                     Alertas activas ({sortedAlerts.length})
                   </Text>
-                  {/* Header right: estructura espejada del row para
-                   *  que el toggle "% al objetivo ▾" quede ARRIBA de
-                   *  la columna de distancia. Mismo gap (12), mismo
-                   *  ancho de la columna (110), spacer del Switch
-                   *  (~51), y el sortIcon en la posición del trash. */}
+                  {/* Header right: el toggle queda arriba de la
+                   *  columna de distancia (mismo width 110), y el
+                   *  sortIcon queda CENTRADO en el área que ocupan
+                   *  Switch + Trash en cada row (99 px). */}
                   <View style={s.headerControls}>
                     <Pressable
                       onPress={() => {
@@ -279,28 +278,32 @@ export default function AssetAlertsScreen() {
                         style={{ marginLeft: 2, marginTop: 1 }}
                       />
                     </Pressable>
-                    {/* Spacer en la posición del Switch del row. */}
-                    <View style={s.headerSwitchSpacer} />
-                    <Pressable
-                      ref={sortBtnRef}
-                      onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        sortBtnRef.current?.measureInWindow(
-                          (x, y, width, height) => {
-                            setSortAnchor({
-                              top: y + height + 6,
-                              right: Math.max(8, windowW - (x + width)),
-                            });
-                            setSortMenuOpen(true);
-                          },
-                        );
-                      }}
-                      hitSlop={10}
-                      style={s.sortIconBtn}
-                      accessibilityLabel="Cambiar orden de la lista"
-                    >
-                      <Feather name="sliders" size={16} color={c.textMuted} />
-                    </Pressable>
+                    {/* Right cluster — width 99 que equivale al
+                     *  Switch+gap+Trash del row. SortIcon centrado
+                     *  adentro = queda exactamente en el medio del
+                     *  toggle on/off y el botón trash de cada fila. */}
+                    <View style={s.headerRightCluster}>
+                      <Pressable
+                        ref={sortBtnRef}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          sortBtnRef.current?.measureInWindow(
+                            (x, y, width, height) => {
+                              setSortAnchor({
+                                top: y + height + 6,
+                                right: Math.max(8, windowW - (x + width)),
+                              });
+                              setSortMenuOpen(true);
+                            },
+                          );
+                        }}
+                        hitSlop={10}
+                        style={s.sortIconBtn}
+                        accessibilityLabel="Cambiar orden de la lista"
+                      >
+                        <Feather name="sliders" size={16} color={c.textMuted} />
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
                 <View style={s.list}>
@@ -865,12 +868,14 @@ const s = StyleSheet.create({
      * exactamente centrado sobre el valor de distancia. */
     minWidth: 110,
   },
-  /* Spacer en la posición que ocupa el Switch en cada fila. La
-   * Switch nativa de iOS reserva ~51 px de layout (no se achica
-   * con transform: scale). Match exacto = sortIcon y trash quedan
-   * en la misma X. */
-  headerSwitchSpacer: {
-    width: 51,
+  /* Right cluster del header — width 99 = Switch (51) + gap (12) +
+   * marginLeft Trash (4) + Trash (32) del row. SortIcon centrado
+   * adentro queda exactamente en el medio entre el on/off y el
+   * trash de cada fila. */
+  headerRightCluster: {
+    width: 99,
+    alignItems: "center",
+    justifyContent: "center",
   },
   /* Toggle del header — 13 / 500, no compite con el título
    * "Alertas activas (N)" (16 / 700) ni con la data del row
@@ -880,15 +885,13 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
   },
-  /* SortIcon ocupa la misma X que el botón trash en cada fila —
-   * mismo width (32) y mismo marginLeft (4) que alertDeleteBtn
-   * para que ambos estén perfectamente alineados verticalmente. */
+  /* SortIcon — centrado dentro del headerRightCluster. Sin
+   * marginLeft porque el cluster ya lo centra. */
   sortIconBtn: {
     width: 32,
     height: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 4,
   },
 
   /* Sort menu (popup que se abre al tocar el ícono de sliders).
@@ -961,13 +964,15 @@ const s = StyleSheet.create({
   section: {
     marginBottom: 12,
   },
+  /* Mismo paddingVertical que alertRow (12) para que el header y
+   * cada fila tengan EXACTAMENTE el mismo alto vertical y la
+   * grilla quede pareja. */
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingVertical: 12,
   },
   sectionTitle: {
     fontFamily: fontFamily[700],
