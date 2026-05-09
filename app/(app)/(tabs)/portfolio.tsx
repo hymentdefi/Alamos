@@ -891,6 +891,87 @@ export default function PortfolioScreen() {
             </Pressable>
           ) : null}
 
+          {/* ─── Mejor / Peor del día — dos columnas Robinhood-style.
+              Eyebrow caps + ticker + delta coloreado. Hairline arriba
+              que las separa del Rendimiento link. Tap → detail del
+              asset. */}
+          {hasHoldings && bestOfDay && worstOfDay ? (
+            <View
+              style={[
+                s.bestWorstBlock,
+                { borderTopColor: c.border },
+              ]}
+            >
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/detail",
+                    params: { ticker: bestOfDay.asset.ticker },
+                  })
+                }
+                style={({ pressed }) => [
+                  s.bestWorstCol,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={[s.bestWorstEyebrow, { color: c.textMuted }]}>
+                  MEJOR DEL DÍA
+                </Text>
+                <Text style={[s.bestWorstTicker, { color: c.text }]}>
+                  {bestOfDay.asset.ticker}
+                </Text>
+                <Text
+                  style={[
+                    s.bestWorstDelta,
+                    {
+                      color:
+                        bestOfDay.asset.change >= 0 ? c.brand : c.red,
+                    },
+                  ]}
+                >
+                  {bestOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                  {fmtPctAbs(bestOfDay.asset.change)}
+                </Text>
+              </Pressable>
+
+              <View
+                style={[s.bestWorstDivider, { backgroundColor: c.border }]}
+              />
+
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/detail",
+                    params: { ticker: worstOfDay.asset.ticker },
+                  })
+                }
+                style={({ pressed }) => [
+                  s.bestWorstCol,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={[s.bestWorstEyebrow, { color: c.textMuted }]}>
+                  PEOR DEL DÍA
+                </Text>
+                <Text style={[s.bestWorstTicker, { color: c.text }]}>
+                  {worstOfDay.asset.ticker}
+                </Text>
+                <Text
+                  style={[
+                    s.bestWorstDelta,
+                    {
+                      color:
+                        worstOfDay.asset.change >= 0 ? c.brand : c.red,
+                    },
+                  ]}
+                >
+                  {worstOfDay.asset.change >= 0 ? "▲" : "▼"}{" "}
+                  {fmtPctAbs(worstOfDay.asset.change)}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {/* ─── Mercados — los 3 buckets de Álamos. Detalle por
               mercado: monto + delta + posiciones + cash. */}
           {hasHoldings ? (
@@ -2801,6 +2882,45 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.1,
+  },
+
+  /* Mejor / Peor del día — bloque de 2 columnas Robinhood-style.
+   * Hairline divider arriba (lo separa del Rendimiento link),
+   * line vertical entre columnas. Cada col tiene eyebrow caps +
+   * ticker grande + delta coloreado por signo. Tap navega a
+   * /(app)/detail del asset. */
+  bestWorstBlock: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  bestWorstCol: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  bestWorstDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    marginHorizontal: 16,
+  },
+  bestWorstEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 0.6,
+  },
+  bestWorstTicker: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    letterSpacing: -0.4,
+    marginTop: 6,
+  },
+  bestWorstDelta: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.15,
+    marginTop: 4,
   },
 
   /* Link row (Rendimiento histórico) — una sola línea con label
