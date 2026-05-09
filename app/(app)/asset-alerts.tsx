@@ -458,13 +458,19 @@ function EmptyState({
   text: string;
 }) {
   const { c } = useTheme();
+  /* Centro ÓPTICO en lugar del matemático: spacer top 1 + bottom 2.
+   * El centro visual queda en el primer tercio del espacio disponible
+   * — se siente "centrado" sin estar pegado al medio (que se lee
+   * como muy abajo). Truco clásico de empty states. */
   return (
     <View style={s.emptyWrap}>
+      <View style={{ flex: 1 }} />
       {title ? (
         <Text style={[s.emptyTitle, { color: c.text }]}>{title}</Text>
       ) : null}
       <View style={s.emptyIllustration}>{illustration}</View>
       <Text style={[s.emptyText, { color: c.textMuted }]}>{text}</Text>
+      <View style={{ flex: 2 }} />
     </View>
   );
 }
@@ -839,14 +845,12 @@ const s = StyleSheet.create({
   },
 
   /* Empty state — bell + texto descriptivo viven como una sola
-   * unidad centrada verticalmente en el espacio disponible entre
-   * los tabs y el CTA del bottom. flex 1 + justifyContent center
-   * los pone en el medio del ScrollView (que ya tiene flexGrow 1
-   * desde el container). */
+   * unidad. Centrado óptico via spacers internos (top 1, bottom 2)
+   * en el componente — queda en el primer tercio visual del espacio
+   * disponible para que se sienta centrado y no muy abajo. */
   emptyWrap: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 32,
   },
   emptyTitle: {
