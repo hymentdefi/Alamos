@@ -56,10 +56,6 @@ import {
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { FlagIcon } from "../../../lib/components/FlagIcon";
-import {
-  MiniSparkline,
-  seriesFromSeed,
-} from "../../../lib/components/Sparkline";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
@@ -1179,11 +1175,6 @@ function MarketRow({
     yesterdayArs > 0 ? (bucket.daySumArs / yesterdayArs) * 100 : 0;
   const dayUp = bucket.daySumArs >= 0;
   const deltaColor = empty ? c.textMuted : dayUp ? c.brand : c.red;
-  /* Sparkline color = el verde data del chart de stock detail
-   * (c.dataGreen — #00C805 light, #5AC53A más suave en dark) y el
-   * red token canónico para down. Match exacto con el chart line
-   * del activo individual. */
-  const sparkColor = empty ? c.textFaint : dayUp ? c.dataGreen : c.red;
 
   const investedDisplay = formatMoney(
     bucket.invested,
@@ -1200,19 +1191,6 @@ function MarketRow({
   const subtitle = cashDisplay
     ? `${countLabel} · ${cashDisplay}`
     : countLabel;
-
-  /* Sparkline del intraday del mercado — mock estable por marketKey
-   * + signo del delta. Sirve como ritmo visual al lado del nombre,
-   * comunica de un vistazo si el mercado se movió. */
-  const sparkSeries = useMemo(
-    () =>
-      seriesFromSeed(
-        `market-${marketKey}-${dayUp ? "up" : "down"}`,
-        24,
-        empty ? "flat" : dayUp ? "up" : "down",
-      ),
-    [marketKey, dayUp, empty],
-  );
 
   return (
     <View
@@ -1238,17 +1216,6 @@ function MarketRow({
           >
             {label}
           </Text>
-          {!empty ? (
-            <View style={s.marketSpark}>
-              <MiniSparkline
-                series={sparkSeries}
-                color={sparkColor}
-                width={50}
-                height={18}
-                strokeWidth={1.6}
-              />
-            </View>
-          ) : null}
           <Text
             style={[
               s.marketAmount,
@@ -2907,14 +2874,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-  },
-  marketSpark: {
-    /* Spark vive en el medio del top row, entre el nombre del
-     * mercado y el monto. Width fijo, no participa del flex. */
-    width: 50,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
   },
   marketRowBottom: {
     flexDirection: "row",
