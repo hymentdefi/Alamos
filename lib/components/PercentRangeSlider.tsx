@@ -18,7 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "../theme";
 
 /**
- * Slider de variación porcentual desde -30 % a +30 %.
+ * Slider de variación porcentual desde -50 % a +50 %.
  *
  * Anatomía del track (estilo "premium", no default del sistema):
  *   - Capa 0 (base): gris suave del theme con opacity baja, sólo
@@ -64,7 +64,7 @@ interface Props {
   width: number;
 }
 
-const RANGE = 30;
+const RANGE = 50;
 const HALF = RANGE;
 const STEP = 0.5;
 
@@ -190,9 +190,9 @@ export function PercentRangeSlider({
     };
   });
 
-  /* Tick marks @ ±10, ±20 — dots discretos sobre el track. El 0
+  /* Tick marks @ ±10/±25/±40 — dots discretos sobre el track. El 0
    * tiene su propio marker (más prominente). */
-  const tickPositions = [-20, -10, 10, 20];
+  const tickPositions = [-40, -25, -10, 10, 25, 40];
 
   return (
     <GestureDetector gesture={composed}>
@@ -267,7 +267,7 @@ export function PercentRangeSlider({
           ]}
         />
 
-        {/* Tick marks chicos a ±10/±20 */}
+        {/* Tick marks chicos a ±10/±25/±40 */}
         {tickPositions.map((tick) => {
           const left =
             THUMB_SIZE / 2 + ((tick + HALF) / (2 * HALF)) * usableWidth;
