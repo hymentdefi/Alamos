@@ -106,16 +106,15 @@ const QUICK_CHIPS: { pct: number; opacity: number }[] = [
 const SLIDER_RANGE = 30;
 
 /* Límites HARD del threshold de la alerta — más allá de esto
- * tampoco aceptamos. Evita que el user se mande una alerta a +500 %
- * (que probablemente sea un typo o nunca dispare) o a -99 %
- * (precio rozando 0). El backend va a hacer su propia validación
- * cuando lo conectemos.
+ * tampoco aceptamos. El piso es > 0 (ya validado en isFinite); el
+ * techo es 10× el precio actual. Evita que alguien tipee un
+ * gigante (típicamente typo, agregando un cero de más) y le rompa
+ * el flow de la app o cree alertas que nunca disparan.
  *
- *   PCT_MIN = -90  → threshold ≥ price * 0.10
- *   PCT_MAX = +100 → threshold ≤ price * 2.00
+ *   threshold > 0
+ *   threshold ≤ price × 10   (delta ≤ +900 %)
  */
-const ALERT_PCT_MIN = -90;
-const ALERT_PCT_MAX = 100;
+const ALERT_MAX_MULTIPLIER = 10;
 
 export function AlertSheet({
   visible,
@@ -249,17 +248,15 @@ export function AlertSheet({
       setErrorMsg("Ingresá un precio válido mayor a 0.");
       return;
     }
-    /* Validación de rango: el delta del threshold respecto al precio
-     * actual debe estar dentro de [-90 %, +100 %]. Fuera de eso no
-     * tiene sentido como alerta de precio (typo o nunca dispara).
-     * El error se muestra inline en el form. */
+    /* Validación de techo: el threshold no puede superar 10× el
+     * precio actual. Casi siempre que pasa eso es un typo (cero de
+     * más) y crearía una alerta que jamás dispara. El piso ya está
+     * cubierto por el check `value > 0` de arriba. */
     if (asset.price > 0) {
-      const pct = (value / asset.price - 1) * 100;
-      if (pct < ALERT_PCT_MIN || pct > ALERT_PCT_MAX) {
-        const minPrice = asset.price * (1 + ALERT_PCT_MIN / 100);
-        const maxPrice = asset.price * (1 + ALERT_PCT_MAX / 100);
+      const maxPrice = asset.price * ALERT_MAX_MULTIPLIER;
+      if (value > maxPrice) {
         setErrorMsg(
-          `El precio tiene que estar entre ${formatMoney(minPrice, currency)} y ${formatMoney(maxPrice, currency)}.`,
+          `El precio no puede superar ${formatMoney(maxPrice, currency)} (${ALERT_MAX_MULTIPLIER}× el precio actual).`,
         );
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Warning,
