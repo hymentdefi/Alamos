@@ -266,11 +266,10 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  {/* La fila del header espeja exactamente las
-                   *  columnas del row de alertas: title (flex 1),
-                   *  label de formato (mismo width 90 que alertDist),
-                   *  sort sobre la columna del Toggle (mismo width 40).
-                   *  Sin trash en el row → no hay 4ta columna. */}
+                  {/* Header espeja el row: title (intrínseco) + label
+                   *  del formato pegado a su lado (mismo gap que el
+                   *  row), spacer flex absorbe el resto, sort flush
+                   *  a la derecha sobre la columna del Toggle. */}
                   <Text
                     style={[s.sectionTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -303,6 +302,11 @@ export default function AssetAlertsScreen() {
                       style={{ marginLeft: 2, marginTop: 1 }}
                     />
                   </Pressable>
+                  {/* Spacer absorbe el espacio entre el label y el
+                      sort icon, para que el sort quede en el extremo
+                      derecho y el label quede pegado al título (mismo
+                      patrón que el row). */}
+                  <View style={{ flex: 1 }} />
                   <Pressable
                     ref={sortBtnRef}
                     onPress={() => {
@@ -766,7 +770,11 @@ function SwipableAlertRow({
             rowAnimStyle,
           ]}
         >
-          {/* Cols 1-2 dentro de un Pressable que abre el editor. */}
+          {/* Cols 1-2 dentro de un Pressable que abre el editor.
+              alertLeft sin flex → toma su ancho intrínseco; alertDist
+              sentado a su lado con gap 12; spacer al final absorbe el
+              resto. Resultado: dist value pegado a "Sube a $X", sin
+              el gigantesco hueco que dejaba antes el push a la derecha. */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
@@ -786,10 +794,7 @@ function SwipableAlertRow({
               <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
               {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col 2: distancia al objetivo en color de dirección.
-             *  Mismo size 16/600 que col 1 (jerarquía pareja). En
-             *  cripto 100k+, "+100.000,00 USDT" no entra en 90 px
-             *  a 16 px, así que adjustsFontSizeToFit lo shrinkea. */}
+            {/* Col 2: distancia al objetivo en color de dirección. */}
             <Text
               style={[s.alertDist, { color: dirColor }]}
               numberOfLines={1}
@@ -800,6 +805,9 @@ function SwipableAlertRow({
                 ? `${distSign}${distPct.toFixed(2)}%`
                 : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
             </Text>
+            {/* Spacer flex — empuja el bloque "alertLeft + alertDist"
+                hacia la izquierda, dejando aire libre antes del Toggle. */}
+            <View style={{ flex: 1 }} />
           </Pressable>
           {/* Col 3: toggle compacto. ON = activa, OFF = pausada. El
            *  Pan tiene activeOffsetX [-12,12], así que un tap simple
@@ -1093,7 +1101,7 @@ const s = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    flex: 1,
+    flexShrink: 1,
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
@@ -1157,9 +1165,13 @@ const s = StyleSheet.create({
   triggeredRow: {
     paddingVertical: 12,
   },
-  /* Col 1: dirección + precio objetivo. 16 / 600. */
+  /* Col 1: dirección + precio objetivo. 16 / 600. SIN flex —
+   * toma su ancho intrínseco, así alertDist se sienta a su lado
+   * con gap 12 (no glued al borde derecho). flexShrink 1 +
+   * adjustsFontSizeToFit del Text para que en crypto 100k+ se
+   * encoja antes que truncarse. */
   alertLeft: {
-    flex: 1,
+    flexShrink: 1,
     fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.3,
