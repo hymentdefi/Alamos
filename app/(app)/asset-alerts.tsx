@@ -305,9 +305,10 @@ export default function AssetAlertsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.textMuted}
-            colors={[c.textMuted]}
+            tintColor={c.text}
+            colors={[c.brand]}
             progressBackgroundColor={c.surface}
+            progressViewOffset={12}
           />
         }
       >
