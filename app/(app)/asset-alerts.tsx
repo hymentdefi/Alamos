@@ -266,42 +266,46 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  {/* Title izquierda (flex 1, empuja el cluster a la
-                   *  derecha). Cluster derecha = label "% al objetivo"
-                   *  + sort icon, separados por gap 12. */}
-                  <Text
-                    style={[s.sectionTitle, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    Alertas activas ({sortedAlerts.length})
-                  </Text>
-                  <View style={s.headerCluster}>
-                    <Pressable
-                      onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setDistFormat(distFormat === "%" ? "$" : "%");
-                      }}
-                      hitSlop={6}
-                      style={s.distFormatBtn}
-                      accessibilityLabel={
-                        distFormat === "%"
-                          ? "Cambiar a distancia en monto"
-                          : "Cambiar a distancia en porcentaje"
-                      }
+                  {/* Mismo patrón que el row: title (flex 1, izquierda),
+                   *  label "% al objetivo" (centrado, intrínseco),
+                   *  sort icon (flex 1, derecha). El cluster del label
+                   *  centrado se expande hacia ambos lados cuando el
+                   *  título o el icon necesitan más espacio. */}
+                  <View style={s.headerSideLeft}>
+                    <Text
+                      style={[s.sectionTitle, { color: c.text }]}
+                      numberOfLines={1}
                     >
-                      <Text
-                        style={[s.distFormatText, { color: c.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
-                      </Text>
-                      <Feather
-                        name="chevron-down"
-                        size={14}
-                        color={c.textMuted}
-                        style={{ marginLeft: 2, marginTop: 1 }}
-                      />
-                    </Pressable>
+                      Alertas activas ({sortedAlerts.length})
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setDistFormat(distFormat === "%" ? "$" : "%");
+                    }}
+                    hitSlop={6}
+                    style={s.distFormatBtn}
+                    accessibilityLabel={
+                      distFormat === "%"
+                        ? "Cambiar a distancia en monto"
+                        : "Cambiar a distancia en porcentaje"
+                    }
+                  >
+                    <Text
+                      style={[s.distFormatText, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
+                    </Text>
+                    <Feather
+                      name="chevron-down"
+                      size={14}
+                      color={c.textMuted}
+                      style={{ marginLeft: 2, marginTop: 1 }}
+                    />
+                  </Pressable>
+                  <View style={s.headerSideRight}>
                     <Pressable
                       ref={sortBtnRef}
                       onPress={() => {
@@ -766,47 +770,48 @@ function SwipableAlertRow({
             rowAnimStyle,
           ]}
         >
-          {/* 3 columnas con proporciones fijas: precio 50% +
-              porcentaje 30% + toggle 20%. Las cols 1 y 2 viven
-              dentro de un Pressable que abre el editor; la col 3
-              queda fuera para que su tap toggle no abra editor. */}
+          {/* Layout 3 secciones — left flex 1 (alertLeft, alineado
+              izquierda), middle intrínseco (alertDist, centrado en
+              el row, se expande hacia ambos lados cuando el valor se
+              hace largo), right flex 1 (Toggle, alineado derecha). */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
-              s.alertEditArea,
+              s.alertSideLeft,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            {/* Col 1 (flex 5 = 50%): "Sube a $X" / "Baja a $X". */}
-            <View style={s.alertCol1}>
-              <Text
-                style={[s.alertLeft, { color: c.text }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.78}
-              >
-                <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
-                {formatMoney(alert.threshold, cur)}
-              </Text>
-            </View>
-            {/* Col 2 (flex 3 = 30%): distancia, alineada a la
-                derecha dentro de su columna. */}
-            <View style={s.alertCol2}>
-              <Text
-                style={[s.alertDist, { color: dirColor }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.78}
-              >
-                {distFormat === "%"
-                  ? `${distSign}${distPct.toFixed(2)}%`
-                  : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
-              </Text>
-            </View>
+            <Text
+              style={[s.alertLeft, { color: c.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
+              {formatMoney(alert.threshold, cur)}
+            </Text>
           </Pressable>
-          {/* Col 3 (flex 2 = 20%): toggle centrado. */}
-          <View style={s.alertCol3}>
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertCenter,
+              { opacity: pressed ? 0.7 : rowOpacity },
+            ]}
+            accessibilityLabel="Editar alerta"
+          >
+            <Text
+              style={[s.alertDist, { color: dirColor }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              {distFormat === "%"
+                ? `${distSign}${distPct.toFixed(2)}%`
+                : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
+            </Text>
+          </Pressable>
+          <View style={s.alertSideRight}>
             <Toggle
               value={!isPaused}
               onValueChange={() => onTogglePause()}
@@ -1097,17 +1102,23 @@ const s = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    flex: 1,
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* Cluster derecho del header — "% al objetivo" + sort icon, con
-   * gap entre ellos. Pegado al borde derecho del header. */
-  headerCluster: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  /* 3 secciones del header. Left + Right ambos flex 1 → empujan
+   * con la misma fuerza al label del centro, que toma su ancho
+   * intrínseco. Resultado: label SIEMPRE centrado en el row, se
+   * expande hacia ambos lados si el contenido se hace más largo. */
+  headerSideLeft: {
+    flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  headerSideRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
   },
   sectionMeta: {
     fontFamily: fontFamily[500],
@@ -1159,31 +1170,30 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
-  /* Área tappable que cubre col 1 + col 2 (precio + porcentaje).
-   * Tap → onEdit. Toma 80 % del row (flex 8 contra los 2 del col 3
-   * del Toggle), y reparte ese 80 % entre col 1 (5) y col 2 (3). */
-  alertEditArea: {
-    flex: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  /* Col 1 — 50 % del row (flex 5 dentro de alertEditArea de flex 8). */
-  alertCol1: {
-    flex: 5,
+  /* 3 secciones del row.
+   *   Left + Right son flex 1 (mismo peso) → mantienen el centro
+   *   genuinamente CENTRADO horizontalmente; cuando el valor del
+   *   medio crece (porcentajes / dólares largos), se expande hacia
+   *   ambos lados de manera simétrica.
+   *   Center es intrínseco (sin flex), su ancho lo dicta el contenido.
+   *   Padding horizontal entre secciones para que no se peguen.
+   */
+  alertSideLeft: {
+    flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "center",
     paddingRight: 8,
   },
-  /* Col 2 — 30 % del row (flex 3 dentro de alertEditArea). El
-   * porcentaje queda alineado a la derecha de la columna. */
-  alertCol2: {
-    flex: 3,
-    alignItems: "flex-end",
-    paddingLeft: 4,
-  },
-  /* Col 3 — 20 % del row. Toggle centrado horizontalmente. */
-  alertCol3: {
-    flex: 2,
+  alertCenter: {
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  alertSideRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    paddingLeft: 8,
   },
   triggeredRow: {
     paddingVertical: 12,
@@ -1194,15 +1204,15 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.3,
   },
-  /* Texto del % o $ de distancia (col 2). 16 / 600 — match con
-   * alertLeft. Alineado a la derecha dentro de su columna (vía
-   * alignItems flex-end del col 2 wrapper). adjustsFontSizeToFit
-   * del Text se encarga del shrinkado en cripto 100k+. */
+  /* Texto del % o $ de distancia (centro del row). 16 / 600
+   * (match con alertLeft). El wrapper alertCenter se encarga del
+   * centrado horizontal dentro del row. adjustsFontSizeToFit del
+   * Text shrinka en cripto 100k+. */
   alertDist: {
     fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.3,
-    textAlign: "right",
+    textAlign: "center",
   },
 
   /* Estilos del TriggeredRow (sección histórico) — layout viejo de
