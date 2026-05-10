@@ -266,18 +266,50 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  {/* Mismo layout que el row: 2 cols flex 1 + center
-                   *  en position absolute. El "% al objetivo" cae al
-                   *  centro geométrico del row → ALINEADO con el value
-                   *  de cada fila. */}
+                  {/* Mismo layout que el row: left flex 1 +
+                   *  center intrínseco + right flex 1. Centro
+                   *  geométrico = x=fullWidth/2 → alineado con el
+                   *  value de cada fila. */}
                   <View style={s.alertSideLeft}>
                     <Text
                       style={[s.sectionTitle, { color: c.text }]}
                       numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.55}
                     >
                       Alertas activas ({sortedAlerts.length})
                     </Text>
                   </View>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setDistFormat(distFormat === "%" ? "$" : "%");
+                    }}
+                    hitSlop={6}
+                    style={s.alertCenter}
+                    accessibilityLabel={
+                      distFormat === "%"
+                        ? "Cambiar a distancia en monto"
+                        : "Cambiar a distancia en porcentaje"
+                    }
+                  >
+                    <View style={s.distFormatBtn}>
+                      <Text
+                        style={[s.distFormatText, { color: c.textMuted }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.55}
+                      >
+                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
+                      </Text>
+                      <Feather
+                        name="chevron-down"
+                        size={14}
+                        color={c.textMuted}
+                        style={{ marginLeft: 2, marginTop: 1 }}
+                      />
+                    </View>
+                  </Pressable>
                   <View style={s.alertSideRight}>
                     <Pressable
                       ref={sortBtnRef}
@@ -298,39 +330,6 @@ export default function AssetAlertsScreen() {
                       accessibilityLabel="Cambiar orden de la lista"
                     >
                       <Feather name="sliders" size={16} color={c.textMuted} />
-                    </Pressable>
-                  </View>
-                  <View
-                    pointerEvents="box-none"
-                    style={s.alertCenterAbs}
-                  >
-                    <Pressable
-                      onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setDistFormat(distFormat === "%" ? "$" : "%");
-                      }}
-                      hitSlop={6}
-                      style={s.alertCenterPressable}
-                      accessibilityLabel={
-                        distFormat === "%"
-                          ? "Cambiar a distancia en monto"
-                          : "Cambiar a distancia en porcentaje"
-                      }
-                    >
-                      <View style={s.distFormatBtn}>
-                        <Text
-                          style={[s.distFormatText, { color: c.textMuted }]}
-                          numberOfLines={1}
-                        >
-                          {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
-                        </Text>
-                        <Feather
-                          name="chevron-down"
-                          size={14}
-                          color={c.textMuted}
-                          style={{ marginLeft: 2, marginTop: 1 }}
-                        />
-                      </View>
                     </Pressable>
                   </View>
                 </View>
@@ -780,10 +779,16 @@ function SwipableAlertRow({
             rowAnimStyle,
           ]}
         >
-          {/* Layout: 2 columnas flex 1 (left + right) + el "center"
-              en position absolute centrado en el row. El header usa
-              el MISMO patrón → label y value caen al mismo x exacto
-              independientemente del ancho del título o del Toggle. */}
+          {/* 3 columnas en flex layout (NO absolute, NO posiciones
+              hardcoded): left flex 1 + center intrínseco + right flex 1.
+              El center toma su ancho de contenido y las dos cols
+              flexibles se reparten lo que queda EQUITATIVAMENTE.
+              Como el header usa el mismo esquema y el row tiene el
+              mismo width, ambos centros caen en x=fullWidth/2 (centro
+              geométrico). overflow hidden + adjustsFontSizeToFit en
+              los Text de los lados fuerza el shrinkado del texto
+              cuando es más ancho que el wrapper, así nunca se mete
+              sobre el center. */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
@@ -796,10 +801,29 @@ function SwipableAlertRow({
               style={[s.alertLeft, { color: c.text }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.78}
+              minimumFontScale={0.55}
             >
               <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
               {formatMoney(alert.threshold, cur)}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertCenter,
+              { opacity: pressed ? 0.7 : rowOpacity },
+            ]}
+            accessibilityLabel="Editar alerta"
+          >
+            <Text
+              style={[s.alertDist, { color: dirColor }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.55}
+            >
+              {distFormat === "%"
+                ? `${distSign}${Math.abs(distPct).toFixed(2)}%`
+                : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
             </Text>
           </Pressable>
           <View style={s.alertSideRight}>
@@ -807,35 +831,6 @@ function SwipableAlertRow({
               value={!isPaused}
               onValueChange={() => onTogglePause()}
             />
-          </View>
-          {/* Center absoluto — fill horizontal con alignItems center
-              hace que el contenido caiga en el centro geométrico de
-              alertRow. pointerEvents box-none deja pasar los taps al
-              left/right (toggle, etc); el Pressable interior captura
-              taps en su área propia para abrir el editor. */}
-          <View
-            pointerEvents="box-none"
-            style={s.alertCenterAbs}
-          >
-            <Pressable
-              onPress={onEdit}
-              style={({ pressed }) => [
-                s.alertCenterPressable,
-                { opacity: pressed ? 0.7 : rowOpacity },
-              ]}
-              accessibilityLabel="Editar alerta"
-            >
-              <Text
-                style={[s.alertDist, { color: dirColor }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.78}
-              >
-                {distFormat === "%"
-                  ? `${distSign}${Math.abs(distPct).toFixed(2)}%`
-                  : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
-              </Text>
-            </Pressable>
           </View>
         </Animated.View>
       </GestureDetector>
@@ -1123,46 +1118,43 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* Layout del row y del header — 2 cols flex 1 (left + right) +
-   * un centro en position absolute que SIEMPRE cae al centro
-   * geométrico del row, independiente del ancho del título o del
-   * Toggle. Esa simetría hace que el label "% al objetivo" del
-   * header y el value "+5,50 %" del row caigan al mismo x exacto. */
+  /* Layout 3-col en flex puro:
+   *   alertSideLeft: flex 1, content alineado a la izquierda.
+   *   alertCenter: SIN flex → toma su ancho intrínseco según el
+   *     contenido (label o value). Cuando el value crece, alertCenter
+   *     se expande y los lados se contraen (cada uno absorbe la
+   *     mitad de la diferencia, mantiene la simetría).
+   *   alertSideRight: flex 1, content alineado a la derecha.
+   *
+   * minWidth: 0 + overflow hidden + adjustsFontSizeToFit en el Text
+   * fuerzan que el contenido se shrinkee dentro del wrapper en lugar
+   * de empujar al wrapper más allá de su flex-allotment.
+   *
+   * Como el header y el row usan EL MISMO esquema y comparten width
+   * total, ambos centros (label y value) caen exactamente en el
+   * x = fullWidth / 2. Alineación vertical perfecta. */
   alertSideLeft: {
     flex: 1,
     minWidth: 0,
+    overflow: "hidden",
     alignItems: "flex-start",
     justifyContent: "center",
     paddingLeft: 24,
-    paddingRight: 8,
+    paddingRight: 6,
+  },
+  alertCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
   },
   alertSideRight: {
     flex: 1,
     minWidth: 0,
+    overflow: "hidden",
     alignItems: "flex-end",
     justifyContent: "center",
-    paddingLeft: 8,
+    paddingLeft: 6,
     paddingRight: 24,
-  },
-  /* Center absoluto — fill horizontal del row, alignItems center
-   * empuja el contenido al medio. pointerEvents box-none permite que
-   * los taps en alertSideLeft/Right (Pressable de edit + Toggle)
-   * sigan funcionando; el Pressable interior captura los taps en
-   * su área propia. */
-  alertCenterAbs: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  alertCenterPressable: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    alignItems: "center",
-    justifyContent: "center",
   },
   sectionMeta: {
     fontFamily: fontFamily[500],
