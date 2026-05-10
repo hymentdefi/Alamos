@@ -2312,17 +2312,17 @@ function FloorPie({
    * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
   const [tooltipH, setTooltipH] = useState(0);
 
-  // Geometría del viewBox — donut centrado horizontal, ligeramente
-  // empujado hacia abajo (cy=85) y H acortado a 170 para minimizar
-  // el padding muerto arriba/abajo. outer 70 / inner 42 → grosor 28.
-  // Drop shadow vive en cy + outerR + 12 = 167 (cabe en H=170 con 3px
-  // de margen al fondo). Top empty pasa de 30 a 15 px.
+  // Geometría del viewBox — donut centrado horizontal, empujado hacia
+  // abajo (cy=85) y H acortado a 170 para minimizar el padding muerto
+  // arriba/abajo. outer 72 / inner 44 → grosor 28 ring un toque más
+  // dominante. Sin drop shadow ni outline entre slices (estética
+  // Robinhood: flat + slices "cortadas" por el bg color).
   const W = 200;
   const H = 170;
   const cx = W / 2;
   const cy = 85;
-  const outerR = 70;
-  const innerR = 42;
+  const outerR = 72;
+  const innerR = 44;
 
   type Row = {
     ticker: string;
@@ -2499,17 +2499,12 @@ function FloorPie({
           height={containerW > 0 ? (containerW * H) / W : undefined}
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Drop shadow debajo del donut — same lenguaje que el
-              ladrillo: óvalo gris bajo de opacidad. */}
-          <Ellipse
-            cx={cx}
-            cy={cy + outerR + 12}
-            rx={outerR + 4}
-            ry={5}
-            fill="rgba(14,15,12,0.10)"
-          />
-
-          {/* Slices del donut. Dimming de 2 fuentes:
+          {/* Slices del donut — flat, sin outline ni drop shadow. La
+           *  separación entre slices viene de un stroke del color de
+           *  fondo (c.bg) de 2.5pt que actúa como "gap" cortando el
+           *  ring. Estética Robinhood: limpio, sin chrome decorativo.
+           *
+           *  Dimming de 2 fuentes:
            *   - activeIdx: el slice activo del propio touch del pie.
            *   - dimMarket: el mercado highlighted desde la barra
            *     (cross-highlight). Si la slice no es de ese mercado
@@ -2533,8 +2528,8 @@ function FloorPie({
                   slice.endAngle,
                 )}
                 fill={fill}
-                stroke="#0E0F0C"
-                strokeWidth={1.5}
+                stroke={c.bg}
+                strokeWidth={2.5}
                 strokeLinejoin="round"
               />
             );
@@ -4704,19 +4699,24 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  /* Center text — estado neutral (sin hold). Balance compact arriba +
+   * eyebrow uppercase abajo. Robinhood-style: dominant + tipográfica
+   * decisiva, sin filler. */
   pieCenterPrimary: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-    lineHeight: 18,
-    maxWidth: 130,
+    fontFamily: fontFamily[800],
+    fontSize: 20,
+    letterSpacing: -0.6,
+    lineHeight: 22,
+    maxWidth: 134,
+    textAlign: "center",
   },
   pieCenterSecondary: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    marginTop: 4,
-    maxWidth: 130,
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginTop: 5,
+    maxWidth: 134,
     textAlign: "center",
   },
   /* Variante del centro cuando el user holdea un mercado en la
