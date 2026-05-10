@@ -14,12 +14,17 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  FadeIn,
   FadeInDown,
+  FadeOut,
   FadeOutUp,
   interpolate,
+  type SharedValue,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import Svg, {
   Circle,
@@ -1464,57 +1469,176 @@ function AllocationBar({
     label: string;
   }>;
 
-  /* Helper para opacidad de cada segmento — full cuando no hay
-   * highlight o el segmento es el highlighted; dimmed (0.25) si
-   * hay un highlight en otro mercado. */
-  const opacityFor = (key: MarketKey): number =>
-    highlightedMarket == null || highlightedMarket === key ? 1 : 0.25;
+  /* Espejo del highlightedMarket en un sharedValue — los segmentos
+   * lo leen desde useAnimatedStyle para animarse en el UI thread con
+   * spring (sin re-render por frame). */
+  const activeKey = useSharedValue<MarketKey | null>(highlightedMarket);
+  useEffect(() => {
+    activeKey.value = highlightedMarket;
+  }, [highlightedMarket, activeKey]);
 
   return (
     <View style={[s.allocBlock, s.allocBlockStandalone]}>
-      <View
-        style={[s.allocBar, { backgroundColor: c.surfaceHover }]}
-      >
+      <View style={[s.allocBar, { backgroundColor: c.surfaceHover }]}>
         {segments.map((seg, i) => (
-          <Pressable
+          <AllocBarSegment
             key={seg.key}
+            segKey={seg.key}
+            pct={seg.pct}
+            marginLeft={i > 0 ? 2 : 0}
+            activeKey={activeKey}
+            c={c}
             onPressIn={() => {
               Haptics.selectionAsync().catch(() => {});
               onHighlight(seg.key);
             }}
             onPressOut={() => onHighlight(null)}
-            style={{
-              flex: seg.pct,
-              backgroundColor: c.brand,
-              marginLeft: i > 0 ? 2 : 0,
-              opacity: opacityFor(seg.key),
-            }}
           />
         ))}
       </View>
       <View style={s.allocCaptionRow}>
         {segments.map((seg, i) => (
-          <Pressable
+          <AllocCaption
             key={seg.key}
+            segKey={seg.key}
+            pct={seg.pct}
+            label={seg.label}
+            marginLeft={i > 0 ? 2 : 0}
+            activeKey={activeKey}
+            c={c}
             onPressIn={() => {
               Haptics.selectionAsync().catch(() => {});
               onHighlight(seg.key);
             }}
             onPressOut={() => onHighlight(null)}
-            style={{
-              flex: seg.pct,
-              marginLeft: i > 0 ? 2 : 0,
-              opacity: opacityFor(seg.key),
-            }}
-          >
-            <Text style={s.allocCaption} numberOfLines={1}>
-              <Text style={{ color: c.brand }}>{seg.pct.toFixed(0)}%</Text>
-              <Text style={{ color: c.text }}> {seg.label}</Text>
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
     </View>
+  );
+}
+
+/* Spring base para la animación bar/caption — elastic, snappy, con
+ * un toque de overshoot que da el "pop" cuando el segmento agarra
+ * foco. Mismos params para los dos elementos así viajan en sync. */
+const ALLOC_SPRING = {
+  damping: 13,
+  stiffness: 220,
+  mass: 0.55,
+  overshootClamping: false,
+} as const;
+
+/* ─── AllocBarSegment — un slot individual de la AllocationBar.
+ *
+ * Cuando el segmento está highlighted, se "infla" verticalmente
+ * (scaleY 2.7) y se levanta apenas (translateY -2) — efecto de
+ * "salir de la barra". El resto de los segmentos baja a opacity 0.18
+ * y el track underneath revela su color sunken como contraste.
+ * Toda la animación corre en spring sobre el UI thread vía
+ * useAnimatedStyle. */
+function AllocBarSegment({
+  segKey,
+  pct,
+  marginLeft,
+  activeKey,
+  c,
+  onPressIn,
+  onPressOut,
+}: {
+  segKey: MarketKey;
+  pct: number;
+  marginLeft: number;
+  activeKey: SharedValue<MarketKey | null>;
+  c: ColorMap;
+  onPressIn: () => void;
+  onPressOut: () => void;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const isActive = activeKey.value === segKey;
+    const hasActive = activeKey.value !== null;
+    return {
+      opacity: withTiming(hasActive && !isActive ? 0.18 : 1, {
+        duration: 160,
+      }),
+      transform: [
+        { translateY: withSpring(isActive ? -2 : 0, ALLOC_SPRING) },
+        { scaleY: withSpring(isActive ? 2.7 : 1, ALLOC_SPRING) },
+      ],
+    };
+  });
+
+  return (
+    <Pressable
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={{ flex: pct, marginLeft }}
+    >
+      <Animated.View
+        style={[
+          {
+            height: 6,
+            width: "100%",
+            backgroundColor: c.brand,
+            borderCurve: "continuous",
+            borderRadius: 3,
+          },
+          animStyle,
+        ]}
+      />
+    </Pressable>
+  );
+}
+
+/* ─── AllocCaption — el "X% Label" debajo de cada segmento.
+ *
+ * En highlight, scalea 1.1 y el "%" se vuelve text (full color)
+ * para subir aún más el peso visual. Los inactivos bajan a opacity
+ * 0.32. */
+function AllocCaption({
+  segKey,
+  pct,
+  label,
+  marginLeft,
+  activeKey,
+  c,
+  onPressIn,
+  onPressOut,
+}: {
+  segKey: MarketKey;
+  pct: number;
+  label: string;
+  marginLeft: number;
+  activeKey: SharedValue<MarketKey | null>;
+  c: ColorMap;
+  onPressIn: () => void;
+  onPressOut: () => void;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const isActive = activeKey.value === segKey;
+    const hasActive = activeKey.value !== null;
+    return {
+      opacity: withTiming(hasActive && !isActive ? 0.32 : 1, {
+        duration: 160,
+      }),
+      transform: [
+        { scale: withSpring(isActive ? 1.1 : 1, ALLOC_SPRING) },
+      ],
+    };
+  });
+
+  return (
+    <Pressable
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={{ flex: pct, marginLeft }}
+    >
+      <Animated.View style={animStyle}>
+        <Text style={s.allocCaption} numberOfLines={1}>
+          <Text style={{ color: c.brand }}>{pct.toFixed(0)}%</Text>
+          <Text style={{ color: c.text }}> {label}</Text>
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -2198,6 +2322,9 @@ function FloorPie({
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  /* Altura medida del tooltip — la usamos para translateY(-tooltipH)
+   * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
+  const [tooltipH, setTooltipH] = useState(0);
 
   // Geometría del viewBox — cuadrado para layout 2-col. Donut centrado
   // con outer 70 / inner 42 → grosor de anillo 28.
@@ -2477,23 +2604,25 @@ function FloorPie({
       {/* Tooltip — aparece al holdear un slice. Mismo patrón visual
           que el FloorBrick: pill ink + label uppercase + pct en
           brand + lista de tickers con su variación. Posicionado
-          debajo del donut, centrado horizontalmente. Caret apunta
-          hacia arriba. */}
+          ENCIMA del donut, centrado horizontalmente. Caret apunta
+          hacia abajo. translateY(-tooltipH) lo levanta sobre el
+          punto anchor (top = arriba del donut). */}
       {activeSlice && containerW > 0 ? (
         <Animated.View
           key={`pie-tip-${activeIdx}`}
-          entering={FadeInDown.duration(120)}
-          exiting={FadeOutUp.duration(100)}
+          entering={FadeIn.duration(120)}
+          exiting={FadeOut.duration(100)}
           pointerEvents="none"
+          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
           style={[
             s.tooltipAnchor,
             {
               left: containerW / 2,
-              top: ((cy + outerR + 22) * containerW) / W,
+              top: ((cy - outerR - 6) * containerW) / W,
+              transform: [{ translateY: -tooltipH }],
             },
           ]}
         >
-          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
           <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
@@ -2580,6 +2709,7 @@ function FloorPie({
               </>
             )}
           </View>
+          <View style={[s.tooltipCaretDown, { backgroundColor: c.ink }]} />
         </Animated.View>
       ) : null}
     </View>
@@ -2674,6 +2804,9 @@ function FloorBrick({
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  /* Altura medida del tooltip — translateY negativo para flotarlo
+   * encima del bloque tocado. */
+  const [tooltipH, setTooltipH] = useState(0);
 
   const W = 340;
   const H = 180;
@@ -2983,21 +3116,23 @@ function FloorBrick({
       {activeBlock && containerW > 0 ? (
         <Animated.View
           key={`tip-${activeIdx}`}
-          entering={FadeInDown.duration(120)}
-          exiting={FadeOutUp.duration(100)}
+          entering={FadeIn.duration(120)}
+          exiting={FadeOut.duration(100)}
           pointerEvents="none"
+          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
           style={[
             s.tooltipAnchor,
             {
               left: tooltipLeftPx,
-              // Position DEBAJO del bloque tocado — apunta hacia el
-              // bloque desde abajo. Antes estaba arriba, pero el
-              // sticky overlay del header lo ocultaba al scrollear.
-              top: (yBot * containerW) / W + 6,
+              /* Position ENCIMA del bloque tocado — apuntando desde
+               * arriba. El anchor sentado al ras del top inclinado del
+               * brick (yTop - topShift) y el translateY(-tooltipH)
+               * eleva el pill por encima del dedo. */
+              top: ((yTop - topShift - 6) * containerW) / W,
+              transform: [{ translateY: -tooltipH }],
             },
           ]}
         >
-          <View style={[s.tooltipCaret, { backgroundColor: c.ink }]} />
           <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
@@ -3082,6 +3217,7 @@ function FloorBrick({
               </>
             )}
           </View>
+          <View style={[s.tooltipCaretDown, { backgroundColor: c.ink }]} />
         </Animated.View>
       ) : null}
     </View>
@@ -3119,7 +3255,20 @@ function RankingList({
 }: RankingListProps) {
   const { c } = useTheme();
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [containerW, setContainerW] = useState(0);
+  const [tooltipH, setTooltipH] = useState(0);
+  /* Layout cache de cada row — para anclar el tooltip en el centro
+   * del row holdeado. */
+  const [rowLayouts, setRowLayouts] = useState<
+    Record<string, { y: number; h: number }>
+  >({});
 
+  type Row = {
+    ticker: string;
+    shortTicker: string;
+    change: number;
+    ars: number;
+  };
   const rows = useMemo(() => {
     const byKey = new Map<
       string,
@@ -3127,7 +3276,7 @@ function RankingList({
         ars: number;
         cat: AssetCategory;
         market: MarketKey;
-        rows: { ticker: string; change: number }[];
+        rows: Row[];
       }
     >();
     for (const h of holdings) {
@@ -3139,7 +3288,12 @@ function RankingList({
         rows: [],
       };
       entry.ars += h.ars;
-      entry.rows.push({ ticker: h.asset.ticker, change: h.asset.change });
+      entry.rows.push({
+        ticker: h.asset.ticker,
+        shortTicker: shortCryptoTicker(h.asset.ticker),
+        change: h.asset.change,
+        ars: h.ars,
+      });
       byKey.set(key, entry);
     }
     return Array.from(byKey.entries())
@@ -3151,6 +3305,7 @@ function RankingList({
         ars: v.ars,
         pct: (v.ars / totalArs) * 100,
         color: BRICK_PALETTE[i % BRICK_PALETTE.length],
+        rows: v.rows.sort((a, b) => b.ars - a.ars),
         tickers: v.rows.length,
       }))
       .sort((a, b) => b.pct - a.pct)
@@ -3167,8 +3322,19 @@ function RankingList({
     [onHoldChange, onActiveMarketChange, rows],
   );
 
+  const activeRow = activeIdx !== null ? rows[activeIdx] ?? null : null;
+  const activeLayout = activeRow ? rowLayouts[activeRow.key] : null;
+  /* Anchor del tooltip — centro vertical del row, translateY(-h)
+   * después lo eleva por encima del dedo. */
+  const tooltipTopPx = activeLayout
+    ? activeLayout.y + activeLayout.h / 2 - 8
+    : 0;
+
   return (
-    <View style={s.rankingWrap}>
+    <View
+      style={s.rankingWrap}
+      onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+    >
       {rows.map((r, i) => {
         const dimmedByActive = activeIdx !== null && activeIdx !== i;
         const dimmedByMarket =
@@ -3182,6 +3348,14 @@ function RankingList({
             key={r.key}
             onPressIn={() => handleHold(i)}
             onPressOut={() => handleHold(null)}
+            onLayout={(e) => {
+              const { y, height } = e.nativeEvent.layout;
+              setRowLayouts((prev) =>
+                prev[r.key]?.y === y && prev[r.key]?.h === height
+                  ? prev
+                  : { ...prev, [r.key]: { y, h: height } },
+              );
+            }}
             style={[
               s.rankRow,
               i > 0 && {
@@ -3263,6 +3437,76 @@ function RankingList({
           </Pressable>
         );
       })}
+
+      {/* Tooltip — pill ink ENCIMA del row holdeado. Mismo lenguaje
+          que FloorPie/FloorBrick: label uppercase + pct brand + lista
+          de tickers con su variación. */}
+      {activeRow && containerW > 0 && activeLayout ? (
+        <Animated.View
+          key={`rank-tip-${activeRow.key}`}
+          entering={FadeIn.duration(120)}
+          exiting={FadeOut.duration(100)}
+          pointerEvents="none"
+          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
+          style={[
+            s.tooltipAnchor,
+            {
+              left: containerW / 2,
+              top: tooltipTopPx,
+              transform: [{ translateY: -tooltipH }],
+            },
+          ]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={[s.tooltipLabel, { color: c.bg }]}>
+                {activeRow.label}
+              </Text>
+              <Text style={[s.tooltipPct, { color: c.brand }]}>
+                {formatTooltipPct(activeRow.pct)}
+              </Text>
+            </View>
+            {activeRow.rows.length > 0 ? (
+              <View
+                style={[
+                  s.tooltipDivider,
+                  { backgroundColor: "rgba(255,255,255,0.12)" },
+                ]}
+              />
+            ) : null}
+            {activeRow.rows.slice(0, 5).map((rr) => (
+              <View key={rr.ticker} style={s.tooltipRow}>
+                <Text
+                  style={[s.tooltipTicker, { color: c.bg }]}
+                  numberOfLines={1}
+                >
+                  {rr.ticker}
+                </Text>
+                <Text
+                  style={[
+                    s.tooltipChange,
+                    { color: rr.change >= 0 ? c.brand : c.red },
+                  ]}
+                >
+                  {rr.change >= 0 ? "▲ " : "▼ "}
+                  {fmtPctAbs(rr.change)}
+                </Text>
+              </View>
+            ))}
+            {activeRow.rows.length > 5 ? (
+              <Text
+                style={[
+                  s.tooltipMore,
+                  { color: "rgba(255,255,255,0.45)" },
+                ]}
+              >
+                +{activeRow.rows.length - 5} más
+              </Text>
+            ) : null}
+          </View>
+          <View style={[s.tooltipCaretDown, { backgroundColor: c.ink }]} />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -3321,11 +3565,20 @@ function Treemap({
   const { c } = useTheme();
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [containerW, setContainerW] = useState(0);
+  /* Altura del tooltip — translateY(-tooltipH) para flotarlo encima
+   * del tile holdeado. */
+  const [tooltipH, setTooltipH] = useState(0);
 
   const aspect = 16 / 10; // wide-ish, ocupa el ancho sin ser muy alto
   const W = 340;
   const H = W / aspect;
 
+  type Row = {
+    ticker: string;
+    shortTicker: string;
+    change: number;
+    ars: number;
+  };
   const tiles = useMemo(() => {
     const byKey = new Map<
       string,
@@ -3333,6 +3586,7 @@ function Treemap({
         ars: number;
         cat: AssetCategory;
         market: MarketKey;
+        rows: Row[];
       }
     >();
     for (const h of holdings) {
@@ -3341,8 +3595,15 @@ function Treemap({
         ars: 0,
         cat: h.asset.category,
         market: chartMarketFor(h.asset),
+        rows: [],
       };
       entry.ars += h.ars;
+      entry.rows.push({
+        ticker: h.asset.ticker,
+        shortTicker: shortCryptoTicker(h.asset.ticker),
+        change: h.asset.change,
+        ars: h.ars,
+      });
       byKey.set(key, entry);
     }
     const sorted = Array.from(byKey.entries())
@@ -3352,6 +3613,7 @@ function Treemap({
         market: v.market,
         label: categoryLabels[v.cat],
         ars: v.ars,
+        rows: v.rows.sort((a, b) => b.ars - a.ars),
       }))
       .sort((a, b) => b.ars - a.ars);
 
@@ -3431,6 +3693,17 @@ function Treemap({
 
   // Total para % en labels
   const totalArsAll = totalArs;
+
+  /* Tile activo + posición de su anchor para el tooltip — centro
+   * horizontal del tile, top del tile. translateY(-tooltipH) lo
+   * eleva por encima del dedo. */
+  const activeTile = activeIdx !== null ? tiles[activeIdx] ?? null : null;
+  const scale = containerW / W;
+  const tooltipLeftPx = activeTile
+    ? (activeTile.x + activeTile.w / 2) * scale
+    : 0;
+  const tooltipTopPx = activeTile ? activeTile.y * scale - 6 : 0;
+  const activePct = activeTile ? (activeTile.ars / totalArsAll) * 100 : 0;
 
   return (
     <View
@@ -3542,6 +3815,75 @@ function Treemap({
             );
           })
         : null}
+
+      {/* Tooltip — pill ink ENCIMA del tile holdeado. Mismo lenguaje
+          que FloorPie/FloorBrick/RankingList. */}
+      {activeTile && containerW > 0 ? (
+        <Animated.View
+          key={`treemap-tip-${activeTile.key}`}
+          entering={FadeIn.duration(120)}
+          exiting={FadeOut.duration(100)}
+          pointerEvents="none"
+          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
+          style={[
+            s.tooltipAnchor,
+            {
+              left: tooltipLeftPx,
+              top: tooltipTopPx,
+              transform: [{ translateY: -tooltipH }],
+            },
+          ]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={[s.tooltipLabel, { color: c.bg }]}>
+                {activeTile.label}
+              </Text>
+              <Text style={[s.tooltipPct, { color: c.brand }]}>
+                {formatTooltipPct(activePct)}
+              </Text>
+            </View>
+            {activeTile.rows.length > 0 ? (
+              <View
+                style={[
+                  s.tooltipDivider,
+                  { backgroundColor: "rgba(255,255,255,0.12)" },
+                ]}
+              />
+            ) : null}
+            {activeTile.rows.slice(0, 5).map((rr) => (
+              <View key={rr.ticker} style={s.tooltipRow}>
+                <Text
+                  style={[s.tooltipTicker, { color: c.bg }]}
+                  numberOfLines={1}
+                >
+                  {rr.ticker}
+                </Text>
+                <Text
+                  style={[
+                    s.tooltipChange,
+                    { color: rr.change >= 0 ? c.brand : c.red },
+                  ]}
+                >
+                  {rr.change >= 0 ? "▲ " : "▼ "}
+                  {fmtPctAbs(rr.change)}
+                </Text>
+              </View>
+            ))}
+            {activeTile.rows.length > 5 ? (
+              <Text
+                style={[
+                  s.tooltipMore,
+                  { color: "rgba(255,255,255,0.45)" },
+                ]}
+              >
+                +{activeTile.rows.length - 5} más
+              </Text>
+            ) : null}
+          </View>
+          <View style={[s.tooltipCaretDown, { backgroundColor: c.ink }]} />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -3725,7 +4067,10 @@ const s = StyleSheet.create({
     height: 6,
     borderCurve: "continuous",
     borderRadius: 3,
-    overflow: "hidden",
+    /* overflow visible para no clipear el scaleY del segmento
+     * highlighted — la animación de "inflar" se sale del bound de
+     * 6 px del track. */
+    overflow: "visible",
   },
   /* Caption stacked: row con un slot por segmento, cada uno con
    * el mismo flex que la barra de arriba — el label queda centrado
@@ -4391,12 +4736,23 @@ const s = StyleSheet.create({
     marginBottom: -4,
     transform: [{ rotate: "45deg" }],
   },
+  /* Caret apuntando hacia ABAJO — para tooltips que viven ENCIMA
+   * del bloque/slice/tile tocado. La mitad de arriba del cuadrado
+   * rotado queda oculta tras el pill, dejando solo la mitad de abajo
+   * visible (forma triangular apuntando al elemento). */
+  tooltipCaretDown: {
+    width: 8,
+    height: 8,
+    marginTop: -4,
+    transform: [{ rotate: "45deg" }],
+  },
 
   /* Ranking — Robinhood-style. Cada row es un Pressable tall con:
    * icon (squircle 36 con bg color + abbr 2-char), label + meta a la
    * izq, pct + valor a la der, y barra de progreso al fondo del row
    * que muestra el "weight" relativo (signature de Robinhood). */
   rankingWrap: {
+    position: "relative",
     paddingHorizontal: 0,
   },
   rankRow: {
@@ -4474,11 +4830,13 @@ const s = StyleSheet.create({
 
   /* Treemap — canvas con tiles absolutamente posicionados.
    * Tipografía proporcional al tamaño del tile (overrideado inline
-   * en el render). Acá quedan los defaults base. */
+   * en el render). Acá quedan los defaults base. overflow: visible
+   * para que el tooltip flotando arriba no se clipee cuando el tile
+   * tocado vive en el top edge. */
   treemapWrap: {
     position: "relative",
     width: "100%",
-    overflow: "hidden",
+    overflow: "visible",
   },
   treemapLabel: {
     fontFamily: fontFamily[700],
