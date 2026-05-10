@@ -69,7 +69,7 @@ export default function AssetAlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const { show } = useToast();
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
 
@@ -308,8 +308,8 @@ export default function AssetAlertsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.brand}
-            colors={[c.brand]}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressBackgroundColor={c.surface}
             progressViewOffset={12}
           />

@@ -411,8 +411,11 @@ function BaseHome() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.brand}
-            colors={[c.brand]}
+            /* En light, c.textMuted gris se ve bien sobre el bg
+             * off-white. En dark, ese muted desaparece sobre el
+             * negro puro — forzamos #FFFFFF para máximo contraste. */
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressBackgroundColor={c.surface}
             progressViewOffset={12}
           />

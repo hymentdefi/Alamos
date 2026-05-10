@@ -390,17 +390,22 @@ export function IndicatorSheet({
                     Elegir indicador
                   </Text>
                   <Text style={[s.pickerSubtitle, { color: c.textMuted }]}>
-                    Seleccioná el indicador que querés monitorear
+                    Seleccioná el indicador técnico sobre el que querés
+                    recibir alertas
                   </Text>
                 </View>
                 <ScrollView
-                  contentContainerStyle={{ paddingBottom: 16 }}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                 >
+                  {/* ── Tendencia ── */}
+                  <Text style={[s.pickerSection, { color: c.textMuted }]}>
+                    TENDENCIA
+                  </Text>
                   <PickerRow
-                    icon={() => <MAIndicatorIllustration size={44} />}
+                    icon={() => <MAIndicatorIllustration size={56} />}
                     title="Media Móvil (SMA)"
-                    description="Cuando el precio cruza el promedio simple"
+                    description="Promedio del precio en un período, suaviza la tendencia general"
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "sma" });
@@ -411,9 +416,9 @@ export function IndicatorSheet({
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <EMAIndicatorIllustration size={44} />}
+                    icon={() => <EMAIndicatorIllustration size={56} />}
                     title="Media Móvil (EMA)"
-                    description="Promedio ponderado, más reactivo al precio"
+                    description="Promedio ponderado, más reactivo a los últimos precios"
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
@@ -423,31 +428,41 @@ export function IndicatorSheet({
                     }}
                     c={c}
                   />
+
+                  {/* ── Momentum ── */}
+                  <Text style={[s.pickerSection, { color: c.textMuted }]}>
+                    MOMENTUM
+                  </Text>
                   <PickerRow
-                    icon={() => <RSIIndicatorIllustration size={44} />}
+                    icon={() => <RSIIndicatorIllustration size={56} />}
                     title="RSI"
-                    description="Sobrecompra / sobreventa"
+                    description="Mide la fuerza del movimiento, detecta sobrecompra y sobreventa"
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <MACDIndicatorIllustration size={44} />}
+                    icon={() => <MACDIndicatorIllustration size={56} />}
                     title="MACD"
-                    description="Cruces de línea y señal"
+                    description="Cruces entre dos medias móviles para anticipar cambios de tendencia"
                     onPress={() => handlePickType("macd")}
                     c={c}
                   />
+
+                  {/* ── Volatilidad y volumen ── */}
+                  <Text style={[s.pickerSection, { color: c.textMuted }]}>
+                    VOLATILIDAD Y VOLUMEN
+                  </Text>
                   <PickerRow
-                    icon={() => <BollingerIndicatorIllustration size={44} />}
+                    icon={() => <BollingerIndicatorIllustration size={56} />}
                     title="Bandas de Bollinger"
-                    description="Volatilidad y rangos"
+                    description="Rangos dinámicos basados en la volatilidad reciente del precio"
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <VolumeIndicatorIllustration size={44} />}
+                    icon={() => <VolumeIndicatorIllustration size={56} />}
                     title="Volumen"
-                    description="Picos vs promedio"
+                    description="Picos significativos respecto al volumen promedio del activo"
                     onPress={() => handlePickType("volume")}
                     c={c}
                   />
@@ -658,7 +673,7 @@ function PickerRow({
         <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
         <Text
           style={[s.pickerRowDesc, { color: c.textMuted }]}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {description}
         </Text>
@@ -1726,47 +1741,64 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
 
-  /* ── Paso 1 — picker ── */
+  /* ── Paso 1 — picker ──
+   * Sizing pensado para matchear la altura natural del AlertSheet
+   * (header + price block + slider + chips + keypad + CTA). Filas
+   * chunky con ícono 56, descripción 2 líneas, agrupadas en 3
+   * secciones (TENDENCIA / MOMENTUM / VOLATILIDAD Y VOLUMEN). */
   pickerHeader: {
     paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   pickerTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontSize: 24,
+    letterSpacing: -0.7,
   },
   pickerSubtitle: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 19,
     letterSpacing: -0.1,
-    marginTop: 4,
+    marginTop: 6,
+  },
+  /* Eyebrow de sección dentro del picker — mismo lenguaje que
+   * sectionEyebrow del paso 2, con inset horizontal 20 para
+   * alinearse al picker (que usa pH 20, no 24). */
+  pickerSection: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.4,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 6,
   },
   pickerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 16,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderCurve: "continuous",
   },
   pickerIcon: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
   pickerRowTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontSize: 16,
+    letterSpacing: -0.25,
   },
   pickerRowDesc: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
     letterSpacing: -0.05,
-    marginTop: 2,
+    marginTop: 3,
   },
 
   /* ── Paso 2 — header ── */
