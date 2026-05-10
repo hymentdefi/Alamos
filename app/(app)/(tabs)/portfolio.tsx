@@ -166,7 +166,7 @@ function marketLabelFull(m: MarketKey): string {
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
   /* Sheet de selección de moneda — se abre desde la pill debajo del
@@ -638,8 +638,8 @@ export default function PortfolioScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={c.brand}
-              colors={[c.brand]}
+              tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+              colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
               progressBackgroundColor={c.surface}
               progressViewOffset={12}
             />

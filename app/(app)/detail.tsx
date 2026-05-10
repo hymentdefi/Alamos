@@ -133,7 +133,7 @@ export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
@@ -306,8 +306,8 @@ export default function DetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.brand}
-            colors={[c.brand]}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressBackgroundColor={c.surface}
             progressViewOffset={12}
           />
