@@ -244,15 +244,22 @@ export default function AssetAlertsScreen() {
 
             {sortedAlerts.length > 0 ? (
               <View style={s.section}>
+                {/* Header columnado — espeja exactamente las columnas
+                 *  del row de alertas: title (col 1, flex), label del
+                 *  formato (col 2, mismo width que alertDist), ghost
+                 *  slot del Toggle (col 3, mismo width 40), sort
+                 *  (col 4, mismo width que el trash). Resultado: el
+                 *  "% al objetivo ▾" queda centrado SOBRE la columna
+                 *  de distancia, y el botón de orden queda ALINEADO
+                 *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  <Text style={[s.sectionTitle, { color: c.text }]}>
-                    Alertas activas ({sortedAlerts.length})
-                  </Text>
-                  {/* Header right: el toggle queda arriba de la
-                   *  columna de distancia (mismo width 110), y el
-                   *  sortIcon queda CENTRADO en el área que ocupan
-                   *  Switch + Trash en cada row (99 px). */}
-                  <View style={s.headerControls}>
+                  <View style={s.headerMain}>
+                    <Text
+                      style={[s.sectionTitle, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      Alertas activas ({sortedAlerts.length})
+                    </Text>
                     <Pressable
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => {});
@@ -268,6 +275,7 @@ export default function AssetAlertsScreen() {
                     >
                       <Text
                         style={[s.distFormatText, { color: c.textMuted }]}
+                        numberOfLines={1}
                       >
                         {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
                       </Text>
@@ -278,33 +286,31 @@ export default function AssetAlertsScreen() {
                         style={{ marginLeft: 2, marginTop: 1 }}
                       />
                     </Pressable>
-                    {/* Right cluster — width 99 que equivale al
-                     *  Switch+gap+Trash del row. SortIcon centrado
-                     *  adentro = queda exactamente en el medio del
-                     *  toggle on/off y el botón trash de cada fila. */}
-                    <View style={s.headerRightCluster}>
-                      <Pressable
-                        ref={sortBtnRef}
-                        onPress={() => {
-                          Haptics.selectionAsync().catch(() => {});
-                          sortBtnRef.current?.measureInWindow(
-                            (x, y, width, height) => {
-                              setSortAnchor({
-                                top: y + height + 6,
-                                right: Math.max(8, windowW - (x + width)),
-                              });
-                              setSortMenuOpen(true);
-                            },
-                          );
-                        }}
-                        hitSlop={10}
-                        style={s.sortIconBtn}
-                        accessibilityLabel="Cambiar orden de la lista"
-                      >
-                        <Feather name="sliders" size={16} color={c.textMuted} />
-                      </Pressable>
-                    </View>
                   </View>
+                  {/* Ghost slot del Toggle del row — mantiene el ancho
+                   *  para que la columna de orden caiga sobre el
+                   *  trash de cada fila. */}
+                  <View style={s.headerToggleSlot} />
+                  <Pressable
+                    ref={sortBtnRef}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      sortBtnRef.current?.measureInWindow(
+                        (x, y, width, height) => {
+                          setSortAnchor({
+                            top: y + height + 6,
+                            right: Math.max(8, windowW - (x + width)),
+                          });
+                          setSortMenuOpen(true);
+                        },
+                      );
+                    }}
+                    hitSlop={10}
+                    style={s.sortIconBtn}
+                    accessibilityLabel="Cambiar orden de la lista"
+                  >
+                    <Feather name="sliders" size={16} color={c.textMuted} />
+                  </Pressable>
                 </View>
                 <View style={s.list}>
                   {sortedAlerts.map((alert, i) => (
@@ -636,10 +642,14 @@ function SwipableAlertRow({
       >
         {/* Col 1: el verbo ("Sube a" / "Baja a") va coloreado por
          *  dirección, el resto del precio queda blanco (c.text). Da
-         *  jerarquía cromática a la dirección sin saturar todo. */}
+         *  jerarquía cromática a la dirección sin saturar todo.
+         *  adjustsFontSizeToFit para que precios crypto de 100k+ no
+         *  trunquen el verbo (USDT 100.000,00 + "Sube a" es ancho). */}
         <Text
           style={[s.alertLeft, { color: c.text }]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
         >
           <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
           {formatMoney(alert.threshold, cur)}
@@ -851,42 +861,46 @@ const s = StyleSheet.create({
   /* Header right-side: estructura idéntica al row para que el
    * toggle quede arriba de la col de distancia y el sortIcon
    * arriba del trash. Mismo gap 12 que alertRow. */
-  headerControls: {
+  /* Header main — espeja la celda Pressable del row (alertRowMain):
+   * title (flex 1) + label de formato (mismo ancho que alertDist).
+   * Gap 12 = mismo gap que el row, para que el label "% al objetivo"
+   * caiga centrado sobre la columna de distancia. */
+  headerMain: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
+  /* Mismo ancho + textAlign center que alertDist en el row, así el
+   * label queda EXACTAMENTE centrado sobre el valor de distancia
+   * de abajo. */
   distFormatBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4,
-    /* Mismo ancho que alertDist del row (110) — el label queda
-     * exactamente centrado sobre el valor de distancia. */
-    minWidth: 110,
+    width: 90,
   },
-  /* Right cluster del header — width 99 = Switch (51) + gap (12) +
-   * marginLeft Trash (4) + Trash (32) del row. SortIcon centrado
-   * adentro queda exactamente en el medio entre el on/off y el
-   * trash de cada fila. */
-  headerRightCluster: {
-    width: 99,
-    alignItems: "center",
-    justifyContent: "center",
+  /* Slot fantasma del Toggle del row — sin contenido, solo width 40
+   * para que la columna de sort caiga sobre el trash de cada fila. */
+  headerToggleSlot: {
+    width: 40,
+    marginLeft: 12,
   },
-  /* Toggle del header — 13 / 500, no compite con el título
-   * "Alertas activas (N)" (16 / 700) ni con la data del row
-   * (16 / 600). */
+  /* Label del formato — 13 / 500, sutil para no competir con el
+   * título "Alertas activas (N)" (15 / 700) ni con la data del row. */
   distFormatText: {
     fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.1,
   },
-  /* SortIcon — centrado dentro del headerRightCluster. Sin
-   * marginLeft porque el cluster ya lo centra. */
+  /* Sort icon — sentado en el extremo derecho del header. Mismo
+   * width 32 + marginLeft 4 que el alertDeleteBtn de la row, así
+   * el icono queda perfectamente alineado sobre el trash. */
   sortIconBtn: {
     width: 32,
     height: 32,
+    marginLeft: 4,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1026,12 +1040,14 @@ const s = StyleSheet.create({
   /* Col 2: distancia (% o $ según el toggle del header). Color
    * verde/naranja según dirección, 14 / 600. Centrada bajo el
    * label "% al objetivo ▾" / "$ al objetivo ▾" del header —
-   * mismo ancho de columna así forman un bloque alineado. */
+   * mismo ancho que distFormatBtn (90) para alineación perfecta.
+   * Damos más aire a la col 1 que antes (era 110), para que
+   * "Sube a 100.000,00 USDT" entre sin truncarse. */
   alertDist: {
     fontFamily: fontFamily[600],
     fontSize: 14,
     letterSpacing: -0.15,
-    minWidth: 110,
+    width: 90,
     textAlign: "center",
   },
   /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
