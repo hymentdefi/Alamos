@@ -514,7 +514,7 @@ export default function PortfolioScreen() {
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
       ).catch(() => {});
-    }, 1100);
+    }, 900);
   }, []);
 
   useEffect(() => {
@@ -638,9 +638,10 @@ export default function PortfolioScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={c.textMuted}
-              colors={[c.textMuted]}
+              tintColor={c.brand}
+              colors={[c.brand]}
               progressBackgroundColor={c.surface}
+              progressViewOffset={12}
             />
           }
         >
