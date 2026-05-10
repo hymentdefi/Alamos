@@ -1,9 +1,10 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   View,
   Text,
   ScrollView,
   Pressable,
+  RefreshControl,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -135,6 +136,23 @@ export default function DetailScreen() {
   const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+
+  /* Pull-to-refresh — refresca el activo (precio, chart, news,
+   * fundamentales, alertas relacionadas). Mantiene el spinner
+   * visible hasta que todos los datos terminen. */
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    /* Mock — en producción acá disparamos los re-fetch de price,
+     * candles del range actual, news, fundamentales, y alertas
+     * para este ticker. Con MOCK_MODE simulamos el await. */
+    await new Promise((r) => setTimeout(r, 900));
+    Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Success,
+    ).catch(() => {});
+    setRefreshing(false);
+  }, []);
 
   /* ─── Sticky header — scroll detection ──────────────────────────
    *
@@ -280,6 +298,16 @@ export default function DetailScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.text}
+            colors={[c.brand]}
+            progressBackgroundColor={c.surface}
+            progressViewOffset={12}
+          />
+        }
       >
         <View style={s.heroBlock}>
           <Text style={[s.heroTicker, { color: c.textMuted }]}>
