@@ -754,6 +754,7 @@ function SwipableAlertRow({
         if (rowH.value === 72) rowH.value = e.nativeEvent.layout.height;
       }}
       style={[
+        s.swipeRoot,
         withTopDivider && {
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
@@ -1181,6 +1182,13 @@ const s = StyleSheet.create({
    * revele edge-to-edge cuando arrastrás. */
   list: {
     paddingHorizontal: 0,
+  },
+  /* Wrapper de cada row swipeable. overflow hidden clipa el bg
+   * destructivo absoluto del swipe-to-delete a los bordes del
+   * wrapper — sin esto, el c.red se filtraba sobre el área del
+   * borderTop al re-ordenar la lista (línea naranja entre filas). */
+  swipeRoot: {
+    overflow: "hidden",
   },
   /* Bg destructivo del swipe-to-delete — vive abajo del row, naranja
    * lleno, label "Eliminar" + ícono trash en blanco anclados a la
