@@ -489,11 +489,11 @@ export default function PortfolioScreen() {
   // se bloquea (scrollEnabled=false) para que el dedo no scrollee
   // accidentalmente mientras el usuario explora la distribución.
   const [brickHolding, setBrickHolding] = useState(false);
-  // Visualización seleccionada — pie chart por default. El usuario
-  // alterna con el segmented arriba del chart. Pie / Brick /
-  // Ranking (horizontal bars) / Treemap (proportional rects).
+  // Visualización seleccionada — cards (ranking) por default, primera
+  // opción del segmented. El usuario alterna entre Cards / Ladrillo /
+  // Pie / Treemap.
   const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
-    "pie",
+    "ranking",
   );
 
   /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
@@ -717,28 +717,26 @@ export default function PortfolioScreen() {
             <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
           </View>
 
-          {/* Selector Pie/Ladrillo — debajo del hero, alineado a la
-           *  derecha. Controla la viz del chart que vive abajo. La
-           *  allocation bar se mudó a estar debajo del chart, justo
-           *  arriba del link de Rendimiento. */}
+          {/* Selector de viz — debajo del hero, alineado a la derecha.
+           *  Orden: Cards (ranking) / Ladrillo / Pie / Treemap. */}
           {hasHoldings ? (
             <View style={s.heroSelectorRow}>
               <View
                 style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
               >
                 <Tap
-                  onPress={() => setViz("pie")}
+                  onPress={() => setViz("ranking")}
                   haptic="selection"
                   pressScale={0.95}
                   hitSlop={4}
                   style={[
                     s.vizSegBtn,
-                    viz === "pie" && { backgroundColor: c.bg },
+                    viz === "ranking" && { backgroundColor: c.bg },
                   ]}
-                  accessibilityLabel="Vista de torta"
+                  accessibilityLabel="Vista de cards"
                 >
-                  <PieGlyph
-                    color={viz === "pie" ? c.text : c.textMuted}
+                  <RankingGlyph
+                    color={viz === "ranking" ? c.text : c.textMuted}
                     size={16}
                   />
                 </Tap>
@@ -759,18 +757,18 @@ export default function PortfolioScreen() {
                   />
                 </Tap>
                 <Tap
-                  onPress={() => setViz("ranking")}
+                  onPress={() => setViz("pie")}
                   haptic="selection"
                   pressScale={0.95}
                   hitSlop={4}
                   style={[
                     s.vizSegBtn,
-                    viz === "ranking" && { backgroundColor: c.bg },
+                    viz === "pie" && { backgroundColor: c.bg },
                   ]}
-                  accessibilityLabel="Vista de ranking"
+                  accessibilityLabel="Vista de torta"
                 >
-                  <RankingGlyph
-                    color={viz === "ranking" ? c.text : c.textMuted}
+                  <PieGlyph
+                    color={viz === "pie" ? c.text : c.textMuted}
                     size={16}
                   />
                 </Tap>
@@ -854,9 +852,10 @@ export default function PortfolioScreen() {
             />
           ) : null}
 
-          {/* ─── Rendimiento — link de una sola línea al detalle.
-              Mejor / Peor del día viven en su propia sección al
-              fondo de la pantalla. */}
+          {/* ─── Rendimiento — link al detalle. Heading "álamos-style"
+              (mismo treatment que Briefing del stock detail): título
+              22/800 + arrow-right pegado, todo en color tone (brand
+              cuando up, red cuando down). Valor del día al costado. */}
           {hasHoldings ? (
             <Pressable
               onPress={() => router.push("/(app)/rendimiento" as never)}
@@ -868,23 +867,19 @@ export default function PortfolioScreen() {
                 },
               ]}
             >
-              <Text style={[s.linkRowLabel, { color: c.text }]}>
-                Rendimiento
-              </Text>
-              <View style={s.linkRowTrailing}>
-                <View style={s.linkRowValueStack}>
-                  <Text style={[s.linkRowValue, { color: c.brand }]}>
-                    ▲ {fmtPctAbs(12.4)}
-                  </Text>
-                  <Text style={[s.linkRowValueSub, { color: c.textMuted }]}>
-                    hoy
-                  </Text>
-                </View>
-                <Feather
-                  name="chevron-right"
-                  size={18}
-                  color={c.textMuted}
-                />
+              <View style={s.alamosHeadingRow}>
+                <Text style={[s.alamosHeadingText, { color }]}>
+                  Rendimiento
+                </Text>
+                <Feather name="arrow-right" size={18} color={color} />
+              </View>
+              <View style={s.linkRowValueStack}>
+                <Text style={[s.linkRowValue, { color }]}>
+                  ▲ {fmtPctAbs(12.4)}
+                </Text>
+                <Text style={[s.linkRowValueSub, { color: c.textMuted }]}>
+                  hoy
+                </Text>
               </View>
             </Pressable>
           ) : null}
@@ -2019,11 +2014,15 @@ function PositionsList({
             { opacity: pressed ? 0.6 : 1 },
           ]}
         >
-          <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
-          <Feather name="chevron-right" size={22} color={c.brand} />
+          <Text style={[s.alamosHeadingText, { color: c.text }]}>
+            Posiciones
+          </Text>
+          <Feather name="arrow-right" size={18} color={c.brand} />
         </Pressable>
       ) : (
-        <Text style={[s.sectionTitle, { color: c.text }]}>Posiciones</Text>
+        <Text style={[s.alamosHeadingText, { color: c.text }]}>
+          Posiciones
+        </Text>
       )}
       {holdings.map((h, i) => {
         const displayValue =
@@ -4302,6 +4301,20 @@ const s = StyleSheet.create({
     letterSpacing: -0.4,
     marginBottom: 12,
   },
+  /* Heading "álamos-style" — mismo treatment que el "Briefing" del
+   * stock detail. Pareja título grande + arrow pegado a la derecha,
+   * todo en color tone (brand cuando up, red cuando down) o en text
+   * para los headings neutrales (Posiciones). */
+  alamosHeadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  alamosHeadingText: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.5,
+  },
   marketRow: {
     paddingVertical: 14,
     flexDirection: "row",
@@ -4405,14 +4418,14 @@ const s = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 24,
   },
-  /* Header de Posiciones — title + chevron verde a la derecha
-   * (Robinhood-style "see all"). Toda la fila es un Pressable. */
+  /* Header de Posiciones — title + arrow brand pegado a la derecha
+   * (mismo treatment que el "Briefing" del stock detail). Toda la
+   * fila es un Pressable. */
   positionsHead: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingRight: 4,
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 10,
   },
   positionRow: {
     flexDirection: "row",
