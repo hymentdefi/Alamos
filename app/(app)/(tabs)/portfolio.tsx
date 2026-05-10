@@ -62,7 +62,6 @@ import {
   findCategoryBySlug,
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
-import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -173,7 +172,6 @@ export default function PortfolioScreen() {
   /* Sheet de selección de moneda — se abre desde la pill debajo del
    * balance. Cambiar moneda ahora es un acto deliberado: tap pill →
    * elegir card → confirma. NO hay swipe horizontal del balance. */
-  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   /* ─── Holdings (todos, sin filtrar) ─── */
 
@@ -658,33 +656,52 @@ export default function PortfolioScreen() {
             />
           </View>
 
-          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
-              para cambiar la moneda. Cambio deliberado: no hay swipe
-              horizontal del balance. El sheet aclara que es la misma
-              cartera, sólo distinta valuación. */}
+          {/* Currency segmented — pill ARS|USD inline estilo Robinhood.
+              Tap directo togglea sin sheet intermedio. El segmento
+              activo lleva un "thumb" elevado (bg c.bg con shadow), el
+              inactivo queda translúcido. */}
           <View style={s.currencyPillRow}>
-            <Tap
-              haptic="selection"
-              pressScale={0.96}
-              onPress={() => setCurrencyOpen(true)}
+            <View
               style={[
-                s.currencyPill,
-                {
-                  backgroundColor: c.surfaceHover,
-                },
+                s.currencySeg,
+                { backgroundColor: c.surfaceHover },
               ]}
             >
-              <Text
-                style={[s.currencyPillCode, { color: c.text }]}
-              >
-                {currency}
-              </Text>
-              <Feather
-                name="chevron-down"
-                size={12}
-                color={c.textMuted}
-              />
-            </Tap>
+              {(["ARS", "USD"] as const).map((cur) => {
+                const active = currency === cur;
+                return (
+                  <Tap
+                    key={cur}
+                    haptic="selection"
+                    pressScale={0.97}
+                    onPress={() => setCurrency(cur)}
+                    style={[
+                      s.currencySegBtn,
+                      active && {
+                        backgroundColor: c.bg,
+                        shadowColor: "#0E0F0C",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.08,
+                        shadowRadius: 2,
+                        elevation: 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.currencySegLabel,
+                        {
+                          color: active ? c.text : c.textMuted,
+                          fontFamily: fontFamily[active ? 800 : 600],
+                        },
+                      ]}
+                    >
+                      {cur}
+                    </Text>
+                  </Tap>
+                );
+              })}
+            </View>
           </View>
 
           <View style={s.deltaRow}>
@@ -978,14 +995,6 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
         </Animated.ScrollView>
-
-        <CurrencySheet
-          visible={currencyOpen}
-          onClose={() => setCurrencyOpen(false)}
-          selected={currency}
-          totalArs={totalArs}
-          onSelect={(cur) => setCurrency(cur)}
-        />
       </View>
     </AssetColorProvider>
   );
@@ -2320,6 +2329,8 @@ function FloorPie({
     shortTicker: string;
     change: number;
     ars: number;
+    native: number;
+    currency: AssetCurrency;
   };
 
   const slices = useMemo(() => {
@@ -2348,6 +2359,8 @@ function FloorPie({
         shortTicker: shortCryptoTicker(h.asset.ticker),
         change: h.asset.change,
         ars: h.ars,
+        native: h.native,
+        currency: assetCurrency(h.asset),
       });
       byKey.set(key, entry);
     }
@@ -2633,11 +2646,12 @@ function FloorPie({
                 {formatTooltipPct(activeSlice.pct)}
               </Text>
             </View>
-            {/* DINERO no tiene cambio diario significativo (cash mock
-                con change=0) — saltamos la lista de tickers porque
-                rompe la lectura: no aporta señal y mete ruido. */}
-            {activeSlice.market === "DINERO" ? null : groupBy === "ticker" &&
-              activeSlice.rows.length === 1 ? (
+            {/* DINERO usa el formato cash (currency code + monto en
+                native) en vez del change %. Single-ticker mode (crypto
+                grouped by ticker) muestra shortTicker + change. */}
+            {activeSlice.market !== "DINERO" &&
+            groupBy === "ticker" &&
+            activeSlice.rows.length === 1 ? (
               <>
                 <View
                   style={[
@@ -2681,25 +2695,12 @@ function FloorPie({
                   />
                 ) : null}
                 {activeSlice.rows.slice(0, 5).map((r) => (
-                  <View key={r.ticker} style={s.tooltipRow}>
-                    <Text
-                      style={[s.tooltipTicker, { color: c.bg }]}
-                      numberOfLines={1}
-                    >
-                      {r.ticker}
-                    </Text>
-                    <Text
-                      style={[
-                        s.tooltipChange,
-                        {
-                          color: r.change >= 0 ? c.brand : c.red,
-                        },
-                      ]}
-                    >
-                      {r.change >= 0 ? "▲ " : "▼ "}
-                      {fmtPctAbs(r.change)}
-                    </Text>
-                  </View>
+                  <TooltipRowEntry
+                    key={r.ticker}
+                    isCash={activeSlice.market === "DINERO"}
+                    row={r}
+                    c={c}
+                  />
                 ))}
                 {activeSlice.rows.length > 5 ? (
                   <Text
@@ -2830,6 +2831,8 @@ function FloorBrick({
     shortTicker: string;
     change: number;
     ars: number;
+    native: number;
+    currency: AssetCurrency;
   };
   const blocks = useMemo(() => {
     const byKey = new Map<
@@ -2858,6 +2861,8 @@ function FloorBrick({
         shortTicker: shortCryptoTicker(h.asset.ticker),
         change: h.asset.change,
         ars: h.ars,
+        native: h.native,
+        currency: assetCurrency(h.asset),
       });
       byKey.set(key, entry);
     }
@@ -3177,10 +3182,11 @@ function FloorBrick({
                 {formatTooltipPct(activeBlock.pct)}
               </Text>
             </View>
-            {/* DINERO no tiene cambio diario (cash mock con change=0)
-                — mostramos sólo label + pct, sin lista de tickers. */}
-            {isCashBlock ? null : groupBy === "ticker" &&
-              activeBlock.rows.length === 1 ? (
+            {/* DINERO usa el formato cash (currency code + monto en
+                native) en vez del change %. */}
+            {!isCashBlock &&
+            groupBy === "ticker" &&
+            activeBlock.rows.length === 1 ? (
               <>
                 <View
                   style={[
@@ -3224,23 +3230,12 @@ function FloorBrick({
                   />
                 ) : null}
                 {activeBlock.rows.slice(0, 5).map((r) => (
-                  <View key={r.ticker} style={s.tooltipRow}>
-                    <Text
-                      style={[s.tooltipTicker, { color: c.bg }]}
-                      numberOfLines={1}
-                    >
-                      {r.ticker}
-                    </Text>
-                    <Text
-                      style={[
-                        s.tooltipChange,
-                        { color: r.change >= 0 ? c.brand : c.red },
-                      ]}
-                    >
-                      {r.change >= 0 ? "▲ " : "▼ "}
-                      {fmtPctAbs(r.change)}
-                    </Text>
-                  </View>
+                  <TooltipRowEntry
+                    key={r.ticker}
+                    isCash={isCashBlock}
+                    row={r}
+                    c={c}
+                  />
                 ))}
                 {activeBlock.rows.length > 5 ? (
                   <Text
@@ -3306,6 +3301,8 @@ function RankingList({
     shortTicker: string;
     change: number;
     ars: number;
+    native: number;
+    currency: AssetCurrency;
   };
   const rows = useMemo(() => {
     const byKey = new Map<
@@ -3331,6 +3328,8 @@ function RankingList({
         shortTicker: shortCryptoTicker(h.asset.ticker),
         change: h.asset.change,
         ars: h.ars,
+        native: h.native,
+        currency: assetCurrency(h.asset),
       });
       byKey.set(key, entry);
     }
@@ -3504,10 +3503,9 @@ function RankingList({
                 {formatTooltipPct(activeRow.pct)}
               </Text>
             </View>
-            {/* DINERO no tiene cambio intra-categoría — saltamos la
-                lista de tickers (ARS/USD/USDT con change=0) porque
-                no aporta nada y mete ruido visual. */}
-            {activeRow.market !== "DINERO" && activeRow.rows.length > 0 ? (
+            {/* DINERO usa el formato cash (currency code + monto en
+                native) en lugar del change %, que no aplica para cash. */}
+            {activeRow.rows.length > 0 ? (
               <View
                 style={[
                   s.tooltipDivider,
@@ -3515,26 +3513,15 @@ function RankingList({
                 ]}
               />
             ) : null}
-            {activeRow.market !== "DINERO" && activeRow.rows.slice(0, 5).map((rr) => (
-              <View key={rr.ticker} style={s.tooltipRow}>
-                <Text
-                  style={[s.tooltipTicker, { color: c.bg }]}
-                  numberOfLines={1}
-                >
-                  {rr.ticker}
-                </Text>
-                <Text
-                  style={[
-                    s.tooltipChange,
-                    { color: rr.change >= 0 ? c.brand : c.red },
-                  ]}
-                >
-                  {rr.change >= 0 ? "▲ " : "▼ "}
-                  {fmtPctAbs(rr.change)}
-                </Text>
-              </View>
+            {activeRow.rows.slice(0, 5).map((rr) => (
+              <TooltipRowEntry
+                key={rr.ticker}
+                isCash={activeRow.market === "DINERO"}
+                row={rr}
+                c={c}
+              />
             ))}
-            {activeRow.market !== "DINERO" && activeRow.rows.length > 5 ? (
+            {activeRow.rows.length > 5 ? (
               <Text
                 style={[
                   s.tooltipMore,
@@ -3621,6 +3608,8 @@ function Treemap({
     shortTicker: string;
     change: number;
     ars: number;
+    native: number;
+    currency: AssetCurrency;
   };
   const tiles = useMemo(() => {
     const byKey = new Map<
@@ -3646,6 +3635,8 @@ function Treemap({
         shortTicker: shortCryptoTicker(h.asset.ticker),
         change: h.asset.change,
         ars: h.ars,
+        native: h.native,
+        currency: assetCurrency(h.asset),
       });
       byKey.set(key, entry);
     }
@@ -3915,10 +3906,9 @@ function Treemap({
                 {formatTooltipPct(activePct)}
               </Text>
             </View>
-            {/* DINERO no tiene variación intra-categoría — el "change"
-                de cash siempre es 0, así que la lista de tickers no
-                aporta nada y queda más limpio sin ella. */}
-            {!isCash && activeTile.rows.length > 0 ? (
+            {/* DINERO usa el formato cash (currency code + monto en
+                native) en lugar del change %. */}
+            {activeTile.rows.length > 0 ? (
               <>
                 <View
                   style={[
@@ -3927,23 +3917,12 @@ function Treemap({
                   ]}
                 />
                 {activeTile.rows.slice(0, 5).map((rr) => (
-                  <View key={rr.ticker} style={s.tooltipRow}>
-                    <Text
-                      style={[s.tooltipTicker, { color: c.bg }]}
-                      numberOfLines={1}
-                    >
-                      {rr.ticker}
-                    </Text>
-                    <Text
-                      style={[
-                        s.tooltipChange,
-                        { color: rr.change >= 0 ? c.brand : c.red },
-                      ]}
-                    >
-                      {rr.change >= 0 ? "▲ " : "▼ "}
-                      {fmtPctAbs(rr.change)}
-                    </Text>
-                  </View>
+                  <TooltipRowEntry
+                    key={rr.ticker}
+                    isCash={isCash}
+                    row={rr}
+                    c={c}
+                  />
                 ))}
                 {activeTile.rows.length > 5 ? (
                   <Text
@@ -4004,6 +3983,55 @@ function shortCryptoTicker(ticker: string): string {
 /** Pct para el tooltip — un decimal siempre, con coma. */
 function formatTooltipPct(p: number): string {
   return p.toFixed(1).replace(".", ",") + "%";
+}
+
+/* ─── TooltipRowEntry — fila de detalle del pill compartido entre los
+ *  4 charts.
+ *
+ * Dos modos:
+ *   - Default: ticker + variación % del día (▲/▼ con color brand/red).
+ *   - isCash: ticker + monto en moneda native — para la categoría
+ *     DINERO el "change" siempre es 0, así que mostramos cuánta plata
+ *     hay en cada divisa (ARS/USD/USDT) que es la info útil. */
+function TooltipRowEntry({
+  row,
+  isCash,
+  c,
+}: {
+  row: {
+    ticker: string;
+    change: number;
+    native: number;
+    currency: AssetCurrency;
+  };
+  isCash: boolean;
+  c: ColorMap;
+}) {
+  return (
+    <View style={s.tooltipRow}>
+      <Text style={[s.tooltipTicker, { color: c.bg }]} numberOfLines={1}>
+        {row.ticker}
+      </Text>
+      {isCash ? (
+        <Text
+          style={[s.tooltipChange, { color: "rgba(255,255,255,0.85)" }]}
+          numberOfLines={1}
+        >
+          {formatMoney(row.native, row.currency)}
+        </Text>
+      ) : (
+        <Text
+          style={[
+            s.tooltipChange,
+            { color: row.change >= 0 ? c.brand : c.red },
+          ]}
+        >
+          {row.change >= 0 ? "▲ " : "▼ "}
+          {fmtPctAbs(row.change)}
+        </Text>
+      )}
+    </View>
+  );
 }
 
 /** Pct sin signo, máximo un decimal cuando es chico (< 10%). */
@@ -4081,7 +4109,11 @@ const s = StyleSheet.create({
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -1.2,
-    marginBottom: 4,
+    /* marginBottom generoso para dejar respirar al $ del balance —
+     * el lineHeight del integer es 1.05x con stretchY, lo que hace
+     * que la cabeza del símbolo casi roce el descender de "Portfolio"
+     * con marginBottom chico. 14 px deja aire suficiente. */
+    marginBottom: 14,
   },
   heroPagerRow: {
     flexDirection: "row",
@@ -4144,26 +4176,30 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
-   * CurrencySheet para cambiar moneda con un acto deliberado. */
+  /* Selector ARS/USD — segmented pill estilo Robinhood debajo del
+   * saldo. Track translúcido + thumb elevado en el activo (bg c.bg
+   * con shadow sutil). Tap directo togglea sin sheet intermedio. */
   currencyPillRow: {
     flexDirection: "row",
-    marginTop: 10,
+    marginTop: 12,
   },
-  currencyPill: {
+  currencySeg: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingLeft: 10,
-    paddingRight: 6,
-    paddingVertical: 4,
+    padding: 3,
     borderCurve: "continuous",
     borderRadius: radius.pill,
   },
-  currencyPillCode: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 0.5,
+  currencySegBtn: {
+    minWidth: 48,
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  currencySegLabel: {
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
   /* Ladrillo full-bleed — sigue al hero scrollable. Sin
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
