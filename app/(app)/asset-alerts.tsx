@@ -637,11 +637,15 @@ function SwipableAlertRow({
   onDelete: () => void;
   onTogglePause: () => void;
 }) {
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const cur = assetCurrency(asset);
   const isPaused = alert.status === "paused";
   const dirLabel = alert.direction === "above" ? "Sube a" : "Baja a";
   const dirColor = alert.direction === "above" ? c.brand : c.red;
+  /* Convención de marca: cuando un botón / fondo es verde o naranja
+   * (brand / c.red), el texto es BLANCO en light mode y NEGRO en
+   * dark mode. Así el texto contrasta bien con el fondo en cada tema. */
+  const onColorInk = mode === "dark" ? "#0E0F0C" : "#FFFFFF";
 
   const distAbs = alert.threshold - asset.price;
   const distPct = asset.price > 0 ? (distAbs / asset.price) * 100 : 0;
@@ -766,8 +770,10 @@ function SwipableAlertRow({
         style={[s.swipeBg, { backgroundColor: c.red }]}
       >
         <Animated.View style={[s.swipeBgInner, bgAnimStyle]}>
-          <Feather name="trash-2" size={18} color="#FFFFFF" />
-          <Text style={s.swipeBgLabel}>Eliminar</Text>
+          <Feather name="trash-2" size={18} color={onColorInk} />
+          <Text style={[s.swipeBgLabel, { color: onColorInk }]}>
+            Eliminar
+          </Text>
         </Animated.View>
       </View>
 
@@ -1180,8 +1186,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  /* Color del label se setea inline (depende del theme: blanco en
+   * light, negro en dark — convención de marca para textos sobre
+   * fondos brand/orange). */
   swipeBgLabel: {
-    color: "#FFFFFF",
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
