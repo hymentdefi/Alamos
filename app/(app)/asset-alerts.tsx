@@ -786,10 +786,15 @@ function SwipableAlertRow({
               <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
               {formatMoney(alert.threshold, cur)}
             </Text>
-            {/* Col 2: distancia al objetivo en color de dirección. */}
+            {/* Col 2: distancia al objetivo en color de dirección.
+             *  Mismo size 16/600 que col 1 (jerarquía pareja). En
+             *  cripto 100k+, "+100.000,00 USDT" no entra en 90 px
+             *  a 16 px, así que adjustsFontSizeToFit lo shrinkea. */}
             <Text
               style={[s.alertDist, { color: dirColor }]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
             >
               {distFormat === "%"
                 ? `${distSign}${distPct.toFixed(2)}%`
@@ -1160,15 +1165,16 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
   },
   /* Col 2: distancia (% o $ según el toggle del header). Color
-   * verde/naranja según dirección, 14 / 600. Centrada bajo el
-   * label "% al objetivo ▾" / "$ al objetivo ▾" del header —
-   * mismo ancho que distFormatBtn (90) para alineación perfecta.
-   * Damos más aire a la col 1 que antes (era 110), para que
-   * "Sube a 100.000,00 USDT" entre sin truncarse. */
+   * verde/naranja según dirección, 16 / 600 — MATCH del alertLeft
+   * (col 1) para que ambos lean con la misma jerarquía. Centrada
+   * bajo el label "% al objetivo ▾" / "$ al objetivo ▾" del header
+   * (mismo ancho 90 que distFormatBtn). En cripto con 100k+, el
+   * valor de distancia es largo ("+100.000,00 USDT") y el
+   * adjustsFontSizeToFit del componente lo shrinkea a fit. */
   alertDist: {
     fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 16,
+    letterSpacing: -0.3,
     width: 90,
     textAlign: "center",
   },
