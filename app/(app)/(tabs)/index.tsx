@@ -196,7 +196,7 @@ function BaseHome() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
-    }, 1100);
+    }, 900);
   }, []);
 
   const onScroll = useCallback(
@@ -411,9 +411,10 @@ function BaseHome() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.textMuted}
-            colors={[c.textMuted]}
+            tintColor={c.brand}
+            colors={[c.brand]}
             progressBackgroundColor={c.surface}
+            progressViewOffset={12}
           />
         }
       >
