@@ -37,8 +37,11 @@ import { useAlerts } from "../../lib/alerts/context";
 import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
 import { AlertSheet } from "../../lib/components/AlertSheet";
+import { IndicatorSheet } from "../../lib/components/IndicatorSheet";
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
+import { IndicatorChartIllustration } from "../../lib/components/illustrations/IndicatorChartIllustration";
 import { Toggle } from "../../lib/components/Toggle";
+import type { IndicatorAlert } from "../../lib/api/alerts";
 
 type Tab = "price" | "indicator";
 type Sort = "proximity" | "createdAt";
@@ -82,6 +85,10 @@ export default function AssetAlertsScreen() {
   const [distFormat, setDistFormat] = useState<"%" | "$">("%");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
+  /* Indicator-tab equivalents — sheet de creación + alerta en edición. */
+  const [indicatorCreateOpen, setIndicatorCreateOpen] = useState(false);
+  const [editingIndicator, setEditingIndicator] =
+    useState<IndicatorAlert | null>(null);
   /* Ancla del popup de sort — medimos la posición exacta del ícono
    *  de sliders al abrir el menú así el popup sale pegado debajo. */
   const sortBtnRef = useRef<View>(null);
@@ -90,12 +97,35 @@ export default function AssetAlertsScreen() {
     right: number;
   }>({ top: 100, right: 24 });
 
-  const { activeForAsset, triggeredForAsset, setPaused, remove } = useAlerts();
+  const {
+    activeForAsset,
+    triggeredForAsset,
+    setPaused,
+    remove,
+    activeIndicatorsForAsset,
+    setIndicatorPaused,
+    removeIndicator,
+  } = useAlerts();
 
   const alertsForAsset = useMemo(
     () => (asset ? activeForAsset(asset.ticker) : []),
     [asset, activeForAsset],
   );
+
+  const indicatorsForAsset = useMemo(
+    () => (asset ? activeIndicatorsForAsset(asset.ticker) : []),
+    [asset, activeIndicatorsForAsset],
+  );
+
+  const sortedIndicators = useMemo(() => {
+    const copy = [...indicatorsForAsset];
+    if (sort === "createdAt") {
+      copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    // "proximity" no aplica para indicadores → quedan en orden de
+    // creación inverso por default (mismo que createdAt).
+    return copy;
+  }, [indicatorsForAsset, sort]);
 
   const sortedAlerts = useMemo(() => {
     if (!asset) return [];
@@ -391,42 +421,116 @@ export default function AssetAlertsScreen() {
             ) : null}
           </>
         ) : (
-          <EmptyState
-            illustration={<AlertBellIllustration size={220} />}
-            text="Las alertas por indicadores técnicos llegan próximamente — RSI, cruces de medias móviles y más."
-          />
+          <>
+            {sortedIndicators.length === 0 ? (
+              <EmptyState
+                illustration={<IndicatorChartIllustration size={184} />}
+                text="Elegí un indicador técnico y recibí una notificación instantánea en el celular cuando cruce el umbral que configuraste."
+              />
+            ) : null}
+
+            {sortedIndicators.length > 0 ? (
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <View style={s.alertSideLeft}>
+                    <Text
+                      style={[s.sectionTitle, { color: c.text }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.45}
+                    >
+                      Alertas activas ({sortedIndicators.length})
+                    </Text>
+                  </View>
+                  <View style={s.alertCenter} />
+                  <View style={s.alertSideRight}>
+                    <Pressable
+                      ref={sortBtnRef}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        sortBtnRef.current?.measureInWindow(
+                          (x, y, width, height) => {
+                            setSortAnchor({
+                              top: y + height + 6,
+                              right: Math.max(8, windowW - (x + width)),
+                            });
+                            setSortMenuOpen(true);
+                          },
+                        );
+                      }}
+                      hitSlop={10}
+                      style={s.sortIconBtn}
+                      accessibilityLabel="Cambiar orden de la lista"
+                    >
+                      <Feather name="sliders" size={16} color={c.textMuted} />
+                    </Pressable>
+                  </View>
+                </View>
+                <View style={s.list}>
+                  {sortedIndicators.map((alert, i) => (
+                    <SwipableIndicatorRow
+                      key={alert.id}
+                      alert={alert}
+                      asset={asset}
+                      withTopDivider={i > 0}
+                      onEdit={() => setEditingIndicator(alert)}
+                      onDelete={async () => {
+                        try {
+                          await removeIndicator(alert.id);
+                        } catch {
+                          show("No pudimos eliminar la alerta", {
+                            variant: "error",
+                          });
+                        }
+                      }}
+                      onTogglePause={async () => {
+                        const willPause = alert.status === "active";
+                        Haptics.selectionAsync().catch(() => {});
+                        try {
+                          await setIndicatorPaused(alert.id, willPause);
+                        } catch {
+                          show("No pudimos actualizar la alerta", {
+                            variant: "error",
+                          });
+                        }
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
         )}
       </ScrollView>
 
-      {tab === "price" ? (
-        <View
-          style={[
-            s.ctaWrap,
-            { paddingBottom: insets.bottom + 12 },
+      <View
+        style={[
+          s.ctaWrap,
+          { paddingBottom: insets.bottom + 12 },
+        ]}
+      >
+        <Pressable
+          style={({ pressed }) => [
+            s.cta,
+            {
+              /* Botón principal — ink/text neutro. El brand verde
+               * lo reservamos para el CTA del AlertSheet (la
+               * confirmación final). */
+              backgroundColor: c.text,
+              opacity: pressed ? 0.86 : 1,
+            },
           ]}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            if (tab === "price") setCreateOpen(true);
+            else setIndicatorCreateOpen(true);
+          }}
         >
-          <Pressable
-            style={({ pressed }) => [
-              s.cta,
-              {
-                /* Botón principal — ink/text neutro. El brand verde
-                 * lo reservamos para el CTA del AlertSheet (la
-                 * confirmación final). */
-                backgroundColor: c.text,
-                opacity: pressed ? 0.86 : 1,
-              },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              setCreateOpen(true);
-            }}
-          >
-            <Text style={[s.ctaText, { color: c.bg }]}>
-              Agregar alerta
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
+          <Text style={[s.ctaText, { color: c.bg }]}>
+            Agregar alerta
+          </Text>
+        </Pressable>
+      </View>
 
       <SortMenu
         visible={sortMenuOpen}
@@ -456,6 +560,23 @@ export default function AssetAlertsScreen() {
           asset={asset}
           editingAlert={editingAlert}
           onClose={() => setEditingAlert(null)}
+        />
+      ) : null}
+
+      <IndicatorSheet
+        key={`ind-create-${asset.ticker}`}
+        visible={indicatorCreateOpen}
+        asset={asset}
+        onClose={() => setIndicatorCreateOpen(false)}
+      />
+
+      {editingIndicator ? (
+        <IndicatorSheet
+          key={`ind-edit-${editingIndicator.id}`}
+          visible
+          asset={asset}
+          editingAlert={editingIndicator}
+          onClose={() => setEditingIndicator(null)}
         />
       ) : null}
     </View>
@@ -872,6 +993,274 @@ function SwipableAlertRow({
       </GestureDetector>
     </Animated.View>
   );
+}
+
+/* ─── Row de alerta de indicador (RSI/SMA/MACD/Bollinger/Volumen) ──
+ *
+ * Mismo lenguaje visual que SwipableAlertRow pero con datos de
+ * indicator alerts. Layout 3-col 45/35/20:
+ *   - Left (45 %): condición coloreada (verde/naranja según dirección)
+ *   - Center (35 %): valor actual del indicador (mock determinístico)
+ *   - Right (20 %): toggle de pausar
+ *
+ * Swipe-left para borrar (bg c.red con ícono trash + "Eliminar"),
+ * tap → onEdit (abre IndicatorSheet con editingAlert pre-cargada).
+ */
+
+function SwipableIndicatorRow({
+  alert,
+  asset,
+  withTopDivider,
+  onEdit,
+  onDelete,
+  onTogglePause,
+}: {
+  alert: IndicatorAlert;
+  asset: Asset;
+  withTopDivider: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onTogglePause: () => void;
+}) {
+  const { c, mode } = useTheme();
+  const isPaused = alert.status === "paused";
+  const rowOpacity = isPaused ? 0.4 : 1;
+  const onColorInk = mode === "dark" ? "#0E0F0C" : "#FFFFFF";
+
+  const display = useMemo(
+    () => describeIndicatorAlert(alert, asset, c),
+    [alert, asset, c],
+  );
+
+  const tx = useSharedValue(0);
+  const rowH = useSharedValue(72);
+  const opacity = useSharedValue(1);
+
+  const triggerDelete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    onDelete();
+  }, [onDelete]);
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-12, 12])
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationX < 0) {
+        if (e.translationX < -SWIPE_DELETE_THRESHOLD) {
+          const overshoot = e.translationX + SWIPE_DELETE_THRESHOLD;
+          tx.value =
+            -SWIPE_DELETE_THRESHOLD + overshoot * SWIPE_OVERSHOOT_DAMPING;
+        } else {
+          tx.value = e.translationX;
+        }
+      } else {
+        tx.value = Math.min(12, e.translationX * 0.25);
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDelete =
+        e.translationX < -SWIPE_DELETE_THRESHOLD ||
+        e.velocityX < -SWIPE_DELETE_VELOCITY;
+      if (shouldDelete) {
+        tx.value = withTiming(-500, {
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+        });
+        opacity.value = withTiming(0, { duration: 160 });
+        rowH.value = withTiming(
+          0,
+          { duration: 220, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(triggerDelete)();
+          },
+        );
+      } else {
+        tx.value = withSpring(0, {
+          damping: 22,
+          stiffness: 240,
+          mass: 0.6,
+        });
+      }
+    });
+
+  const rowAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }],
+  }));
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    height: rowH.value === 72 ? undefined : rowH.value,
+  }));
+  const bgAnimStyle = useAnimatedStyle(() => {
+    const progress = Math.min(1, Math.abs(tx.value) / SWIPE_DELETE_THRESHOLD);
+    return {
+      opacity: interpolate(Math.abs(tx.value), [0, 24], [0, 1]),
+      transform: [
+        {
+          scale: interpolate(progress, [0.6, 1, 1.2], [0.92, 1, 1.05]),
+        },
+      ],
+    };
+  });
+
+  return (
+    <Animated.View
+      onLayout={(e) => {
+        if (rowH.value === 72) rowH.value = e.nativeEvent.layout.height;
+      }}
+      style={[
+        s.swipeRoot,
+        withTopDivider && {
+          borderTopColor: c.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+        },
+        containerAnimStyle,
+      ]}
+    >
+      <View
+        pointerEvents="none"
+        style={[s.swipeBg, { backgroundColor: c.red }]}
+      >
+        <Animated.View style={[s.swipeBgInner, bgAnimStyle]}>
+          <Feather name="trash-2" size={18} color={onColorInk} />
+          <Text style={[s.swipeBgLabel, { color: onColorInk }]}>
+            Eliminar
+          </Text>
+        </Animated.View>
+      </View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            s.alertRow,
+            { backgroundColor: c.bg },
+            rowAnimStyle,
+          ]}
+        >
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertSideLeft,
+              { opacity: pressed ? 0.7 : rowOpacity },
+            ]}
+            accessibilityLabel={`Editar alerta — ${display.label}`}
+          >
+            <Text
+              style={[s.alertLeft, { color: display.color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.45}
+            >
+              {display.label}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertCenter,
+              { opacity: pressed ? 0.7 : rowOpacity },
+            ]}
+            accessibilityLabel="Editar alerta"
+          >
+            <Text
+              style={[s.alertDist, { color: c.textMuted }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.45}
+            >
+              {display.value}
+            </Text>
+          </Pressable>
+          <View style={s.alertSideRight}>
+            <Toggle
+              value={!isPaused}
+              onValueChange={() => onTogglePause()}
+            />
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
+  );
+}
+
+/** Describe una IndicatorAlert para el row de la lista — devuelve
+ *  el label coloreado (condición), el color del label, y el valor
+ *  actual del indicador (mock determinístico basado en asset.price
+ *  + ticker hash). En producción el valor vendría del backend en
+ *  tiempo real. */
+function describeIndicatorAlert(
+  alert: IndicatorAlert,
+  asset: Asset,
+  c: ReturnType<typeof useTheme>["c"],
+): { label: string; color: string; value: string } {
+  // Hash determinístico simple del ticker para variar el mock value.
+  const seed = Array.from(asset.ticker).reduce(
+    (h, ch) => (h * 31 + ch.charCodeAt(0)) | 0,
+    0,
+  );
+  const noise = (Math.abs(seed) % 100) / 100; // 0..1
+  if (alert.type === "rsi") {
+    const isOver = alert.condition === "overbought";
+    const rsi = isOver ? 35 + noise * 25 : 40 + noise * 30;
+    return {
+      label: isOver ? "RSI > 70" : "RSI < 30",
+      color: isOver ? c.red : c.brand,
+      value: `RSI: ${rsi.toFixed(1)}`,
+    };
+  }
+  if (alert.type === "sma") {
+    const above = alert.condition === "above";
+    const factor = 0.92 + noise * 0.16; // ±8%
+    const ma = asset.price * factor;
+    const variantLabel = alert.variant.toUpperCase();
+    return {
+      label: above
+        ? `Precio cruza sobre ${variantLabel} ${alert.period}`
+        : `Precio cruza bajo ${variantLabel} ${alert.period}`,
+      color: above ? c.brand : c.red,
+      value: `${variantLabel} ${alert.period}: ${formatNumber(ma)}`,
+    };
+  }
+  if (alert.type === "macd") {
+    const bullish = alert.condition === "bullish";
+    const macd = (noise - 0.5) * 0.5;
+    return {
+      label: bullish ? "MACD cruce alcista" : "MACD cruce bajista",
+      color: bullish ? c.brand : c.red,
+      value: `MACD: ${macd >= 0 ? "+" : ""}${macd.toFixed(2)}`,
+    };
+  }
+  if (alert.type === "bollinger") {
+    const upper = alert.band === "upper";
+    const factor = upper ? 1.04 + noise * 0.04 : 0.92 + noise * 0.04;
+    const band = asset.price * factor;
+    return {
+      label: upper ? "Banda superior" : "Banda inferior",
+      color: upper ? c.red : c.brand,
+      value: `${upper ? "Sup" : "Inf"}: ${formatNumber(band)}`,
+    };
+  }
+  // volume
+  const cur = 0.8 + noise * 1.4; // 0.8x - 2.2x
+  return {
+    label: `Volumen > ${alert.multiplier}x prom.`,
+    color: c.text,
+    value: `${cur.toFixed(1)}x prom.`,
+  };
+}
+
+function formatNumber(n: number): string {
+  // Formato corto con 2 decimales, separador miles con ".".
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    return n.toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  return n.toFixed(2).replace(".", ",");
 }
 
 /* ─── Row de alerta disparada (historial) ──────────────────────── */

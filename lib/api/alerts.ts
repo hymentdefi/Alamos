@@ -291,6 +291,261 @@ export function _seedTriggeredAlert(alert: Omit<PriceAlert, "id" | "userId">): P
 export function _resetMockAlerts(): void {
   _mockStore.length = 0;
   _idSeq = 1;
+  _indicatorStore.length = 0;
+}
+
+/* ─── Indicator Alerts (RSI / SMA / MACD / Bollinger / Volume) ────
+ *
+ * Alertas técnicas, separadas del store de price alerts. Comparten
+ * AlertStatus, createdAt, triggeredAt para que la UI pueda re-usar
+ * los componentes (toggle, swipe-to-delete, etc.).
+ *
+ * v1: presets mínimos por indicador, sin parámetros editables (los
+ * thresholds estándar como RSI 70/30, MACD 12/26/9 quedan ocultos).
+ * Excepción: SMA tiene period (9/20/50/100/200) + variant (sma/ema)
+ * editable; Volume tiene multiplier (1.5/2/3x) editable. */
+
+export type IndicatorType =
+  | "rsi"
+  | "sma"
+  | "macd"
+  | "bollinger"
+  | "volume";
+
+interface BaseIndicatorAlert {
+  id: string;
+  userId: string;
+  assetId: string;
+  status: AlertStatus;
+  createdAt: string;
+  triggeredAt?: string;
+}
+
+export interface RSIAlert extends BaseIndicatorAlert {
+  type: "rsi";
+  /** "overbought" = RSI sube por encima de 70.
+   *  "oversold"   = RSI baja por debajo de 30. */
+  condition: "overbought" | "oversold";
+}
+
+export interface SMAAlert extends BaseIndicatorAlert {
+  type: "sma";
+  /** "above" = precio cruza por encima de la media móvil.
+   *  "below" = precio cruza por debajo. */
+  condition: "above" | "below";
+  /** Períodos estándar disponibles en chips. */
+  period: 9 | 20 | 50 | 100 | 200;
+  /** Simple vs Exponencial. */
+  variant: "sma" | "ema";
+}
+
+export interface MACDAlert extends BaseIndicatorAlert {
+  type: "macd";
+  /** "bullish" = MACD cruza por encima de la línea de señal.
+   *  "bearish" = MACD cruza por debajo. */
+  condition: "bullish" | "bearish";
+}
+
+export interface BollingerAlert extends BaseIndicatorAlert {
+  type: "bollinger";
+  /** "upper" = precio toca la banda superior.
+   *  "lower" = precio toca la banda inferior. */
+  band: "upper" | "lower";
+}
+
+export interface VolumeAlert extends BaseIndicatorAlert {
+  type: "volume";
+  /** Múltiplo del volumen promedio que tiene que superar. */
+  multiplier: 1.5 | 2 | 3;
+}
+
+export type IndicatorAlert =
+  | RSIAlert
+  | SMAAlert
+  | MACDAlert
+  | BollingerAlert
+  | VolumeAlert;
+
+/** Input para crear cualquier indicator alert. Discriminado por type. */
+export type CreateIndicatorAlertInput =
+  | { type: "rsi"; assetId: string; condition: "overbought" | "oversold" }
+  | {
+      type: "sma";
+      assetId: string;
+      condition: "above" | "below";
+      period: 9 | 20 | 50 | 100 | 200;
+      variant: "sma" | "ema";
+    }
+  | { type: "macd"; assetId: string; condition: "bullish" | "bearish" }
+  | { type: "bollinger"; assetId: string; band: "upper" | "lower" }
+  | { type: "volume"; assetId: string; multiplier: 1.5 | 2 | 3 };
+
+/** Patch de update para un indicator alert ya existente. Sólo los
+ *  campos editables del tipo correspondiente (period/variant en SMA,
+ *  multiplier en Volume, condition en RSI/MACD, band en Bollinger). */
+export type UpdateIndicatorAlertPatch =
+  | { type: "rsi"; condition: "overbought" | "oversold" }
+  | {
+      type: "sma";
+      condition: "above" | "below";
+      period: 9 | 20 | 50 | 100 | 200;
+      variant: "sma" | "ema";
+    }
+  | { type: "macd"; condition: "bullish" | "bearish" }
+  | { type: "bollinger"; band: "upper" | "lower" }
+  | { type: "volume"; multiplier: 1.5 | 2 | 3 };
+
+const _indicatorStore: IndicatorAlert[] = [];
+let _indicatorIdSeq = 1;
+
+export async function createIndicatorAlert(
+  input: CreateIndicatorAlertInput,
+  _accessToken?: string,
+): Promise<IndicatorAlert> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const base = {
+      id: `ind-${_indicatorIdSeq++}`,
+      userId: MOCK_USER_ID,
+      assetId: input.assetId,
+      status: "active" as AlertStatus,
+      createdAt: new Date().toISOString(),
+    };
+    let created: IndicatorAlert;
+    if (input.type === "rsi") {
+      created = { ...base, type: "rsi", condition: input.condition };
+    } else if (input.type === "sma") {
+      created = {
+        ...base,
+        type: "sma",
+        condition: input.condition,
+        period: input.period,
+        variant: input.variant,
+      };
+    } else if (input.type === "macd") {
+      created = { ...base, type: "macd", condition: input.condition };
+    } else if (input.type === "bollinger") {
+      created = { ...base, type: "bollinger", band: input.band };
+    } else {
+      created = { ...base, type: "volume", multiplier: input.multiplier };
+    }
+    _indicatorStore.push(created);
+    return created;
+  }
+  throw new AlertApiError("createIndicatorAlert no implementado");
+}
+
+export async function getIndicatorAlertsForAsset(
+  assetId: string,
+  _accessToken?: string,
+): Promise<IndicatorAlert[]> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    return _indicatorStore.filter(
+      (a) =>
+        a.assetId === assetId &&
+        (a.status === "active" || a.status === "paused"),
+    );
+  }
+  throw new AlertApiError("getIndicatorAlertsForAsset no implementado");
+}
+
+export async function getAllIndicatorAlerts(
+  _accessToken?: string,
+): Promise<IndicatorAlert[]> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    return [..._indicatorStore].sort((a, b) => {
+      if (a.status !== b.status) {
+        if (a.status === "active") return -1;
+        if (b.status === "active") return 1;
+      }
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }
+  throw new AlertApiError("getAllIndicatorAlerts no implementado");
+}
+
+export async function deleteIndicatorAlert(
+  alertId: string,
+  _accessToken?: string,
+): Promise<void> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const idx = _indicatorStore.findIndex((a) => a.id === alertId);
+    if (idx === -1) {
+      throw new AlertApiError("Alerta no encontrada.", "invalid");
+    }
+    _indicatorStore.splice(idx, 1);
+  }
+}
+
+export async function setIndicatorAlertPaused(
+  alertId: string,
+  paused: boolean,
+  _accessToken?: string,
+): Promise<IndicatorAlert> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const idx = _indicatorStore.findIndex((a) => a.id === alertId);
+    if (idx === -1) {
+      throw new AlertApiError("Alerta no encontrada.", "invalid");
+    }
+    const current = _indicatorStore[idx];
+    if (current.status === "triggered" || current.status === "cancelled") {
+      throw new AlertApiError(
+        "No se puede pausar una alerta finalizada.",
+        "invalid",
+      );
+    }
+    const updated = { ...current, status: paused ? "paused" : "active" } as IndicatorAlert;
+    _indicatorStore[idx] = updated;
+    return updated;
+  }
+  throw new AlertApiError("setIndicatorAlertPaused no implementado");
+}
+
+export async function updateIndicatorAlert(
+  alertId: string,
+  patch: UpdateIndicatorAlertPatch,
+  _accessToken?: string,
+): Promise<IndicatorAlert> {
+  if (MOCK_MODE) {
+    await mockDelay();
+    const idx = _indicatorStore.findIndex((a) => a.id === alertId);
+    if (idx === -1) {
+      throw new AlertApiError("Alerta no encontrada.", "invalid");
+    }
+    const current = _indicatorStore[idx];
+    if (current.type !== patch.type) {
+      throw new AlertApiError(
+        "No se puede cambiar el tipo de indicador.",
+        "invalid",
+      );
+    }
+    let updated: IndicatorAlert;
+    if (current.type === "rsi" && patch.type === "rsi") {
+      updated = { ...current, condition: patch.condition };
+    } else if (current.type === "sma" && patch.type === "sma") {
+      updated = {
+        ...current,
+        condition: patch.condition,
+        period: patch.period,
+        variant: patch.variant,
+      };
+    } else if (current.type === "macd" && patch.type === "macd") {
+      updated = { ...current, condition: patch.condition };
+    } else if (current.type === "bollinger" && patch.type === "bollinger") {
+      updated = { ...current, band: patch.band };
+    } else if (current.type === "volume" && patch.type === "volume") {
+      updated = { ...current, multiplier: patch.multiplier };
+    } else {
+      throw new AlertApiError("Tipo desconocido", "invalid");
+    }
+    _indicatorStore[idx] = updated;
+    return updated;
+  }
+  throw new AlertApiError("updateIndicatorAlert no implementado");
 }
 
 /* ─── Seed inicial — alertas disparadas para que el historial no

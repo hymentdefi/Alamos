@@ -12,12 +12,19 @@ import {
   deleteAlert as apiDelete,
   updateAlert as apiUpdate,
   setAlertPaused as apiSetPaused,
+  createIndicatorAlert as apiCreateIndicator,
+  deleteIndicatorAlert as apiDeleteIndicator,
+  updateIndicatorAlert as apiUpdateIndicator,
+  setIndicatorAlertPaused as apiSetIndicatorPaused,
   getAllAlerts,
-  getAlertsForAsset,
+  getAllIndicatorAlerts,
   AlertApiError,
   type AlertDirection,
   type CreateAlertInput,
+  type CreateIndicatorAlertInput,
+  type IndicatorAlert,
   type PriceAlert,
+  type UpdateIndicatorAlertPatch,
 } from "../api/alerts";
 import { useAuth } from "../auth/context";
 
@@ -70,29 +77,56 @@ interface AlertsContextValue {
   /** Refresh de toda la lista — útil al pull-to-refresh en
    *  pantalla "Mis alertas". */
   refresh: () => Promise<void>;
+
+  /* ─── Indicator alerts (RSI / SMA / MACD / Bollinger / Volume) ─
+   *
+   * Mantenemos un store paralelo para alertas de indicadores
+   * técnicos. Comparten AlertStatus y la lógica de active/paused/
+   * triggered, pero el modelo de datos es completamente distinto
+   * (no hay threshold ni currency, sólo condiciones por tipo). */
+  indicatorAlerts: IndicatorAlert[];
+  activeIndicatorsForAsset: (assetId: string) => IndicatorAlert[];
+  triggeredIndicatorsForAsset: (assetId: string) => IndicatorAlert[];
+  createIndicator: (
+    input: CreateIndicatorAlertInput,
+  ) => Promise<IndicatorAlert>;
+  updateIndicator: (
+    alertId: string,
+    patch: UpdateIndicatorAlertPatch,
+  ) => Promise<IndicatorAlert>;
+  setIndicatorPaused: (alertId: string, paused: boolean) => Promise<void>;
+  removeIndicator: (alertId: string) => Promise<void>;
 }
 
 const AlertsContext = createContext<AlertsContextValue | null>(null);
 
 export function AlertsProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [indicatorAlerts, setIndicatorAlerts] = useState<IndicatorAlert[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated } = useAuth();
 
   // Hidratación inicial: cuando el user pasa a autenticado,
-  // hacemos un GET /alerts para llenar la caché. Si se desloguea,
-  // la limpiamos.
+  // hacemos un GET /alerts y /indicator-alerts para llenar la caché.
+  // Si se desloguea, las limpiamos.
   useEffect(() => {
     let cancelled = false;
     if (!isAuthenticated) {
       setAlerts([]);
+      setIndicatorAlerts([]);
       return;
     }
     (async () => {
       setIsLoading(true);
       try {
-        const items = await getAllAlerts();
-        if (!cancelled) setAlerts(items);
+        const [items, indicators] = await Promise.all([
+          getAllAlerts(),
+          getAllIndicatorAlerts(),
+        ]);
+        if (!cancelled) {
+          setAlerts(items);
+          setIndicatorAlerts(indicators);
+        }
       } catch {
         // Silent — la pantalla "Mis alertas" puede reintentar con
         // pull-to-refresh. No queremos un toast al boot.
@@ -206,10 +240,101 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const items = await getAllAlerts();
+      const [items, indicators] = await Promise.all([
+        getAllAlerts(),
+        getAllIndicatorAlerts(),
+      ]);
       setAlerts(items);
+      setIndicatorAlerts(indicators);
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  /* ─── Indicator alerts methods — mismo patrón que las price ──── */
+
+  const activeIndicatorsForAsset = useCallback(
+    (assetId: string) =>
+      indicatorAlerts.filter(
+        (a) =>
+          a.assetId === assetId &&
+          (a.status === "active" || a.status === "paused"),
+      ),
+    [indicatorAlerts],
+  );
+
+  const triggeredIndicatorsForAsset = useCallback(
+    (assetId: string) =>
+      indicatorAlerts
+        .filter((a) => a.assetId === assetId && a.status === "triggered")
+        .sort((a, b) =>
+          (b.triggeredAt ?? "").localeCompare(a.triggeredAt ?? ""),
+        ),
+    [indicatorAlerts],
+  );
+
+  const createIndicator = useCallback(
+    async (input: CreateIndicatorAlertInput) => {
+      const created = await apiCreateIndicator(input);
+      setIndicatorAlerts((prev) => [created, ...prev]);
+      return created;
+    },
+    [],
+  );
+
+  const updateIndicator = useCallback(
+    async (alertId: string, patch: UpdateIndicatorAlertPatch) => {
+      const updated = await apiUpdateIndicator(alertId, patch);
+      setIndicatorAlerts((prev) =>
+        prev.map((a) => (a.id === alertId ? updated : a)),
+      );
+      return updated;
+    },
+    [],
+  );
+
+  const setIndicatorPaused = useCallback(
+    async (alertId: string, paused: boolean) => {
+      const previous = indicatorAlerts.find((a) => a.id === alertId);
+      if (!previous) return;
+      // Optimistic flip — revertimos si el server falla.
+      setIndicatorAlerts((prev) =>
+        prev.map((a) =>
+          a.id === alertId
+            ? ({ ...a, status: paused ? "paused" : "active" } as IndicatorAlert)
+            : a,
+        ),
+      );
+      try {
+        await apiSetIndicatorPaused(alertId, paused);
+      } catch (e) {
+        setIndicatorAlerts((prev) =>
+          prev.map((a) => (a.id === alertId ? previous : a)),
+        );
+        throw e;
+      }
+    },
+    [indicatorAlerts],
+  );
+
+  const removeIndicator = useCallback(async (alertId: string) => {
+    let removed: IndicatorAlert | undefined;
+    setIndicatorAlerts((prev) => {
+      const idx = prev.findIndex((a) => a.id === alertId);
+      if (idx === -1) return prev;
+      removed = prev[idx];
+      const next = [...prev];
+      next.splice(idx, 1);
+      return next;
+    });
+    try {
+      await apiDeleteIndicator(alertId);
+    } catch (e) {
+      if (removed) {
+        const r = removed;
+        setIndicatorAlerts((prev) => [r, ...prev]);
+      }
+      throw e;
     }
   }, []);
 
@@ -225,6 +350,13 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       setPaused,
       remove,
       refresh,
+      indicatorAlerts,
+      activeIndicatorsForAsset,
+      triggeredIndicatorsForAsset,
+      createIndicator,
+      updateIndicator,
+      setIndicatorPaused,
+      removeIndicator,
     }),
     [
       alerts,
@@ -237,6 +369,13 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       setPaused,
       remove,
       refresh,
+      indicatorAlerts,
+      activeIndicatorsForAsset,
+      triggeredIndicatorsForAsset,
+      createIndicator,
+      updateIndicator,
+      setIndicatorPaused,
+      removeIndicator,
     ],
   );
 
