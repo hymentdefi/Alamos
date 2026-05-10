@@ -266,19 +266,18 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  {/* Mismo patrón que el row: title (flex 1, izquierda),
-                   *  label "% al objetivo" (centrado, intrínseco),
-                   *  sort icon (flex 1, derecha). El cluster del label
-                   *  centrado se expande hacia ambos lados cuando el
-                   *  título o el icon necesitan más espacio. */}
-                  <View style={s.headerSideLeft}>
-                    <Text
-                      style={[s.sectionTitle, { color: c.text }]}
-                      numberOfLines={1}
-                    >
-                      Alertas activas ({sortedAlerts.length})
-                    </Text>
-                  </View>
+                  {/* Mismo patrón que el row: title (intrínseco) -
+                   *  spacer - label "% al objetivo" (intrínseco) -
+                   *  spacer - sort (intrínseco). Spacers iguales →
+                   *  label centrado EN EL GAP entre el title y el
+                   *  sort, no en el centro geométrico del row. */}
+                  <Text
+                    style={[s.sectionTitle, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    Alertas activas ({sortedAlerts.length})
+                  </Text>
+                  <View style={s.alertSpacer} />
                   <Pressable
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
@@ -305,28 +304,27 @@ export default function AssetAlertsScreen() {
                       style={{ marginLeft: 2, marginTop: 1 }}
                     />
                   </Pressable>
-                  <View style={s.headerSideRight}>
-                    <Pressable
-                      ref={sortBtnRef}
-                      onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        sortBtnRef.current?.measureInWindow(
-                          (x, y, width, height) => {
-                            setSortAnchor({
-                              top: y + height + 6,
-                              right: Math.max(8, windowW - (x + width)),
-                            });
-                            setSortMenuOpen(true);
-                          },
-                        );
-                      }}
-                      hitSlop={10}
-                      style={s.sortIconBtn}
-                      accessibilityLabel="Cambiar orden de la lista"
-                    >
-                      <Feather name="sliders" size={16} color={c.textMuted} />
-                    </Pressable>
-                  </View>
+                  <View style={s.alertSpacer} />
+                  <Pressable
+                    ref={sortBtnRef}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      sortBtnRef.current?.measureInWindow(
+                        (x, y, width, height) => {
+                          setSortAnchor({
+                            top: y + height + 6,
+                            right: Math.max(8, windowW - (x + width)),
+                          });
+                          setSortMenuOpen(true);
+                        },
+                      );
+                    }}
+                    hitSlop={10}
+                    style={s.sortIconBtn}
+                    accessibilityLabel="Cambiar orden de la lista"
+                  >
+                    <Feather name="sliders" size={16} color={c.textMuted} />
+                  </Pressable>
                 </View>
                 <View style={s.list}>
                   {sortedAlerts.map((alert, i) => (
@@ -770,14 +768,14 @@ function SwipableAlertRow({
             rowAnimStyle,
           ]}
         >
-          {/* Layout 3 secciones — left flex 1 (alertLeft, alineado
-              izquierda), middle intrínseco (alertDist, centrado en
-              el row, se expande hacia ambos lados cuando el valor se
-              hace largo), right flex 1 (Toggle, alineado derecha). */}
+          {/* Layout 3 elementos + 2 spacers flex 1 entre ellos:
+              alertLeft (intrínseco) - spacer - alertDist (intrínseco)
+              - spacer - Toggle (intrínseco). Spacers iguales hacen
+              que alertDist quede centrado EN EL GAP entre alertLeft
+              y Toggle (no en el centro geométrico del row). */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
-              s.alertSideLeft,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
@@ -792,10 +790,10 @@ function SwipableAlertRow({
               {formatMoney(alert.threshold, cur)}
             </Text>
           </Pressable>
+          <View style={s.alertSpacer} />
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
-              s.alertCenter,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
             accessibilityLabel="Editar alerta"
@@ -811,12 +809,11 @@ function SwipableAlertRow({
                 : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
             </Text>
           </Pressable>
-          <View style={s.alertSideRight}>
-            <Toggle
-              value={!isPaused}
-              onValueChange={() => onTogglePause()}
-            />
-          </View>
+          <View style={s.alertSpacer} />
+          <Toggle
+            value={!isPaused}
+            onValueChange={() => onTogglePause()}
+          />
         </Animated.View>
       </GestureDetector>
     </Animated.View>
@@ -1106,19 +1103,12 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* 3 secciones del header. Left + Right ambos flex 1 → empujan
-   * con la misma fuerza al label del centro, que toma su ancho
-   * intrínseco. Resultado: label SIEMPRE centrado en el row, se
-   * expande hacia ambos lados si el contenido se hace más largo. */
-  headerSideLeft: {
+  /* Spacer flex 1 — usado dos veces entre los 3 elementos del row
+   * (alertLeft / alertDist / Toggle) y del header (title / label /
+   * sort). Como ambos spacers tienen el mismo flex (1), el elemento
+   * del medio queda centrado en el GAP entre los dos extremos. */
+  alertSpacer: {
     flex: 1,
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
-  headerSideRight: {
-    flex: 1,
-    alignItems: "flex-end",
-    justifyContent: "center",
   },
   sectionMeta: {
     fontFamily: fontFamily[500],
@@ -1170,31 +1160,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
-  /* 3 secciones del row.
-   *   Left + Right son flex 1 (mismo peso) → mantienen el centro
-   *   genuinamente CENTRADO horizontalmente; cuando el valor del
-   *   medio crece (porcentajes / dólares largos), se expande hacia
-   *   ambos lados de manera simétrica.
-   *   Center es intrínseco (sin flex), su ancho lo dicta el contenido.
-   *   Padding horizontal entre secciones para que no se peguen.
-   */
-  alertSideLeft: {
-    flex: 1,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    paddingRight: 8,
-  },
-  alertCenter: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  alertSideRight: {
-    flex: 1,
-    alignItems: "flex-end",
-    justifyContent: "center",
-    paddingLeft: 8,
-  },
   triggeredRow: {
     paddingVertical: 12,
   },
@@ -1204,10 +1169,10 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.3,
   },
-  /* Texto del % o $ de distancia (centro del row). 16 / 600
-   * (match con alertLeft). El wrapper alertCenter se encarga del
-   * centrado horizontal dentro del row. adjustsFontSizeToFit del
-   * Text shrinka en cripto 100k+. */
+  /* Texto del % o $ de distancia (centro del row). 16 / 600 —
+   * match con alertLeft. Centrado en el gap por los spacers flex 1
+   * a cada lado. adjustsFontSizeToFit del Text shrinka en cripto
+   * 100k+ si el valor crece más que el espacio disponible. */
   alertDist: {
     fontFamily: fontFamily[600],
     fontSize: 16,
