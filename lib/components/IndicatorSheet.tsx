@@ -356,7 +356,7 @@ export function IndicatorSheet({
           style={[
             s.sheet,
             {
-              backgroundColor: c.surface,
+              backgroundColor: c.bg,
               borderColor: c.border,
               paddingBottom: insets.bottom + 8,
               maxHeight: windowH * 0.92,
@@ -431,9 +431,7 @@ export function IndicatorSheet({
 
               {/* ──────── Paso 2: Config flat rows ──────── */}
               <View style={{ width: windowW, flex: 1 }}>
-                <View
-                  style={[s.configHeader, { borderBottomColor: c.border }]}
-                >
+                <View style={s.configHeader}>
                   <Pressable
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
@@ -491,10 +489,52 @@ export function IndicatorSheet({
                 </View>
 
                 <ScrollView
-                  contentContainerStyle={{ paddingBottom: 120 }}
+                  contentContainerStyle={{ paddingBottom: 130 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
+                  {/* HERO — preview en lenguaje natural arriba del
+                      todo. Mismo lenguaje visual que la priceBlock
+                      del AlertSheet (eyebrow caps + sentencia 22/700
+                      + sub-line muted). NO border, NO bg — flota
+                      directo sobre c.bg como el hero del Precio. */}
+                  {selectedType ? (
+                    <View style={s.hero}>
+                      <Text
+                        style={[s.heroEyebrow, { color: c.textMuted }]}
+                      >
+                        TE AVISAREMOS CUANDO
+                      </Text>
+                      <Text
+                        style={[s.heroSentence, { color: c.text }]}
+                      >
+                        {renderPreviewSentence(
+                          selectedType,
+                          asset.ticker,
+                          config,
+                          c.brand,
+                          c.text,
+                        )}
+                      </Text>
+                      <Text
+                        style={[s.heroSub, { color: c.textMuted }]}
+                      >
+                        En {config.timeframe} ·{" "}
+                        {config.frequency === "once"
+                          ? "Solo una vez"
+                          : "Cada vez que ocurra"}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Divisor entre hero y rows */}
+                  <View
+                    style={[
+                      s.heroDivider,
+                      { backgroundColor: c.border },
+                    ]}
+                  />
+
                   {selectedType ? (
                     <RowsFor
                       type={selectedType}
@@ -507,56 +547,34 @@ export function IndicatorSheet({
                     />
                   ) : null}
 
-                  {/* Vista previa al fondo */}
-                  <View style={s.previewWrap}>
+                  {/* Warning MACD inline arriba del CTA si emaSlow
+                      <= emaFast — pintado fuera del scroll area pero
+                      antes del sticky CTA para que sea visible. */}
+                </ScrollView>
+
+                {/* Warning + CTA sticky abajo, sin chrome bar (sin
+                    borderTop) — sit on c.bg como AlertSheet. */}
+                <View style={s.ctaContainer}>
+                  {macdInvalid ? (
                     <View
                       style={[
-                        s.preview,
+                        s.warning,
                         {
-                          backgroundColor: c.surfaceHover,
-                          borderLeftColor: c.brand,
+                          borderColor: c.red,
+                          backgroundColor: c.bg,
                         },
                       ]}
                     >
-                      <Text
-                        style={[s.previewText, { color: c.textSecondary }]}
-                      >
-                        {previewSentence}
+                      <Feather
+                        name="alert-triangle"
+                        size={14}
+                        color={c.red}
+                      />
+                      <Text style={[s.warningText, { color: c.red }]}>
+                        La EMA lenta tiene que ser mayor a la EMA rápida.
                       </Text>
                     </View>
-                    {macdInvalid ? (
-                      <View
-                        style={[
-                          s.warning,
-                          {
-                            borderColor: c.red,
-                            backgroundColor: c.surface,
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name="alert-triangle"
-                          size={14}
-                          color={c.red}
-                        />
-                        <Text style={[s.warningText, { color: c.red }]}>
-                          La EMA lenta tiene que ser mayor a la EMA rápida.
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </ScrollView>
-
-                {/* CTA sticky abajo — mismo estilo que el de Precio */}
-                <View
-                  style={[
-                    s.ctaWrap,
-                    {
-                      backgroundColor: c.surface,
-                      borderTopColor: c.border,
-                    },
-                  ]}
-                >
+                  ) : null}
                   <Pressable
                     onPress={handleSubmit}
                     disabled={!ctaEnabled}
@@ -641,38 +659,60 @@ function FlatRow({
   children?: React.ReactNode;
   c: ColorMap;
 }) {
+  // Animación de rotación del chevron — 0deg cerrado, 90deg abierto.
+  // Mismo timing que el slide del sheet (220ms cubic).
+  const rot = useSharedValue(expanded ? 1 : 0);
+  useEffect(() => {
+    rot.value = withTiming(expanded ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [expanded, rot]);
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value * 90}deg` }],
+  }));
+
   return (
     <View
       style={[
         s.flatRowWrap,
-        { borderBottomColor: hairlineColor(c) },
+        expanded && { backgroundColor: c.bgWarm },
       ]}
     >
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
           s.flatRow,
-          { backgroundColor: pressed ? c.surfaceHover : "transparent" },
+          {
+            backgroundColor: pressed && !expanded ? c.bgWarm : "transparent",
+          },
         ]}
       >
-        <Text style={[s.flatLabel, { color: c.textMuted }]}>{label}</Text>
+        <Text style={[s.flatLabel, { color: c.text }]}>{label}</Text>
         <View style={s.flatRight}>
           <Text
-            style={[s.flatValue, { color: c.text }]}
+            style={[
+              s.flatValue,
+              {
+                color: expanded ? c.text : c.textMuted,
+                fontFamily: expanded ? fontFamily[800] : fontFamily[700],
+              },
+            ]}
             numberOfLines={1}
           >
             {value}
           </Text>
-          <Feather
-            name={expanded ? "chevron-down" : "chevron-right"}
-            size={16}
-            color={c.textFaint}
-          />
+          <Animated.View style={chevronStyle}>
+            <Feather name="chevron-right" size={18} color={c.textFaint} />
+          </Animated.View>
         </View>
       </Pressable>
       {expanded && children ? (
         <View style={s.flatExpand}>{children}</View>
       ) : null}
+      {/* Hairline divider abajo — inset 24 desde la izquierda para
+          que no toque el edge (look iOS Settings). */}
+      <View style={[s.hairline, { backgroundColor: c.border }]} />
     </View>
   );
 }
@@ -748,20 +788,16 @@ function RowsFor({
   const frecuenciaLabel =
     config.frequency === "once" ? "Solo una vez" : "Cada vez que ocurra";
 
+  // El "Activo" ya vive en el hero, así que en las rows lo
+  // eliminamos para no duplicarlo. Si en el futuro hay un asset
+  // switcher, vuelve como su propia row.
+  void assetValue;
   return (
     <View style={s.flatList}>
-      <FlatRow
-        label="Activo"
-        value={assetValue}
-        expanded={expandedRow === "activo"}
-        onPress={() => toggleRow("activo")}
-        c={c}
-      >
-        <Text style={[s.helperText, { color: c.textMuted }]}>
-          La alerta está vinculada al activo de esta pantalla. Para otro
-          activo, creá una alerta desde su detalle.
-        </Text>
-      </FlatRow>
+      {/* Section eyebrow — PARÁMETROS */}
+      <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
+        PARÁMETROS
+      </Text>
 
       {type === "ma" ? (
         <>
@@ -1102,6 +1138,16 @@ function RowsFor({
         </>
       ) : null}
 
+      {/* Section eyebrow — CUÁNDO */}
+      <Text
+        style={[
+          s.sectionEyebrow,
+          { color: c.textMuted, marginTop: 24 },
+        ]}
+      >
+        CUÁNDO
+      </Text>
+
       <FlatRow
         label="Temporalidad"
         value={timeframeLabel}
@@ -1122,8 +1168,8 @@ function RowsFor({
                 style={({ pressed }) => [
                   s.chip,
                   {
-                    borderColor: active ? c.text : c.border,
-                    backgroundColor: active ? c.text : "transparent",
+                    /* removed border — solid bg only */
+                    backgroundColor: active ? c.text : c.surface,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
@@ -1238,8 +1284,8 @@ function ChipsAndStepper({
               style={({ pressed }) => [
                 s.chip,
                 {
-                  borderColor: active ? c.text : c.border,
-                  backgroundColor: active ? c.text : "transparent",
+                  /* removed border — solid bg only */
+                  backgroundColor: active ? c.text : c.surface,
                   opacity: pressed ? 0.7 : 1,
                 },
               ]}
@@ -1291,8 +1337,8 @@ function ChipsLabeled({
             style={({ pressed }) => [
               s.chip,
               {
-                borderColor: active ? c.text : c.border,
-                backgroundColor: active ? c.text : "transparent",
+                /* removed border — solid bg only */
+                backgroundColor: active ? c.text : c.surface,
                 opacity: pressed ? 0.7 : 1,
               },
             ]}
@@ -1331,21 +1377,15 @@ function OptionList<T extends string>({
             }}
             style={({ pressed }) => [
               s.optionItem,
-              {
-                backgroundColor: pressed
-                  ? c.surfaceHover
-                  : isActive
-                    ? c.surfaceHover
-                    : "transparent",
-              },
+              { opacity: pressed ? 0.6 : 1 },
             ]}
           >
             <Text
               style={[
                 s.optionLabel,
                 {
-                  color: c.text,
-                  fontFamily: isActive ? fontFamily[700] : fontFamily[600],
+                  color: isActive ? c.text : c.textSecondary,
+                  fontFamily: isActive ? fontFamily[800] : fontFamily[500],
                 },
               ]}
               numberOfLines={1}
@@ -1353,7 +1393,7 @@ function OptionList<T extends string>({
               {opt.label}
             </Text>
             {isActive ? (
-              <Feather name="check" size={16} color={c.brand} />
+              <Feather name="check" size={18} color={c.brand} />
             ) : null}
           </Pressable>
         );
@@ -1465,6 +1505,130 @@ function indicatorTitle(t: IndicatorType): string {
   if (t === "macd") return "MACD";
   if (t === "bollinger") return "Bandas de Bollinger";
   return "Volumen";
+}
+
+/** Renderiza la sentencia preview con tokens highlightados (ticker,
+ *  números, símbolos) en brand color + fontFamily[800], y el resto
+ *  en texto regular. Devuelve un array de Text children. */
+function renderPreviewSentence(
+  type: IndicatorType,
+  ticker: string,
+  cfg: ConfigState,
+  highlightColor: string,
+  baseColor: string,
+): React.ReactNode {
+  const segments = previewSegments(type, ticker, cfg);
+  return segments.map((seg, i) => (
+    <Text
+      key={`${i}-${seg.text}`}
+      style={
+        seg.highlight
+          ? {
+              fontFamily: fontFamily[800],
+              color: highlightColor,
+            }
+          : { color: baseColor }
+      }
+    >
+      {seg.text}
+    </Text>
+  ));
+}
+
+/** Genera los segmentos del preview — partes en bold/brand vs
+ *  partes en texto normal. La structure de cada return define qué
+ *  va resaltado: ticker, números, períodos, umbrales, timeframe. */
+function previewSegments(
+  type: IndicatorType,
+  ticker: string,
+  cfg: ConfigState,
+): { text: string; highlight: boolean }[] {
+  const tf = cfg.timeframe;
+  const T = (text: string, highlight = false) => ({ text, highlight });
+  if (type === "ma") {
+    const v = cfg.maVariant.toUpperCase();
+    const dir =
+      cfg.maCondition === "above"
+        ? "cruce por encima"
+        : "cruce por debajo";
+    return [
+      T("El precio de "),
+      T(ticker, true),
+      T(` ${dir} de la `),
+      T(`${v}(${cfg.maPeriod})`, true),
+      T(" en "),
+      T(tf, true),
+      T("."),
+    ];
+  }
+  if (type === "rsi") {
+    const dir =
+      cfg.rsiCondition === "above"
+        ? "suba por encima"
+        : "baje por debajo";
+    return [
+      T("El "),
+      T(`RSI(${cfg.rsiPeriod})`, true),
+      T(" de "),
+      T(ticker, true),
+      T(` ${dir} de `),
+      T(`${cfg.rsiThreshold}`, true),
+      T(" en "),
+      T(tf, true),
+      T("."),
+    ];
+  }
+  if (type === "macd") {
+    let dir: string;
+    if (cfg.macdCondition === "bullish_signal")
+      dir = "cruce la línea de señal al alza";
+    else if (cfg.macdCondition === "bearish_signal")
+      dir = "cruce la línea de señal a la baja";
+    else if (cfg.macdCondition === "zero_up")
+      dir = "cruce la línea cero al alza";
+    else dir = "cruce la línea cero a la baja";
+    return [
+      T("El "),
+      T("MACD", true),
+      T(` ${dir} para `),
+      T(ticker, true),
+      T(" en "),
+      T(tf, true),
+      T("."),
+    ];
+  }
+  if (type === "bollinger") {
+    if (cfg.bbCondition === "squeeze") {
+      return [
+        T("Las "),
+        T("Bandas de Bollinger", true),
+        T(" de "),
+        T(ticker, true),
+        T(" se contraigan en "),
+        T(tf, true),
+        T("."),
+      ];
+    }
+    const upper = cfg.bbCondition === "touch_upper";
+    return [
+      T("El precio de "),
+      T(ticker, true),
+      T(` toque la `),
+      T(upper ? "banda superior" : "banda inferior", true),
+      T(" en "),
+      T(tf, true),
+      T("."),
+    ];
+  }
+  return [
+    T("El volumen de "),
+    T(ticker, true),
+    T(" supere "),
+    T(`${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}×`, true),
+    T(" el promedio en "),
+    T(tf, true),
+    T("."),
+  ];
 }
 
 function describePreview(
@@ -1620,36 +1784,94 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
   flatRowWrap: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    /* sin border — el hairline va abajo via View propia con inset
+     * desde la izquierda (look iOS Settings). */
   },
   flatRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    minHeight: 48,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   flatLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   flatRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     maxWidth: "60%",
   },
   flatValue: {
     fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 15,
+    letterSpacing: -0.2,
     textAlign: "right",
   },
   flatExpand: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 20,
+  },
+  /* Hairline inset desde la izquierda — toque iOS Settings. */
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 24,
+  },
+
+  /* Hero block — eyebrow caps + sentencia 22/700 con tokens
+   * highlightados + sub-line muted. Mismo lenguaje que el
+   * priceBlock del AlertSheet. */
+  hero: {
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 22,
+  },
+  heroEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.4,
+  },
+  heroSentence: {
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.5,
+    marginTop: 8,
+  },
+  heroSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 8,
+  },
+  heroDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+
+  /* Section eyebrow entre grupos de rows. */
+  sectionEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 1.4,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+
+  /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
+  ctaContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 8,
+    gap: 8,
   },
 
   /* ── Editores inline ── */
@@ -1674,18 +1896,20 @@ const s = StyleSheet.create({
   chipsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
   },
+  /* Chips estilo AlertSheet — sin border, sólido tone activo
+   * (c.text bg + c.bg text) vs inactivo (c.surface bg + c.text text).
+   * Px ~ 14h / 11v + pill radius. */
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderCurve: "continuous",
     borderRadius: radius.pill,
-    borderWidth: 1,
   },
   chipText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: -0.1,
   },
   stepperWrap: {
@@ -1699,16 +1923,14 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
+    paddingHorizontal: 0,
+    paddingVertical: 14,
     gap: 12,
   },
   optionLabel: {
     flex: 1,
-    fontSize: 14,
-    letterSpacing: -0.15,
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   macdParamRow: {
     flexDirection: "row",
@@ -1763,26 +1985,27 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* ── CTA sticky ── */
+  /* ── CTA — pill style match AlertSheet ── */
   ctaWrap: {
+    /* legacy — ya no se usa, queda por compat de referencias. */
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   cta: {
-    paddingVertical: 16,
+    height: 58,
     borderCurve: "continuous",
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
     alignItems: "center",
+    justifyContent: "center",
   },
   ctaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontFamily: fontFamily[800],
+    fontSize: 17,
     letterSpacing: -0.2,
   },
 });
