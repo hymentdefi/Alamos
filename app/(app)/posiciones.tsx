@@ -18,14 +18,8 @@ import {
   assetCurrency,
   formatMoney,
   type Asset,
-  type AssetCategory,
 } from "../../lib/data/assets";
 import { convertAmount } from "../../lib/data/accounts";
-import {
-  categorizeAsset,
-  findCategoryBySlug,
-  type CategorySlug,
-} from "../../lib/data/marketCategories";
 import { Tap } from "../../lib/components/Tap";
 import {
   MiniSparkline,
@@ -33,47 +27,31 @@ import {
 } from "../../lib/components/Sparkline";
 
 /**
- * Tus posiciones — pantalla dedicada Robinhood-style. Accedida desde
- * el chevron verde al lado del título "Posiciones" del portfolio.
+ * Tus posiciones — pantalla dedicada estilo Robinhood. Accedida desde
+ * el arrow brand al lado del título "Posiciones" en el portfolio.
  *
- * Layout:
- *   - Top bar fijo con back arrow + título + total a la derecha.
- *   - Scroll con secciones por categoría (CEDEARs, Acciones AR,
- *     Bonos USD, Crypto, etc.). Cada sección: header con label +
- *     total ARS + count + dot color de la categoría; rows de cada
- *     posición con ticker, nombre, sparkline mini, valor y delta.
- *   - Categorías ordenadas por valor descendente (la más grande
- *     arriba). Posiciones dentro de cada categoría también ordenadas
- *     por valor.
+ * Layout (Robinhood-inspired, no category grouping):
+ *   1. Top bar minimalista — back arrow + "Posiciones" muted centrado.
+ *   2. Hero scrollable — eyebrow + total grande + delta del día con
+ *      tone color + count.
+ *   3. Sort segmented — pill estilo Robinhood: Valor / Hoy / A-Z.
+ *      Default: Valor (mayor → menor).
+ *   4. Lista flat de holdings, ordenada según el sort seleccionado.
+ *      Cada row: ticker bold + nombre muted; sparkline; valor + delta %.
  *
- * Pull-to-refresh disponible. Tap en cualquier row → /(app)/detail.
+ * Tap en cualquier row → /(app)/detail. Pull-to-refresh disponible.
  */
 
 type Currency = "ARS" | "USD";
+type SortKey = "value" | "delta" | "alpha";
 
 interface Holding {
   asset: Asset;
   native: number;
   ars: number;
-}
-
-/* Misma paleta del FloorBrick — los dots de cada sección hablan el
- * mismo idioma cromático que el chart de la cartera. */
-const PALETTE = [
-  "#00C805",
-  "#0E0F0C",
-  "#7EE9A6",
-  "#00B864",
-  "#94A3B8",
-  "#5AC53A",
-  "#6B6C66",
-];
-
-/* Etiqueta corta para el header del market group. */
-function marketLabelShort(slug: CategorySlug): string {
-  if (slug.startsWith("us-")) return "EE.UU.";
-  if (slug.startsWith("cr-")) return "Crypto";
-  return "Argentina";
+  /** Delta del día en ARS — se usa para calcular el delta agregado del
+   *  hero y para la jerarquía de color en cada row. */
+  dayDeltaArs: number;
 }
 
 export default function PosicionesScreen() {
@@ -82,71 +60,45 @@ export default function PosicionesScreen() {
   const { c } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [currency] = useState<Currency>("ARS");
+  const [sort, setSort] = useState<SortKey>("value");
 
   const holdings = useMemo<Holding[]>(() => {
     const held = assets.filter(
       (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
     );
-    return held
-      .map((a) => {
-        const native = a.price * (a.qty ?? 0);
-        const ars = convertAmount(native, assetCurrency(a), "ARS");
-        return { asset: a, native, ars };
-      })
-      .sort((x, y) => y.ars - x.ars);
+    return held.map((a) => {
+      const native = a.price * (a.qty ?? 0);
+      const ars = convertAmount(native, assetCurrency(a), "ARS");
+      const dayDeltaArs = ars * (a.change / 100);
+      return { asset: a, native, ars, dayDeltaArs };
+    });
   }, []);
 
   const totalArs = useMemo(
     () => holdings.reduce((acc, h) => acc + h.ars, 0),
     [holdings],
   );
+  const dayDeltaArs = useMemo(
+    () => holdings.reduce((acc, h) => acc + h.dayDeltaArs, 0),
+    [holdings],
+  );
+  const dayPct = totalArs > 0 ? (dayDeltaArs / totalArs) * 100 : 0;
+  const dayUp = dayDeltaArs >= 0;
+  const tone = dayUp ? c.brand : c.red;
 
-  /* Agrupamos por slug de categoría — usa el mismo categorize que
-   * el resto de la app (CEDEARs vs Acciones AR vs Bonos USD, etc). */
-  const groups = useMemo(() => {
-    const map = new Map<
-      CategorySlug,
-      {
-        label: string;
-        cat: AssetCategory;
-        rows: Holding[];
-        totalArs: number;
-      }
-    >();
-    for (const h of holdings) {
-      const slug = categorizeAsset(h.asset);
-      if (!slug) continue;
-      const lookup = findCategoryBySlug(slug);
-      const label = lookup?.category.label ?? slug;
-      const prev = map.get(slug);
-      if (prev) {
-        prev.rows.push(h);
-        prev.totalArs += h.ars;
-      } else {
-        map.set(slug, {
-          label,
-          cat: h.asset.category,
-          rows: [h],
-          totalArs: h.ars,
-        });
-      }
+  const sortedHoldings = useMemo(() => {
+    const arr = [...holdings];
+    if (sort === "value") {
+      arr.sort((a, b) => b.ars - a.ars);
+    } else if (sort === "delta") {
+      arr.sort((a, b) => b.asset.change - a.asset.change);
+    } else {
+      arr.sort((a, b) =>
+        a.asset.ticker.localeCompare(b.asset.ticker, "es-AR"),
+      );
     }
-    // Sort por totalArs desc, dentro de cada uno por ars desc.
-    const arr = [...map.entries()]
-      .map(([slug, v], i) => ({
-        slug,
-        ...v,
-        color: PALETTE[i % PALETTE.length],
-        rows: [...v.rows].sort((a, b) => b.ars - a.ars),
-        marketLabel: marketLabelShort(slug),
-      }))
-      .sort((a, b) => b.totalArs - a.totalArs);
-    // Recolor en orden ya sorteado para que el más grande sea brand.
-    return arr.map((g, i) => ({
-      ...g,
-      color: PALETTE[i % PALETTE.length],
-    }));
-  }, [holdings]);
+    return arr;
+  }, [holdings, sort]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -157,6 +109,10 @@ export default function PosicionesScreen() {
 
   const totalDisplay =
     currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", currency);
+  const dayDisplay =
+    currency === "ARS"
+      ? dayDeltaArs
+      : convertAmount(dayDeltaArs, "ARS", currency);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -170,7 +126,7 @@ export default function PosicionesScreen() {
           <Feather name="arrow-left" size={22} color={c.text} />
         </Tap>
         <View style={s.topCenter}>
-          <Text style={[s.topTitle, { color: c.text }]}>Tus posiciones</Text>
+          <Text style={[s.topTitle, { color: c.textMuted }]}>Posiciones</Text>
         </View>
         <View style={s.iconBtn} />
       </View>
@@ -179,6 +135,7 @@ export default function PosicionesScreen() {
         contentContainerStyle={{
           paddingBottom: insets.bottom + 32,
         }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -187,125 +144,126 @@ export default function PosicionesScreen() {
           />
         }
       >
-        {/* Hero — total + count de posiciones. */}
+        {/* Hero — eyebrow + total dominante + delta del día tone-color
+            + count. La jerarquía visual es la misma que el portfolio
+            tab (eyebrow uppercase + amount 800 + delta). */}
         <View style={s.heroBlock}>
           <Text style={[s.heroEyebrow, { color: c.textMuted }]}>
-            Valor de las posiciones
+            Tus posiciones
           </Text>
-          <Text style={[s.heroAmount, { color: c.text }]}>
+          <Text style={[s.heroAmount, { color: c.text }]} numberOfLines={1}>
             {formatMoney(totalDisplay, currency)}
           </Text>
+          <View style={s.heroDeltaRow}>
+            <Text style={[s.heroDeltaTri, { color: tone }]}>
+              {dayUp ? "▲" : "▼"}
+            </Text>
+            <Text style={[s.heroDeltaText, { color: tone }]}>
+              {formatMoney(Math.abs(dayDisplay), currency)}
+            </Text>
+            <Text style={[s.heroDeltaText, { color: tone }]}>
+              ({fmtPctAbs(dayPct)})
+            </Text>
+            <Text style={[s.heroDeltaText, { color: c.textMuted }]}>hoy</Text>
+          </View>
           <Text style={[s.heroCount, { color: c.textMuted }]}>
             {holdings.length}{" "}
-            {holdings.length === 1 ? "posición" : "posiciones"} ·{" "}
-            {groups.length}{" "}
-            {groups.length === 1 ? "categoría" : "categorías"}
+            {holdings.length === 1 ? "posición" : "posiciones"}
           </Text>
         </View>
 
-        {groups.map((g) => {
-          const groupPct =
-            totalArs > 0 ? (g.totalArs / totalArs) * 100 : 0;
-          return (
-            <View key={g.slug} style={s.section}>
-              <View style={s.sectionHead}>
-                <View style={s.sectionLeft}>
-                  <View
-                    style={[s.sectionDot, { backgroundColor: g.color }]}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[s.sectionLabel, { color: c.text }]}
-                      numberOfLines={1}
-                    >
-                      {g.label}
-                    </Text>
-                    <Text
-                      style={[s.sectionMeta, { color: c.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {g.marketLabel} · {g.rows.length}{" "}
-                      {g.rows.length === 1 ? "posición" : "posiciones"}
-                    </Text>
-                  </View>
-                </View>
-                <View style={s.sectionRight}>
+        {/* Sort segmented — pill estilo Robinhood debajo del hero,
+            alineado a la izquierda. Track translúcido + thumb elevado
+            en el activo. */}
+        <View style={s.sortRow}>
+          <View style={[s.sortSeg, { backgroundColor: c.surfaceHover }]}>
+            {(
+              [
+                { key: "value", label: "Valor" },
+                { key: "delta", label: "Hoy" },
+                { key: "alpha", label: "A-Z" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = sort === key;
+              return (
+                <Tap
+                  key={key}
+                  haptic="selection"
+                  pressScale={0.97}
+                  onPress={() => setSort(key)}
+                  style={[
+                    s.sortSegBtn,
+                    active && {
+                      backgroundColor: c.bg,
+                      shadowColor: "#0E0F0C",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    },
+                  ]}
+                >
                   <Text
-                    style={[s.sectionValue, { color: c.text }]}
-                    numberOfLines={1}
+                    style={[
+                      s.sortSegLabel,
+                      {
+                        color: active ? c.text : c.textMuted,
+                        fontFamily: fontFamily[active ? 800 : 600],
+                      },
+                    ]}
                   >
-                    {formatMoney(
-                      currency === "ARS"
-                        ? g.totalArs
-                        : convertAmount(g.totalArs, "ARS", currency),
-                      currency,
-                    )}
+                    {label}
                   </Text>
-                  <Text
-                    style={[s.sectionPct, { color: c.textMuted }]}
-                  >
-                    {groupPct >= 10
-                      ? Math.round(groupPct).toString()
-                      : groupPct.toFixed(1).replace(".", ",")}
-                    %
-                  </Text>
-                </View>
-              </View>
+                </Tap>
+              );
+            })}
+          </View>
+        </View>
 
-              <View
-                style={[s.sectionRows, { borderTopColor: c.border }]}
-              >
-                {g.rows.map((h, i) => (
-                  <PositionRow
-                    key={h.asset.ticker}
-                    h={h}
-                    currency={currency}
-                    showDivider={i > 0}
-                    cBorder={c.border}
-                    cText={c.text}
-                    cMuted={c.textMuted}
-                    cBrand={c.brand}
-                    cRed={c.red}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(app)/detail",
-                        params: { ticker: h.asset.ticker },
-                      })
-                    }
-                  />
-                ))}
-              </View>
-            </View>
-          );
-        })}
+        {/* Lista flat — sin grouping por categoría. Cada row es un
+            tap target al detalle. Hairline divider entre rows. */}
+        <View style={s.list}>
+          {sortedHoldings.map((h, i) => (
+            <PositionRow
+              key={h.asset.ticker}
+              h={h}
+              currency={currency}
+              showDivider={i > 0}
+              c={c}
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/detail",
+                  params: { ticker: h.asset.ticker },
+                })
+              }
+            />
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
+/* ─── PositionRow — un holding individual estilo Robinhood.
+ *
+ * Layout: ticker bold + nombre muted a la izquierda; sparkline mini al
+ * centro; valor + delta % apilados a la derecha. Sparkline + delta %
+ * usan tone color (brand cuando up, red cuando down). */
 function PositionRow({
   h,
   currency,
   showDivider,
-  cBorder,
-  cText,
-  cMuted,
-  cBrand,
-  cRed,
+  c,
   onPress,
 }: {
   h: Holding;
   currency: Currency;
   showDivider: boolean;
-  cBorder: string;
-  cText: string;
-  cMuted: string;
-  cBrand: string;
-  cRed: string;
+  c: ReturnType<typeof useTheme>["c"];
   onPress: () => void;
 }) {
   const dayUp = h.asset.change >= 0;
-  const tone = dayUp ? cBrand : cRed;
+  const tone = dayUp ? c.brand : c.red;
   const displayValue =
     currency === "ARS"
       ? h.ars
@@ -318,7 +276,7 @@ function PositionRow({
       style={({ pressed }) => [
         s.posRow,
         showDivider && {
-          borderTopColor: cBorder,
+          borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
         { opacity: pressed ? 0.6 : 1 },
@@ -326,13 +284,13 @@ function PositionRow({
     >
       <View style={s.posLeft}>
         <Text
-          style={[s.posTicker, { color: cText }]}
+          style={[s.posTicker, { color: c.text }]}
           numberOfLines={1}
         >
           {cleanTicker}
         </Text>
         <Text
-          style={[s.posName, { color: cMuted }]}
+          style={[s.posName, { color: c.textMuted }]}
           numberOfLines={1}
         >
           {h.asset.name}
@@ -342,14 +300,14 @@ function PositionRow({
         <MiniSparkline
           series={spark}
           color={tone}
-          width={56}
-          height={22}
+          width={64}
+          height={26}
           strokeWidth={1.6}
         />
       </View>
       <View style={s.posRight}>
         <Text
-          style={[s.posValue, { color: cText }]}
+          style={[s.posValue, { color: c.text }]}
           numberOfLines={1}
         >
           {formatMoney(displayValue, currency)}
@@ -374,6 +332,10 @@ function fmtPctAbs(n: number): string {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+
+  /* Top bar minimalista — back arrow izquierda + título muted
+   * centrado + spacer derecha. Sin border bottom: el peso visual
+   * lo lleva el hero. */
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -384,6 +346,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
+    borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
@@ -398,99 +361,97 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Hero — total + count, sin card. */
+  /* Hero — eyebrow uppercase + total grande + delta + count. Mismo
+   * lenguaje que el hero del portfolio tab. */
   heroBlock: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 18,
   },
   heroEyebrow: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[700],
     fontSize: 11,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   heroAmount: {
     fontFamily: fontFamily[800],
-    fontSize: 34,
-    letterSpacing: -1.2,
-    marginBottom: 4,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -1.4,
+  },
+  heroDeltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  heroDeltaTri: {
+    fontFamily: fontFamily[800],
+    fontSize: 12,
+  },
+  heroDeltaText: {
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   heroCount: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.1,
+    marginTop: 10,
   },
 
-  /* Sección — header + rows. */
-  section: {
-    marginTop: 20,
-  },
-  sectionHead: {
+  /* Sort segmented — pill ARS-style debajo del hero. */
+  sortRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingBottom: 10,
-    gap: 12,
+    marginBottom: 8,
   },
-  sectionLeft: {
+  sortSeg: {
     flexDirection: "row",
+    padding: 3,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  sortSegBtn: {
+    minWidth: 56,
     alignItems: "center",
-    gap: 10,
-    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
   },
-  sectionDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  sectionLabel: {
-    fontFamily: fontFamily[800],
-    fontSize: 17,
-    letterSpacing: -0.4,
-  },
-  sectionMeta: {
-    fontFamily: fontFamily[500],
+  sortSegLabel: {
     fontSize: 12,
     letterSpacing: -0.1,
-    marginTop: 2,
-  },
-  sectionRight: {
-    alignItems: "flex-end",
-  },
-  sectionValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.3,
-  },
-  sectionPct: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    marginTop: 2,
-  },
-  sectionRows: {
-    paddingHorizontal: 24,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
 
-  /* Position row — mismo lenguaje que el PositionsList del portfolio. */
+  /* Lista flat — sin secciones. Padding horizontal único, hairlines
+   * entre rows. */
+  list: {
+    paddingHorizontal: 24,
+    paddingTop: 4,
+  },
+
+  /* Position row — Robinhood-style: ticker bold + nombre muted; mini
+   * sparkline al centro; valor bold + delta % tone-color a la derecha. */
   posRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 12,
   },
   posLeft: {
     flex: 1,
   },
   posTicker: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
+    fontFamily: fontFamily[800],
+    fontSize: 17,
+    letterSpacing: -0.4,
   },
   posName: {
     fontFamily: fontFamily[500],
@@ -499,21 +460,21 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   posSpark: {
-    width: 56,
+    width: 64,
     alignItems: "center",
     justifyContent: "center",
   },
   posRight: {
     alignItems: "flex-end",
-    minWidth: 90,
+    minWidth: 96,
   },
   posValue: {
     fontFamily: fontFamily[700],
     fontSize: 15,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   posDelta: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.1,
     marginTop: 2,
