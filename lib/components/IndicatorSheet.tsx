@@ -39,6 +39,7 @@ import {
 } from "../api/alerts";
 import { Stepper } from "./Stepper";
 import { MAIndicatorIllustration } from "./illustrations/MAIndicatorIllustration";
+import { EMAIndicatorIllustration } from "./illustrations/EMAIndicatorIllustration";
 import { RSIIndicatorIllustration } from "./illustrations/RSIIndicatorIllustration";
 import { MACDIndicatorIllustration } from "./illustrations/MACDIndicatorIllustration";
 import { BollingerIndicatorIllustration } from "./illustrations/BollingerIndicatorIllustration";
@@ -398,9 +399,28 @@ export function IndicatorSheet({
                 >
                   <PickerRow
                     icon={() => <MAIndicatorIllustration size={44} />}
-                    title="Media Móvil (MA)"
-                    description="Cuando el precio cruza el promedio"
-                    onPress={() => handlePickType("ma")}
+                    title="Media Móvil (SMA)"
+                    description="Cuando el precio cruza el promedio simple"
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setConfig({ ...DEFAULT_CONFIG, maVariant: "sma" });
+                      setSelectedType("ma");
+                      setExpandedRow(null);
+                      setStep(2);
+                    }}
+                    c={c}
+                  />
+                  <PickerRow
+                    icon={() => <EMAIndicatorIllustration size={44} />}
+                    title="Media Móvil (EMA)"
+                    description="Promedio ponderado, más reactivo al precio"
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
+                      setSelectedType("ma");
+                      setExpandedRow(null);
+                      setStep(2);
+                    }}
                     c={c}
                   />
                   <PickerRow
@@ -461,7 +481,7 @@ export function IndicatorSheet({
                     numberOfLines={1}
                   >
                     {selectedType
-                      ? indicatorTitle(selectedType)
+                      ? indicatorTitle(selectedType, config)
                       : "Configurar"}
                   </Text>
                   {isEditing ? (
@@ -1505,8 +1525,11 @@ function buildInputFromConfig(
   };
 }
 
-function indicatorTitle(t: IndicatorType): string {
-  if (t === "ma") return "Media Móvil";
+function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
+  if (t === "ma") {
+    if (cfg && cfg.maVariant === "ema") return "Media Móvil (EMA)";
+    return "Media Móvil (SMA)";
+  }
   if (t === "rsi") return "RSI";
   if (t === "macd") return "MACD";
   if (t === "bollinger") return "Bandas de Bollinger";

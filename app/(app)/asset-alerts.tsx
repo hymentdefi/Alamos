@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -109,7 +110,28 @@ export default function AssetAlertsScreen() {
     activeIndicatorsForAsset,
     setIndicatorPaused,
     removeIndicator,
+    refresh,
   } = useAlerts();
+
+  /* Pull-to-refresh — la lista se actualiza automáticamente con el
+   * mock store, pero el gesto suma como feedback táctil + insurance
+   * para forzar una re-sincronización con el server real cuando se
+   * conecte. Aplica tanto al tab Precio como al tab Indicadores
+   * (mismo ScrollView). */
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await refresh();
+    } catch {
+      // silent — un error de refresh no merece toast.
+    }
+    Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Success,
+    ).catch(() => {});
+    setRefreshing(false);
+  }, [refresh]);
 
   const alertsForAsset = useMemo(
     () => (asset ? activeForAsset(asset.ticker) : []),
@@ -279,6 +301,15 @@ export default function AssetAlertsScreen() {
           flexGrow: 1,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.textMuted}
+            colors={[c.textMuted]}
+            progressBackgroundColor={c.surface}
+          />
+        }
       >
         {tab === "price" ? (
           <>
