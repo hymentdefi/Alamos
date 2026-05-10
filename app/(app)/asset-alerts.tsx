@@ -424,7 +424,7 @@ export default function AssetAlertsScreen() {
           <>
             {sortedIndicators.length === 0 ? (
               <EmptyState
-                illustration={<IndicatorChartIllustration size={184} />}
+                illustration={<IndicatorChartIllustration size={200} />}
                 text="Elegí un indicador técnico y recibí una notificación instantánea en el celular cuando cruce el umbral que configuraste."
               />
             ) : null}
