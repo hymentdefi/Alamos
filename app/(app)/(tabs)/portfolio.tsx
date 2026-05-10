@@ -2633,7 +2633,11 @@ function FloorPie({
                 {formatTooltipPct(activeSlice.pct)}
               </Text>
             </View>
-            {groupBy === "ticker" && activeSlice.rows.length === 1 ? (
+            {/* DINERO no tiene cambio diario significativo (cash mock
+                con change=0) — saltamos la lista de tickers porque
+                rompe la lectura: no aporta señal y mete ruido. */}
+            {activeSlice.market === "DINERO" ? null : groupBy === "ticker" &&
+              activeSlice.rows.length === 1 ? (
               <>
                 <View
                   style={[
@@ -2805,9 +2809,11 @@ function FloorBrick({
   const { c } = useTheme();
   const [containerW, setContainerW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  /* Altura medida del tooltip — translateY negativo para flotarlo
-   * encima del bloque tocado. */
+  /* Dimensiones medidas del tooltip — height para translateY(-h) y
+   * width para clamp horizontal cuando el bloque vive contra el
+   * borde de la pantalla. */
   const [tooltipH, setTooltipH] = useState(0);
+  const [tooltipW, setTooltipW] = useState(0);
 
   const W = 340;
   const H = 180;
@@ -2931,6 +2937,23 @@ function FloorBrick({
     activeBlock && containerW > 0
       ? (((activeBlock.x0 + activeBlock.x1) / 2) / W) * containerW
       : 0;
+  const isCashBlock = activeBlock?.market === "DINERO";
+
+  /* Clamp horizontal — el anchor (y caret) sigue clavado en el centro
+   * del bloque para no perder la referencia visual, pero el pill se
+   * desplaza con translateX si su minWidth lo saca del viewport. */
+  const tooltipPillOffsetX = useMemo(() => {
+    if (!activeBlock || tooltipW === 0 || containerW === 0) return 0;
+    const pad = 8;
+    const minCenter = tooltipW / 2 + pad;
+    const maxCenter = containerW - tooltipW / 2 - pad;
+    if (minCenter > maxCenter) return 0;
+    const clampedCenter = Math.max(
+      minCenter,
+      Math.min(maxCenter, tooltipLeftPx),
+    );
+    return clampedCenter - tooltipLeftPx;
+  }, [activeBlock, tooltipW, containerW, tooltipLeftPx]);
 
   // % agregado del mercado highlighted desde la AllocationBar — si
   // el user holdea AR en la barra, sumamos los pcts de los bloques
@@ -3120,7 +3143,6 @@ function FloorBrick({
           entering={FadeIn.duration(120)}
           exiting={FadeOut.duration(100)}
           pointerEvents="none"
-          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
           style={[
             s.tooltipAnchor,
             {
@@ -3134,7 +3156,19 @@ function FloorBrick({
             },
           ]}
         >
-          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+          <View
+            onLayout={(e) => {
+              setTooltipH(e.nativeEvent.layout.height);
+              setTooltipW(e.nativeEvent.layout.width);
+            }}
+            style={[
+              s.tooltipPill,
+              {
+                backgroundColor: c.ink,
+                transform: [{ translateX: tooltipPillOffsetX }],
+              },
+            ]}
+          >
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
                 {activeBlock.label}
@@ -3143,7 +3177,10 @@ function FloorBrick({
                 {formatTooltipPct(activeBlock.pct)}
               </Text>
             </View>
-            {groupBy === "ticker" && activeBlock.rows.length === 1 ? (
+            {/* DINERO no tiene cambio diario (cash mock con change=0)
+                — mostramos sólo label + pct, sin lista de tickers. */}
+            {isCashBlock ? null : groupBy === "ticker" &&
+              activeBlock.rows.length === 1 ? (
               <>
                 <View
                   style={[
@@ -3467,7 +3504,10 @@ function RankingList({
                 {formatTooltipPct(activeRow.pct)}
               </Text>
             </View>
-            {activeRow.rows.length > 0 ? (
+            {/* DINERO no tiene cambio intra-categoría — saltamos la
+                lista de tickers (ARS/USD/USDT con change=0) porque
+                no aporta nada y mete ruido visual. */}
+            {activeRow.market !== "DINERO" && activeRow.rows.length > 0 ? (
               <View
                 style={[
                   s.tooltipDivider,
@@ -3475,7 +3515,7 @@ function RankingList({
                 ]}
               />
             ) : null}
-            {activeRow.rows.slice(0, 5).map((rr) => (
+            {activeRow.market !== "DINERO" && activeRow.rows.slice(0, 5).map((rr) => (
               <View key={rr.ticker} style={s.tooltipRow}>
                 <Text
                   style={[s.tooltipTicker, { color: c.bg }]}
@@ -3494,7 +3534,7 @@ function RankingList({
                 </Text>
               </View>
             ))}
-            {activeRow.rows.length > 5 ? (
+            {activeRow.market !== "DINERO" && activeRow.rows.length > 5 ? (
               <Text
                 style={[
                   s.tooltipMore,
@@ -3566,9 +3606,11 @@ function Treemap({
   const { c } = useTheme();
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [containerW, setContainerW] = useState(0);
-  /* Altura del tooltip — translateY(-tooltipH) para flotarlo encima
-   * del tile holdeado. */
+  /* Dimensiones medidas del pill — height para translateY(-h) y width
+   * para clamp horizontal cuando el tile vive en el borde de la
+   * pantalla (sino el pop-up se sale del viewport). */
   const [tooltipH, setTooltipH] = useState(0);
+  const [tooltipW, setTooltipW] = useState(0);
 
   const aspect = 16 / 10; // wide-ish, ocupa el ancho sin ser muy alto
   const W = 340;
@@ -3705,6 +3747,24 @@ function Treemap({
     : 0;
   const tooltipTopPx = activeTile ? activeTile.y * scale - 6 : 0;
   const activePct = activeTile ? (activeTile.ars / totalArsAll) * 100 : 0;
+  const isCash = activeTile?.market === "DINERO";
+
+  /* Clamp horizontal del pill — el anchor sigue clavado en el centro
+   * del tile (así el caret apunta al lugar correcto), pero el pill se
+   * desplaza con translateX para no salir del viewport cuando el tile
+   * vive contra el borde derecho/izquierdo de la pantalla. */
+  const tooltipPillOffsetX = useMemo(() => {
+    if (!activeTile || tooltipW === 0 || containerW === 0) return 0;
+    const pad = 8;
+    const minCenter = tooltipW / 2 + pad;
+    const maxCenter = containerW - tooltipW / 2 - pad;
+    if (minCenter > maxCenter) return 0;
+    const clampedCenter = Math.max(
+      minCenter,
+      Math.min(maxCenter, tooltipLeftPx),
+    );
+    return clampedCenter - tooltipLeftPx;
+  }, [activeTile, tooltipW, containerW, tooltipLeftPx]);
 
   return (
     <View
@@ -3825,7 +3885,6 @@ function Treemap({
           entering={FadeIn.duration(120)}
           exiting={FadeOut.duration(100)}
           pointerEvents="none"
-          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
           style={[
             s.tooltipAnchor,
             {
@@ -3835,7 +3894,19 @@ function Treemap({
             },
           ]}
         >
-          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+          <View
+            onLayout={(e) => {
+              setTooltipH(e.nativeEvent.layout.height);
+              setTooltipW(e.nativeEvent.layout.width);
+            }}
+            style={[
+              s.tooltipPill,
+              {
+                backgroundColor: c.ink,
+                transform: [{ translateX: tooltipPillOffsetX }],
+              },
+            ]}
+          >
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
                 {activeTile.label}
@@ -3844,42 +3915,47 @@ function Treemap({
                 {formatTooltipPct(activePct)}
               </Text>
             </View>
-            {activeTile.rows.length > 0 ? (
-              <View
-                style={[
-                  s.tooltipDivider,
-                  { backgroundColor: "rgba(255,255,255,0.12)" },
-                ]}
-              />
-            ) : null}
-            {activeTile.rows.slice(0, 5).map((rr) => (
-              <View key={rr.ticker} style={s.tooltipRow}>
-                <Text
-                  style={[s.tooltipTicker, { color: c.bg }]}
-                  numberOfLines={1}
-                >
-                  {rr.ticker}
-                </Text>
-                <Text
+            {/* DINERO no tiene variación intra-categoría — el "change"
+                de cash siempre es 0, así que la lista de tickers no
+                aporta nada y queda más limpio sin ella. */}
+            {!isCash && activeTile.rows.length > 0 ? (
+              <>
+                <View
                   style={[
-                    s.tooltipChange,
-                    { color: rr.change >= 0 ? c.brand : c.red },
+                    s.tooltipDivider,
+                    { backgroundColor: "rgba(255,255,255,0.12)" },
                   ]}
-                >
-                  {rr.change >= 0 ? "▲ " : "▼ "}
-                  {fmtPctAbs(rr.change)}
-                </Text>
-              </View>
-            ))}
-            {activeTile.rows.length > 5 ? (
-              <Text
-                style={[
-                  s.tooltipMore,
-                  { color: "rgba(255,255,255,0.45)" },
-                ]}
-              >
-                +{activeTile.rows.length - 5} más
-              </Text>
+                />
+                {activeTile.rows.slice(0, 5).map((rr) => (
+                  <View key={rr.ticker} style={s.tooltipRow}>
+                    <Text
+                      style={[s.tooltipTicker, { color: c.bg }]}
+                      numberOfLines={1}
+                    >
+                      {rr.ticker}
+                    </Text>
+                    <Text
+                      style={[
+                        s.tooltipChange,
+                        { color: rr.change >= 0 ? c.brand : c.red },
+                      ]}
+                    >
+                      {rr.change >= 0 ? "▲ " : "▼ "}
+                      {fmtPctAbs(rr.change)}
+                    </Text>
+                  </View>
+                ))}
+                {activeTile.rows.length > 5 ? (
+                  <Text
+                    style={[
+                      s.tooltipMore,
+                      { color: "rgba(255,255,255,0.45)" },
+                    ]}
+                  >
+                    +{activeTile.rows.length - 5} más
+                  </Text>
+                ) : null}
+              </>
             ) : null}
           </View>
           <View style={[s.tooltipCaretDown, { backgroundColor: c.ink }]} />
