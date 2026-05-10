@@ -62,7 +62,6 @@ import {
   findCategoryBySlug,
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
-import { BalanceInfoSheet } from "../../../lib/components/BalanceInfoSheet";
 import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import {
   MiniSparkline,
@@ -171,7 +170,6 @@ export default function PortfolioScreen() {
   const { c } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
-  const [infoOpen, setInfoOpen] = useState(false);
   /* Sheet de selección de moneda — se abre desde la pill debajo del
    * balance. Cambiar moneda ahora es un acto deliberado: tap pill →
    * elegir card → confirma. NO hay swipe horizontal del balance. */
@@ -653,28 +651,11 @@ export default function PortfolioScreen() {
             <Text style={[s.heroTitle, { color: c.text }]}>Portfolio</Text>
 
           <View style={s.heroPagerRow}>
-            <View style={{ flex: 1 }}>
-              <AmountDisplay
-                value={totalDisplay * tickerProgress}
-                size={42}
-                currency={currency}
-              />
-            </View>
-            <Tap
-              hitSlop={10}
-              haptic="selection"
-              onPress={() => setInfoOpen(true)}
-              style={[
-                s.heroInfoDot,
-                { borderColor: c.border },
-              ]}
-            >
-              <Text
-                style={[s.heroInfoLetter, { color: c.textMuted }]}
-              >
-                i
-              </Text>
-            </Tap>
+            <AmountDisplay
+              value={totalDisplay * tickerProgress}
+              size={42}
+              currency={currency}
+            />
           </View>
 
           {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
@@ -998,10 +979,6 @@ export default function PortfolioScreen() {
           ) : null}
         </Animated.ScrollView>
 
-        <BalanceInfoSheet
-          visible={infoOpen}
-          onClose={() => setInfoOpen(false)}
-        />
         <CurrencySheet
           visible={currencyOpen}
           onClose={() => setCurrencyOpen(false)}
@@ -2326,12 +2303,15 @@ function FloorPie({
    * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
   const [tooltipH, setTooltipH] = useState(0);
 
-  // Geometría del viewBox — cuadrado para layout 2-col. Donut centrado
-  // con outer 70 / inner 42 → grosor de anillo 28.
+  // Geometría del viewBox — donut centrado horizontal, ligeramente
+  // empujado hacia abajo (cy=85) y H acortado a 170 para minimizar
+  // el padding muerto arriba/abajo. outer 70 / inner 42 → grosor 28.
+  // Drop shadow vive en cy + outerR + 12 = 167 (cabe en H=170 con 3px
+  // de margen al fondo). Top empty pasa de 30 a 15 px.
   const W = 200;
-  const H = 200;
+  const H = 170;
   const cx = W / 2;
-  const cy = H / 2;
+  const cy = 85;
   const outerR = 70;
   const innerR = 42;
 
@@ -2562,7 +2542,28 @@ function FloorPie({
               },
             ]}
           >
-            {dimMarketPct != null && activeIdx === null ? (
+            {activeSlice ? (
+              /* Hold sobre un slice — el centro del donut espeja el %
+               * + label de la categoría tocada (mismo treatment visual
+               * que el cross-highlight desde la AllocationBar). */
+              <>
+                <Text
+                  style={[s.pieCenterMarketPct, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {activeSlice.pct >= 10
+                    ? Math.round(activeSlice.pct).toString()
+                    : activeSlice.pct.toFixed(1).replace(".", ",")}
+                  <Text style={{ color: c.textMuted }}>%</Text>
+                </Text>
+                <Text
+                  style={[s.pieCenterMarketLabel, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {activeSlice.label}
+                </Text>
+              </>
+            ) : dimMarketPct != null ? (
               <>
                 <Text
                   style={[s.pieCenterMarketPct, { color: c.text }]}
@@ -4010,25 +4011,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  /* Info dot — border-only circle con "i" tipográfica en Plus Jakarta
-   * 800. Reemplaza el Feather "info" genérico por un treatment que
-   * usa la typography del design system (negative letter spacing,
-   * weight álamos, continuous radius). */
-  heroInfoDot: {
-    width: 22,
-    height: 22,
-    borderCurve: "continuous",
-    borderRadius: 11,
-    borderWidth: 1.2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroInfoLetter: {
-    fontFamily: fontFamily[800],
-    fontSize: 12,
-    lineHeight: 14,
-    letterSpacing: -0.4,
   },
   deltaRow: {
     flexDirection: "row",
