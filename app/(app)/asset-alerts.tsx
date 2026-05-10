@@ -38,6 +38,7 @@ import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { IndicatorSheet } from "../../lib/components/IndicatorSheet";
+import { IndicatorDetailSheet } from "../../lib/components/IndicatorDetailSheet";
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
 import { IndicatorChartIllustration } from "../../lib/components/illustrations/IndicatorChartIllustration";
 import { Toggle } from "../../lib/components/Toggle";
@@ -85,9 +86,12 @@ export default function AssetAlertsScreen() {
   const [distFormat, setDistFormat] = useState<"%" | "$">("%");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
-  /* Indicator-tab equivalents — sheet de creación + alerta en edición. */
+  /* Indicator-tab equivalents — sheet de creación + alerta en edición
+   * + alerta en preview (detail sheet). */
   const [indicatorCreateOpen, setIndicatorCreateOpen] = useState(false);
   const [editingIndicator, setEditingIndicator] =
+    useState<IndicatorAlert | null>(null);
+  const [detailIndicator, setDetailIndicator] =
     useState<IndicatorAlert | null>(null);
   /* Ancla del popup de sort — medimos la posición exacta del ícono
    *  de sliders al abrir el menú así el popup sale pegado debajo. */
@@ -473,7 +477,7 @@ export default function AssetAlertsScreen() {
                       alert={alert}
                       asset={asset}
                       withTopDivider={i > 0}
-                      onEdit={() => setEditingIndicator(alert)}
+                      onEdit={() => setDetailIndicator(alert)}
                       onDelete={async () => {
                         try {
                           await removeIndicator(alert.id);
@@ -579,6 +583,20 @@ export default function AssetAlertsScreen() {
           onClose={() => setEditingIndicator(null)}
         />
       ) : null}
+
+      <IndicatorDetailSheet
+        visible={!!detailIndicator}
+        alert={detailIndicator}
+        asset={asset}
+        onClose={() => setDetailIndicator(null)}
+        onEdit={(a) => {
+          setDetailIndicator(null);
+          // Pequeño delay para que el detail termine su slide-out
+          // antes de que abra el sheet de edit, sino se solapan los
+          // modales y queda raro.
+          setTimeout(() => setEditingIndicator(a), 240);
+        }}
+      />
     </View>
   );
 }
@@ -1201,16 +1219,7 @@ function describeIndicatorAlert(
     0,
   );
   const noise = (Math.abs(seed) % 100) / 100; // 0..1
-  if (alert.type === "rsi") {
-    const isOver = alert.condition === "overbought";
-    const rsi = isOver ? 35 + noise * 25 : 40 + noise * 30;
-    return {
-      label: isOver ? "RSI > 70" : "RSI < 30",
-      color: isOver ? c.red : c.brand,
-      value: `RSI: ${rsi.toFixed(1)}`,
-    };
-  }
-  if (alert.type === "sma") {
+  if (alert.type === "ma") {
     const above = alert.condition === "above";
     const factor = 0.92 + noise * 0.16; // ±8%
     const ma = asset.price * factor;
@@ -1223,21 +1232,53 @@ function describeIndicatorAlert(
       value: `${variantLabel} ${alert.period}: ${formatNumber(ma)}`,
     };
   }
-  if (alert.type === "macd") {
-    const bullish = alert.condition === "bullish";
-    const macd = (noise - 0.5) * 0.5;
+  if (alert.type === "rsi") {
+    const above = alert.condition === "above";
+    const rsi = above ? 40 + noise * 30 : 35 + noise * 25;
     return {
-      label: bullish ? "MACD cruce alcista" : "MACD cruce bajista",
-      color: bullish ? c.brand : c.red,
+      label: above
+        ? `RSI cruza > ${alert.threshold}`
+        : `RSI cruza < ${alert.threshold}`,
+      color: above ? c.red : c.brand,
+      value: `RSI: ${rsi.toFixed(1)}`,
+    };
+  }
+  if (alert.type === "macd") {
+    const macd = (noise - 0.5) * 0.5;
+    let label: string;
+    let color: string;
+    if (alert.condition === "bullish_signal") {
+      label = "MACD cruce alcista";
+      color = c.brand;
+    } else if (alert.condition === "bearish_signal") {
+      label = "MACD cruce bajista";
+      color = c.red;
+    } else if (alert.condition === "zero_up") {
+      label = "MACD cruza cero ↑";
+      color = c.brand;
+    } else {
+      label = "MACD cruza cero ↓";
+      color = c.red;
+    }
+    return {
+      label,
+      color,
       value: `MACD: ${macd >= 0 ? "+" : ""}${macd.toFixed(2)}`,
     };
   }
   if (alert.type === "bollinger") {
-    const upper = alert.band === "upper";
+    if (alert.condition === "squeeze") {
+      return {
+        label: "Squeeze de bandas",
+        color: c.text,
+        value: `σ ${alert.deviation.toFixed(1).replace(".", ",")}`,
+      };
+    }
+    const upper = alert.condition === "touch_upper";
     const factor = upper ? 1.04 + noise * 0.04 : 0.92 + noise * 0.04;
     const band = asset.price * factor;
     return {
-      label: upper ? "Banda superior" : "Banda inferior",
+      label: upper ? "Toca banda superior" : "Toca banda inferior",
       color: upper ? c.red : c.brand,
       value: `${upper ? "Sup" : "Inf"}: ${formatNumber(band)}`,
     };
@@ -1245,9 +1286,9 @@ function describeIndicatorAlert(
   // volume
   const cur = 0.8 + noise * 1.4; // 0.8x - 2.2x
   return {
-    label: `Volumen > ${alert.multiplier}x prom.`,
+    label: `Volumen > ${alert.multiplier.toFixed(1).replace(".", ",")}x prom.`,
     color: c.text,
-    value: `${cur.toFixed(1)}x prom.`,
+    value: `${cur.toFixed(1).replace(".", ",")}x prom.`,
   };
 }
 
