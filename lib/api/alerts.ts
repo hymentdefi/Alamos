@@ -306,11 +306,26 @@ export function _resetMockAlerts(): void {
  * editable; Volume tiene multiplier (1.5/2/3x) editable. */
 
 export type IndicatorType =
+  | "ma"
   | "rsi"
-  | "sma"
   | "macd"
   | "bollinger"
   | "volume";
+
+/** Temporalidad común a todas las alertas técnicas. 1m a 1W. */
+export type Timeframe =
+  | "1m"
+  | "5m"
+  | "15m"
+  | "30m"
+  | "1H"
+  | "4H"
+  | "1D"
+  | "1W";
+
+/** "once" = la alerta se autopausea al primer disparo. "always" =
+ *  sigue activa y dispara cada vez que se cumple la condición. */
+export type IndicatorFrequency = "once" | "always";
 
 interface BaseIndicatorAlert {
   id: string;
@@ -319,84 +334,143 @@ interface BaseIndicatorAlert {
   status: AlertStatus;
   createdAt: string;
   triggeredAt?: string;
+  timeframe: Timeframe;
+  frequency: IndicatorFrequency;
+}
+
+export interface MAAlert extends BaseIndicatorAlert {
+  type: "ma";
+  /** "above" = precio cruza por encima de la media.
+   *  "below" = precio cruza por debajo. */
+  condition: "above" | "below";
+  /** SMA = simple. EMA = exponencial. */
+  variant: "sma" | "ema";
+  /** Período de la media. Rango 5–500. */
+  period: number;
 }
 
 export interface RSIAlert extends BaseIndicatorAlert {
   type: "rsi";
-  /** "overbought" = RSI sube por encima de 70.
-   *  "oversold"   = RSI baja por debajo de 30. */
-  condition: "overbought" | "oversold";
-}
-
-export interface SMAAlert extends BaseIndicatorAlert {
-  type: "sma";
-  /** "above" = precio cruza por encima de la media móvil.
-   *  "below" = precio cruza por debajo. */
+  /** "above" = RSI cruza por encima del threshold.
+   *  "below" = RSI cruza por debajo. */
   condition: "above" | "below";
-  /** Períodos estándar disponibles en chips. */
-  period: 9 | 20 | 50 | 100 | 200;
-  /** Simple vs Exponencial. */
-  variant: "sma" | "ema";
+  /** Threshold del RSI. Rango 0–100. */
+  threshold: number;
+  /** Período de cálculo del RSI. Rango 2–50. */
+  period: number;
 }
 
 export interface MACDAlert extends BaseIndicatorAlert {
   type: "macd";
-  /** "bullish" = MACD cruza por encima de la línea de señal.
-   *  "bearish" = MACD cruza por debajo. */
-  condition: "bullish" | "bearish";
+  /** bullish_signal = MACD cruza señal al alza.
+   *  bearish_signal = MACD cruza señal a la baja.
+   *  zero_up        = MACD cruza línea cero al alza.
+   *  zero_down      = MACD cruza línea cero a la baja. */
+  condition:
+    | "bullish_signal"
+    | "bearish_signal"
+    | "zero_up"
+    | "zero_down";
+  /** EMA rápida — default 12, rango 2–50. */
+  emaFast: number;
+  /** EMA lenta — default 26, rango 5–100. Debe ser > emaFast. */
+  emaSlow: number;
+  /** Período de la línea de señal — default 9, rango 2–50. */
+  signal: number;
 }
 
 export interface BollingerAlert extends BaseIndicatorAlert {
   type: "bollinger";
-  /** "upper" = precio toca la banda superior.
-   *  "lower" = precio toca la banda inferior. */
-  band: "upper" | "lower";
+  /** touch_upper = precio toca banda superior.
+   *  touch_lower = precio toca banda inferior.
+   *  squeeze     = bandas se contraen (volatilidad baja). */
+  condition: "touch_upper" | "touch_lower" | "squeeze";
+  /** Período de la media base. Rango 5–100. */
+  period: number;
+  /** Desviación estándar de las bandas. Rango 0.5–5.0 step 0.5. */
+  deviation: number;
 }
 
 export interface VolumeAlert extends BaseIndicatorAlert {
   type: "volume";
-  /** Múltiplo del volumen promedio que tiene que superar. */
-  multiplier: 1.5 | 2 | 3;
+  /** Multiplicador del volumen promedio. Rango 1.1–20 step 0.1. */
+  multiplier: number;
 }
 
 export type IndicatorAlert =
+  | MAAlert
   | RSIAlert
-  | SMAAlert
   | MACDAlert
   | BollingerAlert
   | VolumeAlert;
 
 /** Input para crear cualquier indicator alert. Discriminado por type. */
 export type CreateIndicatorAlertInput =
-  | { type: "rsi"; assetId: string; condition: "overbought" | "oversold" }
-  | {
-      type: "sma";
-      assetId: string;
-      condition: "above" | "below";
-      period: 9 | 20 | 50 | 100 | 200;
-      variant: "sma" | "ema";
-    }
-  | { type: "macd"; assetId: string; condition: "bullish" | "bearish" }
-  | { type: "bollinger"; assetId: string; band: "upper" | "lower" }
-  | { type: "volume"; assetId: string; multiplier: 1.5 | 2 | 3 };
+  | (Omit<MAAlert, "id" | "userId" | "status" | "createdAt" | "triggeredAt">)
+  | (Omit<RSIAlert, "id" | "userId" | "status" | "createdAt" | "triggeredAt">)
+  | (Omit<MACDAlert, "id" | "userId" | "status" | "createdAt" | "triggeredAt">)
+  | (Omit<BollingerAlert, "id" | "userId" | "status" | "createdAt" | "triggeredAt">)
+  | (Omit<VolumeAlert, "id" | "userId" | "status" | "createdAt" | "triggeredAt">);
 
-/** Patch de update para un indicator alert ya existente. Sólo los
- *  campos editables del tipo correspondiente (period/variant en SMA,
- *  multiplier en Volume, condition en RSI/MACD, band en Bollinger). */
-export type UpdateIndicatorAlertPatch =
-  | { type: "rsi"; condition: "overbought" | "oversold" }
-  | {
-      type: "sma";
-      condition: "above" | "below";
-      period: 9 | 20 | 50 | 100 | 200;
-      variant: "sma" | "ema";
-    }
-  | { type: "macd"; condition: "bullish" | "bearish" }
-  | { type: "bollinger"; band: "upper" | "lower" }
-  | { type: "volume"; multiplier: 1.5 | 2 | 3 };
+/** Patch de update — mismo shape que create (sin assetId obligatorio). */
+export type UpdateIndicatorAlertPatch = CreateIndicatorAlertInput;
 
 const _indicatorStore: IndicatorAlert[] = [];
 let _indicatorIdSeq = 1;
+
+/** Detecta si ya existe una alerta de indicador con los MISMOS
+ *  parámetros (todos los campos definitorios del tipo). Excluye
+ *  triggered/cancelled. */
+function findIndicatorDuplicate(
+  input: CreateIndicatorAlertInput,
+  excludeId?: string,
+): IndicatorAlert | undefined {
+  return _indicatorStore.find((a) => {
+    if (excludeId && a.id === excludeId) return false;
+    if (a.status !== "active" && a.status !== "paused") return false;
+    if (a.assetId !== input.assetId) return false;
+    if (a.type !== input.type) return false;
+    if (a.timeframe !== input.timeframe) return false;
+    if (a.frequency !== input.frequency) return false;
+    if (a.type === "ma" && input.type === "ma") {
+      return (
+        a.variant === input.variant &&
+        a.period === input.period &&
+        a.condition === input.condition
+      );
+    }
+    if (a.type === "rsi" && input.type === "rsi") {
+      return (
+        a.threshold === input.threshold &&
+        a.period === input.period &&
+        a.condition === input.condition
+      );
+    }
+    if (a.type === "macd" && input.type === "macd") {
+      return (
+        a.emaFast === input.emaFast &&
+        a.emaSlow === input.emaSlow &&
+        a.signal === input.signal &&
+        a.condition === input.condition
+      );
+    }
+    if (a.type === "bollinger" && input.type === "bollinger") {
+      return (
+        a.period === input.period &&
+        a.deviation === input.deviation &&
+        a.condition === input.condition
+      );
+    }
+    if (a.type === "volume" && input.type === "volume") {
+      return a.multiplier === input.multiplier;
+    }
+    return false;
+  });
+}
+
+/** Límite hard de alertas técnicas por usuario. La spec lo pide
+ *  para evitar push spam. */
+const INDICATOR_ALERT_LIMIT = 20;
 
 export async function createIndicatorAlert(
   input: CreateIndicatorAlertInput,
@@ -404,31 +478,41 @@ export async function createIndicatorAlert(
 ): Promise<IndicatorAlert> {
   if (MOCK_MODE) {
     await mockDelay();
+    // Validación de duplicado
+    const dup = findIndicatorDuplicate(input);
+    if (dup) {
+      throw new AlertApiError(
+        "Ya tenés esta alerta configurada.",
+        "duplicate",
+      );
+    }
+    // Validación de límite
+    const activeCount = _indicatorStore.filter(
+      (a) => a.status === "active" || a.status === "paused",
+    ).length;
+    if (activeCount >= INDICATOR_ALERT_LIMIT) {
+      throw new AlertApiError(
+        `Alcanzaste el límite de ${INDICATOR_ALERT_LIMIT} alertas activas.`,
+        "invalid",
+      );
+    }
+    // Validación específica de MACD: EMA lenta > EMA rápida.
+    if (input.type === "macd" && input.emaSlow <= input.emaFast) {
+      throw new AlertApiError(
+        "La EMA lenta tiene que ser mayor a la EMA rápida.",
+        "invalid",
+      );
+    }
     const base = {
       id: `ind-${_indicatorIdSeq++}`,
       userId: MOCK_USER_ID,
-      assetId: input.assetId,
       status: "active" as AlertStatus,
       createdAt: new Date().toISOString(),
     };
-    let created: IndicatorAlert;
-    if (input.type === "rsi") {
-      created = { ...base, type: "rsi", condition: input.condition };
-    } else if (input.type === "sma") {
-      created = {
-        ...base,
-        type: "sma",
-        condition: input.condition,
-        period: input.period,
-        variant: input.variant,
-      };
-    } else if (input.type === "macd") {
-      created = { ...base, type: "macd", condition: input.condition };
-    } else if (input.type === "bollinger") {
-      created = { ...base, type: "bollinger", band: input.band };
-    } else {
-      created = { ...base, type: "volume", multiplier: input.multiplier };
-    }
+    const created: IndicatorAlert = {
+      ...base,
+      ...input,
+    } as IndicatorAlert;
     _indicatorStore.push(created);
     return created;
   }
@@ -498,7 +582,10 @@ export async function setIndicatorAlertPaused(
         "invalid",
       );
     }
-    const updated = { ...current, status: paused ? "paused" : "active" } as IndicatorAlert;
+    const updated = {
+      ...current,
+      status: paused ? "paused" : "active",
+    } as IndicatorAlert;
     _indicatorStore[idx] = updated;
     return updated;
   }
@@ -523,25 +610,24 @@ export async function updateIndicatorAlert(
         "invalid",
       );
     }
-    let updated: IndicatorAlert;
-    if (current.type === "rsi" && patch.type === "rsi") {
-      updated = { ...current, condition: patch.condition };
-    } else if (current.type === "sma" && patch.type === "sma") {
-      updated = {
-        ...current,
-        condition: patch.condition,
-        period: patch.period,
-        variant: patch.variant,
-      };
-    } else if (current.type === "macd" && patch.type === "macd") {
-      updated = { ...current, condition: patch.condition };
-    } else if (current.type === "bollinger" && patch.type === "bollinger") {
-      updated = { ...current, band: patch.band };
-    } else if (current.type === "volume" && patch.type === "volume") {
-      updated = { ...current, multiplier: patch.multiplier };
-    } else {
-      throw new AlertApiError("Tipo desconocido", "invalid");
+    // Check de duplicado excluyendo la misma alerta.
+    const dup = findIndicatorDuplicate(patch, alertId);
+    if (dup) {
+      throw new AlertApiError(
+        "Ya tenés esta alerta configurada.",
+        "duplicate",
+      );
     }
+    if (patch.type === "macd" && patch.emaSlow <= patch.emaFast) {
+      throw new AlertApiError(
+        "La EMA lenta tiene que ser mayor a la EMA rápida.",
+        "invalid",
+      );
+    }
+    const updated: IndicatorAlert = {
+      ...current,
+      ...patch,
+    } as IndicatorAlert;
     _indicatorStore[idx] = updated;
     return updated;
   }

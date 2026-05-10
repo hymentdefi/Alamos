@@ -26,39 +26,35 @@ import { fontFamily, radius, useTheme } from "../theme";
 import type { Asset } from "../data/assets";
 import { useAlerts } from "../alerts/context";
 import { useToast } from "../toast/context";
-import type {
-  CreateIndicatorAlertInput,
-  IndicatorAlert,
-  UpdateIndicatorAlertPatch,
+import {
+  type CreateIndicatorAlertInput,
+  type IndicatorAlert,
+  type IndicatorFrequency,
+  type IndicatorType,
+  type Timeframe,
 } from "../api/alerts";
+import { Stepper } from "./Stepper";
 
 /**
- * Bottom sheet de creación + edición de alertas técnicas (indicator
- * alerts: RSI / SMA / MACD / Bollinger / Volumen).
+ * IndicatorSheet — bottom sheet de creación + edición de alertas
+ * técnicas. Dos pasos:
+ *   Paso 1: Picker — lista de 5 indicadores (MA / RSI / MACD /
+ *           Bandas de Bollinger / Volumen) con icono squircle 40,
+ *           label, descripción corta y chevron.
+ *   Paso 2: Config — header back/X + scroll con secciones:
+ *           Activo · Parámetros · Condición · Temporalidad ·
+ *           Frecuencia · Vista previa. CTA sticky abajo.
  *
- * Layout:
- *   1. Header: "Nueva alerta de indicador" / "Editar alerta" + botón
- *      outline naranja "Eliminar" cuando es edit.
- *   2. ScrollView con 5 cards (una por indicador). Cada card tiene
- *      el nombre + opciones tappables verde/naranja + descripción 12px.
- *      SMA y Volumen tienen selectores extra (períodos / variant /
- *      multiplier).
- *   3. CTA bottom-fixed "Crear alerta" / "Guardar" cuando hay una
- *      opción seleccionada.
+ * Slide horizontal entre paso 1 y paso 2 (220 ms ease-out).
  *
- * En modo CREATE, sólo aparece UNA selección activa a la vez. Si el
- * user toca otra card, la anterior se de-selecciona.
- *
- * En modo EDIT (editingAlert prop), arrancamos con la card del tipo
- * correspondiente expandida y pre-selección de la opción/parámetros
- * actuales. El user puede cambiar dentro del mismo tipo (no cambiar
- * de RSI a SMA).
+ * En modo EDIT (editingAlert prop), saltea el paso 1 y abre directo
+ * en el paso 2 del tipo correspondiente con los parámetros pre-cargados.
  */
 
 interface Props {
   visible: boolean;
   asset: Asset;
-  /** Si está, sheet abre en EDIT mode con la alerta pre-cargada. */
+  /** Si está, sheet abre en EDIT mode salteando el paso 1. */
   editingAlert?: IndicatorAlert;
   onClose: () => void;
 }
@@ -66,39 +62,66 @@ interface Props {
 const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
-type SmaPeriod = 9 | 20 | 50 | 100 | 200;
-type VolumeMultiplier = 1.5 | 2 | 3;
+const TIMEFRAMES: Timeframe[] = [
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1H",
+  "4H",
+  "1D",
+  "1W",
+];
 
-/* Estado interno de selección — discriminated por type. Un solo
- * objeto representa la elección actual del user. */
-type Selection =
-  | null
-  | { type: "rsi"; condition: "overbought" | "oversold" }
-  | {
-      type: "sma";
-      condition: "above" | "below";
-      period: SmaPeriod;
-      variant: "sma" | "ema";
-    }
-  | { type: "macd"; condition: "bullish" | "bearish" }
-  | { type: "bollinger"; band: "upper" | "lower" }
-  | { type: "volume"; multiplier: VolumeMultiplier };
-
-/** Convierte una IndicatorAlert existente al estado de Selection
- *  inicial para el modo EDIT. */
-function selectionFromAlert(a: IndicatorAlert): Selection {
-  if (a.type === "rsi") return { type: "rsi", condition: a.condition };
-  if (a.type === "sma")
-    return {
-      type: "sma",
-      condition: a.condition,
-      period: a.period,
-      variant: a.variant,
-    };
-  if (a.type === "macd") return { type: "macd", condition: a.condition };
-  if (a.type === "bollinger") return { type: "bollinger", band: a.band };
-  return { type: "volume", multiplier: a.multiplier };
+/* Estado interno de configuración — todos los campos posibles, vivos
+ * a la vez. El input final lo armamos según selectedType. Defaults
+ * por la spec. */
+interface ConfigState {
+  timeframe: Timeframe;
+  frequency: IndicatorFrequency;
+  // MA
+  maVariant: "sma" | "ema";
+  maPeriod: number;
+  maCondition: "above" | "below";
+  // RSI
+  rsiThreshold: number;
+  rsiPeriod: number;
+  rsiCondition: "above" | "below";
+  // MACD
+  macdEmaFast: number;
+  macdEmaSlow: number;
+  macdSignal: number;
+  macdCondition:
+    | "bullish_signal"
+    | "bearish_signal"
+    | "zero_up"
+    | "zero_down";
+  // Bollinger
+  bbPeriod: number;
+  bbDeviation: number;
+  bbCondition: "touch_upper" | "touch_lower" | "squeeze";
+  // Volume
+  volumeMultiplier: number;
 }
+
+const DEFAULT_CONFIG: ConfigState = {
+  timeframe: "1D",
+  frequency: "once",
+  maVariant: "sma",
+  maPeriod: 50,
+  maCondition: "above",
+  rsiThreshold: 70,
+  rsiPeriod: 14,
+  rsiCondition: "above",
+  macdEmaFast: 12,
+  macdEmaSlow: 26,
+  macdSignal: 9,
+  macdCondition: "bullish_signal",
+  bbPeriod: 20,
+  bbDeviation: 2,
+  bbCondition: "touch_upper",
+  volumeMultiplier: 2,
+};
 
 export function IndicatorSheet({
   visible,
@@ -108,45 +131,35 @@ export function IndicatorSheet({
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowH } = useWindowDimensions();
+  const { width: windowW, height: windowH } = useWindowDimensions();
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
 
-  /* SMA defaults — período 200, variant SMA. Cuando el user toca
-   * una opción de la card SMA, el período/variant se inicializan a
-   * estos defaults a menos que estuvieran configurados. */
-  const [smaPeriod, setSmaPeriod] = useState<SmaPeriod>(200);
-  const [smaVariant, setSmaVariant] = useState<"sma" | "ema">("sma");
-  /* Volumen default — 2x. */
-  const [volumeMultiplier, setVolumeMultiplier] =
-    useState<VolumeMultiplier>(2);
-  const [selection, setSelection] = useState<Selection>(null);
+  /* Step 1 = picker, Step 2 = config form. En edit saltea a step 2. */
+  const [step, setStep] = useState<1 | 2>(1);
+  const [selectedType, setSelectedType] = useState<IndicatorType | null>(
+    null,
+  );
+  const [config, setConfig] = useState<ConfigState>(DEFAULT_CONFIG);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset / hidratación al abrir.
+  // Hidratación al abrir.
   useEffect(() => {
     if (visible) {
       if (editingAlert) {
-        const s = selectionFromAlert(editingAlert);
-        setSelection(s);
-        if (editingAlert.type === "sma") {
-          setSmaPeriod(editingAlert.period);
-          setSmaVariant(editingAlert.variant);
-        } else {
-          setSmaPeriod(200);
-          setSmaVariant("sma");
-        }
-        if (editingAlert.type === "volume") {
-          setVolumeMultiplier(editingAlert.multiplier);
-        } else {
-          setVolumeMultiplier(2);
-        }
+        setStep(2);
+        setSelectedType(editingAlert.type);
+        setConfig(configFromAlert(editingAlert));
+        setAdvancedOpen(
+          editingAlert.type === "macd" || editingAlert.type === "bollinger",
+        );
       } else {
-        setSelection(null);
-        setSmaPeriod(200);
-        setSmaVariant("sma");
-        setVolumeMultiplier(2);
+        setStep(1);
+        setSelectedType(null);
+        setConfig(DEFAULT_CONFIG);
+        setAdvancedOpen(false);
       }
     }
   }, [visible, editingAlert]);
@@ -154,6 +167,7 @@ export function IndicatorSheet({
   /* ─── Animación bottom sheet ─── */
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
+  const stepProgress = useSharedValue(isEditing ? 1 : 0);
 
   useEffect(() => {
     if (visible) {
@@ -168,6 +182,14 @@ export function IndicatorSheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
+
+  // Animar el slide horizontal cuando cambia el step.
+  useEffect(() => {
+    stepProgress.value = withTiming(step === 1 ? 0 : 1, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [step, stepProgress]);
 
   const dismiss = () => {
     translateY.value = withTiming(
@@ -219,83 +241,36 @@ export function IndicatorSheet({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
+  // Track de los 2 panels horizontalmente.
+  const sliderStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -stepProgress.value * windowW }],
+  }));
 
-  /* ─── Handlers ─── */
-
+  /* ─── Handler de creación / update ─── */
   const handleSubmit = async () => {
-    if (!selection) return;
+    if (!selectedType) return;
     setSubmitting(true);
     Haptics.selectionAsync().catch(() => {});
     try {
+      const input = buildInputFromConfig(selectedType, asset.ticker, config);
       if (isEditing && editingAlert) {
-        // Update — sólo dentro del mismo tipo.
-        if (editingAlert.type !== selection.type) {
-          throw new Error("type mismatch");
-        }
-        let patch: UpdateIndicatorAlertPatch;
-        if (selection.type === "rsi") {
-          patch = { type: "rsi", condition: selection.condition };
-        } else if (selection.type === "sma") {
-          patch = {
-            type: "sma",
-            condition: selection.condition,
-            period: selection.period,
-            variant: selection.variant,
-          };
-        } else if (selection.type === "macd") {
-          patch = { type: "macd", condition: selection.condition };
-        } else if (selection.type === "bollinger") {
-          patch = { type: "bollinger", band: selection.band };
-        } else {
-          patch = { type: "volume", multiplier: selection.multiplier };
-        }
-        await updateIndicator(editingAlert.id, patch);
-        Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        ).catch(() => {});
+        await updateIndicator(editingAlert.id, input);
       } else {
-        let input: CreateIndicatorAlertInput;
-        if (selection.type === "rsi") {
-          input = {
-            type: "rsi",
-            assetId: asset.ticker,
-            condition: selection.condition,
-          };
-        } else if (selection.type === "sma") {
-          input = {
-            type: "sma",
-            assetId: asset.ticker,
-            condition: selection.condition,
-            period: selection.period,
-            variant: selection.variant,
-          };
-        } else if (selection.type === "macd") {
-          input = {
-            type: "macd",
-            assetId: asset.ticker,
-            condition: selection.condition,
-          };
-        } else if (selection.type === "bollinger") {
-          input = {
-            type: "bollinger",
-            assetId: asset.ticker,
-            band: selection.band,
-          };
-        } else {
-          input = {
-            type: "volume",
-            assetId: asset.ticker,
-            multiplier: selection.multiplier,
-          };
-        }
         await createIndicator(input);
-        Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        ).catch(() => {});
       }
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
+      showToast(isEditing ? "Alerta actualizada" : "Alerta creada", {
+        variant: "success",
+      });
       dismiss();
-    } catch {
-      showToast("No pudimos guardar la alerta", { variant: "error" });
+    } catch (e) {
+      const msg =
+        e instanceof Error && e.message
+          ? e.message
+          : "No pudimos guardar la alerta";
+      showToast(msg, { variant: "error" });
     } finally {
       setSubmitting(false);
     }
@@ -312,17 +287,24 @@ export function IndicatorSheet({
     }
   };
 
-  /* En edit mode, sólo se muestra la card del tipo correspondiente.
-   * En create mode, se muestran todas las 5. Esto evita que el user
-   * confunda "estoy editando una RSI" con "estoy creando una nueva". */
-  const visibleTypes = useMemo<
-    ("rsi" | "sma" | "macd" | "bollinger" | "volume")[]
-  >(() => {
-    if (isEditing && editingAlert) return [editingAlert.type];
-    return ["rsi", "sma", "macd", "bollinger", "volume"];
-  }, [isEditing, editingAlert]);
+  const handlePickType = (t: IndicatorType) => {
+    Haptics.selectionAsync().catch(() => {});
+    setSelectedType(t);
+    setAdvancedOpen(t === "macd" || t === "bollinger" ? false : false);
+    setStep(2);
+  };
 
-  const ctaEnabled = selection !== null && !submitting;
+  const previewSentence = useMemo(() => {
+    if (!selectedType) return "";
+    return describePreview(selectedType, asset.ticker, config);
+  }, [selectedType, asset.ticker, config]);
+
+  /* MACD EMA validation — para mostrar warning inline. */
+  const macdInvalid =
+    selectedType === "macd" && config.macdEmaSlow <= config.macdEmaFast;
+
+  const ctaEnabled = !!selectedType && !macdInvalid && !submitting;
+  const ctaLabel = isEditing ? "Guardar cambios" : "Crear alerta";
 
   return (
     <Modal
@@ -343,7 +325,7 @@ export function IndicatorSheet({
             {
               backgroundColor: c.bg,
               borderColor: c.border,
-              paddingBottom: insets.bottom + 16,
+              paddingBottom: insets.bottom + 8,
               maxHeight: windowH * 0.92,
             },
             sheetStyle,
@@ -355,194 +337,331 @@ export function IndicatorSheet({
             />
           </View>
 
-          {/* Header */}
-          <View style={s.header}>
-            <Text style={[s.title, { color: c.text }]}>
-              {isEditing ? "Editar alerta" : "Nueva alerta de indicador"}
-            </Text>
-            {isEditing ? (
-              <Pressable
-                onPress={handleDelete}
-                hitSlop={6}
-                accessibilityLabel="Eliminar alerta"
-                style={({ pressed }) => [
-                  s.deleteBtn,
-                  { borderColor: c.red, opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={[s.deleteBtnText, { color: c.red }]}>
-                  Eliminar
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <ScrollView
-            contentContainerStyle={{
-              paddingBottom: 96,
-              paddingHorizontal: 0,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {visibleTypes.includes("rsi") ? (
-              <RSICard
-                selection={selection}
-                onSelect={(sel) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelection(sel);
-                }}
-                c={c}
-              />
-            ) : null}
-
-            {visibleTypes.includes("sma") ? (
-              <SMACard
-                selection={selection}
-                period={smaPeriod}
-                variant={smaVariant}
-                onSelect={(condition) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelection({
-                    type: "sma",
-                    condition,
-                    period: smaPeriod,
-                    variant: smaVariant,
-                  });
-                }}
-                onPeriod={(p) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSmaPeriod(p);
-                  if (selection && selection.type === "sma") {
-                    setSelection({ ...selection, period: p });
-                  }
-                }}
-                onVariant={(v) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSmaVariant(v);
-                  if (selection && selection.type === "sma") {
-                    setSelection({ ...selection, variant: v });
-                  }
-                }}
-                c={c}
-              />
-            ) : null}
-
-            {visibleTypes.includes("macd") ? (
-              <MACDCard
-                selection={selection}
-                onSelect={(sel) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelection(sel);
-                }}
-                c={c}
-              />
-            ) : null}
-
-            {visibleTypes.includes("bollinger") ? (
-              <BollingerCard
-                selection={selection}
-                onSelect={(sel) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelection(sel);
-                }}
-                c={c}
-              />
-            ) : null}
-
-            {visibleTypes.includes("volume") ? (
-              <VolumeCard
-                selection={selection}
-                multiplier={volumeMultiplier}
-                onSelect={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelection({
-                    type: "volume",
-                    multiplier: volumeMultiplier,
-                  });
-                }}
-                onMultiplier={(m) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setVolumeMultiplier(m);
-                  if (selection && selection.type === "volume") {
-                    setSelection({ ...selection, multiplier: m });
-                  }
-                }}
-                c={c}
-              />
-            ) : null}
-          </ScrollView>
-
-          {/* CTA bottom — aparece sólo si hay selección */}
-          {selection !== null ? (
-            <View
-              style={[
-                s.ctaWrap,
-                { backgroundColor: c.bg, borderTopColor: c.border },
-              ]}
+          {/* Slider horizontal entre paso 1 y paso 2. */}
+          <View style={{ overflow: "hidden", flex: 1 }}>
+            <Animated.View
+              style={[{ flexDirection: "row", width: windowW * 2 }, sliderStyle]}
             >
-              <Pressable
-                onPress={handleSubmit}
-                disabled={!ctaEnabled}
-                style={({ pressed }) => [
-                  s.cta,
-                  {
-                    backgroundColor: c.text,
-                    opacity: !ctaEnabled ? 0.55 : pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <Text style={[s.ctaText, { color: c.bg }]}>
-                  {isEditing ? "Guardar" : "Crear alerta"}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
+              {/* Paso 1 — Picker */}
+              <View style={{ width: windowW, paddingHorizontal: 20 }}>
+                <View style={s.headerPicker}>
+                  <Text style={[s.title, { color: c.text }]}>
+                    Elegir indicador
+                  </Text>
+                  <Text style={[s.subtitle, { color: c.textMuted }]}>
+                    Seleccioná el indicador que querés monitorear
+                  </Text>
+                </View>
+                <ScrollView
+                  contentContainerStyle={{ paddingBottom: 16 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <PickerRow
+                    icon="trending-up"
+                    title="Media Móvil (MA)"
+                    description="Cuando el precio cruza el promedio"
+                    onPress={() => handlePickType("ma")}
+                    c={c}
+                  />
+                  <PickerRow
+                    icon="activity"
+                    title="RSI"
+                    description="Sobrecompra / sobreventa"
+                    onPress={() => handlePickType("rsi")}
+                    c={c}
+                  />
+                  <PickerRow
+                    icon="git-merge"
+                    title="MACD"
+                    description="Cruces de línea y señal"
+                    onPress={() => handlePickType("macd")}
+                    c={c}
+                  />
+                  <PickerRow
+                    icon="bar-chart-2"
+                    title="Bandas de Bollinger"
+                    description="Volatilidad y rangos"
+                    onPress={() => handlePickType("bollinger")}
+                    c={c}
+                  />
+                  <PickerRow
+                    icon="bar-chart"
+                    title="Volumen"
+                    description="Picos vs promedio"
+                    onPress={() => handlePickType("volume")}
+                    c={c}
+                  />
+                </ScrollView>
+              </View>
+
+              {/* Paso 2 — Config */}
+              <View style={{ width: windowW, paddingHorizontal: 20 }}>
+                <View style={s.headerConfig}>
+                  <Pressable
+                    onPress={() => {
+                      if (isEditing) {
+                        // En edit, "atrás" cierra el sheet (no hay paso 1).
+                        dismiss();
+                      } else {
+                        Haptics.selectionAsync().catch(() => {});
+                        setStep(1);
+                      }
+                    }}
+                    hitSlop={10}
+                    style={s.headerSideBtn}
+                    accessibilityLabel="Atrás"
+                  >
+                    <Feather
+                      name={isEditing ? "x" : "arrow-left"}
+                      size={20}
+                      color={c.text}
+                    />
+                  </Pressable>
+                  <Text
+                    style={[s.headerTitle, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {selectedType
+                      ? indicatorTitle(selectedType)
+                      : "Configurar"}
+                  </Text>
+                  {isEditing ? (
+                    <Pressable
+                      onPress={handleDelete}
+                      hitSlop={6}
+                      style={({ pressed }) => [
+                        s.deleteBtn,
+                        {
+                          borderColor: c.red,
+                          opacity: pressed ? 0.6 : 1,
+                        },
+                      ]}
+                      accessibilityLabel="Eliminar alerta"
+                    >
+                      <Text style={[s.deleteBtnText, { color: c.red }]}>
+                        Eliminar
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={dismiss}
+                      hitSlop={10}
+                      style={s.headerSideBtn}
+                      accessibilityLabel="Cerrar"
+                    >
+                      <Feather name="x" size={20} color={c.text} />
+                    </Pressable>
+                  )}
+                </View>
+
+                <ScrollView
+                  contentContainerStyle={{ paddingBottom: 120 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Sección: Activo */}
+                  <SectionLabel label="Activo" c={c} />
+                  <View
+                    style={[
+                      s.assetRow,
+                      { backgroundColor: c.surface, borderColor: c.border },
+                    ]}
+                  >
+                    <View>
+                      <Text style={[s.assetTicker, { color: c.text }]}>
+                        {asset.ticker}
+                      </Text>
+                      <Text
+                        style={[s.assetName, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {asset.name}
+                      </Text>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={18}
+                      color={c.textFaint}
+                    />
+                  </View>
+
+                  {/* Parámetros específicos por tipo */}
+                  {selectedType === "ma" ? (
+                    <MAParams config={config} setConfig={setConfig} c={c} />
+                  ) : null}
+                  {selectedType === "rsi" ? (
+                    <RSIParams config={config} setConfig={setConfig} c={c} />
+                  ) : null}
+                  {selectedType === "macd" ? (
+                    <MACDParams
+                      config={config}
+                      setConfig={setConfig}
+                      open={advancedOpen}
+                      setOpen={setAdvancedOpen}
+                      invalid={macdInvalid}
+                      c={c}
+                    />
+                  ) : null}
+                  {selectedType === "bollinger" ? (
+                    <BBParams
+                      config={config}
+                      setConfig={setConfig}
+                      open={advancedOpen}
+                      setOpen={setAdvancedOpen}
+                      c={c}
+                    />
+                  ) : null}
+                  {selectedType === "volume" ? (
+                    <VolumeParams config={config} setConfig={setConfig} c={c} />
+                  ) : null}
+
+                  {/* Sección: Condición */}
+                  {selectedType ? (
+                    <ConditionSection
+                      type={selectedType}
+                      config={config}
+                      setConfig={setConfig}
+                      c={c}
+                    />
+                  ) : null}
+
+                  {/* Sección: Temporalidad */}
+                  <SectionLabel label="Temporalidad" c={c} />
+                  <View style={s.chipsRow}>
+                    {TIMEFRAMES.map((tf) => {
+                      const active = config.timeframe === tf;
+                      return (
+                        <Pressable
+                          key={tf}
+                          onPress={() => {
+                            Haptics.selectionAsync().catch(() => {});
+                            setConfig({ ...config, timeframe: tf });
+                          }}
+                          style={({ pressed }) => [
+                            s.chip,
+                            {
+                              borderColor: active ? c.text : c.border,
+                              backgroundColor: active
+                                ? c.text
+                                : "transparent",
+                              opacity: pressed ? 0.7 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.chipText,
+                              { color: active ? c.bg : c.text },
+                            ]}
+                          >
+                            {tf}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Sección: Frecuencia */}
+                  <SectionLabel label="Frecuencia" c={c} />
+                  <RadioRow
+                    label="Solo una vez"
+                    active={config.frequency === "once"}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setConfig({ ...config, frequency: "once" });
+                    }}
+                    c={c}
+                  />
+                  <RadioRow
+                    label="Cada vez que ocurra"
+                    active={config.frequency === "always"}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setConfig({ ...config, frequency: "always" });
+                    }}
+                    c={c}
+                  />
+
+                  {/* Sección: Vista previa */}
+                  <SectionLabel label="Vista previa" c={c} />
+                  <View
+                    style={[
+                      s.preview,
+                      {
+                        backgroundColor: c.surface,
+                        borderLeftColor: c.brand,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[s.previewText, { color: c.text }]}
+                    >
+                      {previewSentence}
+                    </Text>
+                  </View>
+
+                  {/* Warning MACD inline */}
+                  {macdInvalid ? (
+                    <View style={[s.warning, { borderColor: c.red }]}>
+                      <Feather
+                        name="alert-triangle"
+                        size={14}
+                        color={c.red}
+                      />
+                      <Text
+                        style={[s.warningText, { color: c.red }]}
+                      >
+                        La EMA lenta tiene que ser mayor a la EMA rápida.
+                      </Text>
+                    </View>
+                  ) : null}
+                </ScrollView>
+
+                {/* CTA sticky abajo */}
+                <View
+                  style={[
+                    s.ctaWrap,
+                    { backgroundColor: c.bg, borderTopColor: c.border },
+                  ]}
+                >
+                  <Pressable
+                    onPress={handleSubmit}
+                    disabled={!ctaEnabled}
+                    style={({ pressed }) => [
+                      s.cta,
+                      {
+                        backgroundColor: c.text,
+                        opacity: !ctaEnabled ? 0.5 : pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={[s.ctaText, { color: c.bg }]}>
+                      {ctaLabel}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
         </Animated.View>
       </GestureDetector>
     </Modal>
   );
 }
 
-/* ─── Cards por indicador ──────────────────────────────────────── */
+/* ─── Subcomponents ─────────────────────────────────────────────── */
 
 type ColorMap = ReturnType<typeof useTheme>["c"];
 
-function CardShell({
+function PickerRow({
+  icon,
   title,
   description,
-  children,
-  c,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  c: ColorMap;
-}) {
-  return (
-    <View
-      style={[
-        s.card,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
-    >
-      <Text style={[s.cardTitle, { color: c.text }]}>{title}</Text>
-      <View style={s.cardOptions}>{children}</View>
-      <Text style={[s.cardDesc, { color: c.textMuted }]}>{description}</Text>
-    </View>
-  );
-}
-
-function OptionRow({
-  label,
-  active,
-  tone,
   onPress,
   c,
 }: {
-  label: string;
-  active: boolean;
-  /** Color del label/border cuando está active. */
-  tone: string;
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  description: string;
   onPress: () => void;
   c: ColorMap;
 }) {
@@ -550,165 +669,170 @@ function OptionRow({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        s.option,
+        s.pickerRow,
         {
-          borderColor: active ? tone : c.border,
-          backgroundColor: active ? `${tone}1A` : "transparent",
-          opacity: pressed ? 0.7 : 1,
+          backgroundColor: pressed ? c.surfaceHover : "transparent",
         },
       ]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
     >
-      <Text
-        style={[
-          s.optionText,
-          {
-            color: tone,
-            fontFamily: active ? fontFamily[700] : fontFamily[600],
-          },
-        ]}
+      <View
+        style={[s.pickerIcon, { backgroundColor: c.surface }]}
       >
-        {label}
-      </Text>
-      {active ? (
-        <View style={[s.checkDot, { backgroundColor: tone }]}>
-          <Feather name="check" size={11} color={c.bg} />
-        </View>
-      ) : null}
+        <Feather name={icon} size={18} color={c.brand} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.pickerTitle, { color: c.text }]}>{title}</Text>
+        <Text
+          style={[s.pickerDesc, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {description}
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={20} color={c.textFaint} />
     </Pressable>
   );
 }
 
-function RSICard({
-  selection,
-  onSelect,
-  c,
-}: {
-  selection: Selection;
-  onSelect: (s: Selection) => void;
-  c: ColorMap;
-}) {
-  const sel = selection?.type === "rsi" ? selection : null;
+function SectionLabel({ label, c }: { label: string; c: ColorMap }) {
   return (
-    <CardShell
-      title="RSI (Relative Strength Index)"
-      description="Mide la velocidad y magnitud de los movimientos de precio."
-      c={c}
-    >
-      <OptionRow
-        label="Sobrecompra: RSI sube por encima de 70"
-        active={sel?.condition === "overbought"}
-        tone={c.red}
-        onPress={() =>
-          onSelect({ type: "rsi", condition: "overbought" })
-        }
-        c={c}
-      />
-      <OptionRow
-        label="Sobreventa: RSI baja por debajo de 30"
-        active={sel?.condition === "oversold"}
-        tone={c.brand}
-        onPress={() =>
-          onSelect({ type: "rsi", condition: "oversold" })
-        }
-        c={c}
-      />
-    </CardShell>
+    <Text style={[s.sectionLabel, { color: c.textMuted }]}>
+      {label.toUpperCase()}
+    </Text>
   );
 }
 
-function SMACard({
-  selection,
-  period,
-  variant,
-  onSelect,
-  onPeriod,
-  onVariant,
+function RadioRow({
+  label,
+  active,
+  onPress,
   c,
 }: {
-  selection: Selection;
-  period: SmaPeriod;
-  variant: "sma" | "ema";
-  onSelect: (condition: "above" | "below") => void;
-  onPeriod: (p: SmaPeriod) => void;
-  onVariant: (v: "sma" | "ema") => void;
+  label: string;
+  active: boolean;
+  onPress: () => void;
   c: ColorMap;
 }) {
-  const sel = selection?.type === "sma" ? selection : null;
-  const periods: SmaPeriod[] = [9, 20, 50, 100, 200];
   return (
-    <CardShell
-      title="Media Móvil"
-      description="Promedio del precio en un período determinado."
-      c={c}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.radioRow,
+        {
+          backgroundColor: pressed ? c.surfaceHover : "transparent",
+          borderColor: c.border,
+        },
+      ]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
     >
-      <OptionRow
-        label="Precio cruza por encima de la SMA"
-        active={sel?.condition === "above"}
-        tone={c.brand}
-        onPress={() => onSelect("above")}
-        c={c}
-      />
-      <OptionRow
-        label="Precio cruza por debajo de la SMA"
-        active={sel?.condition === "below"}
-        tone={c.red}
-        onPress={() => onSelect("below")}
-        c={c}
-      />
-
-      {/* Chips de período */}
-      <View style={s.chipsLabelRow}>
-        <Text style={[s.chipsLabel, { color: c.textMuted }]}>
-          Período
-        </Text>
-      </View>
-      <View style={s.chipsRow}>
-        {periods.map((p) => {
-          const active = period === p;
-          return (
-            <Pressable
-              key={p}
-              onPress={() => onPeriod(p)}
-              style={({ pressed }) => [
-                s.chip,
-                {
-                  borderColor: active ? c.text : c.border,
-                  backgroundColor: active ? c.text : "transparent",
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  s.chipText,
-                  { color: active ? c.bg : c.text },
-                ]}
-              >
-                {p}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Segmented SMA / EMA */}
-      <View style={s.chipsLabelRow}>
-        <Text style={[s.chipsLabel, { color: c.textMuted }]}>Tipo</Text>
-      </View>
       <View
         style={[
-          s.segmented,
-          { backgroundColor: c.surfaceHover },
+          s.radioDot,
+          { borderColor: active ? c.brand : c.borderStrong },
         ]}
       >
+        {active ? (
+          <View style={[s.radioDotInner, { backgroundColor: c.brand }]} />
+        ) : null}
+      </View>
+      <Text style={[s.radioLabel, { color: c.text }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ChipsRow({
+  values,
+  active,
+  onPress,
+  c,
+  format,
+}: {
+  values: number[];
+  active: number;
+  onPress: (v: number) => void;
+  c: ColorMap;
+  format?: (v: number) => string;
+}) {
+  return (
+    <View style={s.chipsRow}>
+      {values.map((v) => {
+        const isActive = active === v;
+        return (
+          <Pressable
+            key={v}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onPress(v);
+            }}
+            style={({ pressed }) => [
+              s.chip,
+              {
+                borderColor: isActive ? c.text : c.border,
+                backgroundColor: isActive ? c.text : "transparent",
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                s.chipText,
+                { color: isActive ? c.bg : c.text },
+              ]}
+            >
+              {format ? format(v) : v.toString()}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function ParamRow({
+  label,
+  children,
+  c,
+}: {
+  label: string;
+  children: React.ReactNode;
+  c: ColorMap;
+}) {
+  return (
+    <View style={s.paramRow}>
+      <Text style={[s.paramLabel, { color: c.text }]}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+/* ─── MA params ─── */
+function MAParams({
+  config,
+  setConfig,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View>
+      <SectionLabel label="Tipo" c={c} />
+      <View
+        style={[s.segmented, { backgroundColor: c.surfaceHover }]}
+      >
         {(["sma", "ema"] as const).map((v) => {
-          const active = variant === v;
+          const active = config.maVariant === v;
           return (
             <Pressable
               key={v}
-              onPress={() => onVariant(v)}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setConfig({ ...config, maVariant: v });
+              }}
               style={[
                 s.segmentedItem,
                 active && { backgroundColor: c.bg },
@@ -719,7 +843,9 @@ function SMACard({
                   s.segmentedText,
                   {
                     color: active ? c.text : c.textMuted,
-                    fontFamily: active ? fontFamily[700] : fontFamily[600],
+                    fontFamily: active
+                      ? fontFamily[700]
+                      : fontFamily[600],
                   },
                 ]}
               >
@@ -729,129 +855,54 @@ function SMACard({
           );
         })}
       </View>
-    </CardShell>
-  );
-}
 
-function MACDCard({
-  selection,
-  onSelect,
-  c,
-}: {
-  selection: Selection;
-  onSelect: (s: Selection) => void;
-  c: ColorMap;
-}) {
-  const sel = selection?.type === "macd" ? selection : null;
-  return (
-    <CardShell
-      title="MACD"
-      description="Detecta cambios en la fuerza y dirección de la tendencia."
-      c={c}
-    >
-      <OptionRow
-        label="Cruce alcista: MACD cruza por encima de la señal"
-        active={sel?.condition === "bullish"}
-        tone={c.brand}
-        onPress={() =>
-          onSelect({ type: "macd", condition: "bullish" })
-        }
+      <SectionLabel label="Período" c={c} />
+      <ChipsRow
+        values={[9, 20, 50, 100, 200]}
+        active={config.maPeriod}
+        onPress={(v) => setConfig({ ...config, maPeriod: v })}
         c={c}
       />
-      <OptionRow
-        label="Cruce bajista: MACD cruza por debajo de la señal"
-        active={sel?.condition === "bearish"}
-        tone={c.red}
-        onPress={() =>
-          onSelect({ type: "macd", condition: "bearish" })
-        }
-        c={c}
-      />
-    </CardShell>
-  );
-}
-
-function BollingerCard({
-  selection,
-  onSelect,
-  c,
-}: {
-  selection: Selection;
-  onSelect: (s: Selection) => void;
-  c: ColorMap;
-}) {
-  const sel = selection?.type === "bollinger" ? selection : null;
-  return (
-    <CardShell
-      title="Bandas de Bollinger"
-      description="Mide volatilidad relativa al precio promedio."
-      c={c}
-    >
-      <OptionRow
-        label="Precio toca banda superior"
-        active={sel?.band === "upper"}
-        tone={c.red}
-        onPress={() =>
-          onSelect({ type: "bollinger", band: "upper" })
-        }
-        c={c}
-      />
-      <OptionRow
-        label="Precio toca banda inferior"
-        active={sel?.band === "lower"}
-        tone={c.brand}
-        onPress={() =>
-          onSelect({ type: "bollinger", band: "lower" })
-        }
-        c={c}
-      />
-    </CardShell>
-  );
-}
-
-function VolumeCard({
-  selection,
-  multiplier,
-  onSelect,
-  onMultiplier,
-  c,
-}: {
-  selection: Selection;
-  multiplier: VolumeMultiplier;
-  onSelect: () => void;
-  onMultiplier: (m: VolumeMultiplier) => void;
-  c: ColorMap;
-}) {
-  const sel = selection?.type === "volume" ? selection : null;
-  const isActive = !!sel;
-  const multipliers: VolumeMultiplier[] = [1.5, 2, 3];
-  return (
-    <CardShell
-      title="Volumen"
-      description="Detecta actividad inusual en el volumen de operaciones."
-      c={c}
-    >
-      <OptionRow
-        label={`Volumen supera ${multiplier}x el promedio`}
-        active={isActive}
-        tone={c.text}
-        onPress={onSelect}
-        c={c}
-      />
-
-      {/* Chips de multiplier */}
-      <View style={s.chipsLabelRow}>
-        <Text style={[s.chipsLabel, { color: c.textMuted }]}>
-          Multiplicador
-        </Text>
+      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
+        <Stepper
+          value={config.maPeriod}
+          onChange={(v) => setConfig({ ...config, maPeriod: v })}
+          min={5}
+          max={500}
+          step={1}
+        />
       </View>
+    </View>
+  );
+}
+
+/* ─── RSI params ─── */
+function RSIParams({
+  config,
+  setConfig,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View>
+      <SectionLabel label="Umbral" c={c} />
       <View style={s.chipsRow}>
-        {multipliers.map((m) => {
-          const active = multiplier === m;
+        {[
+          { v: 30, label: "30 Sobreventa" },
+          { v: 50, label: "50 Neutro" },
+          { v: 70, label: "70 Sobrecompra" },
+        ].map((opt) => {
+          const active = config.rsiThreshold === opt.v;
           return (
             <Pressable
-              key={m}
-              onPress={() => onMultiplier(m)}
+              key={opt.v}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setConfig({ ...config, rsiThreshold: opt.v });
+              }}
               style={({ pressed }) => [
                 s.chip,
                 {
@@ -867,14 +918,494 @@ function VolumeCard({
                   { color: active ? c.bg : c.text },
                 ]}
               >
-                {m}x
+                {opt.label}
               </Text>
             </Pressable>
           );
         })}
       </View>
-    </CardShell>
+      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
+        <Stepper
+          value={config.rsiThreshold}
+          onChange={(v) => setConfig({ ...config, rsiThreshold: v })}
+          min={0}
+          max={100}
+          step={1}
+        />
+      </View>
+
+      <SectionLabel label="Período" c={c} />
+      <ChipsRow
+        values={[7, 9, 14, 21]}
+        active={config.rsiPeriod}
+        onPress={(v) => setConfig({ ...config, rsiPeriod: v })}
+        c={c}
+      />
+      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
+        <Stepper
+          value={config.rsiPeriod}
+          onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
+          min={2}
+          max={50}
+          step={1}
+        />
+      </View>
+    </View>
   );
+}
+
+/* ─── MACD params (avanzado collapsable) ─── */
+function MACDParams({
+  config,
+  setConfig,
+  open,
+  setOpen,
+  invalid,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  open: boolean;
+  setOpen: (next: boolean) => void;
+  invalid: boolean;
+  c: ColorMap;
+}) {
+  return (
+    <View>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          setOpen(!open);
+        }}
+        style={s.advancedToggle}
+      >
+        <Text style={[s.advancedToggleText, { color: c.brand }]}>
+          {open ? "Ocultar avanzado" : "Avanzado"}
+        </Text>
+        <Feather
+          name={open ? "chevron-up" : "chevron-down"}
+          size={14}
+          color={c.brand}
+        />
+      </Pressable>
+      {open ? (
+        <View
+          style={[
+            s.advancedBox,
+            {
+              backgroundColor: c.surface,
+              borderColor: invalid ? c.red : c.border,
+            },
+          ]}
+        >
+          <ParamRow label="EMA rápida" c={c}>
+            <Stepper
+              value={config.macdEmaFast}
+              onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
+              min={2}
+              max={50}
+              step={1}
+            />
+          </ParamRow>
+          <ParamRow label="EMA lenta" c={c}>
+            <Stepper
+              value={config.macdEmaSlow}
+              onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
+              min={5}
+              max={100}
+              step={1}
+            />
+          </ParamRow>
+          <ParamRow label="Señal" c={c}>
+            <Stepper
+              value={config.macdSignal}
+              onChange={(v) => setConfig({ ...config, macdSignal: v })}
+              min={2}
+              max={50}
+              step={1}
+            />
+          </ParamRow>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ─── Bollinger params (avanzado collapsable) ─── */
+function BBParams({
+  config,
+  setConfig,
+  open,
+  setOpen,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  open: boolean;
+  setOpen: (next: boolean) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          setOpen(!open);
+        }}
+        style={s.advancedToggle}
+      >
+        <Text style={[s.advancedToggleText, { color: c.brand }]}>
+          {open ? "Ocultar avanzado" : "Avanzado"}
+        </Text>
+        <Feather
+          name={open ? "chevron-up" : "chevron-down"}
+          size={14}
+          color={c.brand}
+        />
+      </Pressable>
+      {open ? (
+        <View
+          style={[
+            s.advancedBox,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          <ParamRow label="Período" c={c}>
+            <Stepper
+              value={config.bbPeriod}
+              onChange={(v) => setConfig({ ...config, bbPeriod: v })}
+              min={5}
+              max={100}
+              step={1}
+            />
+          </ParamRow>
+          <ParamRow label="Desviación σ" c={c}>
+            <Stepper
+              value={config.bbDeviation}
+              onChange={(v) => setConfig({ ...config, bbDeviation: v })}
+              min={0.5}
+              max={5}
+              step={0.5}
+              decimals={1}
+            />
+          </ParamRow>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ─── Volume params ─── */
+function VolumeParams({
+  config,
+  setConfig,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View>
+      <SectionLabel label="Multiplicador" c={c} />
+      <ChipsRow
+        values={[1.5, 2, 3, 5]}
+        active={config.volumeMultiplier}
+        onPress={(v) => setConfig({ ...config, volumeMultiplier: v })}
+        c={c}
+        format={(v) => `${v}x`}
+      />
+      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
+        <Stepper
+          value={config.volumeMultiplier}
+          onChange={(v) => setConfig({ ...config, volumeMultiplier: v })}
+          min={1.1}
+          max={20}
+          step={0.1}
+          decimals={1}
+          suffix="x"
+        />
+      </View>
+    </View>
+  );
+}
+
+/* ─── Sección condición — varía por tipo ─── */
+function ConditionSection({
+  type,
+  config,
+  setConfig,
+  c,
+}: {
+  type: IndicatorType;
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  c: ColorMap;
+}) {
+  if (type === "ma") {
+    return (
+      <View>
+        <SectionLabel label="Condición" c={c} />
+        <RadioRow
+          label="Precio cruza por encima"
+          active={config.maCondition === "above"}
+          onPress={() => setConfig({ ...config, maCondition: "above" })}
+          c={c}
+        />
+        <RadioRow
+          label="Precio cruza por debajo"
+          active={config.maCondition === "below"}
+          onPress={() => setConfig({ ...config, maCondition: "below" })}
+          c={c}
+        />
+      </View>
+    );
+  }
+  if (type === "rsi") {
+    return (
+      <View>
+        <SectionLabel label="Condición" c={c} />
+        <RadioRow
+          label="Cruza por encima del umbral"
+          active={config.rsiCondition === "above"}
+          onPress={() => setConfig({ ...config, rsiCondition: "above" })}
+          c={c}
+        />
+        <RadioRow
+          label="Cruza por debajo del umbral"
+          active={config.rsiCondition === "below"}
+          onPress={() => setConfig({ ...config, rsiCondition: "below" })}
+          c={c}
+        />
+      </View>
+    );
+  }
+  if (type === "macd") {
+    return (
+      <View>
+        <SectionLabel label="Condición" c={c} />
+        <RadioRow
+          label="Cruce alcista (MACD cruza señal al alza)"
+          active={config.macdCondition === "bullish_signal"}
+          onPress={() =>
+            setConfig({ ...config, macdCondition: "bullish_signal" })
+          }
+          c={c}
+        />
+        <RadioRow
+          label="Cruce bajista (MACD cruza señal a la baja)"
+          active={config.macdCondition === "bearish_signal"}
+          onPress={() =>
+            setConfig({ ...config, macdCondition: "bearish_signal" })
+          }
+          c={c}
+        />
+        <RadioRow
+          label="MACD cruza línea cero al alza"
+          active={config.macdCondition === "zero_up"}
+          onPress={() =>
+            setConfig({ ...config, macdCondition: "zero_up" })
+          }
+          c={c}
+        />
+        <RadioRow
+          label="MACD cruza línea cero a la baja"
+          active={config.macdCondition === "zero_down"}
+          onPress={() =>
+            setConfig({ ...config, macdCondition: "zero_down" })
+          }
+          c={c}
+        />
+      </View>
+    );
+  }
+  if (type === "bollinger") {
+    return (
+      <View>
+        <SectionLabel label="Condición" c={c} />
+        <RadioRow
+          label="Precio toca banda superior"
+          active={config.bbCondition === "touch_upper"}
+          onPress={() =>
+            setConfig({ ...config, bbCondition: "touch_upper" })
+          }
+          c={c}
+        />
+        <RadioRow
+          label="Precio toca banda inferior"
+          active={config.bbCondition === "touch_lower"}
+          onPress={() =>
+            setConfig({ ...config, bbCondition: "touch_lower" })
+          }
+          c={c}
+        />
+        <RadioRow
+          label="Bandas se contraen (squeeze)"
+          active={config.bbCondition === "squeeze"}
+          onPress={() =>
+            setConfig({ ...config, bbCondition: "squeeze" })
+          }
+          c={c}
+        />
+      </View>
+    );
+  }
+  if (type === "volume") {
+    return (
+      <View>
+        <SectionLabel label="Condición" c={c} />
+        <RadioRow
+          label="Volumen supera múltiplo del promedio"
+          active={true}
+          onPress={() => {}}
+          c={c}
+        />
+      </View>
+    );
+  }
+  return null;
+}
+
+/* ─── Helpers de conversión config ↔ alert ─── */
+
+function configFromAlert(a: IndicatorAlert): ConfigState {
+  const base = { ...DEFAULT_CONFIG, timeframe: a.timeframe, frequency: a.frequency };
+  if (a.type === "ma") {
+    return {
+      ...base,
+      maVariant: a.variant,
+      maPeriod: a.period,
+      maCondition: a.condition,
+    };
+  }
+  if (a.type === "rsi") {
+    return {
+      ...base,
+      rsiThreshold: a.threshold,
+      rsiPeriod: a.period,
+      rsiCondition: a.condition,
+    };
+  }
+  if (a.type === "macd") {
+    return {
+      ...base,
+      macdEmaFast: a.emaFast,
+      macdEmaSlow: a.emaSlow,
+      macdSignal: a.signal,
+      macdCondition: a.condition,
+    };
+  }
+  if (a.type === "bollinger") {
+    return {
+      ...base,
+      bbPeriod: a.period,
+      bbDeviation: a.deviation,
+      bbCondition: a.condition,
+    };
+  }
+  // volume
+  return {
+    ...base,
+    volumeMultiplier: a.multiplier,
+  };
+}
+
+function buildInputFromConfig(
+  type: IndicatorType,
+  assetId: string,
+  cfg: ConfigState,
+): CreateIndicatorAlertInput {
+  const common = { assetId, timeframe: cfg.timeframe, frequency: cfg.frequency };
+  if (type === "ma") {
+    return {
+      type: "ma",
+      ...common,
+      variant: cfg.maVariant,
+      period: cfg.maPeriod,
+      condition: cfg.maCondition,
+    };
+  }
+  if (type === "rsi") {
+    return {
+      type: "rsi",
+      ...common,
+      threshold: cfg.rsiThreshold,
+      period: cfg.rsiPeriod,
+      condition: cfg.rsiCondition,
+    };
+  }
+  if (type === "macd") {
+    return {
+      type: "macd",
+      ...common,
+      emaFast: cfg.macdEmaFast,
+      emaSlow: cfg.macdEmaSlow,
+      signal: cfg.macdSignal,
+      condition: cfg.macdCondition,
+    };
+  }
+  if (type === "bollinger") {
+    return {
+      type: "bollinger",
+      ...common,
+      period: cfg.bbPeriod,
+      deviation: cfg.bbDeviation,
+      condition: cfg.bbCondition,
+    };
+  }
+  return {
+    type: "volume",
+    ...common,
+    multiplier: cfg.volumeMultiplier,
+  };
+}
+
+function indicatorTitle(t: IndicatorType): string {
+  if (t === "ma") return "Media Móvil";
+  if (t === "rsi") return "RSI";
+  if (t === "macd") return "MACD";
+  if (t === "bollinger") return "Bandas de Bollinger";
+  return "Volumen";
+}
+
+/* ─── Natural language preview ──────────────────────────────────── */
+
+function describePreview(
+  type: IndicatorType,
+  ticker: string,
+  cfg: ConfigState,
+): string {
+  const tf = cfg.timeframe;
+  if (type === "ma") {
+    const variantLabel = cfg.maVariant.toUpperCase();
+    const dir =
+      cfg.maCondition === "above"
+        ? "cruce por encima"
+        : "cruce por debajo";
+    return `Te avisaremos cuando el precio de ${ticker} ${dir} de la ${variantLabel}(${cfg.maPeriod}) en ${tf}.`;
+  }
+  if (type === "rsi") {
+    const dir =
+      cfg.rsiCondition === "above" ? "suba por encima" : "baje por debajo";
+    return `Te avisaremos cuando el RSI(${cfg.rsiPeriod}) de ${ticker} ${dir} de ${cfg.rsiThreshold} en ${tf}.`;
+  }
+  if (type === "macd") {
+    if (cfg.macdCondition === "bullish_signal")
+      return `Te avisaremos cuando el MACD cruce la línea de señal al alza para ${ticker} en ${tf}.`;
+    if (cfg.macdCondition === "bearish_signal")
+      return `Te avisaremos cuando el MACD cruce la línea de señal a la baja para ${ticker} en ${tf}.`;
+    if (cfg.macdCondition === "zero_up")
+      return `Te avisaremos cuando el MACD cruce la línea cero al alza para ${ticker} en ${tf}.`;
+    return `Te avisaremos cuando el MACD cruce la línea cero a la baja para ${ticker} en ${tf}.`;
+  }
+  if (type === "bollinger") {
+    if (cfg.bbCondition === "touch_upper")
+      return `Te avisaremos cuando el precio de ${ticker} toque la banda superior en ${tf}.`;
+    if (cfg.bbCondition === "touch_lower")
+      return `Te avisaremos cuando el precio de ${ticker} toque la banda inferior en ${tf}.`;
+    return `Te avisaremos cuando las bandas de Bollinger de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
+  }
+  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier}x el promedio en ${tf}.`;
 }
 
 const s = StyleSheet.create({
@@ -890,7 +1421,6 @@ const s = StyleSheet.create({
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 20,
     paddingTop: 8,
   },
   grabber: {
@@ -904,20 +1434,45 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
 
-  /* Header */
-  header: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingTop: 6,
+  /* Header — paso 1 */
+  headerPicker: {
+    paddingTop: 4,
     paddingBottom: 16,
   },
   title: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.6,
-    flexShrink: 1,
+  },
+  subtitle: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginTop: 4,
+  },
+
+  /* Header — paso 2 */
+  headerConfig: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 2,
+    paddingBottom: 14,
+    gap: 8,
+  },
+  headerSideBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+  },
+  headerTitle: {
+    flex: 1,
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+    textAlign: "center",
   },
   deleteBtn: {
     paddingHorizontal: 12,
@@ -925,7 +1480,6 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1.4,
-    backgroundColor: "transparent",
   },
   deleteBtnText: {
     fontFamily: fontFamily[700],
@@ -933,70 +1487,101 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Cards */
-  card: {
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-    marginBottom: 10,
-  },
-  cardOptions: {
-    gap: 8,
-  },
-  cardDesc: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.05,
-    marginTop: 12,
-  },
-
-  /* Option row */
-  option: {
+  /* Picker rows */
+  pickerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
     borderCurve: "continuous",
     borderRadius: radius.md,
-    borderWidth: 1.2,
   },
-  optionText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
-    flexShrink: 1,
-  },
-  checkDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+  pickerIcon: {
+    width: 40,
+    height: 40,
+    borderCurve: "continuous",
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
+  pickerTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  pickerDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
 
-  /* Chips */
-  chipsLabelRow: {
-    marginTop: 14,
+  /* Sections */
+  sectionLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.6,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+
+  /* Asset row */
+  assetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  assetTicker: {
+    fontFamily: fontFamily[800],
+    fontSize: 15,
+    letterSpacing: -0.3,
+  },
+  assetName: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+
+  /* Radio */
+  radioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    borderWidth: 1,
     marginBottom: 6,
   },
-  chipsLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
+  radioDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.6,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  radioDotInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  radioLabel: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+
+  /* Chips + segmented */
   chipsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1004,7 +1589,7 @@ const s = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -1014,8 +1599,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: -0.1,
   },
-
-  /* Segmented control SMA/EMA */
   segmented: {
     flexDirection: "row",
     padding: 3,
@@ -1033,6 +1616,73 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 12,
     letterSpacing: 0.4,
+  },
+
+  /* Param rows in advanced box */
+  paramRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  paramLabel: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  advancedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 8,
+    alignSelf: "flex-start",
+  },
+  advancedToggleText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  advancedBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+
+  /* Preview card */
+  preview: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    borderLeftWidth: 3,
+  },
+  previewText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    lineHeight: 19,
+    letterSpacing: -0.1,
+  },
+
+  /* Inline warning */
+  warning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  warningText: {
+    flex: 1,
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
   },
 
   /* CTA */
