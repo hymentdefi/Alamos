@@ -38,6 +38,11 @@ import {
   type Timeframe,
 } from "../api/alerts";
 import { Stepper } from "./Stepper";
+import { MAIndicatorIllustration } from "./illustrations/MAIndicatorIllustration";
+import { RSIIndicatorIllustration } from "./illustrations/RSIIndicatorIllustration";
+import { MACDIndicatorIllustration } from "./illustrations/MACDIndicatorIllustration";
+import { BollingerIndicatorIllustration } from "./illustrations/BollingerIndicatorIllustration";
+import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllustration";
 
 /**
  * IndicatorSheet — rediseño Robinhood-style con dos pasos.
@@ -392,35 +397,35 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                 >
                   <PickerRow
-                    icon="trending-up"
+                    icon={() => <MAIndicatorIllustration size={44} />}
                     title="Media Móvil (MA)"
                     description="Cuando el precio cruza el promedio"
                     onPress={() => handlePickType("ma")}
                     c={c}
                   />
                   <PickerRow
-                    icon="activity"
+                    icon={() => <RSIIndicatorIllustration size={44} />}
                     title="RSI"
                     description="Sobrecompra / sobreventa"
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
-                    icon="git-merge"
+                    icon={() => <MACDIndicatorIllustration size={44} />}
                     title="MACD"
                     description="Cruces de línea y señal"
                     onPress={() => handlePickType("macd")}
                     c={c}
                   />
                   <PickerRow
-                    icon="bar-chart-2"
+                    icon={() => <BollingerIndicatorIllustration size={44} />}
                     title="Bandas de Bollinger"
                     description="Volatilidad y rangos"
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
-                    icon="bar-chart"
+                    icon={() => <VolumeIndicatorIllustration size={44} />}
                     title="Volumen"
                     description="Picos vs promedio"
                     onPress={() => handlePickType("volume")}
@@ -611,7 +616,10 @@ function PickerRow({
   onPress,
   c,
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  /** Render function para el icono — permite pasar tanto un Feather
+   *  como una illustration custom. Se rendea en un slot 44×44 sin bg
+   *  (las illustrations ya tienen su propia composición). */
+  icon: () => React.ReactNode;
   title: string;
   description: string;
   onPress: () => void;
@@ -625,9 +633,7 @@ function PickerRow({
         { backgroundColor: pressed ? c.surfaceHover : "transparent" },
       ]}
     >
-      <View style={[s.pickerIcon, { backgroundColor: c.surfaceHover }]}>
-        <Feather name={icon} size={18} color={c.brand} />
-      </View>
+      <View style={s.pickerIcon}>{icon()}</View>
       <View style={{ flex: 1 }}>
         <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
         <Text
@@ -1723,10 +1729,8 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
   },
   pickerIcon: {
-    width: 40,
-    height: 40,
-    borderCurve: "continuous",
-    borderRadius: 12,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
