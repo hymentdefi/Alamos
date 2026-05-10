@@ -294,13 +294,26 @@ export default function AssetAlertsScreen() {
                     }
                   >
                     <View style={s.distFormatBtn}>
+                      {/* "%" / "$" sale como Text aparte para dejar
+                          un margen visible (~2 px) entre el símbolo
+                          y "al objetivo" — sin esto leía pegado. */}
                       <Text
                         style={[s.distFormatText, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {distFormat === "%" ? "%" : "$"}
+                      </Text>
+                      <Text
+                        style={[
+                          s.distFormatText,
+                          s.distFormatTextRest,
+                          { color: c.textMuted },
+                        ]}
                         numberOfLines={1}
                         adjustsFontSizeToFit
                         minimumFontScale={0.45}
                       >
-                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
+                        al objetivo
                       </Text>
                       <Feather
                         name="chevron-down"
@@ -1046,6 +1059,11 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.1,
+  },
+  /* Margen 2 px entre el símbolo "%" / "$" y "al objetivo" — sin
+   * esto leía pegado al símbolo. */
+  distFormatTextRest: {
+    marginLeft: 2,
   },
   /* Sort icon — vive en la columna del Toggle (mismo width 40),
    * centrado adentro. El row de abajo tiene Toggle 40 en esta
