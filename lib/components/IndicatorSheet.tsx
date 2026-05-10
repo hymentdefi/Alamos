@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  UIManager,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -36,20 +40,31 @@ import {
 import { Stepper } from "./Stepper";
 
 /**
- * IndicatorSheet — bottom sheet de creación + edición de alertas
- * técnicas. Dos pasos:
- *   Paso 1: Picker — lista de 5 indicadores (MA / RSI / MACD /
- *           Bandas de Bollinger / Volumen) con icono squircle 40,
- *           label, descripción corta y chevron.
- *   Paso 2: Config — header back/X + scroll con secciones:
- *           Activo · Parámetros · Condición · Temporalidad ·
- *           Frecuencia · Vista previa. CTA sticky abajo.
+ * IndicatorSheet — rediseño Robinhood-style con dos pasos.
  *
- * Slide horizontal entre paso 1 y paso 2 (220 ms ease-out).
+ *   Paso 1 — Picker: lista tappable de 5 indicadores con icono
+ *            squircle + label + descripción + chevron.
  *
- * En modo EDIT (editingAlert prop), saltea el paso 1 y abre directo
- * en el paso 2 del tipo correspondiente con los parámetros pre-cargados.
+ *   Paso 2 — Config: lista FLAT de filas tappables (label izq +
+ *            value der + chevron). Tap en una fila expande inline
+ *            el editor correspondiente (segmented / chips + stepper
+ *            / lista de opciones), animado con LayoutAnimation.
+ *            Single-expansion: solo una fila abierta a la vez. Sin
+ *            section headers en caps, sin radios circulares,
+ *            estética iOS Settings / Robinhood.
+ *
+ * Slide horizontal 220ms entre paso 1 y paso 2.
+ * En EDIT: arranca directamente en paso 2 del tipo correspondiente
+ * con todos los parámetros pre-cargados.
  */
+
+// Habilitar LayoutAnimation en Android.
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface Props {
   visible: boolean;
@@ -73,9 +88,6 @@ const TIMEFRAMES: Timeframe[] = [
   "1W",
 ];
 
-/* Estado interno de configuración — todos los campos posibles, vivos
- * a la vez. El input final lo armamos según selectedType. Defaults
- * por la spec. */
 interface ConfigState {
   timeframe: Timeframe;
   frequency: IndicatorFrequency;
@@ -123,6 +135,25 @@ const DEFAULT_CONFIG: ConfigState = {
   volumeMultiplier: 2,
 };
 
+/** Id de cada fila flat configurable. */
+type RowKey =
+  | "activo"
+  | "ma_tipo"
+  | "ma_periodo"
+  | "ma_condicion"
+  | "rsi_periodo"
+  | "rsi_umbral"
+  | "rsi_condicion"
+  | "macd_params"
+  | "macd_condicion"
+  | "bb_periodo"
+  | "bb_desviacion"
+  | "bb_condicion"
+  | "vol_multiplicador"
+  | "vol_condicion"
+  | "timeframe"
+  | "frecuencia";
+
 export function IndicatorSheet({
   visible,
   asset,
@@ -136,13 +167,12 @@ export function IndicatorSheet({
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
 
-  /* Step 1 = picker, Step 2 = config form. En edit saltea a step 2. */
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedType, setSelectedType] = useState<IndicatorType | null>(
     null,
   );
   const [config, setConfig] = useState<ConfigState>(DEFAULT_CONFIG);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<RowKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Hidratación al abrir.
@@ -152,15 +182,12 @@ export function IndicatorSheet({
         setStep(2);
         setSelectedType(editingAlert.type);
         setConfig(configFromAlert(editingAlert));
-        setAdvancedOpen(
-          editingAlert.type === "macd" || editingAlert.type === "bollinger",
-        );
       } else {
         setStep(1);
         setSelectedType(null);
         setConfig(DEFAULT_CONFIG);
-        setAdvancedOpen(false);
       }
+      setExpandedRow(null);
     }
   }, [visible, editingAlert]);
 
@@ -183,7 +210,6 @@ export function IndicatorSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // Animar el slide horizontal cuando cambia el step.
   useEffect(() => {
     stepProgress.value = withTiming(step === 1 ? 0 : 1, {
       duration: 220,
@@ -241,12 +267,21 @@ export function IndicatorSheet({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
-  // Track de los 2 panels horizontalmente.
   const sliderStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -stepProgress.value * windowW }],
   }));
 
-  /* ─── Handler de creación / update ─── */
+  /* Toggle de fila — animado con LayoutAnimation. Single expansion. */
+  const toggleRow = (key: RowKey) => {
+    Haptics.selectionAsync().catch(() => {});
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(220, "easeInEaseOut", "opacity"),
+    );
+    setExpandedRow((prev) => (prev === key ? null : key));
+  };
+
+  /* ─── Handlers ─── */
+
   const handleSubmit = async () => {
     if (!selectedType) return;
     setSubmitting(true);
@@ -290,7 +325,7 @@ export function IndicatorSheet({
   const handlePickType = (t: IndicatorType) => {
     Haptics.selectionAsync().catch(() => {});
     setSelectedType(t);
-    setAdvancedOpen(t === "macd" || t === "bollinger" ? false : false);
+    setExpandedRow(null);
     setStep(2);
   };
 
@@ -299,10 +334,8 @@ export function IndicatorSheet({
     return describePreview(selectedType, asset.ticker, config);
   }, [selectedType, asset.ticker, config]);
 
-  /* MACD EMA validation — para mostrar warning inline. */
   const macdInvalid =
     selectedType === "macd" && config.macdEmaSlow <= config.macdEmaFast;
-
   const ctaEnabled = !!selectedType && !macdInvalid && !submitting;
   const ctaLabel = isEditing ? "Guardar cambios" : "Crear alerta";
 
@@ -323,7 +356,7 @@ export function IndicatorSheet({
           style={[
             s.sheet,
             {
-              backgroundColor: c.bg,
+              backgroundColor: c.surface,
               borderColor: c.border,
               paddingBottom: insets.bottom + 8,
               maxHeight: windowH * 0.92,
@@ -337,18 +370,20 @@ export function IndicatorSheet({
             />
           </View>
 
-          {/* Slider horizontal entre paso 1 y paso 2. */}
           <View style={{ overflow: "hidden", flex: 1 }}>
             <Animated.View
-              style={[{ flexDirection: "row", width: windowW * 2 }, sliderStyle]}
+              style={[
+                { flexDirection: "row", width: windowW * 2 },
+                sliderStyle,
+              ]}
             >
-              {/* Paso 1 — Picker */}
-              <View style={{ width: windowW, paddingHorizontal: 20 }}>
-                <View style={s.headerPicker}>
-                  <Text style={[s.title, { color: c.text }]}>
+              {/* ──────── Paso 1: Picker ──────── */}
+              <View style={{ width: windowW }}>
+                <View style={s.pickerHeader}>
+                  <Text style={[s.pickerTitle, { color: c.text }]}>
                     Elegir indicador
                   </Text>
-                  <Text style={[s.subtitle, { color: c.textMuted }]}>
+                  <Text style={[s.pickerSubtitle, { color: c.textMuted }]}>
                     Seleccioná el indicador que querés monitorear
                   </Text>
                 </View>
@@ -394,17 +429,18 @@ export function IndicatorSheet({
                 </ScrollView>
               </View>
 
-              {/* Paso 2 — Config */}
-              <View style={{ width: windowW, paddingHorizontal: 20 }}>
-                <View style={s.headerConfig}>
+              {/* ──────── Paso 2: Config flat rows ──────── */}
+              <View style={{ width: windowW, flex: 1 }}>
+                <View
+                  style={[s.configHeader, { borderBottomColor: c.border }]}
+                >
                   <Pressable
                     onPress={() => {
-                      if (isEditing) {
-                        // En edit, "atrás" cierra el sheet (no hay paso 1).
-                        dismiss();
-                      } else {
-                        Haptics.selectionAsync().catch(() => {});
+                      Haptics.selectionAsync().catch(() => {});
+                      if (isEditing) dismiss();
+                      else {
                         setStep(1);
+                        setExpandedRow(null);
                       }
                     }}
                     hitSlop={10}
@@ -418,7 +454,7 @@ export function IndicatorSheet({
                     />
                   </Pressable>
                   <Text
-                    style={[s.headerTitle, { color: c.text }]}
+                    style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
                   >
                     {selectedType
@@ -457,170 +493,68 @@ export function IndicatorSheet({
                 <ScrollView
                   contentContainerStyle={{ paddingBottom: 120 }}
                   showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
                 >
-                  {/* Sección: Activo */}
-                  <SectionLabel label="Activo" c={c} />
-                  <View
-                    style={[
-                      s.assetRow,
-                      { backgroundColor: c.surface, borderColor: c.border },
-                    ]}
-                  >
-                    <View>
-                      <Text style={[s.assetTicker, { color: c.text }]}>
-                        {asset.ticker}
-                      </Text>
-                      <Text
-                        style={[s.assetName, { color: c.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {asset.name}
-                      </Text>
-                    </View>
-                    <Feather
-                      name="chevron-right"
-                      size={18}
-                      color={c.textFaint}
-                    />
-                  </View>
-
-                  {/* Parámetros específicos por tipo */}
-                  {selectedType === "ma" ? (
-                    <MAParams config={config} setConfig={setConfig} c={c} />
-                  ) : null}
-                  {selectedType === "rsi" ? (
-                    <RSIParams config={config} setConfig={setConfig} c={c} />
-                  ) : null}
-                  {selectedType === "macd" ? (
-                    <MACDParams
-                      config={config}
-                      setConfig={setConfig}
-                      open={advancedOpen}
-                      setOpen={setAdvancedOpen}
-                      invalid={macdInvalid}
-                      c={c}
-                    />
-                  ) : null}
-                  {selectedType === "bollinger" ? (
-                    <BBParams
-                      config={config}
-                      setConfig={setConfig}
-                      open={advancedOpen}
-                      setOpen={setAdvancedOpen}
-                      c={c}
-                    />
-                  ) : null}
-                  {selectedType === "volume" ? (
-                    <VolumeParams config={config} setConfig={setConfig} c={c} />
-                  ) : null}
-
-                  {/* Sección: Condición */}
                   {selectedType ? (
-                    <ConditionSection
+                    <RowsFor
                       type={selectedType}
+                      asset={asset}
                       config={config}
                       setConfig={setConfig}
+                      expandedRow={expandedRow}
+                      toggleRow={toggleRow}
                       c={c}
                     />
                   ) : null}
 
-                  {/* Sección: Temporalidad */}
-                  <SectionLabel label="Temporalidad" c={c} />
-                  <View style={s.chipsRow}>
-                    {TIMEFRAMES.map((tf) => {
-                      const active = config.timeframe === tf;
-                      return (
-                        <Pressable
-                          key={tf}
-                          onPress={() => {
-                            Haptics.selectionAsync().catch(() => {});
-                            setConfig({ ...config, timeframe: tf });
-                          }}
-                          style={({ pressed }) => [
-                            s.chip,
-                            {
-                              borderColor: active ? c.text : c.border,
-                              backgroundColor: active
-                                ? c.text
-                                : "transparent",
-                              opacity: pressed ? 0.7 : 1,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.chipText,
-                              { color: active ? c.bg : c.text },
-                            ]}
-                          >
-                            {tf}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* Sección: Frecuencia */}
-                  <SectionLabel label="Frecuencia" c={c} />
-                  <RadioRow
-                    label="Solo una vez"
-                    active={config.frequency === "once"}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setConfig({ ...config, frequency: "once" });
-                    }}
-                    c={c}
-                  />
-                  <RadioRow
-                    label="Cada vez que ocurra"
-                    active={config.frequency === "always"}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setConfig({ ...config, frequency: "always" });
-                    }}
-                    c={c}
-                  />
-
-                  {/* Sección: Vista previa */}
-                  <SectionLabel label="Vista previa" c={c} />
-                  <View
-                    style={[
-                      s.preview,
-                      {
-                        backgroundColor: c.surface,
-                        borderLeftColor: c.brand,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[s.previewText, { color: c.text }]}
+                  {/* Vista previa al fondo */}
+                  <View style={s.previewWrap}>
+                    <View
+                      style={[
+                        s.preview,
+                        {
+                          backgroundColor: c.surfaceHover,
+                          borderLeftColor: c.brand,
+                        },
+                      ]}
                     >
-                      {previewSentence}
-                    </Text>
-                  </View>
-
-                  {/* Warning MACD inline */}
-                  {macdInvalid ? (
-                    <View style={[s.warning, { borderColor: c.red }]}>
-                      <Feather
-                        name="alert-triangle"
-                        size={14}
-                        color={c.red}
-                      />
                       <Text
-                        style={[s.warningText, { color: c.red }]}
+                        style={[s.previewText, { color: c.textSecondary }]}
                       >
-                        La EMA lenta tiene que ser mayor a la EMA rápida.
+                        {previewSentence}
                       </Text>
                     </View>
-                  ) : null}
+                    {macdInvalid ? (
+                      <View
+                        style={[
+                          s.warning,
+                          {
+                            borderColor: c.red,
+                            backgroundColor: c.surface,
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name="alert-triangle"
+                          size={14}
+                          color={c.red}
+                        />
+                        <Text style={[s.warningText, { color: c.red }]}>
+                          La EMA lenta tiene que ser mayor a la EMA rápida.
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </ScrollView>
 
-                {/* CTA sticky abajo */}
+                {/* CTA sticky abajo — mismo estilo que el de Precio */}
                 <View
                   style={[
                     s.ctaWrap,
-                    { backgroundColor: c.bg, borderTopColor: c.border },
+                    {
+                      backgroundColor: c.surface,
+                      borderTopColor: c.border,
+                    },
                   ]}
                 >
                   <Pressable
@@ -648,7 +582,7 @@ export function IndicatorSheet({
   );
 }
 
-/* ─── Subcomponents ─────────────────────────────────────────────── */
+/* ─── Picker row del paso 1 ───────────────────────────────────── */
 
 type ColorMap = ReturnType<typeof useTheme>["c"];
 
@@ -670,20 +604,16 @@ function PickerRow({
       onPress={onPress}
       style={({ pressed }) => [
         s.pickerRow,
-        {
-          backgroundColor: pressed ? c.surfaceHover : "transparent",
-        },
+        { backgroundColor: pressed ? c.surfaceHover : "transparent" },
       ]}
     >
-      <View
-        style={[s.pickerIcon, { backgroundColor: c.surface }]}
-      >
+      <View style={[s.pickerIcon, { backgroundColor: c.surfaceHover }]}>
         <Feather name={icon} size={18} color={c.brand} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.pickerTitle, { color: c.text }]}>{title}</Text>
+        <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
         <Text
-          style={[s.pickerDesc, { color: c.textMuted }]}
+          style={[s.pickerRowDesc, { color: c.textMuted }]}
           numberOfLines={1}
         >
           {description}
@@ -694,95 +624,580 @@ function PickerRow({
   );
 }
 
-function SectionLabel({ label, c }: { label: string; c: ColorMap }) {
-  return (
-    <Text style={[s.sectionLabel, { color: c.textMuted }]}>
-      {label.toUpperCase()}
-    </Text>
-  );
-}
+/* ─── Flat row genérica ───────────────────────────────────────── */
 
-function RadioRow({
+function FlatRow({
   label,
-  active,
+  value,
+  expanded,
   onPress,
+  children,
   c,
 }: {
   label: string;
-  active: boolean;
+  value: string;
+  expanded: boolean;
   onPress: () => void;
+  children?: React.ReactNode;
   c: ColorMap;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        s.radioRow,
-        {
-          backgroundColor: pressed ? c.surfaceHover : "transparent",
-          borderColor: c.border,
-        },
+    <View
+      style={[
+        s.flatRowWrap,
+        { borderBottomColor: hairlineColor(c) },
       ]}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
     >
-      <View
-        style={[
-          s.radioDot,
-          { borderColor: active ? c.brand : c.borderStrong },
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          s.flatRow,
+          { backgroundColor: pressed ? c.surfaceHover : "transparent" },
         ]}
       >
-        {active ? (
-          <View style={[s.radioDotInner, { backgroundColor: c.brand }]} />
-        ) : null}
-      </View>
-      <Text style={[s.radioLabel, { color: c.text }]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+        <Text style={[s.flatLabel, { color: c.textMuted }]}>{label}</Text>
+        <View style={s.flatRight}>
+          <Text
+            style={[s.flatValue, { color: c.text }]}
+            numberOfLines={1}
+          >
+            {value}
+          </Text>
+          <Feather
+            name={expanded ? "chevron-down" : "chevron-right"}
+            size={16}
+            color={c.textFaint}
+          />
+        </View>
+      </Pressable>
+      {expanded && children ? (
+        <View style={s.flatExpand}>{children}</View>
+      ) : null}
+    </View>
   );
 }
 
-function ChipsRow({
-  values,
-  active,
-  onPress,
+/** Hairline color — gris al ~15% opacidad. Usa c.border y le baja
+ *  la opacidad por encima de una capa neutra. RN no soporta alpha
+ *  channel directo en hex, así que devolvemos un rgba sintético
+ *  basado en si el tema es light o dark. */
+function hairlineColor(c: ColorMap): string {
+  // c.border es ya bastante sutil. Aprovechamos como está.
+  return c.border;
+}
+
+/* ─── Rows compuestas por tipo ────────────────────────────────── */
+
+function RowsFor({
+  type,
+  asset,
+  config,
+  setConfig,
+  expandedRow,
+  toggleRow,
   c,
-  format,
 }: {
-  values: number[];
-  active: number;
-  onPress: (v: number) => void;
+  type: IndicatorType;
+  asset: Asset;
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  expandedRow: RowKey | null;
+  toggleRow: (k: RowKey) => void;
   c: ColorMap;
-  format?: (v: number) => string;
+}) {
+  const assetValue = `${asset.ticker}`;
+
+  /* Helpers de format por tipo. */
+  const tipoMA = config.maVariant.toUpperCase();
+  const periodoMA = config.maPeriod.toString();
+  const condicionMA =
+    config.maCondition === "above" ? "Cruza por encima" : "Cruza por debajo";
+
+  const periodoRSI = config.rsiPeriod.toString();
+  const umbralRSI = config.rsiThreshold.toString();
+  const condicionRSI =
+    config.rsiCondition === "above"
+      ? "Cruza por encima"
+      : "Cruza por debajo";
+
+  const paramsMACD = `${config.macdEmaFast}, ${config.macdEmaSlow}, ${config.macdSignal}`;
+  const condicionMACD =
+    config.macdCondition === "bullish_signal"
+      ? "Cruce alcista"
+      : config.macdCondition === "bearish_signal"
+        ? "Cruce bajista"
+        : config.macdCondition === "zero_up"
+          ? "Cruza cero al alza"
+          : "Cruza cero a la baja";
+
+  const periodoBB = config.bbPeriod.toString();
+  const desviacionBB = `${config.bbDeviation.toFixed(1).replace(".", ",")}σ`;
+  const condicionBB =
+    config.bbCondition === "touch_upper"
+      ? "Toca banda superior"
+      : config.bbCondition === "touch_lower"
+        ? "Toca banda inferior"
+        : "Squeeze (volatilidad baja)";
+
+  const multiplicadorVol = `${config.volumeMultiplier
+    .toFixed(1)
+    .replace(".", ",")}×`;
+  const condicionVol = "Supera promedio";
+
+  const timeframeLabel = config.timeframe;
+  const frecuenciaLabel =
+    config.frequency === "once" ? "Solo una vez" : "Cada vez que ocurra";
+
+  return (
+    <View style={s.flatList}>
+      <FlatRow
+        label="Activo"
+        value={assetValue}
+        expanded={expandedRow === "activo"}
+        onPress={() => toggleRow("activo")}
+        c={c}
+      >
+        <Text style={[s.helperText, { color: c.textMuted }]}>
+          La alerta está vinculada al activo de esta pantalla. Para otro
+          activo, creá una alerta desde su detalle.
+        </Text>
+      </FlatRow>
+
+      {type === "ma" ? (
+        <>
+          <FlatRow
+            label="Tipo"
+            value={tipoMA}
+            expanded={expandedRow === "ma_tipo"}
+            onPress={() => toggleRow("ma_tipo")}
+            c={c}
+          >
+            <SegmentedSMA
+              value={config.maVariant}
+              onChange={(v) => setConfig({ ...config, maVariant: v })}
+              c={c}
+            />
+          </FlatRow>
+          <FlatRow
+            label="Período"
+            value={periodoMA}
+            expanded={expandedRow === "ma_periodo"}
+            onPress={() => toggleRow("ma_periodo")}
+            c={c}
+          >
+            <ChipsAndStepper
+              chips={[9, 20, 50, 100, 200]}
+              value={config.maPeriod}
+              onChange={(v) => setConfig({ ...config, maPeriod: v })}
+              min={5}
+              max={500}
+              step={1}
+              c={c}
+            />
+          </FlatRow>
+          <FlatRow
+            label="Condición"
+            value={condicionMA}
+            expanded={expandedRow === "ma_condicion"}
+            onPress={() => toggleRow("ma_condicion")}
+            c={c}
+          >
+            <OptionList
+              options={[
+                { value: "above", label: "Precio cruza por encima" },
+                { value: "below", label: "Precio cruza por debajo" },
+              ]}
+              active={config.maCondition}
+              onChange={(v) =>
+                setConfig({ ...config, maCondition: v as "above" | "below" })
+              }
+              c={c}
+            />
+          </FlatRow>
+        </>
+      ) : null}
+
+      {type === "rsi" ? (
+        <>
+          <FlatRow
+            label="Período"
+            value={periodoRSI}
+            expanded={expandedRow === "rsi_periodo"}
+            onPress={() => toggleRow("rsi_periodo")}
+            c={c}
+          >
+            <ChipsAndStepper
+              chips={[7, 9, 14, 21]}
+              value={config.rsiPeriod}
+              onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
+              min={2}
+              max={50}
+              step={1}
+              c={c}
+            />
+          </FlatRow>
+          <FlatRow
+            label="Umbral"
+            value={umbralRSI}
+            expanded={expandedRow === "rsi_umbral"}
+            onPress={() => toggleRow("rsi_umbral")}
+            c={c}
+          >
+            <View>
+              <ChipsLabeled
+                chips={[
+                  { v: 30, label: "30 Sobreventa" },
+                  { v: 50, label: "50 Neutro" },
+                  { v: 70, label: "70 Sobrecompra" },
+                ]}
+                value={config.rsiThreshold}
+                onChange={(v) => setConfig({ ...config, rsiThreshold: v })}
+                c={c}
+              />
+              <View style={s.stepperWrap}>
+                <Stepper
+                  value={config.rsiThreshold}
+                  onChange={(v) =>
+                    setConfig({ ...config, rsiThreshold: v })
+                  }
+                  min={0}
+                  max={100}
+                  step={1}
+                />
+              </View>
+            </View>
+          </FlatRow>
+          <FlatRow
+            label="Condición"
+            value={condicionRSI}
+            expanded={expandedRow === "rsi_condicion"}
+            onPress={() => toggleRow("rsi_condicion")}
+            c={c}
+          >
+            <OptionList
+              options={[
+                { value: "above", label: "Cruza por encima del umbral" },
+                { value: "below", label: "Cruza por debajo del umbral" },
+              ]}
+              active={config.rsiCondition}
+              onChange={(v) =>
+                setConfig({
+                  ...config,
+                  rsiCondition: v as "above" | "below",
+                })
+              }
+              c={c}
+            />
+          </FlatRow>
+        </>
+      ) : null}
+
+      {type === "macd" ? (
+        <>
+          <FlatRow
+            label="Parámetros"
+            value={paramsMACD}
+            expanded={expandedRow === "macd_params"}
+            onPress={() => toggleRow("macd_params")}
+            c={c}
+          >
+            <View style={{ gap: 10 }}>
+              <View style={s.macdParamRow}>
+                <Text style={[s.macdParamLabel, { color: c.text }]}>
+                  Rápida
+                </Text>
+                <Stepper
+                  value={config.macdEmaFast}
+                  onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
+                  min={2}
+                  max={50}
+                  step={1}
+                />
+              </View>
+              <View style={s.macdParamRow}>
+                <Text style={[s.macdParamLabel, { color: c.text }]}>
+                  Lenta
+                </Text>
+                <Stepper
+                  value={config.macdEmaSlow}
+                  onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
+                  min={5}
+                  max={100}
+                  step={1}
+                />
+              </View>
+              <View style={s.macdParamRow}>
+                <Text style={[s.macdParamLabel, { color: c.text }]}>
+                  Señal
+                </Text>
+                <Stepper
+                  value={config.macdSignal}
+                  onChange={(v) => setConfig({ ...config, macdSignal: v })}
+                  min={2}
+                  max={50}
+                  step={1}
+                />
+              </View>
+            </View>
+          </FlatRow>
+          <FlatRow
+            label="Condición"
+            value={condicionMACD}
+            expanded={expandedRow === "macd_condicion"}
+            onPress={() => toggleRow("macd_condicion")}
+            c={c}
+          >
+            <OptionList
+              options={[
+                {
+                  value: "bullish_signal",
+                  label: "Cruce alcista (MACD cruza señal al alza)",
+                },
+                {
+                  value: "bearish_signal",
+                  label: "Cruce bajista (MACD cruza señal a la baja)",
+                },
+                {
+                  value: "zero_up",
+                  label: "MACD cruza línea cero al alza",
+                },
+                {
+                  value: "zero_down",
+                  label: "MACD cruza línea cero a la baja",
+                },
+              ]}
+              active={config.macdCondition}
+              onChange={(v) =>
+                setConfig({
+                  ...config,
+                  macdCondition: v as ConfigState["macdCondition"],
+                })
+              }
+              c={c}
+            />
+          </FlatRow>
+        </>
+      ) : null}
+
+      {type === "bollinger" ? (
+        <>
+          <FlatRow
+            label="Período"
+            value={periodoBB}
+            expanded={expandedRow === "bb_periodo"}
+            onPress={() => toggleRow("bb_periodo")}
+            c={c}
+          >
+            <View style={s.stepperWrap}>
+              <Stepper
+                value={config.bbPeriod}
+                onChange={(v) => setConfig({ ...config, bbPeriod: v })}
+                min={5}
+                max={100}
+                step={1}
+              />
+            </View>
+          </FlatRow>
+          <FlatRow
+            label="Desviación"
+            value={desviacionBB}
+            expanded={expandedRow === "bb_desviacion"}
+            onPress={() => toggleRow("bb_desviacion")}
+            c={c}
+          >
+            <View style={s.stepperWrap}>
+              <Stepper
+                value={config.bbDeviation}
+                onChange={(v) => setConfig({ ...config, bbDeviation: v })}
+                min={0.5}
+                max={5}
+                step={0.5}
+                decimals={1}
+                suffix="σ"
+              />
+            </View>
+          </FlatRow>
+          <FlatRow
+            label="Condición"
+            value={condicionBB}
+            expanded={expandedRow === "bb_condicion"}
+            onPress={() => toggleRow("bb_condicion")}
+            c={c}
+          >
+            <OptionList
+              options={[
+                {
+                  value: "touch_upper",
+                  label: "Precio toca banda superior",
+                },
+                {
+                  value: "touch_lower",
+                  label: "Precio toca banda inferior",
+                },
+                { value: "squeeze", label: "Bandas se contraen (squeeze)" },
+              ]}
+              active={config.bbCondition}
+              onChange={(v) =>
+                setConfig({
+                  ...config,
+                  bbCondition: v as ConfigState["bbCondition"],
+                })
+              }
+              c={c}
+            />
+          </FlatRow>
+        </>
+      ) : null}
+
+      {type === "volume" ? (
+        <>
+          <FlatRow
+            label="Multiplicador"
+            value={multiplicadorVol}
+            expanded={expandedRow === "vol_multiplicador"}
+            onPress={() => toggleRow("vol_multiplicador")}
+            c={c}
+          >
+            <View>
+              <ChipsLabeled
+                chips={[
+                  { v: 1.5, label: "1.5x" },
+                  { v: 2, label: "2x" },
+                  { v: 3, label: "3x" },
+                  { v: 5, label: "5x" },
+                ]}
+                value={config.volumeMultiplier}
+                onChange={(v) =>
+                  setConfig({ ...config, volumeMultiplier: v })
+                }
+                c={c}
+              />
+              <View style={s.stepperWrap}>
+                <Stepper
+                  value={config.volumeMultiplier}
+                  onChange={(v) =>
+                    setConfig({ ...config, volumeMultiplier: v })
+                  }
+                  min={1.1}
+                  max={20}
+                  step={0.1}
+                  decimals={1}
+                  suffix="x"
+                />
+              </View>
+            </View>
+          </FlatRow>
+          <FlatRow
+            label="Condición"
+            value={condicionVol}
+            expanded={expandedRow === "vol_condicion"}
+            onPress={() => toggleRow("vol_condicion")}
+            c={c}
+          >
+            <Text style={[s.helperText, { color: c.textMuted }]}>
+              La alerta se dispara cuando el volumen del período supera el
+              multiplicador configurado sobre el volumen promedio.
+            </Text>
+          </FlatRow>
+        </>
+      ) : null}
+
+      <FlatRow
+        label="Temporalidad"
+        value={timeframeLabel}
+        expanded={expandedRow === "timeframe"}
+        onPress={() => toggleRow("timeframe")}
+        c={c}
+      >
+        <View style={s.chipsWrap}>
+          {TIMEFRAMES.map((tf) => {
+            const active = config.timeframe === tf;
+            return (
+              <Pressable
+                key={tf}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setConfig({ ...config, timeframe: tf });
+                }}
+                style={({ pressed }) => [
+                  s.chip,
+                  {
+                    borderColor: active ? c.text : c.border,
+                    backgroundColor: active ? c.text : "transparent",
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[s.chipText, { color: active ? c.bg : c.text }]}
+                >
+                  {tf}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </FlatRow>
+
+      <FlatRow
+        label="Frecuencia"
+        value={frecuenciaLabel}
+        expanded={expandedRow === "frecuencia"}
+        onPress={() => toggleRow("frecuencia")}
+        c={c}
+      >
+        <OptionList
+          options={[
+            { value: "once", label: "Solo una vez" },
+            { value: "always", label: "Cada vez que ocurra" },
+          ]}
+          active={config.frequency}
+          onChange={(v) =>
+            setConfig({ ...config, frequency: v as IndicatorFrequency })
+          }
+          c={c}
+        />
+      </FlatRow>
+    </View>
+  );
+}
+
+/* ─── Inline editors ──────────────────────────────────────────── */
+
+function SegmentedSMA({
+  value,
+  onChange,
+  c,
+}: {
+  value: "sma" | "ema";
+  onChange: (v: "sma" | "ema") => void;
+  c: ColorMap;
 }) {
   return (
-    <View style={s.chipsRow}>
-      {values.map((v) => {
-        const isActive = active === v;
+    <View
+      style={[s.segmented, { backgroundColor: c.surfaceHover }]}
+    >
+      {(["sma", "ema"] as const).map((v) => {
+        const active = value === v;
         return (
           <Pressable
             key={v}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              onPress(v);
+              onChange(v);
             }}
-            style={({ pressed }) => [
-              s.chip,
-              {
-                borderColor: isActive ? c.text : c.border,
-                backgroundColor: isActive ? c.text : "transparent",
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
+            style={[s.segmentedItem, active && { backgroundColor: c.bg }]}
           >
             <Text
               style={[
-                s.chipText,
-                { color: isActive ? c.bg : c.text },
+                s.segmentedText,
+                {
+                  color: active ? c.text : c.textMuted,
+                  fontFamily: active ? fontFamily[700] : fontFamily[600],
+                },
               ]}
             >
-              {format ? format(v) : v.toString()}
+              {v.toUpperCase()}
             </Text>
           </Pressable>
         );
@@ -791,117 +1206,34 @@ function ChipsRow({
   );
 }
 
-function ParamRow({
-  label,
-  children,
+function ChipsAndStepper({
+  chips,
+  value,
+  onChange,
+  min,
+  max,
+  step,
   c,
 }: {
-  label: string;
-  children: React.ReactNode;
-  c: ColorMap;
-}) {
-  return (
-    <View style={s.paramRow}>
-      <Text style={[s.paramLabel, { color: c.text }]}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-/* ─── MA params ─── */
-function MAParams({
-  config,
-  setConfig,
-  c,
-}: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
+  chips: number[];
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
   c: ColorMap;
 }) {
   return (
     <View>
-      <SectionLabel label="Tipo" c={c} />
-      <View
-        style={[s.segmented, { backgroundColor: c.surfaceHover }]}
-      >
-        {(["sma", "ema"] as const).map((v) => {
-          const active = config.maVariant === v;
+      <View style={s.chipsWrap}>
+        {chips.map((v) => {
+          const active = value === v;
           return (
             <Pressable
               key={v}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
-                setConfig({ ...config, maVariant: v });
-              }}
-              style={[
-                s.segmentedItem,
-                active && { backgroundColor: c.bg },
-              ]}
-            >
-              <Text
-                style={[
-                  s.segmentedText,
-                  {
-                    color: active ? c.text : c.textMuted,
-                    fontFamily: active
-                      ? fontFamily[700]
-                      : fontFamily[600],
-                  },
-                ]}
-              >
-                {v.toUpperCase()}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <SectionLabel label="Período" c={c} />
-      <ChipsRow
-        values={[9, 20, 50, 100, 200]}
-        active={config.maPeriod}
-        onPress={(v) => setConfig({ ...config, maPeriod: v })}
-        c={c}
-      />
-      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
-        <Stepper
-          value={config.maPeriod}
-          onChange={(v) => setConfig({ ...config, maPeriod: v })}
-          min={5}
-          max={500}
-          step={1}
-        />
-      </View>
-    </View>
-  );
-}
-
-/* ─── RSI params ─── */
-function RSIParams({
-  config,
-  setConfig,
-  c,
-}: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  c: ColorMap;
-}) {
-  return (
-    <View>
-      <SectionLabel label="Umbral" c={c} />
-      <View style={s.chipsRow}>
-        {[
-          { v: 30, label: "30 Sobreventa" },
-          { v: 50, label: "50 Neutro" },
-          { v: 70, label: "70 Sobrecompra" },
-        ].map((opt) => {
-          const active = config.rsiThreshold === opt.v;
-          return (
-            <Pressable
-              key={opt.v}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setConfig({ ...config, rsiThreshold: opt.v });
+                onChange(v);
               }}
               style={({ pressed }) => [
                 s.chip,
@@ -913,360 +1245,124 @@ function RSIParams({
               ]}
             >
               <Text
-                style={[
-                  s.chipText,
-                  { color: active ? c.bg : c.text },
-                ]}
+                style={[s.chipText, { color: active ? c.bg : c.text }]}
               >
-                {opt.label}
+                {v}
               </Text>
             </Pressable>
           );
         })}
       </View>
-      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
+      <View style={s.stepperWrap}>
         <Stepper
-          value={config.rsiThreshold}
-          onChange={(v) => setConfig({ ...config, rsiThreshold: v })}
-          min={0}
-          max={100}
-          step={1}
-        />
-      </View>
-
-      <SectionLabel label="Período" c={c} />
-      <ChipsRow
-        values={[7, 9, 14, 21]}
-        active={config.rsiPeriod}
-        onPress={(v) => setConfig({ ...config, rsiPeriod: v })}
-        c={c}
-      />
-      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
-        <Stepper
-          value={config.rsiPeriod}
-          onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
-          min={2}
-          max={50}
-          step={1}
+          value={value}
+          onChange={onChange}
+          min={min}
+          max={max}
+          step={step}
         />
       </View>
     </View>
   );
 }
 
-/* ─── MACD params (avanzado collapsable) ─── */
-function MACDParams({
-  config,
-  setConfig,
-  open,
-  setOpen,
-  invalid,
+function ChipsLabeled({
+  chips,
+  value,
+  onChange,
   c,
 }: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  open: boolean;
-  setOpen: (next: boolean) => void;
-  invalid: boolean;
+  chips: { v: number; label: string }[];
+  value: number;
+  onChange: (v: number) => void;
   c: ColorMap;
 }) {
   return (
-    <View>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          setOpen(!open);
-        }}
-        style={s.advancedToggle}
-      >
-        <Text style={[s.advancedToggleText, { color: c.brand }]}>
-          {open ? "Ocultar avanzado" : "Avanzado"}
-        </Text>
-        <Feather
-          name={open ? "chevron-up" : "chevron-down"}
-          size={14}
-          color={c.brand}
-        />
-      </Pressable>
-      {open ? (
-        <View
-          style={[
-            s.advancedBox,
-            {
-              backgroundColor: c.surface,
-              borderColor: invalid ? c.red : c.border,
-            },
-          ]}
-        >
-          <ParamRow label="EMA rápida" c={c}>
-            <Stepper
-              value={config.macdEmaFast}
-              onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
-              min={2}
-              max={50}
-              step={1}
-            />
-          </ParamRow>
-          <ParamRow label="EMA lenta" c={c}>
-            <Stepper
-              value={config.macdEmaSlow}
-              onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
-              min={5}
-              max={100}
-              step={1}
-            />
-          </ParamRow>
-          <ParamRow label="Señal" c={c}>
-            <Stepper
-              value={config.macdSignal}
-              onChange={(v) => setConfig({ ...config, macdSignal: v })}
-              min={2}
-              max={50}
-              step={1}
-            />
-          </ParamRow>
-        </View>
-      ) : null}
+    <View style={s.chipsWrap}>
+      {chips.map((chip) => {
+        const active = value === chip.v;
+        return (
+          <Pressable
+            key={chip.v}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(chip.v);
+            }}
+            style={({ pressed }) => [
+              s.chip,
+              {
+                borderColor: active ? c.text : c.border,
+                backgroundColor: active ? c.text : "transparent",
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Text style={[s.chipText, { color: active ? c.bg : c.text }]}>
+              {chip.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
-/* ─── Bollinger params (avanzado collapsable) ─── */
-function BBParams({
-  config,
-  setConfig,
-  open,
-  setOpen,
+function OptionList<T extends string>({
+  options,
+  active,
+  onChange,
   c,
 }: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  open: boolean;
-  setOpen: (next: boolean) => void;
+  options: { value: T; label: string }[];
+  active: T;
+  onChange: (v: T) => void;
   c: ColorMap;
 }) {
   return (
-    <View>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          setOpen(!open);
-        }}
-        style={s.advancedToggle}
-      >
-        <Text style={[s.advancedToggleText, { color: c.brand }]}>
-          {open ? "Ocultar avanzado" : "Avanzado"}
-        </Text>
-        <Feather
-          name={open ? "chevron-up" : "chevron-down"}
-          size={14}
-          color={c.brand}
-        />
-      </Pressable>
-      {open ? (
-        <View
-          style={[
-            s.advancedBox,
-            { backgroundColor: c.surface, borderColor: c.border },
-          ]}
-        >
-          <ParamRow label="Período" c={c}>
-            <Stepper
-              value={config.bbPeriod}
-              onChange={(v) => setConfig({ ...config, bbPeriod: v })}
-              min={5}
-              max={100}
-              step={1}
-            />
-          </ParamRow>
-          <ParamRow label="Desviación σ" c={c}>
-            <Stepper
-              value={config.bbDeviation}
-              onChange={(v) => setConfig({ ...config, bbDeviation: v })}
-              min={0.5}
-              max={5}
-              step={0.5}
-              decimals={1}
-            />
-          </ParamRow>
-        </View>
-      ) : null}
+    <View style={s.optionList}>
+      {options.map((opt) => {
+        const isActive = active === opt.value;
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(opt.value);
+            }}
+            style={({ pressed }) => [
+              s.optionItem,
+              {
+                backgroundColor: pressed
+                  ? c.surfaceHover
+                  : isActive
+                    ? c.surfaceHover
+                    : "transparent",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                s.optionLabel,
+                {
+                  color: c.text,
+                  fontFamily: isActive ? fontFamily[700] : fontFamily[600],
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {opt.label}
+            </Text>
+            {isActive ? (
+              <Feather name="check" size={16} color={c.brand} />
+            ) : null}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
-/* ─── Volume params ─── */
-function VolumeParams({
-  config,
-  setConfig,
-  c,
-}: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  c: ColorMap;
-}) {
-  return (
-    <View>
-      <SectionLabel label="Multiplicador" c={c} />
-      <ChipsRow
-        values={[1.5, 2, 3, 5]}
-        active={config.volumeMultiplier}
-        onPress={(v) => setConfig({ ...config, volumeMultiplier: v })}
-        c={c}
-        format={(v) => `${v}x`}
-      />
-      <View style={{ marginTop: 10, alignSelf: "flex-start" }}>
-        <Stepper
-          value={config.volumeMultiplier}
-          onChange={(v) => setConfig({ ...config, volumeMultiplier: v })}
-          min={1.1}
-          max={20}
-          step={0.1}
-          decimals={1}
-          suffix="x"
-        />
-      </View>
-    </View>
-  );
-}
-
-/* ─── Sección condición — varía por tipo ─── */
-function ConditionSection({
-  type,
-  config,
-  setConfig,
-  c,
-}: {
-  type: IndicatorType;
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  c: ColorMap;
-}) {
-  if (type === "ma") {
-    return (
-      <View>
-        <SectionLabel label="Condición" c={c} />
-        <RadioRow
-          label="Precio cruza por encima"
-          active={config.maCondition === "above"}
-          onPress={() => setConfig({ ...config, maCondition: "above" })}
-          c={c}
-        />
-        <RadioRow
-          label="Precio cruza por debajo"
-          active={config.maCondition === "below"}
-          onPress={() => setConfig({ ...config, maCondition: "below" })}
-          c={c}
-        />
-      </View>
-    );
-  }
-  if (type === "rsi") {
-    return (
-      <View>
-        <SectionLabel label="Condición" c={c} />
-        <RadioRow
-          label="Cruza por encima del umbral"
-          active={config.rsiCondition === "above"}
-          onPress={() => setConfig({ ...config, rsiCondition: "above" })}
-          c={c}
-        />
-        <RadioRow
-          label="Cruza por debajo del umbral"
-          active={config.rsiCondition === "below"}
-          onPress={() => setConfig({ ...config, rsiCondition: "below" })}
-          c={c}
-        />
-      </View>
-    );
-  }
-  if (type === "macd") {
-    return (
-      <View>
-        <SectionLabel label="Condición" c={c} />
-        <RadioRow
-          label="Cruce alcista (MACD cruza señal al alza)"
-          active={config.macdCondition === "bullish_signal"}
-          onPress={() =>
-            setConfig({ ...config, macdCondition: "bullish_signal" })
-          }
-          c={c}
-        />
-        <RadioRow
-          label="Cruce bajista (MACD cruza señal a la baja)"
-          active={config.macdCondition === "bearish_signal"}
-          onPress={() =>
-            setConfig({ ...config, macdCondition: "bearish_signal" })
-          }
-          c={c}
-        />
-        <RadioRow
-          label="MACD cruza línea cero al alza"
-          active={config.macdCondition === "zero_up"}
-          onPress={() =>
-            setConfig({ ...config, macdCondition: "zero_up" })
-          }
-          c={c}
-        />
-        <RadioRow
-          label="MACD cruza línea cero a la baja"
-          active={config.macdCondition === "zero_down"}
-          onPress={() =>
-            setConfig({ ...config, macdCondition: "zero_down" })
-          }
-          c={c}
-        />
-      </View>
-    );
-  }
-  if (type === "bollinger") {
-    return (
-      <View>
-        <SectionLabel label="Condición" c={c} />
-        <RadioRow
-          label="Precio toca banda superior"
-          active={config.bbCondition === "touch_upper"}
-          onPress={() =>
-            setConfig({ ...config, bbCondition: "touch_upper" })
-          }
-          c={c}
-        />
-        <RadioRow
-          label="Precio toca banda inferior"
-          active={config.bbCondition === "touch_lower"}
-          onPress={() =>
-            setConfig({ ...config, bbCondition: "touch_lower" })
-          }
-          c={c}
-        />
-        <RadioRow
-          label="Bandas se contraen (squeeze)"
-          active={config.bbCondition === "squeeze"}
-          onPress={() =>
-            setConfig({ ...config, bbCondition: "squeeze" })
-          }
-          c={c}
-        />
-      </View>
-    );
-  }
-  if (type === "volume") {
-    return (
-      <View>
-        <SectionLabel label="Condición" c={c} />
-        <RadioRow
-          label="Volumen supera múltiplo del promedio"
-          active={true}
-          onPress={() => {}}
-          c={c}
-        />
-      </View>
-    );
-  }
-  return null;
-}
-
-/* ─── Helpers de conversión config ↔ alert ─── */
+/* ─── Helpers de conversión config ↔ alert + preview NL ───────── */
 
 function configFromAlert(a: IndicatorAlert): ConfigState {
   const base = { ...DEFAULT_CONFIG, timeframe: a.timeframe, frequency: a.frequency };
@@ -1303,7 +1399,6 @@ function configFromAlert(a: IndicatorAlert): ConfigState {
       bbCondition: a.condition,
     };
   }
-  // volume
   return {
     ...base,
     volumeMultiplier: a.multiplier,
@@ -1315,7 +1410,11 @@ function buildInputFromConfig(
   assetId: string,
   cfg: ConfigState,
 ): CreateIndicatorAlertInput {
-  const common = { assetId, timeframe: cfg.timeframe, frequency: cfg.frequency };
+  const common = {
+    assetId,
+    timeframe: cfg.timeframe,
+    frequency: cfg.frequency,
+  };
   if (type === "ma") {
     return {
       type: "ma",
@@ -1368,8 +1467,6 @@ function indicatorTitle(t: IndicatorType): string {
   return "Volumen";
 }
 
-/* ─── Natural language preview ──────────────────────────────────── */
-
 function describePreview(
   type: IndicatorType,
   ticker: string,
@@ -1377,16 +1474,18 @@ function describePreview(
 ): string {
   const tf = cfg.timeframe;
   if (type === "ma") {
-    const variantLabel = cfg.maVariant.toUpperCase();
+    const v = cfg.maVariant.toUpperCase();
     const dir =
       cfg.maCondition === "above"
         ? "cruce por encima"
         : "cruce por debajo";
-    return `Te avisaremos cuando el precio de ${ticker} ${dir} de la ${variantLabel}(${cfg.maPeriod}) en ${tf}.`;
+    return `Te avisaremos cuando el precio de ${ticker} ${dir} de la ${v}(${cfg.maPeriod}) en ${tf}.`;
   }
   if (type === "rsi") {
     const dir =
-      cfg.rsiCondition === "above" ? "suba por encima" : "baje por debajo";
+      cfg.rsiCondition === "above"
+        ? "suba por encima"
+        : "baje por debajo";
     return `Te avisaremos cuando el RSI(${cfg.rsiPeriod}) de ${ticker} ${dir} de ${cfg.rsiThreshold} en ${tf}.`;
   }
   if (type === "macd") {
@@ -1405,7 +1504,7 @@ function describePreview(
       return `Te avisaremos cuando el precio de ${ticker} toque la banda inferior en ${tf}.`;
     return `Te avisaremos cuando las bandas de Bollinger de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
   }
-  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier}x el promedio en ${tf}.`;
+  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}x el promedio en ${tf}.`;
 }
 
 const s = StyleSheet.create({
@@ -1434,30 +1533,59 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
 
-  /* Header — paso 1 */
-  headerPicker: {
-    paddingTop: 4,
-    paddingBottom: 16,
+  /* ── Paso 1 — picker ── */
+  pickerHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 14,
   },
-  title: {
+  pickerTitle: {
     fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.6,
   },
-  subtitle: {
+  pickerSubtitle: {
     fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.1,
     marginTop: 4,
   },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+  },
+  pickerIcon: {
+    width: 40,
+    height: 40,
+    borderCurve: "continuous",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerRowTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  pickerRowDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
 
-  /* Header — paso 2 */
-  headerConfig: {
+  /* ── Paso 2 — header ── */
+  configHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 2,
-    paddingBottom: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
   headerSideBtn: {
@@ -1467,10 +1595,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.pill,
   },
-  headerTitle: {
+  configTitle: {
     flex: 1,
     fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontSize: 17,
     letterSpacing: -0.3,
     textAlign: "center",
   },
@@ -1487,118 +1615,44 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* Picker rows */
-  pickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
+  /* ── Flat list rows ── */
+  flatList: {
+    marginTop: 4,
   },
-  pickerIcon: {
-    width: 40,
-    height: 40,
-    borderCurve: "continuous",
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+  flatRowWrap: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  pickerTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  pickerDesc: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
-    marginTop: 2,
-  },
-
-  /* Sections */
-  sectionLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 0.6,
-    marginTop: 18,
-    marginBottom: 8,
-  },
-
-  /* Asset row */
-  assetRow: {
+  flatRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-    borderWidth: 1,
+    paddingHorizontal: 20,
+    minHeight: 48,
   },
-  assetTicker: {
-    fontFamily: fontFamily[800],
-    fontSize: 15,
-    letterSpacing: -0.3,
-  },
-  assetName: {
+  flatLabel: {
     fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
-    marginTop: 2,
-  },
-
-  /* Radio */
-  radioRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  radioDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioDotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  radioLabel: {
-    flex: 1,
-    fontFamily: fontFamily[600],
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: -0.15,
   },
-
-  /* Chips + segmented */
-  chipsRow: {
+  flatRight: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 6,
+    maxWidth: "60%",
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  chipText: {
+  flatValue: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.1,
+    fontSize: 14,
+    letterSpacing: -0.15,
+    textAlign: "right",
   },
+  flatExpand: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+
+  /* ── Editores inline ── */
   segmented: {
     flexDirection: "row",
     padding: 3,
@@ -1617,41 +1671,67 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.4,
   },
-
-  /* Param rows in advanced box */
-  paramRow: {
+  chipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontFamily: fontFamily[700],
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  stepperWrap: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+  optionList: {
+    gap: 2,
+  },
+  optionItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    gap: 12,
   },
-  paramLabel: {
+  optionLabel: {
+    flex: 1,
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  macdParamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  macdParamLabel: {
     fontFamily: fontFamily[600],
     fontSize: 13,
     letterSpacing: -0.15,
   },
-  advancedToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-    alignSelf: "flex-start",
-  },
-  advancedToggleText: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  advancedBox: {
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: 4,
+  helperText: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.05,
   },
 
-  /* Preview card */
+  /* ── Preview + warning ── */
+  previewWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
   preview: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1660,13 +1740,11 @@ const s = StyleSheet.create({
     borderLeftWidth: 3,
   },
   previewText: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[500],
     fontSize: 13,
     lineHeight: 19,
     letterSpacing: -0.1,
   },
-
-  /* Inline warning */
   warning: {
     flexDirection: "row",
     alignItems: "center",
@@ -1685,7 +1763,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* CTA */
+  /* ── CTA sticky ── */
   ctaWrap: {
     position: "absolute",
     left: 0,
@@ -1708,3 +1786,5 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 });
+// Suppress unused TextInput import warning — we may use it for keyboard-typed numbers in a future iteration.
+void TextInput;
