@@ -139,15 +139,19 @@ export default function DetailScreen() {
 
   /* Pull-to-refresh — refresca el activo (precio, chart, news,
    * fundamentales, alertas relacionadas). Mantiene el spinner
-   * visible hasta que todos los datos terminen. */
+   * visible un mínimo de ~900 ms para que el feedback se sienta
+   * (operaciones <500 ms no se perciben). Mismo timing que el
+   * pull-to-refresh de /asset-alerts. */
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    /* Mock — en producción acá disparamos los re-fetch de price,
-     * candles del range actual, news, fundamentales, y alertas
-     * para este ticker. Con MOCK_MODE simulamos el await. */
-    await new Promise((r) => setTimeout(r, 900));
+    /* Mock — en producción acá hacemos Promise.all con los re-fetch
+     * reales (price, candles del range actual, news, fundamentales,
+     * alertas del ticker). El minDelay garantiza que el spinner se
+     * vea aunque la API responda en <500 ms. */
+    const minDelay = new Promise((r) => setTimeout(r, 900));
+    await Promise.all([minDelay]);
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success,
     ).catch(() => {});
@@ -302,7 +306,7 @@ export default function DetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.text}
+            tintColor={c.brand}
             colors={[c.brand]}
             progressBackgroundColor={c.surface}
             progressViewOffset={12}
