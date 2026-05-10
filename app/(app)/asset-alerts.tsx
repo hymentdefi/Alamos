@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -10,6 +10,19 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fontFamily, radius, useTheme } from "../../lib/theme";
@@ -253,44 +266,43 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  <View style={s.headerMain}>
+                  {/* La fila del header espeja exactamente las
+                   *  columnas del row de alertas: title (flex 1),
+                   *  label de formato (mismo width 90 que alertDist),
+                   *  sort sobre la columna del Toggle (mismo width 40).
+                   *  Sin trash en el row → no hay 4ta columna. */}
+                  <Text
+                    style={[s.sectionTitle, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    Alertas activas ({sortedAlerts.length})
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setDistFormat(distFormat === "%" ? "$" : "%");
+                    }}
+                    hitSlop={6}
+                    style={s.distFormatBtn}
+                    accessibilityLabel={
+                      distFormat === "%"
+                        ? "Cambiar a distancia en monto"
+                        : "Cambiar a distancia en porcentaje"
+                    }
+                  >
                     <Text
-                      style={[s.sectionTitle, { color: c.text }]}
+                      style={[s.distFormatText, { color: c.textMuted }]}
                       numberOfLines={1}
                     >
-                      Alertas activas ({sortedAlerts.length})
+                      {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
                     </Text>
-                    <Pressable
-                      onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setDistFormat(distFormat === "%" ? "$" : "%");
-                      }}
-                      hitSlop={6}
-                      style={s.distFormatBtn}
-                      accessibilityLabel={
-                        distFormat === "%"
-                          ? "Cambiar a distancia en monto"
-                          : "Cambiar a distancia en porcentaje"
-                      }
-                    >
-                      <Text
-                        style={[s.distFormatText, { color: c.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
-                      </Text>
-                      <Feather
-                        name="chevron-down"
-                        size={14}
-                        color={c.textMuted}
-                        style={{ marginLeft: 2, marginTop: 1 }}
-                      />
-                    </Pressable>
-                  </View>
-                  {/* Ghost slot del Toggle del row — mantiene el ancho
-                   *  para que la columna de orden caiga sobre el
-                   *  trash de cada fila. */}
-                  <View style={s.headerToggleSlot} />
+                    <Feather
+                      name="chevron-down"
+                      size={14}
+                      color={c.textMuted}
+                      style={{ marginLeft: 2, marginTop: 1 }}
+                    />
+                  </Pressable>
                   <Pressable
                     ref={sortBtnRef}
                     onPress={() => {
@@ -589,6 +601,14 @@ function EmptyState({
 
 /* ─── Row de alerta activa ─────────────────────────────────────── */
 
+/* Distancia mínima en X para considerar la swipe como delete (px). */
+const SWIPE_DELETE_THRESHOLD = 96;
+/* Velocidad mínima para "fling-to-delete" sin llegar al threshold. */
+const SWIPE_DELETE_VELOCITY = 900;
+/* Resistance al pasarse del threshold — el row no se va para siempre,
+ * frena visualmente para indicar que ya está listo. */
+const SWIPE_OVERSHOOT_DAMPING = 0.45;
+
 function SwipableAlertRow({
   alert,
   asset,
@@ -619,74 +639,173 @@ function SwipableAlertRow({
   const distSign = distAbs > 0 ? "+" : "";
   const rowOpacity = isPaused ? 0.4 : 1;
 
+  /* Swipe-left-to-delete con react-native-gesture-handler.
+   *
+   *  - Pan se activa SOLO con movimiento horizontal ≥ 12 px (deja
+   *    pasar taps y permite que ScrollView padre scrollee vertical).
+   *  - failOffsetY([-12,12]): si el dedo se va a vertical primero,
+   *    Pan falla (no captura, ScrollView gana).
+   *  - Solo deja swipear hacia la izquierda. Hacia la derecha clamp
+   *    a 0 con un poco de elasticidad (≤ 12 px) sólo para feel.
+   *  - Al pasar el threshold (96 px) o velocidad alta (900 px/s),
+   *    completa la animación + dispara onDelete vía runOnJS.
+   *  - Sino spring-back a 0. */
+  const tx = useSharedValue(0);
+  const rowH = useSharedValue(72);
+  const opacity = useSharedValue(1);
+
+  const triggerDelete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    onDelete();
+  }, [onDelete]);
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-12, 12])
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationX < 0) {
+        // Pasado el threshold, aplicamos damping para que el row no
+        // se vaya volando — feel iOS Mail / Robinhood.
+        if (e.translationX < -SWIPE_DELETE_THRESHOLD) {
+          const overshoot = e.translationX + SWIPE_DELETE_THRESHOLD;
+          tx.value =
+            -SWIPE_DELETE_THRESHOLD + overshoot * SWIPE_OVERSHOOT_DAMPING;
+        } else {
+          tx.value = e.translationX;
+        }
+      } else {
+        // Resistencia hacia la derecha (no se permite swipe-right).
+        tx.value = Math.min(12, e.translationX * 0.25);
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      const shouldDelete =
+        e.translationX < -SWIPE_DELETE_THRESHOLD ||
+        e.velocityX < -SWIPE_DELETE_VELOCITY;
+      if (shouldDelete) {
+        // Slide off + collapse + fade in paralelo, después dispara delete.
+        tx.value = withTiming(-500, {
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+        });
+        opacity.value = withTiming(0, { duration: 160 });
+        rowH.value = withTiming(
+          0,
+          { duration: 220, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            "worklet";
+            if (finished) runOnJS(triggerDelete)();
+          },
+        );
+      } else {
+        tx.value = withSpring(0, {
+          damping: 22,
+          stiffness: 240,
+          mass: 0.6,
+        });
+      }
+    });
+
+  const rowAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }],
+  }));
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    height: rowH.value === 72 ? undefined : rowH.value,
+  }));
+  // Bg "Eliminar" — fade in a medida que el row se mueve hacia la
+  // izquierda; el icono de trash se escala apenas pasa el threshold
+  // para señalar que ya está listo.
+  const bgAnimStyle = useAnimatedStyle(() => {
+    const progress = Math.min(1, Math.abs(tx.value) / SWIPE_DELETE_THRESHOLD);
+    return {
+      opacity: interpolate(Math.abs(tx.value), [0, 24], [0, 1]),
+      transform: [
+        {
+          scale: interpolate(progress, [0.6, 1, 1.2], [0.92, 1, 1.05]),
+        },
+      ],
+    };
+  });
+
   return (
-    <View
+    <Animated.View
+      onLayout={(e) => {
+        // Capturamos la altura real para poder colapsar a 0 en delete.
+        if (rowH.value === 72) rowH.value = e.nativeEvent.layout.height;
+      }}
       style={[
-        s.alertRow,
         withTopDivider && {
           borderTopColor: c.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
+        containerAnimStyle,
       ]}
     >
-      {/* Cols 1-2 dentro de un Pressable que abre el editor. El
-          toggle y el botón de eliminar viven afuera para que sus
-          taps no disparen el editor. */}
-      <Pressable
-        onPress={onEdit}
-        style={({ pressed }) => [
-          s.alertRowMain,
-          { opacity: pressed ? 0.7 : rowOpacity },
-        ]}
-        accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
+      {/* Bg destructivo absoluto — vive debajo del row animado, se
+          revela al swipear hacia la izquierda. Naranja c.red, label
+          "Eliminar" + ícono trash en blanco. Pegado al borde derecho
+          del row. */}
+      <View
+        pointerEvents="none"
+        style={[s.swipeBg, { backgroundColor: c.red }]}
       >
-        {/* Col 1: el verbo ("Sube a" / "Baja a") va coloreado por
-         *  dirección, el resto del precio queda blanco (c.text). Da
-         *  jerarquía cromática a la dirección sin saturar todo.
-         *  adjustsFontSizeToFit para que precios crypto de 100k+ no
-         *  trunquen el verbo (USDT 100.000,00 + "Sube a" es ancho). */}
-        <Text
-          style={[s.alertLeft, { color: c.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.78}
+        <Animated.View style={[s.swipeBgInner, bgAnimStyle]}>
+          <Feather name="trash-2" size={18} color="#FFFFFF" />
+          <Text style={s.swipeBgLabel}>Eliminar</Text>
+        </Animated.View>
+      </View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            s.alertRow,
+            { backgroundColor: c.bg },
+            rowAnimStyle,
+          ]}
         >
-          <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
-          {formatMoney(alert.threshold, cur)}
-        </Text>
-        {/* Col 2: distancia al objetivo en color de dirección. */}
-        <Text
-          style={[s.alertDist, { color: dirColor }]}
-          numberOfLines={1}
-        >
-          {distFormat === "%"
-            ? `${distSign}${distPct.toFixed(2)}%`
-            : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
-        </Text>
-      </Pressable>
-      {/* Col 3: toggle compacto custom (no Switch nativo) — sizing
-       *  alineado a la tipografía del row. ON = activa, OFF = pausada. */}
-      <Toggle
-        value={!isPaused}
-        onValueChange={() => onTogglePause()}
-      />
-      {/* Col 4: botón trash directo. Sin swipe, sin confirmación
-       *  modal — la eliminación es un tap explícito y haptic light
-       *  alcanza como ack. */}
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-            () => {},
-          );
-          onDelete();
-        }}
-        hitSlop={10}
-        style={s.alertDeleteBtn}
-        accessibilityLabel="Eliminar alerta"
-      >
-        <Feather name="trash-2" size={16} color={c.textMuted} />
-      </Pressable>
-    </View>
+          {/* Cols 1-2 dentro de un Pressable que abre el editor. */}
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [
+              s.alertRowMain,
+              { opacity: pressed ? 0.7 : rowOpacity },
+            ]}
+            accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
+          >
+            {/* Col 1: el verbo ("Sube a" / "Baja a") coloreado por
+             *  dirección. adjustsFontSizeToFit para crypto 100k+. */}
+            <Text
+              style={[s.alertLeft, { color: c.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
+              {formatMoney(alert.threshold, cur)}
+            </Text>
+            {/* Col 2: distancia al objetivo en color de dirección. */}
+            <Text
+              style={[s.alertDist, { color: dirColor }]}
+              numberOfLines={1}
+            >
+              {distFormat === "%"
+                ? `${distSign}${distPct.toFixed(2)}%`
+                : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
+            </Text>
+          </Pressable>
+          {/* Col 3: toggle compacto. ON = activa, OFF = pausada. El
+           *  Pan tiene activeOffsetX [-12,12], así que un tap simple
+           *  acá no lo activa, el Toggle responde normal. */}
+          <Toggle
+            value={!isPaused}
+            onValueChange={() => onTogglePause()}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
@@ -861,31 +980,15 @@ const s = StyleSheet.create({
   /* Header right-side: estructura idéntica al row para que el
    * toggle quede arriba de la col de distancia y el sortIcon
    * arriba del trash. Mismo gap 12 que alertRow. */
-  /* Header main — espeja la celda Pressable del row (alertRowMain):
-   * title (flex 1) + label de formato (mismo ancho que alertDist).
-   * Gap 12 = mismo gap que el row, para que el label "% al objetivo"
-   * caiga centrado sobre la columna de distancia. */
-  headerMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  /* Mismo ancho + textAlign center que alertDist en el row, así el
-   * label queda EXACTAMENTE centrado sobre el valor de distancia
-   * de abajo. */
+  /* Mismo ancho que alertDist en el row + content centrado, así el
+   * label "% al objetivo ▾" queda EXACTAMENTE centrado sobre el
+   * valor de distancia de abajo. */
   distFormatBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4,
     width: 90,
-  },
-  /* Slot fantasma del Toggle del row — sin contenido, solo width 40
-   * para que la columna de sort caiga sobre el trash de cada fila. */
-  headerToggleSlot: {
-    width: 40,
-    marginLeft: 12,
   },
   /* Label del formato — 13 / 500, sutil para no competir con el
    * título "Alertas activas (N)" (15 / 700) ni con la data del row. */
@@ -894,13 +997,12 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
   },
-  /* Sort icon — sentado en el extremo derecho del header. Mismo
-   * width 32 + marginLeft 4 que el alertDeleteBtn de la row, así
-   * el icono queda perfectamente alineado sobre el trash. */
+  /* Sort icon — vive en la columna del Toggle (mismo width 40),
+   * centrado adentro. El row de abajo tiene Toggle 40 en esta
+   * misma posición, así el icono queda exactamente arriba. */
   sortIconBtn: {
-    width: 32,
+    width: 40,
     height: 32,
-    marginLeft: 4,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -981,11 +1083,12 @@ const s = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingVertical: 12,
+    gap: 12,
   },
   sectionTitle: {
+    flex: 1,
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
@@ -996,27 +1099,46 @@ const s = StyleSheet.create({
     letterSpacing: -0.05,
   },
 
-  /* Lista */
+  /* Lista — sin padding lateral. Cada row tiene su propio paddingHor
+   * para permitir que el bg destructivo del swipe-to-delete se
+   * revele edge-to-edge cuando arrastrás. */
   list: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 0,
   },
-  /* Botón trash a la derecha del toggle — tap = elimina la alerta.
-   * Reemplaza al swipe-to-delete anterior. Ícono chico gris tenue
-   * para que no domine la fila. */
-  alertDeleteBtn: {
-    width: 32,
-    height: 32,
+  /* Bg destructivo del swipe-to-delete — vive abajo del row, naranja
+   * lleno, label "Eliminar" + ícono trash en blanco anclados a la
+   * derecha. Position absolute para que no afecte el layout del row;
+   * se revela cuando el row se desplaza por el Pan gesture. */
+  swipeBg: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 4,
+    justifyContent: "flex-end",
+    paddingRight: 24,
   },
-  /* Row de alerta — 4 columnas: ticker+dir+precio | % | $ | toggle.
-   * Sin cards, sin íconos circulares. Filas separadas por hairline
-   * border (configurado en s.swipeRoot). */
+  swipeBgInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  swipeBgLabel: {
+    color: "#FFFFFF",
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  /* Row de alerta — 3 columnas: dir+precio | distancia | toggle.
+   * El delete vive como swipe-left (bg destructivo absoluto debajo);
+   * sin botón trash explícito. */
   alertRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     gap: 12,
   },
   /* Pressable que envuelve cols 1-3 — su tap abre el editor. El
