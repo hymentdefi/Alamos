@@ -120,13 +120,43 @@ const BRICK_PALETTE = [
  * que NO pertenezcan a ese mercado. Inversamente, cuando agarra
  * una slice del chart, identificamos su mercado y atenuamos los
  * otros segmentos de la barra. */
-type MarketKey = "AR" | "US" | "CRYPTO";
+type MarketKey = "AR" | "US" | "CRYPTO" | "DINERO";
+
+/** Resuelve el "market" del holding para los charts. Override del
+ *  assetMarket() de la data layer: cash (category="efectivo") va a
+ *  DINERO, el resto sigue la lógica normal. */
+function chartMarketFor(asset: Asset): MarketKey {
+  if (asset.category === "efectivo") return "DINERO";
+  return assetMarket(asset) as MarketKey;
+}
+
+/** Crea un Asset sintético para representar un bucket de cash en
+ *  los charts (no es una posición real, no aparece en /asset/X). */
+function makeCashAsset(args: {
+  ticker: string;
+  name: string;
+  subLabel: string;
+  currency: AssetCurrency;
+}): Asset {
+  return {
+    ticker: args.ticker,
+    name: args.name,
+    subLabel: args.subLabel,
+    category: "efectivo",
+    currency: args.currency,
+    price: 0,
+    change: 0,
+    qty: 0,
+    held: false,
+  } as unknown as Asset;
+}
 
 /** Label completo del mercado para chrome del chart (centro del pie,
  *  overlays). Más expresivo que el "AR" / "US" del segmento. */
 function marketLabelFull(m: MarketKey): string {
   if (m === "AR") return "Argentina";
   if (m === "US") return "Estados Unidos";
+  if (m === "DINERO") return "Dinero";
   return "Crypto";
 }
 
@@ -164,6 +194,75 @@ export default function PortfolioScreen() {
   const totalArs = useMemo(
     () => holdingsSorted.reduce((acc, h) => acc + h.ars, 0),
     [holdingsSorted],
+  );
+
+  /* ─── Dinero (cash) ─────────────────────────────────────────────
+   *
+   * Sintetizamos holdings de "Dinero" desde la tabla de accounts.
+   * Cada moneda con saldo > 0 se convierte en una fila propia con
+   * category "efectivo" — así las 4 vistas (pie/brick/ranking/treemap)
+   * la agrupan en UN solo slice "Dinero" pero con 3 sub-rows en el
+   * tooltip (Pesos / Dólares / USDT).
+   *
+   * Cash NO entra en posiciones (PositionsList) ni en mejor/peor
+   * del día — sólo en los charts y en la AllocationBar como 4to
+   * mercado, junto a AR / EE.UU / Crypto. */
+  const cashHoldings = useMemo<Holding[]>(() => {
+    const items: Holding[] = [];
+    const arsAccount = accounts.find((a) => a.id === "ars-ar");
+    const usdAccounts = accounts.filter((a) => a.currency === "USD");
+    const usdtAccount = accounts.find((a) => a.id === "usdt-crypto");
+
+    if (arsAccount && arsAccount.balance > 0) {
+      items.push({
+        asset: makeCashAsset({
+          ticker: "ARS",
+          name: "Pesos disponibles",
+          subLabel: "ARS · Disponible para operar",
+          currency: "ARS",
+        }),
+        native: arsAccount.balance,
+        ars: arsAccount.balance,
+      });
+    }
+    const usdTotal = usdAccounts.reduce((acc, a) => acc + a.balance, 0);
+    if (usdTotal > 0) {
+      items.push({
+        asset: makeCashAsset({
+          ticker: "USD",
+          name: "Dólares disponibles",
+          subLabel: "USD · Disponible para operar",
+          currency: "USD",
+        }),
+        native: usdTotal,
+        ars: convertAmount(usdTotal, "USD", "ARS"),
+      });
+    }
+    if (usdtAccount && usdtAccount.balance > 0) {
+      items.push({
+        asset: makeCashAsset({
+          ticker: "USDT",
+          name: "USDT disponible",
+          subLabel: "USDT · Disponible para operar",
+          currency: "USDT",
+        }),
+        native: usdtAccount.balance,
+        ars: convertAmount(usdtAccount.balance, "USDT", "ARS"),
+      });
+    }
+    return items;
+  }, []);
+
+  /* Combo holdings + cash para los charts. Las posiciones de la
+   * lista, los movers y el rendimiento siguen usando holdingsSorted
+   * (sin cash) — Dinero NO es una posición. */
+  const holdingsForCharts = useMemo<Holding[]>(
+    () => [...holdingsSorted, ...cashHoldings],
+    [holdingsSorted, cashHoldings],
+  );
+  const totalArsWithCash = useMemo(
+    () => holdingsForCharts.reduce((acc, h) => acc + h.ars, 0),
+    [holdingsForCharts],
   );
 
   // Delta del día = sum de (ars * change/100) por holding. Da el ARS
@@ -248,20 +347,23 @@ export default function PortfolioScreen() {
     let ar = 0;
     let us = 0;
     let crypto = 0;
-    for (const h of holdingsSorted) {
-      const m = assetMarket(h.asset);
+    let cash = 0;
+    for (const h of holdingsForCharts) {
+      const m = chartMarketFor(h.asset);
       if (m === "AR") ar += h.ars;
       else if (m === "US") us += h.ars;
       else if (m === "CRYPTO") crypto += h.ars;
+      else if (m === "DINERO") cash += h.ars;
     }
-    const total = ar + us + crypto;
+    const total = ar + us + crypto + cash;
     return {
       arPct: total > 0 ? (ar / total) * 100 : 0,
       usPct: total > 0 ? (us / total) * 100 : 0,
       cryptoPct: total > 0 ? (crypto / total) * 100 : 0,
+      cashPct: total > 0 ? (cash / total) * 100 : 0,
       categoriesCount: groupedByCategory.length,
     };
-  }, [holdingsSorted, groupedByCategory]);
+  }, [holdingsForCharts, groupedByCategory]);
 
   /* ─── Breakdown por mercado para la sección "Mercados" ────────────
    *
@@ -697,8 +799,8 @@ export default function PortfolioScreen() {
               <View style={s.chartCanvas}>
                 {viz === "pie" ? (
                   <FloorPie
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
                     currency={currency}
                     groupBy="category"
                     onHoldChange={setBrickHolding}
@@ -707,8 +809,8 @@ export default function PortfolioScreen() {
                   />
                 ) : viz === "brick" ? (
                   <FloorBrick
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
                     groupBy="category"
                     onHoldChange={setBrickHolding}
                     dimMarket={highlightedMarket}
@@ -716,16 +818,16 @@ export default function PortfolioScreen() {
                   />
                 ) : viz === "ranking" ? (
                   <RankingList
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
                     onHoldChange={setBrickHolding}
                     dimMarket={highlightedMarket}
                     onActiveMarketChange={setHighlightedMarket}
                   />
                 ) : (
                   <Treemap
-                    holdings={holdingsSorted}
-                    totalArs={totalArs}
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
                     onHoldChange={setBrickHolding}
                     dimMarket={highlightedMarket}
                     onActiveMarketChange={setHighlightedMarket}
@@ -1201,25 +1303,31 @@ function ArgentinaBoldFlag({ size }: { size: number }) {
   );
 }
 
-/** Bandera US variante Betsy Ross (1777) — 13 estrellas en círculo
- *  en el canton, 13 stripes rojo/blanco. Old Glory red + true navy. */
+/** Bandera US estándar — 13 stripes rojo/blanco + canton navy con
+ *  estrellas distribuidas en grilla alternada (Old Glory style),
+ *  no en círculo. Cromática bold: Old Glory red + true navy. */
 function BetsyRossFlag({ size }: { size: number }) {
   const RED = "#BF0A30";
   const WHITE = "#FFFFFF";
   const NAVY = "#002868";
   const stripeH = 40 / 13;
-  // 13 estrellas en círculo en el canton
   const cantonW = 40 * 0.4;
   const cantonH = stripeH * 7;
-  const ringCx = cantonW / 2;
-  const ringCy = cantonH / 2;
-  const ringR = Math.min(cantonW, cantonH) * 0.32;
-  const starPositions = Array.from({ length: 13 }).map((_, i) => {
-    const angle = (i * 2 * Math.PI) / 13 - Math.PI / 2;
-    return {
-      cx: ringCx + Math.cos(angle) * ringR,
-      cy: ringCy + Math.sin(angle) * ringR,
-    };
+  // Grilla alternada de estrellas — 5 filas / 4-3-4-3-4 estrellas,
+  // simulando el pattern de Old Glory (que en el original son 9
+  // filas alternadas de 6 y 5 estrellas). Acá compactado para 40 px.
+  const cols = [4, 3, 4, 3, 4];
+  const rows = cols.length;
+  const rowGap = cantonH / (rows + 1);
+  const stars: { cx: number; cy: number }[] = [];
+  cols.forEach((count, rowIdx) => {
+    const colGap = cantonW / (count + 1);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        cx: colGap * (i + 1),
+        cy: rowGap * (rowIdx + 1),
+      });
+    }
   });
   return (
     <View
@@ -1230,11 +1338,11 @@ function BetsyRossFlag({ size }: { size: number }) {
     >
       <Svg width={size} height={size} viewBox="0 0 40 40">
         <Defs>
-          <ClipPath id="usBetsyClip">
+          <ClipPath id="usFlagClip">
             <Circle cx={20} cy={20} r={20} />
           </ClipPath>
         </Defs>
-        <G clipPath="url(#usBetsyClip)">
+        <G clipPath="url(#usFlagClip)">
           <Rect x={0} y={0} width={40} height={40} fill={WHITE} />
           {[0, 2, 4, 6, 8, 10, 12].map((i) => (
             <Rect
@@ -1247,12 +1355,12 @@ function BetsyRossFlag({ size }: { size: number }) {
             />
           ))}
           <Rect x={0} y={0} width={cantonW} height={cantonH} fill={NAVY} />
-          {/* 13 estrellas circulares (puntos blancos con tamaño justo
-              para leerse a 40 px). En realidad son 5-puntas pero a
-              este tamaño los círculos leen mejor que estrellas
-              poligonales mal renderizadas. */}
-          {starPositions.map((p, i) => (
-            <Circle key={i} cx={p.cx} cy={p.cy} r={0.85} fill={WHITE} />
+          {/* Estrellas como puntos blancos distribuidos en grilla
+              alternada — a 40 px los polígonos de 5 puntas no leen,
+              los círculos sí. La distribución (4-3-4-3-4) replica
+              el feel del Old Glory. */}
+          {stars.map((p, i) => (
+            <Circle key={i} cx={p.cx} cy={p.cy} r={0.7} fill={WHITE} />
           ))}
         </G>
         <Circle
@@ -1338,6 +1446,7 @@ function AllocationBar({
     arPct: number;
     usPct: number;
     cryptoPct: number;
+    cashPct: number;
     categoriesCount: number;
   };
   highlightedMarket: MarketKey | null;
@@ -1348,6 +1457,7 @@ function AllocationBar({
     { key: "AR", pct: alloc.arPct, label: "AR" },
     { key: "US", pct: alloc.usPct, label: "EE.UU." },
     { key: "CRYPTO", pct: alloc.cryptoPct, label: "Crypto" },
+    { key: "DINERO", pct: alloc.cashPct, label: "Dinero" },
   ].filter((s) => s.pct > 0) as Array<{
     key: MarketKey;
     pct: number;
@@ -2123,7 +2233,7 @@ function FloorPie({
         rows: [],
         cat: h.asset.category,
         name: h.asset.name,
-        market: assetMarket(h.asset) as MarketKey,
+        market: chartMarketFor(h.asset),
       };
       entry.ars += h.ars;
       entry.rows.push({
@@ -2325,7 +2435,7 @@ function FloorPie({
               },
             ]}
           >
-            {dimMarketPct != null ? (
+            {dimMarketPct != null && activeIdx === null ? (
               <>
                 <Text
                   style={[s.pieCenterMarketPct, { color: c.text }]}
@@ -2600,7 +2710,7 @@ function FloorBrick({
         rows: [],
         cat: h.asset.category,
         name: h.asset.name,
-        market: assetMarket(h.asset) as MarketKey,
+        market: chartMarketFor(h.asset),
       };
       entry.ars += h.ars;
       entry.rows.push({
@@ -2839,7 +2949,8 @@ function FloorBrick({
           el hold de la barra. */}
       {dimMarket != null &&
       dimMarketPct != null &&
-      dimMarketLeftPx != null ? (
+      dimMarketLeftPx != null &&
+      activeIdx === null ? (
         <Animated.View
           key={`brick-mkt-${dimMarket}`}
           entering={FadeInDown.duration(120)}
@@ -3024,7 +3135,7 @@ function RankingList({
       const entry = byKey.get(key) ?? {
         ars: 0,
         cat: h.asset.category,
-        market: assetMarket(h.asset) as MarketKey,
+        market: chartMarketFor(h.asset),
         rows: [],
       };
       entry.ars += h.ars;
@@ -3064,55 +3175,119 @@ function RankingList({
           dimMarket != null && r.market !== dimMarket;
         const dimmed = dimmedByActive || dimmedByMarket;
         const widthPct = Math.max(2, Math.min(100, r.pct));
+        const abbrev = abbrevLabel(r.label);
+        const valueArs = formatRankingValue(r.ars);
         return (
           <Pressable
             key={r.key}
             onPressIn={() => handleHold(i)}
             onPressOut={() => handleHold(null)}
             style={[
-              s.rankingRow,
+              s.rankRow,
+              i > 0 && {
+                borderTopColor: c.border,
+                borderTopWidth: StyleSheet.hairlineWidth,
+              },
               { opacity: dimmed ? 0.35 : 1 },
             ]}
           >
-            <View
-              style={[
-                s.rankingBar,
-                {
-                  backgroundColor: r.color,
-                  width: `${widthPct}%`,
-                  opacity: 0.22,
-                },
-              ]}
-            />
-            <View style={s.rankingContent}>
-              <View style={s.rankingLeft}>
-                <View
-                  style={[
-                    s.rankingDot,
-                    { backgroundColor: r.color },
-                  ]}
-                />
+            <View style={s.rankBody}>
+              {/* Category icon — squircle 36 con bg de la paleta del
+                  brick + abbreviation 2-char en blanco bold. */}
+              <View
+                style={[
+                  s.rankIcon,
+                  { backgroundColor: r.color },
+                ]}
+              >
                 <Text
-                  style={[s.rankingLabel, { color: c.text }]}
+                  style={[
+                    s.rankIconText,
+                    { color: textOnHex(r.color) },
+                  ]}
+                >
+                  {abbrev}
+                </Text>
+              </View>
+              <View style={s.rankCenter}>
+                <Text
+                  style={[s.rankLabel, { color: c.text }]}
                   numberOfLines={1}
                 >
                   {r.label}
                 </Text>
-              </View>
-              <View style={s.rankingRight}>
-                <Text style={[s.rankingTickers, { color: c.textMuted }]}>
-                  {r.tickers}
+                <Text
+                  style={[s.rankMeta, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {r.tickers}{" "}
+                  {r.tickers === 1 ? "posición" : "posiciones"}
                 </Text>
-                <Text style={[s.rankingPct, { color: c.text }]}>
-                  {formatTooltipPct(r.pct)}
+              </View>
+              <View style={s.rankRight}>
+                <Text style={[s.rankPct, { color: c.text }]}>
+                  {r.pct >= 10
+                    ? Math.round(r.pct).toString()
+                    : r.pct.toFixed(1).replace(".", ",")}
+                  <Text style={[s.rankPctSign, { color: c.textMuted }]}>
+                    {" "}%
+                  </Text>
+                </Text>
+                <Text
+                  style={[s.rankValue, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {valueArs}
                 </Text>
               </View>
+            </View>
+            {/* Progress bar al fondo del row — fill de la categoría
+                hasta widthPct, fondo neutro. Robinhood signature
+                "weight indicator". */}
+            <View
+              style={[
+                s.rankProgressTrack,
+                { backgroundColor: c.surfaceHover },
+              ]}
+            >
+              <View
+                style={[
+                  s.rankProgressFill,
+                  {
+                    backgroundColor: r.color,
+                    width: `${widthPct}%`,
+                  },
+                ]}
+              />
             </View>
           </Pressable>
         );
       })}
     </View>
   );
+}
+
+/** 2-char uppercase del label para el icon — CEDEARs → CE,
+ *  Acciones AR → AR, Bonos → BO, Crypto → CR, etc. Si el label
+ *  tiene espacio, agarra primera letra de cada palabra (max 2).
+ *  Caso default: primeras 2 chars del label. */
+function abbrevLabel(label: string): string {
+  const words = label.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return label.slice(0, 2).toUpperCase();
+}
+
+/** Compact format del valor de un grupo en el ranking — "$ 5,7 M",
+ *  "$ 8 K", o el monto entero si es chico. */
+function formatRankingValue(ars: number): string {
+  if (ars >= 1e9)
+    return `$ ${(ars / 1e9).toFixed(1).replace(".", ",")} B`;
+  if (ars >= 1e6)
+    return `$ ${(ars / 1e6).toFixed(1).replace(".", ",")} M`;
+  if (ars >= 1e3) return `$ ${Math.round(ars / 1e3)} K`;
+  return `$ ${Math.round(ars)}`;
 }
 
 /* ─── Treemap — rectángulos proporcionales (slice-and-dice) ──────
@@ -3165,7 +3340,7 @@ function Treemap({
       const entry = byKey.get(key) ?? {
         ars: 0,
         cat: h.asset.category,
-        market: assetMarket(h.asset) as MarketKey,
+        market: chartMarketFor(h.asset),
       };
       entry.ars += h.ars;
       byKey.set(key, entry);
@@ -3270,9 +3445,24 @@ function Treemap({
               dimMarket != null && t.market !== dimMarket;
             const dimmed = dimmedByActive || dimmedByMarket;
             const scale = containerW / W;
+            const tileW = t.w * scale - 3;
+            const tileH = t.h * scale - 3;
             const pct = (t.ars / totalArsAll) * 100;
-            const showLabel = t.w * scale > 60 && t.h * scale > 36;
-            const showPct = t.w * scale > 40 && t.h * scale > 22;
+            // Tipografía proporcional al tamaño del tile — tiles
+            // grandes muestran label + pct grandes, tiles chicos
+            // sólo el pct, micro-tiles nada. Más jerarquía visual
+            // (Robinhood usa este patrón en su treemap de Sectors).
+            const isLarge = tileW > 110 && tileH > 70;
+            const isMedium = tileW > 70 && tileH > 50;
+            const isMini = tileW > 44 && tileH > 26;
+            const showLabel = isMedium;
+            const showPct = isMini;
+            const labelSize = isLarge ? 15 : 12;
+            const pctSize = isLarge ? 24 : isMedium ? 18 : 13;
+            const ink = textOnHex(t.color);
+            const inkMuted = ink === "#FAFAF7"
+              ? "rgba(250,247,247,0.62)"
+              : "rgba(14,15,12,0.55)";
             return (
               <Pressable
                 key={t.key}
@@ -3280,40 +3470,73 @@ function Treemap({
                 onPressOut={() => handleHold(null)}
                 style={{
                   position: "absolute",
-                  left: t.x * scale + 1,
-                  top: t.y * scale + 1,
-                  width: t.w * scale - 2,
-                  height: t.h * scale - 2,
+                  left: t.x * scale + 1.5,
+                  top: t.y * scale + 1.5,
+                  width: tileW,
+                  height: tileH,
                   backgroundColor: dimmed ? c.surfaceSunken : t.color,
                   borderCurve: "continuous",
-                  borderRadius: 6,
-                  padding: 8,
-                  justifyContent: "flex-end",
-                  opacity: dimmed ? 0.6 : 1,
+                  borderRadius: 8,
+                  paddingHorizontal: isLarge ? 12 : 8,
+                  paddingVertical: isLarge ? 12 : 8,
+                  justifyContent: "space-between",
+                  opacity: dimmed ? 0.55 : 1,
+                  overflow: "hidden",
                 }}
               >
+                {/* Label arriba — eyebrow style cuando entra. Si el
+                    tile es enano, todo el contenido se omite. */}
                 {showLabel ? (
                   <Text
                     style={[
                       s.treemapLabel,
-                      { color: textOnHex(t.color) },
+                      {
+                        color: ink,
+                        fontSize: labelSize,
+                        opacity: 0.95,
+                      },
                     ]}
                     numberOfLines={1}
                   >
                     {t.label}
                   </Text>
-                ) : null}
+                ) : (
+                  <View />
+                )}
+                {/* Pct grande abajo — protagonista del tile. Si el
+                    tile es chico, el % aparece igual (centrado), si
+                    es grande va abajo a la izquierda. */}
                 {showPct ? (
-                  <Text
-                    style={[
-                      s.treemapPct,
-                      { color: textOnHex(t.color) },
-                    ]}
-                  >
-                    {pct >= 10
-                      ? Math.round(pct).toString() + "%"
-                      : pct.toFixed(1).replace(".", ",") + "%"}
-                  </Text>
+                  <View>
+                    <Text
+                      style={[
+                        s.treemapPct,
+                        {
+                          color: ink,
+                          fontSize: pctSize,
+                          letterSpacing: pctSize >= 20 ? -0.8 : -0.4,
+                        },
+                      ]}
+                    >
+                      {pct >= 10
+                        ? Math.round(pct).toString() + "%"
+                        : pct.toFixed(1).replace(".", ",") + "%"}
+                    </Text>
+                    {/* Sub-label sólo en tiles grandes — un detalle
+                        más de jerarquía. Muestra count de tickers
+                        para contextualizar el valor. */}
+                    {isLarge ? (
+                      <Text
+                        style={[
+                          s.treemapSub,
+                          { color: inkMuted },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {formatRankingValue(t.ars)}
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </Pressable>
             );
@@ -4169,71 +4392,89 @@ const s = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
   },
 
-  /* Ranking — barras horizontales ordenadas. Cada row es un Pressable
-   * con barra de fondo absoluta + contenido (label + pct). */
+  /* Ranking — Robinhood-style. Cada row es un Pressable tall con:
+   * icon (squircle 36 con bg color + abbr 2-char), label + meta a la
+   * izq, pct + valor a la der, y barra de progreso al fondo del row
+   * que muestra el "weight" relativo (signature de Robinhood). */
   rankingWrap: {
-    paddingHorizontal: 4,
-    gap: 6,
+    paddingHorizontal: 0,
   },
-  rankingRow: {
-    position: "relative",
-    height: 44,
+  rankRow: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  rankBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  rankIcon: {
+    width: 36,
+    height: 36,
     borderCurve: "continuous",
     borderRadius: 10,
-    overflow: "hidden",
+    alignItems: "center",
     justifyContent: "center",
   },
-  rankingBar: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderCurve: "continuous",
-    borderRadius: 10,
-  },
-  rankingContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    gap: 12,
-  },
-  rankingLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  rankingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  rankingLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-    flexShrink: 1,
-  },
-  rankingRight: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  rankingTickers: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-  },
-  rankingPct: {
+  rankIconText: {
     fontFamily: fontFamily[800],
-    fontSize: 14,
+    fontSize: 13,
+    letterSpacing: -0.2,
+  },
+  rankCenter: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rankLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
     letterSpacing: -0.3,
-    minWidth: 48,
-    textAlign: "right",
+  },
+  rankMeta: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+  rankRight: {
+    alignItems: "flex-end",
+    minWidth: 78,
+  },
+  rankPct: {
+    fontFamily: fontFamily[800],
+    fontSize: 18,
+    letterSpacing: -0.5,
+  },
+  rankPctSign: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
+  },
+  rankValue: {
+    fontFamily: fontFamily[600],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 2,
+  },
+  /* Progress bar al fondo del row — track + fill. 3 px alto, llega
+   * de borde a borde del row interior. */
+  rankProgressTrack: {
+    height: 3,
+    marginTop: 12,
+    borderCurve: "continuous",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  rankProgressFill: {
+    height: 3,
+    borderCurve: "continuous",
+    borderRadius: 2,
   },
 
-  /* Treemap — canvas con tiles absolutamente posicionados. */
+  /* Treemap — canvas con tiles absolutamente posicionados.
+   * Tipografía proporcional al tamaño del tile (overrideado inline
+   * en el render). Acá quedan los defaults base. */
   treemapWrap: {
     position: "relative",
     width: "100%",
@@ -4241,13 +4482,15 @@ const s = StyleSheet.create({
   },
   treemapLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: -0.15,
+    letterSpacing: -0.2,
   },
   treemapPct: {
     fontFamily: fontFamily[800],
-    fontSize: 13,
-    letterSpacing: -0.3,
+  },
+  treemapSub: {
+    fontFamily: fontFamily[600],
+    fontSize: 11,
+    letterSpacing: -0.05,
     marginTop: 2,
   },
 });
