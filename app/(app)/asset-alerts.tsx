@@ -275,7 +275,7 @@ export default function AssetAlertsScreen() {
                       style={[s.sectionTitle, { color: c.text }]}
                       numberOfLines={1}
                       adjustsFontSizeToFit
-                      minimumFontScale={0.55}
+                      minimumFontScale={0.45}
                     >
                       Alertas activas ({sortedAlerts.length})
                     </Text>
@@ -298,7 +298,7 @@ export default function AssetAlertsScreen() {
                         style={[s.distFormatText, { color: c.textMuted }]}
                         numberOfLines={1}
                         adjustsFontSizeToFit
-                        minimumFontScale={0.55}
+                        minimumFontScale={0.45}
                       >
                         {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
                       </Text>
@@ -801,7 +801,7 @@ function SwipableAlertRow({
               style={[s.alertLeft, { color: c.text }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.55}
+              minimumFontScale={0.45}
             >
               <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
               {formatMoney(alert.threshold, cur)}
@@ -819,7 +819,7 @@ function SwipableAlertRow({
               style={[s.alertDist, { color: dirColor }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.55}
+              minimumFontScale={0.45}
             >
               {distFormat === "%"
                 ? `${distSign}${Math.abs(distPct).toFixed(2)}%`
@@ -1118,24 +1118,18 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* Layout 3-col en flex puro:
-   *   alertSideLeft: flex 1, content alineado a la izquierda.
-   *   alertCenter: SIN flex → toma su ancho intrínseco según el
-   *     contenido (label o value). Cuando el value crece, alertCenter
-   *     se expande y los lados se contraen (cada uno absorbe la
-   *     mitad de la diferencia, mantiene la simetría).
-   *   alertSideRight: flex 1, content alineado a la derecha.
+  /* Layout 3-col con ANCHOS EXPLÍCITOS EN PORCENTAJE — la única
+   * forma 100 % determinística de tener el header label y el row
+   * value en el mismo x (el centro del row). 35/30/35 = total 100,
+   * el centro arranca en 35 % y termina en 65 %, MIDDLE = 50 %.
    *
-   * minWidth: 0 + overflow hidden + adjustsFontSizeToFit en el Text
-   * fuerzan que el contenido se shrinkee dentro del wrapper en lugar
-   * de empujar al wrapper más allá de su flex-allotment.
-   *
-   * Como el header y el row usan EL MISMO esquema y comparten width
-   * total, ambos centros (label y value) caen exactamente en el
-   * x = fullWidth / 2. Alineación vertical perfecta. */
+   * Texto adentro: numberOfLines 1 + adjustsFontSizeToFit +
+   * minimumFontScale 0.45 → si el contenido no entra (ej. cripto
+   * 100k+) se shrinkea hasta caber. overflow hidden clipa el render
+   * para que el texto NUNCA se salga del wrapper y se meta sobre
+   * la columna del centro. */
   alertSideLeft: {
-    flex: 1,
-    minWidth: 0,
+    width: "35%",
     overflow: "hidden",
     alignItems: "flex-start",
     justifyContent: "center",
@@ -1143,13 +1137,14 @@ const s = StyleSheet.create({
     paddingRight: 6,
   },
   alertCenter: {
+    width: "30%",
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
   },
   alertSideRight: {
-    flex: 1,
-    minWidth: 0,
+    width: "35%",
     overflow: "hidden",
     alignItems: "flex-end",
     justifyContent: "center",
