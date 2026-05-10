@@ -250,7 +250,7 @@ export default function AssetAlertsScreen() {
           <>
             {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
               <EmptyState
-                illustration={<AlertBellIllustration size={160} />}
+                illustration={<AlertBellIllustration size={184} />}
                 text="Definí un precio objetivo y recibí una notificación instantánea en tu celular cuando el activo lo cruce."
               />
             ) : null}
