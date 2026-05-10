@@ -250,7 +250,7 @@ export default function AssetAlertsScreen() {
           <>
             {sortedAlerts.length === 0 && triggeredAlerts.length === 0 ? (
               <EmptyState
-                illustration={<AlertBellIllustration size={160} />}
+                illustration={<AlertBellIllustration size={184} />}
                 text="Definí un precio objetivo y recibí una notificación instantánea en tu celular cuando el activo lo cruce."
               />
             ) : null}
@@ -803,15 +803,31 @@ function SwipableAlertRow({
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
           >
-            <Text
-              style={[s.alertLeft, { color: c.text }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.45}
-            >
-              <Text style={{ color: dirColor }}>{dirLabel}</Text>{" "}
-              {formatMoney(alert.threshold, cur)}
-            </Text>
+            {/* "Sube a" / "Baja a" + precio en una flex row con
+                marginLeft 4 entre ellos, así hay un gap visible
+                entre la dirección coloreada y el número objetivo
+                (en vez del space-character pegado de antes). El
+                precio shrinkea si no entra. */}
+            <View style={s.alertLeftRow}>
+              <Text
+                style={[s.alertLeft, { color: dirColor }]}
+                numberOfLines={1}
+              >
+                {dirLabel}
+              </Text>
+              <Text
+                style={[
+                  s.alertLeft,
+                  s.alertLeftPrice,
+                  { color: c.text },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.45}
+              >
+                {formatMoney(alert.threshold, cur)}
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={onEdit}
@@ -1208,11 +1224,30 @@ const s = StyleSheet.create({
   triggeredRow: {
     paddingVertical: 12,
   },
+  /* Wrapper row para "Sube a"/"Baja a" + precio. flex shrink y
+   * minWidth 0 permiten que el precio se shrinkee adentro de su
+   * espacio sin empujar el wrapper. alignItems baseline alinea las
+   * baselines de la dirección y el número (look más limpio). */
+  alertLeftRow: {
+    flexShrink: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
   /* Texto del precio objetivo (col 1). 16 / 600. */
   alertLeft: {
     fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.3,
+  },
+  /* Margen 4 px entre la dirección "Sube a"/"Baja a" coloreada y
+   * el precio objetivo. flexShrink 1 + minWidth 0 dejan que el
+   * adjustsFontSizeToFit del Text se active cuando el precio es
+   * más ancho que el espacio que le queda en el wrapper. */
+  alertLeftPrice: {
+    marginLeft: 4,
+    flexShrink: 1,
+    minWidth: 0,
   },
   /* Texto del % o $ de distancia (centro del row). 16 / 600 —
    * match con alertLeft. Centrado en el gap por los spacers flex 1
