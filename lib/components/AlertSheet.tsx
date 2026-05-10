@@ -125,7 +125,7 @@ export function AlertSheet({
   /* Ancho del slider: el sheet tiene paddingHorizontal 24 a cada
    * lado. El slider rellena de borde a borde del padding. */
   const SLIDER_WIDTH = windowW - 48;
-  const { create, update } = useAlerts();
+  const { create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
 
@@ -296,6 +296,19 @@ export function AlertSheet({
     }
   };
 
+  /* Borra la alerta en modo edit. Sin confirmación — la fila
+   * desaparece del listado. Cierra el sheet al confirmar. */
+  const handleDelete = async () => {
+    if (!editingAlert) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      await remove(editingAlert.id);
+      dismiss();
+    } catch {
+      showToast("No pudimos eliminar la alerta", { variant: "error" });
+    }
+  };
+
   /* ─── Keypad handlers — mismo patrón que buy.tsx (in-app
        teclado, sin keyboard nativo). USDT permite 4 decimales,
        ARS/USD se quedan en 2. ─── */
@@ -444,13 +457,32 @@ export function AlertSheet({
               />
             </View>
 
-            {/* Header del sheet — solo título, alineado izquierda. El
-             *  subtítulo "Apple · AAPL.US" desapareció (vive en el
-             *  header del screen). */}
+            {/* Header del sheet — título a la izquierda. En modo
+             *  edit, agregamos un botón outline naranja "Eliminar"
+             *  arriba a la derecha. */}
             <View style={s.header}>
               <Text style={[s.title, { color: c.text }]}>
                 {isEditing ? "Editar alerta" : "Nueva alerta de precio"}
               </Text>
+              {isEditing ? (
+                <Pressable
+                  onPress={handleDelete}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Eliminar alerta"
+                  style={({ pressed }) => [
+                    s.deleteBtn,
+                    {
+                      borderColor: c.red,
+                      opacity: pressed ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[s.deleteBtnText, { color: c.red }]}>
+                    Eliminar
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <View style={s.form}>
@@ -657,10 +689,14 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
-  /* Header del sheet — sólo título, sin subtítulo (vive en el header
-   * del screen). Alineado izquierda. Padding bottom genera el >24px
-   * de gap entre título y label "PRECIO OBJETIVO". */
+  /* Header del sheet — título izquierda, botón "Eliminar" outline
+   * naranja (sólo en modo edit) a la derecha. Padding bottom genera
+   * el >24px de gap entre título y label "PRECIO OBJETIVO". */
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
     paddingTop: 6,
     paddingBottom: 28,
   },
@@ -668,6 +704,23 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
+    flexShrink: 1,
+  },
+  /* Botón outline naranja para eliminar la alerta. SIN fill, solo
+   * borde + texto en c.red (el "naranja" del sistema de tokens).
+   * Pill compacto que vive arriba a la derecha del header. */
+  deleteBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    borderWidth: 1.4,
+    backgroundColor: "transparent",
+  },
+  deleteBtnText: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
   },
   /* Form: gap GENERAL entre módulos (precio block, slider, chips,
    * keypad, CTA) cuando no se override por marginTop específico. */
