@@ -266,65 +266,69 @@ export default function AssetAlertsScreen() {
                  *  de distancia, y el botón de orden queda ALINEADO
                  *  a la derecha igual que el trash de cada fila. */}
                 <View style={s.sectionHeader}>
-                  {/* Mismo patrón que el row: title (intrínseco) -
-                   *  spacer - label "% al objetivo" (intrínseco) -
-                   *  spacer - sort (intrínseco). Spacers iguales →
-                   *  label centrado EN EL GAP entre el title y el
-                   *  sort, no en el centro geométrico del row. */}
-                  <Text
-                    style={[s.sectionTitle, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    Alertas activas ({sortedAlerts.length})
-                  </Text>
-                  <View style={s.alertSpacer} />
+                  {/* MISMO esquema que el row: 3 secciones flex 1
+                   *  (left, center, right). Label "% al objetivo"
+                   *  cae en el centro geométrico del row, EXACTAMENTE
+                   *  arriba del valor "+5,50 %" de las filas
+                   *  (alineación vertical perfecta). */}
+                  <View style={s.alertSideLeft}>
+                    <Text
+                      style={[s.sectionTitle, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      Alertas activas ({sortedAlerts.length})
+                    </Text>
+                  </View>
                   <Pressable
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setDistFormat(distFormat === "%" ? "$" : "%");
                     }}
                     hitSlop={6}
-                    style={s.distFormatBtn}
+                    style={s.alertCenter}
                     accessibilityLabel={
                       distFormat === "%"
                         ? "Cambiar a distancia en monto"
                         : "Cambiar a distancia en porcentaje"
                     }
                   >
-                    <Text
-                      style={[s.distFormatText, { color: c.textMuted }]}
-                      numberOfLines={1}
+                    <View style={s.distFormatBtn}>
+                      <Text
+                        style={[s.distFormatText, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
+                      </Text>
+                      <Feather
+                        name="chevron-down"
+                        size={14}
+                        color={c.textMuted}
+                        style={{ marginLeft: 2, marginTop: 1 }}
+                      />
+                    </View>
+                  </Pressable>
+                  <View style={s.alertSideRight}>
+                    <Pressable
+                      ref={sortBtnRef}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        sortBtnRef.current?.measureInWindow(
+                          (x, y, width, height) => {
+                            setSortAnchor({
+                              top: y + height + 6,
+                              right: Math.max(8, windowW - (x + width)),
+                            });
+                            setSortMenuOpen(true);
+                          },
+                        );
+                      }}
+                      hitSlop={10}
+                      style={s.sortIconBtn}
+                      accessibilityLabel="Cambiar orden de la lista"
                     >
-                      {distFormat === "%" ? "% al objetivo" : "$ al objetivo"}
-                    </Text>
-                    <Feather
-                      name="chevron-down"
-                      size={14}
-                      color={c.textMuted}
-                      style={{ marginLeft: 2, marginTop: 1 }}
-                    />
-                  </Pressable>
-                  <View style={s.alertSpacer} />
-                  <Pressable
-                    ref={sortBtnRef}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      sortBtnRef.current?.measureInWindow(
-                        (x, y, width, height) => {
-                          setSortAnchor({
-                            top: y + height + 6,
-                            right: Math.max(8, windowW - (x + width)),
-                          });
-                          setSortMenuOpen(true);
-                        },
-                      );
-                    }}
-                    hitSlop={10}
-                    style={s.sortIconBtn}
-                    accessibilityLabel="Cambiar orden de la lista"
-                  >
-                    <Feather name="sliders" size={16} color={c.textMuted} />
-                  </Pressable>
+                      <Feather name="sliders" size={16} color={c.textMuted} />
+                    </Pressable>
+                  </View>
                 </View>
                 <View style={s.list}>
                   {sortedAlerts.map((alert, i) => (
@@ -638,7 +642,11 @@ function SwipableAlertRow({
 
   const distAbs = alert.threshold - asset.price;
   const distPct = asset.price > 0 ? (distAbs / asset.price) * 100 : 0;
-  const distSign = distAbs > 0 ? "+" : "";
+  /* Signo explícito para %; en $ el formatMoney recibe Math.abs y
+   * el signo va por separado, así que también ponemos "-" cuando
+   * el monto es negativo (sino el "$ al objetivo" mostraría sólo
+   * el valor positivo y se confundiría con un Sube a). */
+  const distSign = distAbs > 0 ? "+" : distAbs < 0 ? "-" : "";
   const rowOpacity = isPaused ? 0.4 : 1;
 
   /* Swipe-left-to-delete con react-native-gesture-handler.
@@ -768,14 +776,15 @@ function SwipableAlertRow({
             rowAnimStyle,
           ]}
         >
-          {/* Layout 3 elementos + 2 spacers flex 1 entre ellos:
-              alertLeft (intrínseco) - spacer - alertDist (intrínseco)
-              - spacer - Toggle (intrínseco). Spacers iguales hacen
-              que alertDist quede centrado EN EL GAP entre alertLeft
-              y Toggle (no en el centro geométrico del row). */}
+          {/* Layout 3 secciones flex 1 — left + right toman el mismo
+              espacio (mismo flex), el centro queda en el centro
+              geométrico del row. El header usa el MISMO esquema, así
+              el label "% al objetivo" y el value "+5,50 %" caen en
+              el mismo x exacto (alineación vertical perfecta). */}
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
+              s.alertSideLeft,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
             accessibilityLabel={`Editar alerta — ${dirLabel} ${formatMoney(alert.threshold, cur)}`}
@@ -790,10 +799,10 @@ function SwipableAlertRow({
               {formatMoney(alert.threshold, cur)}
             </Text>
           </Pressable>
-          <View style={s.alertSpacer} />
           <Pressable
             onPress={onEdit}
             style={({ pressed }) => [
+              s.alertCenter,
               { opacity: pressed ? 0.7 : rowOpacity },
             ]}
             accessibilityLabel="Editar alerta"
@@ -809,11 +818,12 @@ function SwipableAlertRow({
                 : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
             </Text>
           </Pressable>
-          <View style={s.alertSpacer} />
-          <Toggle
-            value={!isPaused}
-            onValueChange={() => onTogglePause()}
-          />
+          <View style={s.alertSideRight}>
+            <Toggle
+              value={!isPaused}
+              onValueChange={() => onTogglePause()}
+            />
+          </View>
         </Animated.View>
       </GestureDetector>
     </Animated.View>
@@ -1103,12 +1113,28 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  /* Spacer flex 1 — usado dos veces entre los 3 elementos del row
-   * (alertLeft / alertDist / Toggle) y del header (title / label /
-   * sort). Como ambos spacers tienen el mismo flex (1), el elemento
-   * del medio queda centrado en el GAP entre los dos extremos. */
-  alertSpacer: {
+  /* 3 secciones del row + del header. Left + Right son flex 1
+   * (mismo peso) → empujan al center con la misma fuerza desde
+   * ambos lados, dejándolo en el CENTRO GEOMÉTRICO del row.
+   * Como header y row usan el mismo esquema, el label y el value
+   * caen en el mismo x exacto = alineación vertical perfecta entre
+   * "% al objetivo" del header y "+5,50 %" de cada fila. */
+  alertSideLeft: {
     flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    paddingRight: 8,
+  },
+  alertCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  alertSideRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    paddingLeft: 8,
   },
   sectionMeta: {
     fontFamily: fontFamily[500],
