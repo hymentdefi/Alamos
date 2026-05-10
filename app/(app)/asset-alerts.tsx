@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   useWindowDimensions,
   View,
@@ -26,6 +25,7 @@ import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
+import { Toggle } from "../../lib/components/Toggle";
 
 type Tab = "price" | "indicator";
 type Sort = "proximity" | "createdAt";
@@ -654,14 +654,11 @@ function SwipableAlertRow({
             : `${distSign}${formatMoney(Math.abs(distAbs), cur)}`}
         </Text>
       </Pressable>
-      {/* Col 3: toggle iOS-style. ON = activa, OFF = pausada. */}
-      <Switch
+      {/* Col 3: toggle compacto custom (no Switch nativo) — sizing
+       *  alineado a la tipografía del row. ON = activa, OFF = pausada. */}
+      <Toggle
         value={!isPaused}
         onValueChange={() => onTogglePause()}
-        trackColor={{ false: c.surfaceHover, true: c.brand }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor={c.surfaceHover}
-        style={s.alertToggle}
       />
       {/* Col 4: botón trash directo. Sin swipe, sin confirmación
        *  modal — la eliminación es un tap explícito y haptic light
@@ -1039,9 +1036,6 @@ const s = StyleSheet.create({
   },
   /* Col 4: toggle iOS-style. Lo escalamos un toque para que no
    * domine la fila. */
-  alertToggle: {
-    transform: [{ scale: 0.85 }],
-  },
 
   /* Estilos del TriggeredRow (sección histórico) — layout viejo de
    * 2 líneas con dirBadge + label/precio/distance. Distinto del row

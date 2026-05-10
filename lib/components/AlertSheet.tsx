@@ -690,11 +690,12 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
   /* Header del sheet — título izquierda, botón "Eliminar" outline
-   * naranja (sólo en modo edit) a la derecha. Padding bottom genera
-   * el >24px de gap entre título y label "PRECIO OBJETIVO". */
+   * naranja (sólo en modo edit) a la derecha. alignItems baseline
+   * para que la baseline de "Eliminar" coincida con la de "Editar
+   * alerta" (sino el botón flota arriba por su padding). */
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
     gap: 12,
     paddingTop: 6,
@@ -708,10 +709,10 @@ const s = StyleSheet.create({
   },
   /* Botón outline naranja para eliminar la alerta. SIN fill, solo
    * borde + texto en c.red (el "naranja" del sistema de tokens).
-   * Pill compacto que vive arriba a la derecha del header. */
+   * Pill compacto, sentado en la baseline del título. */
   deleteBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1.4,
