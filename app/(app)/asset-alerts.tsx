@@ -113,19 +113,22 @@ export default function AssetAlertsScreen() {
     refresh,
   } = useAlerts();
 
-  /* Pull-to-refresh — la lista se actualiza automáticamente con el
-   * mock store, pero el gesto suma como feedback táctil + insurance
-   * para forzar una re-sincronización con el server real cuando se
-   * conecte. Aplica tanto al tab Precio como al tab Indicadores
-   * (mismo ScrollView). */
+  /* Pull-to-refresh — mantiene el spinner un mínimo de ~900 ms
+   * aunque el refresh() mock resuelva más rápido. Sin el minDelay,
+   * el spinner aparecía y desaparecía en <300 ms y casi no se
+   * sentía. 900 ms es el sweet spot donde el gesto "registra" sin
+   * sentirse lento. Mismo timing que el pull-to-refresh de
+   * stock detail. Aplica a ambos tabs (Precio + Indicadores). */
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const minDelay = new Promise((r) => setTimeout(r, 900));
     try {
-      await refresh();
+      await Promise.all([refresh(), minDelay]);
     } catch {
       // silent — un error de refresh no merece toast.
+      await minDelay;
     }
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success,
@@ -305,7 +308,7 @@ export default function AssetAlertsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.text}
+            tintColor={c.brand}
             colors={[c.brand]}
             progressBackgroundColor={c.surface}
             progressViewOffset={12}
