@@ -169,14 +169,6 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
-  /* Altura compartida con AlertSheet — ambos sheets se sienten del
-   * mismo tamaño visual. El cálculo viene de la altura natural del
-   * AlertSheet (≈ 729 px de contenido) con aire arriba. Si tocás
-   * esta fórmula, ESPEJALA en AlertSheet.tsx. */
-  const SHARED_SHEET_HEIGHT = Math.min(
-    windowH * 0.88,
-    760 + insets.bottom,
-  );
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
@@ -373,7 +365,7 @@ export function IndicatorSheet({
               backgroundColor: c.bg,
               borderColor: c.border,
               paddingBottom: insets.bottom + 8,
-              height: SHARED_SHEET_HEIGHT,
+              maxHeight: windowH * 0.92,
             },
             sheetStyle,
           ]}
@@ -411,7 +403,7 @@ export function IndicatorSheet({
                     TENDENCIA
                   </Text>
                   <PickerRow
-                    icon={() => <MAIndicatorIllustration size={56} />}
+                    icon={() => <MAIndicatorIllustration size={48} />}
                     title="Media Móvil (SMA)"
                     description="Cruces sobre la media móvil simple"
                     onPress={() => {
@@ -424,7 +416,7 @@ export function IndicatorSheet({
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <EMAIndicatorIllustration size={56} />}
+                    icon={() => <EMAIndicatorIllustration size={48} />}
                     title="Media Móvil (EMA)"
                     description="Cruces sobre la media móvil exponencial"
                     onPress={() => {
@@ -442,14 +434,14 @@ export function IndicatorSheet({
                     MOMENTUM
                   </Text>
                   <PickerRow
-                    icon={() => <RSIIndicatorIllustration size={56} />}
+                    icon={() => <RSIIndicatorIllustration size={48} />}
                     title="RSI"
                     description="Avisa sobrecompra y sobreventa"
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <MACDIndicatorIllustration size={56} />}
+                    icon={() => <MACDIndicatorIllustration size={48} />}
                     title="MACD"
                     description="Cruces de medias y cambios de tendencia"
                     onPress={() => handlePickType("macd")}
@@ -461,14 +453,14 @@ export function IndicatorSheet({
                     VOLATILIDAD Y VOLUMEN
                   </Text>
                   <PickerRow
-                    icon={() => <BollingerIndicatorIllustration size={56} />}
+                    icon={() => <BollingerIndicatorIllustration size={48} />}
                     title="Bandas de Bollinger"
                     description="Toques de banda y bajas de volatilidad"
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <VolumeIndicatorIllustration size={56} />}
+                    icon={() => <VolumeIndicatorIllustration size={48} />}
                     title="Volumen"
                     description="Picos sobre el volumen promedio"
                     onPress={() => handlePickType("volume")}
@@ -1750,26 +1742,26 @@ const s = StyleSheet.create({
   },
 
   /* ── Paso 1 — picker ──
-   * Sizing pensado para matchear la altura natural del AlertSheet
-   * (header + price block + slider + chips + keypad + CTA). Filas
-   * chunky con ícono 56, descripción 2 líneas, agrupadas en 3
-   * secciones (TENDENCIA / MOMENTUM / VOLATILIDAD Y VOLUMEN). */
+   * Densidad pensada para matchear la altura natural del AlertSheet
+   * (~729 px). Filas con ícono 48, descripción de 1-2 líneas,
+   * agrupadas en 3 secciones (TENDENCIA / MOMENTUM / VOLATILIDAD
+   * Y VOLUMEN). */
   pickerHeader: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   pickerTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 24,
-    letterSpacing: -0.7,
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
   pickerSubtitle: {
     fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 18,
     letterSpacing: -0.1,
-    marginTop: 6,
+    marginTop: 4,
   },
   /* Eyebrow de sección dentro del picker — mismo lenguaje que
    * sectionEyebrow del paso 2, con inset horizontal 20 para
@@ -1779,26 +1771,26 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.4,
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 6,
+    paddingTop: 14,
+    paddingBottom: 4,
   },
   pickerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 14,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderCurve: "continuous",
   },
   pickerIcon: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
   pickerRowTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontSize: 15,
     letterSpacing: -0.25,
   },
   pickerRowDesc: {
@@ -1806,7 +1798,7 @@ const s = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     letterSpacing: -0.05,
-    marginTop: 3,
+    marginTop: 2,
   },
 
   /* ── Paso 2 — header ── */
