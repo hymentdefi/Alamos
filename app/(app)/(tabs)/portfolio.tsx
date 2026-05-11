@@ -2540,7 +2540,12 @@ function FloorPie({
     >
       <View
         onStartShouldSetResponder={() => true}
-        onResponderTerminationRequest={() => false}
+        /* Si el ScrollView padre (pager horizontal) detecta un swipe
+         * horizontal, pide el responder. Devolvemos true para que el
+         * chart libere el touch y el pager pueda swipear. Mientras el
+         * dedo está quieto o se mueve verticalmente, el pager no pide
+         * termination y el hold sigue funcionando. */
+        onResponderTerminationRequest={() => true}
         onResponderGrant={(e) => {
           onHoldChange?.(true);
           handleTouch(
@@ -3121,7 +3126,12 @@ function FloorBrick({
     >
       <View
         onStartShouldSetResponder={() => true}
-        onResponderTerminationRequest={() => false}
+        /* Si el ScrollView padre (pager horizontal) detecta un swipe
+         * horizontal, pide el responder. Devolvemos true para que el
+         * chart libere el touch y el pager pueda swipear. Mientras el
+         * dedo está quieto o se mueve verticalmente, el pager no pide
+         * termination y el hold sigue funcionando. */
+        onResponderTerminationRequest={() => true}
         onResponderGrant={(e) => {
           onHoldChange?.(true);
           handleTouch(e.nativeEvent.locationX);
@@ -3624,7 +3634,10 @@ function RankingList({
       ]}
       onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
       onStartShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => false}
+      /* Misma lógica que FloorPie/FloorBrick: termination true para
+       * que el pager horizontal pueda agarrar el swipe sin pelearse
+       * con el hold de la CoinStack. */
+      onResponderTerminationRequest={() => true}
       onResponderGrant={(e) =>
         handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY)
       }
@@ -4694,11 +4707,14 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   /* Cada page del horizontal pager — width se asigna inline desde
-   * pageW. alignItems center para que charts con menos altura
-   * queden alineados con el resto. */
+   * pageW. alignItems center para que charts con menos altura queden
+   * alineados con el resto. overflow hidden para que ningún chart
+   * (tiles del Mosaico, sombra del CoinStack, etc.) bleed a la page
+   * adyacente cuando el user swipea. */
   vizPage: {
     alignItems: "stretch",
     justifyContent: "center",
+    overflow: "hidden",
   },
   /* 4 dots indicadores abajo del pager — el activo es full-color y
    * un toque más grande (8px) que los inactivos (6px), siguiendo el
