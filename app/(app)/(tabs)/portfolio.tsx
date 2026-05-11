@@ -32,9 +32,11 @@ import Svg, {
   Ellipse,
   G,
   Line,
+  LinearGradient as SvgLinearGradient,
   Path as SvgPath,
   Polygon,
   Rect,
+  Stop,
   Text as SvgText,
 } from "react-native-svg";
 import { useRouter } from "expo-router";
@@ -3738,44 +3740,47 @@ function RankingList({
               dimMarket != null && co.market !== dimMarket;
             const dimmed = dimmedByActive || dimmedByMarket;
             const sideFill = dimmed ? c.surfaceSunken : co.color;
-            const topFill = dimmed
+            const capLightShade = dimmed
               ? c.surfaceHover
-              : shadeHex(co.color, 0.22);
-            const highlightFill = dimmed
+              : shadeHex(co.color, 0.7);
+            const capBaseShade = dimmed
               ? c.surfaceHover
-              : shadeHex(co.color, 0.65);
+              : shadeHex(co.color, 0.15);
+            const gradId = `coin-cap-${co.key}`;
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
             /* Render order:
-             *   1. Ellipse del cap (base shade + stroke difuso).
-             *   2. Highlight ellipse arriba del cap (lighter shade,
-             *      opacity 0.85) — el "reflejo de luz" pedido.
+             *   1. Defs: LinearGradient vertical para el cap — light
+             *      shade arriba (reflejo de luz), darker shade abajo.
+             *   2. Ellipse del cap usando el gradient como fill.
              *   3. Side rect on top — cubre la mitad inferior del
              *      cap ellipse, así su stroke curvo no cruza el label.
              *
              *   stroke: c.text con strokeOpacity 0.45 + strokeWidth 1.1
-             *   — la línea negra se ve más difuminada, no tan dura. */
+             *   — la línea entre cap y body se ve difuminada. */
             return (
               <G key={co.key}>
+                <Defs>
+                  <SvgLinearGradient
+                    id={gradId}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <Stop offset="0" stopColor={capLightShade} />
+                    <Stop offset="1" stopColor={capBaseShade} />
+                  </SvgLinearGradient>
+                </Defs>
                 <Ellipse
                   cx={co.cx}
                   cy={co.topY}
                   rx={co.rx}
                   ry={co.ry}
-                  fill={topFill}
+                  fill={`url(#${gradId})`}
                   stroke={c.text}
                   strokeWidth={1.1}
                   strokeOpacity={0.45}
                 />
-                {!dimmed ? (
-                  <Ellipse
-                    cx={co.cx}
-                    cy={co.topY - co.ry * 0.38}
-                    rx={co.rx * 0.6}
-                    ry={co.ry * 0.32}
-                    fill={highlightFill}
-                    opacity={0.85}
-                  />
-                ) : null}
                 <SvgPath
                   d={sidePath}
                   fill={sideFill}
@@ -4790,13 +4795,13 @@ const s = StyleSheet.create({
   },
   /* Cada page del horizontal pager — width se asigna inline desde
    * pageW. alignItems center para que charts con menos altura queden
-   * alineados con el resto. overflow hidden para que ningún chart
-   * (tiles del Mosaico, sombra del CoinStack, etc.) bleed a la page
-   * adyacente cuando el user swipea. */
+   * alineados con el resto. overflow VISIBLE — los tooltips que
+   * flotan arriba del coin/slice/bloque necesitan poder excederse del
+   * page para aparecer encima del dedo sin ser clippeados. */
   vizPage: {
     alignItems: "stretch",
     justifyContent: "center",
-    overflow: "hidden",
+    overflow: "visible",
   },
   /* 4 dots indicadores abajo del pager — el activo es full-color y
    * un toque más grande (8px) que los inactivos (6px), siguiendo el
