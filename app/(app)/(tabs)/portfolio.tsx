@@ -3661,26 +3661,33 @@ function RankingList({
             const cxPx = co.cx * scale;
             const topPx = co.topY * scale;
             const heightPx = co.height * scale;
+            const ryPx = co.ry * scale;
             const pctText =
               co.pct >= 10
                 ? Math.round(co.pct).toString() + "%"
                 : co.pct.toFixed(1).replace(".", ",") + "%";
-            /* fontSize del pct escalado al rx — moneda grande pide
-             * número más dominante. Cap superior en 32 para no
-             * desbordar la cara frontal en las más anchas. */
+            /* fontSize del pct escalado MÁS agresivamente — la moneda
+             * grande pide número dominante. clamp(22, 42, rx/3.8). */
             const pctFontSize = Math.max(
-              16,
-              Math.min(32, co.rx / 5),
+              22,
+              Math.min(42, co.rx / 3.8),
             );
+            /* Vertical offset — el wrapper se shiftea ~ry/2 hacia
+             * abajo para compensar visualmente que el TOP del coin
+             * tiene la "cap" (ellipse arriba) y la bottom curve cae
+             * por debajo del side rect. El óptico se siente más
+             * centrado cuando el label está un toque debajo del
+             * geometric center del side rect. */
+            const yShift = ryPx * 0.45;
             return (
               <View
                 key={`label-${co.key}`}
                 pointerEvents="none"
                 style={{
                   position: "absolute",
-                  left: cxPx - 90,
-                  top: topPx,
-                  width: 180,
+                  left: cxPx - 100,
+                  top: topPx + yShift,
+                  width: 200,
                   height: heightPx,
                   alignItems: "center",
                   justifyContent: "center",
@@ -3692,8 +3699,8 @@ function RankingList({
                     color: inkColor,
                     fontFamily: fontFamily[800],
                     fontSize: pctFontSize,
-                    letterSpacing: -0.8,
-                    lineHeight: pctFontSize + 2,
+                    letterSpacing: -1.2,
+                    lineHeight: pctFontSize,
                   }}
                   numberOfLines={1}
                 >
@@ -3704,7 +3711,7 @@ function RankingList({
                     style={{
                       color: labelColor,
                       fontFamily: fontFamily[800],
-                      fontSize: 11,
+                      fontSize: 12,
                       letterSpacing: 0.6,
                       textTransform: "uppercase",
                       marginTop: 2,
