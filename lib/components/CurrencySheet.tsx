@@ -225,15 +225,24 @@ function CurrencyOption({
   onPress,
 }: OptProps) {
   const { c } = useTheme();
+  /* Robinhood-style: en vez del "invert dark" del card seleccionado,
+   * usamos un acento verde — borde brand 2 px + eyebrow brand + check
+   * filled brand. La card mantiene bg surface para que la lectura no
+   * sufra. Unselected queda neutral con borde sutil. */
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         s.option,
         {
-          backgroundColor: selected ? c.text : c.surface,
-          borderColor: selected ? c.text : c.border,
-          opacity: pressed ? 0.85 : 1,
+          backgroundColor: c.surface,
+          borderColor: selected ? c.brand : c.border,
+          borderWidth: selected ? 2 : 1,
+          /* Compensa el +1 px del border seleccionado restando 1 al
+           * padding así no se le mueve el contenido entre estados. */
+          paddingHorizontal: selected ? 17 : 18,
+          paddingVertical: selected ? 15 : 16,
+          opacity: pressed ? 0.88 : 1,
         },
       ]}
     >
@@ -241,16 +250,13 @@ function CurrencyOption({
         <Text
           style={[
             s.optionLabel,
-            { color: selected ? c.bg : c.textSecondary },
+            { color: selected ? c.brand : c.textMuted },
           ]}
         >
           {label}
         </Text>
         <Text
-          style={[
-            s.optionAmount,
-            { color: selected ? c.bg : c.text },
-          ]}
+          style={[s.optionAmount, { color: c.text }]}
           numberOfLines={1}
           adjustsFontSizeToFit
         >
@@ -258,8 +264,8 @@ function CurrencyOption({
         </Text>
       </View>
       {selected ? (
-        <View style={[s.check, { backgroundColor: c.bg }]}>
-          <Feather name="check" size={14} color={c.text} />
+        <View style={[s.check, { backgroundColor: c.brand }]}>
+          <Feather name="check" size={14} color={c.onColor} />
         </View>
       ) : (
         <View
@@ -305,6 +311,10 @@ const s = StyleSheet.create({
   },
   heroWrap: {
     alignItems: "center",
+    /* marginTop generoso para que el pico del salto del "$" no roce
+     * el grabber pill gris del top del sheet (la pila sube ~26 px
+     * en la animación y la "$" top vivía a ~8 px del pill). */
+    marginTop: 28,
     marginBottom: 8,
   },
   title: {
