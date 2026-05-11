@@ -3094,8 +3094,6 @@ function FloorBrick({
             const dimmed = dimmedByActive || dimmedByMarket;
             const front = dimmed ? dimmedFront : blk.color;
             const top = dimmed ? dimmedTop : shadeHex(blk.color, 0.22);
-            const labelW = blk.x1 - blk.x0;
-            const showLabel = labelW > 46 && !dimmed;
             return (
               <G key={blk.key}>
                 <Polygon
@@ -3106,27 +3104,6 @@ function FloorBrick({
                   points={`${blk.x0},${yTop} ${blk.x1},${yTop} ${blk.x1 + depth},${yTop - topShift} ${blk.x0 + depth},${yTop - topShift}`}
                   fill={top}
                 />
-                {showLabel ? (
-                  /* % centrado en la cara frontal. textAnchor="middle"
-                   * + x=(x0+x1)/2 da centrado horizontal preciso. La y
-                   * usa offset manual fontSize*0.34 sobre el centro
-                   * vertical del wall — alignmentBaseline en RNSVG
-                   * tiene bugs cross-plataforma (iOS shifteaba el
-                   * texto horizontalmente en algunos casos). El peso
-                   * del 800 sale del fontFamily directo, sin
-                   * fontWeight (puede colisionar con el family-weight
-                   * y forzar fallback al system font). */
-                  <SvgText
-                    x={(blk.x0 + blk.x1) / 2}
-                    y={(yTop + yBot) / 2 + 6.5}
-                    textAnchor="middle"
-                    fontSize="19"
-                    fill={textOnHex(blk.color)}
-                    fontFamily={fontFamily[800]}
-                  >
-                    {Math.round(blk.pct)}%
-                  </SvgText>
-                ) : null}
               </G>
             );
           })}
@@ -3183,6 +3160,54 @@ function FloorBrick({
           </G>
         </Svg>
       </View>
+
+      {/* Labels de % — renderizados como RN Text en lugar de SvgText
+          para evitar bugs cross-plataforma del text-anchor middle con
+          ExtraBold + glyph "%". Cada label se ancla al centro PRECISO
+          de la cara frontal del block, calculado en pixels del
+          container con la misma escala viewBox→container del SVG.
+          El wrapper View de 80 px de ancho + alignItems "center"
+          garantiza el centrado horizontal exacto (el Text se auto-
+          dimensiona al contenido). */}
+      {containerW > 0
+        ? blocks.map((blk, i) => {
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && blk.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            const labelWvb = blk.x1 - blk.x0;
+            if (labelWvb <= 46 || dimmed) return null;
+            const scale = containerW / W;
+            const cxPx = ((blk.x0 + blk.x1) / 2) * scale;
+            const cyPx = ((yTop + yBot) / 2) * scale;
+            return (
+              <View
+                key={`pct-${blk.key}`}
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: cxPx - 40,
+                  top: cyPx - 12,
+                  width: 80,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: fontFamily[800],
+                    fontSize: 17,
+                    letterSpacing: -0.4,
+                    color: textOnHex(blk.color),
+                  }}
+                  numberOfLines={1}
+                >
+                  {Math.round(blk.pct)}%
+                </Text>
+              </View>
+            );
+          })
+        : null}
 
       {/* Market summary pill — aparece cuando el user holdea un
           mercado en la AllocationBar (dimMarket != null). Pill ink
