@@ -306,18 +306,22 @@ export default function AssetAlertsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
+            /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
+             * cuando cambia el prop con el control ya montado — queda
+             * pegado al tint inicial. `key={mode}` fuerza un remount
+             * cada vez que cambia el tema, garantizando que el color
+             * del modo actual sí se aplique. Esta es la diferencia que
+             * vuelve visible el spinner en dark. */
+            key={mode}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* En dark forzamos blanco — c.textMuted no se ve sobre el
-             * negro puro. Acá el ScrollView arranca DEBAJO del topBar
-             * + screenIntro + tabs, así que un offset pequeño alcanza
-             * para que el spinner no quede pegado al borde de los
-             * tabs. Sin progressBackgroundColor: en dark c.surface
-             * (#0D0D0D) ≈ c.bg (#000000) y la pill blanca default
-             * de Android contrasta mucho mejor con el spinner. */
+            /* Blanco puro en dark (máximo contraste sobre OLED),
+             * muted en light. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressViewOffset={20}
+            /* Offset chico: el ScrollView ya arranca debajo del topBar
+             * + screenIntro + tabs, no hace falta empujar más. */
+            progressViewOffset={8}
           />
         }
       >

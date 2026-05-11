@@ -304,17 +304,24 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
+            /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
+             * cuando cambia el prop con el control ya montado — queda
+             * pegado al tint inicial. `key={mode}` fuerza un remount
+             * cada vez que cambia el tema, garantizando que el color
+             * del modo actual sí se aplique. Esta es la diferencia que
+             * vuelve visible el spinner en dark. */
+            key={mode}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* En dark forzamos blanco — c.textMuted no se ve sobre el
-             * negro puro. progressViewOffset baja el spinner debajo
-             * del topBar sticky (insets.top + 12 + ~40 alto + colchón)
-             * para que no quede tapado. Sin progressBackgroundColor:
-             * en dark c.surface (#0D0D0D) ≈ c.bg (#000000) y arruina
-             * la pill que Android dibuja detrás del spinner. */
+            /* Blanco puro en dark (máximo contraste sobre OLED),
+             * muted en light. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressViewOffset={insets.top + 60}
+            /* Offset chico: el topBar ya ocupa espacio en flow normal
+             * y el ScrollView arranca debajo. Empujar el spinner +100px
+             * hacia adentro del contenido lo hacía irreconocible
+             * durante un pull corto. */
+            progressViewOffset={8}
           />
         }
       >

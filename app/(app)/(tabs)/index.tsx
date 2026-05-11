@@ -409,27 +409,32 @@ function BaseHome() {
         scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
+            /* CAUSA RAÍZ del "spinner invisible en dark":
+             *  iOS UIRefreshControl es un componente nativo gestionado
+             *  por UIKit. Cuando React Native cambia el `tintColor`
+             *  por prop, en muchas ocasiones (especialmente cuando el
+             *  control ya fue montado en light) NO re-aplica el color
+             *  al UIRefreshControl subyacente — queda pegado al primer
+             *  tint con el que arrancó. Forzando un remount via
+             *  `key={mode}` reseteamos el native view cada vez que
+             *  cambia el tema, garantizando que el tintColor del modo
+             *  actual sí se aplique. Issue tracking conocido en RN
+             *  (e.g. facebook/react-native#27272). */
+            key={mode}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* En light, c.textMuted gris se ve bien sobre el bg
-             * off-white. En dark, ese muted desaparece sobre el
-             * negro puro — forzamos #FFFFFF para máximo contraste.
-             *
-             * progressViewOffset = insets.top + topBar paddingTop (12)
-             * + topBar height (≈40) + colchón (8) = ~insets.top+60.
-             * Antes era 12 fijo y el spinner caía DETRÁS del topBar
-             * (que tiene bg c.bg sólido) — invisible en dark sobre
-             * #000000. Bajándolo MÁS abajo del topBar el spinner
-             * cae sobre el contenido del scroll y se lee.
-             *
-             * NO seteamos progressBackgroundColor: en dark el
-             * c.surface (#0D0D0D) era casi idéntico al c.bg (#000000)
-             * y arruinaba el contraste de la pill del spinner en
-             * Android. Default Android = pill blanco → mejor lectura
-             * de cualquier tintColor. */
+            /* Color: blanco puro en dark para máximo contraste sobre
+             * el #000000 OLED; gris muted en light que se lee bien
+             * sobre el off-white. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressViewOffset={insets.top + 60}
+            /* `progressViewOffset` chico — el topBar ya está en flow
+             * normal (no absolute), así que el ScrollView arranca
+             * debajo y el spinner aparece naturalmente en el área
+             * visible del scroll. Offsets grandes (insets.top+60)
+             * empujaban el spinner DENTRO del contenido y no llegaba
+             * a verse al hacer un pull corto. */
+            progressViewOffset={8}
           />
         }
       >
