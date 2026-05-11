@@ -859,7 +859,7 @@ export default function PortfolioScreen() {
                 <Text style={[s.linkRowHeading, { color }]}>
                   Rendimiento
                 </Text>
-                <Feather name="arrow-right" size={16} color={color} />
+                <Feather name="arrow-right" size={18} color={color} />
               </View>
               <View style={s.pygStack}>
                 <View style={s.pygAmountRow}>
@@ -4784,12 +4784,14 @@ const s = StyleSheet.create({
   marketsHeading: {
     marginBottom: 12,
   },
-  /* Variante compacta del heading — para el link de Rendimiento que
-   * vive en un row con valor al costado y necesita más balance. */
+  /* Heading del link de Rendimiento — fontSize 20 igualando el
+   * integer del AmountDisplay de la derecha (variación nominal).
+   * Así "Rendimiento" y el monto quedan a la misma altura visual. */
   linkRowHeading: {
     fontFamily: fontFamily[800],
-    fontSize: 17,
-    letterSpacing: -0.4,
+    fontSize: 20,
+    letterSpacing: -0.6,
+    lineHeight: 22,
   },
   marketRow: {
     paddingVertical: 14,
@@ -5006,7 +5008,10 @@ const s = StyleSheet.create({
    * un hairline arriba que lo separa de la sección Mercados. */
   linkRow: {
     flexDirection: "row",
-    alignItems: "center",
+    /* alignItems flex-start así "Rendimiento" del lado izquierdo se
+     * alinea con el AmountDisplay (top del right stack), y el eyebrow
+     * "PyG HOY" queda debajo sin afectar el alineo del título. */
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingVertical: 18,
