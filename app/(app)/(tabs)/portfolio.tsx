@@ -787,6 +787,8 @@ export default function PortfolioScreen() {
                     totalArs={totalArsWithCash}
                     currency={currency}
                     groupBy="category"
+                    dayPct={dayPct}
+                    dayUp={dayUp}
                     onHoldChange={setBrickHolding}
                     dimMarket={highlightedMarket}
                     onActiveMarketChange={setHighlightedMarket}
@@ -2275,6 +2277,10 @@ interface FloorPieProps {
   totalArs: number;
   currency: Currency;
   groupBy: "category" | "ticker";
+  /** % de variación del día del portfolio entero — se muestra en el
+   *  centro del donut como ▲/▼ pct%. */
+  dayPct: number;
+  dayUp: boolean;
   onHoldChange?: (holding: boolean) => void;
   /** Cuando !== null, las slices que NO sean de ese mercado se
    *  rendean a opacity 0.25. Driver: el cross-highlight de la
@@ -2292,6 +2298,8 @@ function FloorPie({
   totalArs,
   currency,
   groupBy,
+  dayPct,
+  dayUp,
   onHoldChange,
   dimMarket,
   onActiveMarketChange,
@@ -2303,17 +2311,20 @@ function FloorPie({
    * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
   const [tooltipH, setTooltipH] = useState(0);
 
-  // Geometría del viewBox — donut centrado horizontal, empujado hacia
-  // abajo (cy=85) y H acortado a 170 para minimizar el padding muerto
-  // arriba/abajo. outer 72 / inner 44 → grosor 28 ring un toque más
-  // dominante. Sin drop shadow ni outline entre slices (estética
-  // Robinhood: flat + slices "cortadas" por el bg color).
-  const W = 200;
-  const H = 170;
+  // Geometría del viewBox — más ancho (240) y alto (200) que la versión
+  // previa para hospedar los outer labels (%s alrededor del donut, con
+  // leader lines radiales). Donut centrado en (120, 100), outer 70 /
+  // inner 44 (grosor 26). Slices flat, "cortadas" por el bg color.
+  const W = 240;
+  const H = 200;
   const cx = W / 2;
-  const cy = 85;
-  const outerR = 72;
+  const cy = H / 2;
+  const outerR = 70;
   const innerR = 44;
+  /* Distancia (en viewBox units) desde el outer edge hasta el final
+   * de la leader line. El % va un poco más afuera. */
+  const LEADER_OUT = 8;
+  const LABEL_OUT = 14;
 
   type Row = {
     ticker: string;
@@ -2525,6 +2536,56 @@ function FloorPie({
               />
             );
           })}
+
+          {/* Outer labels — % de cada slice afuera del ring, conectado
+           *  con una leader line radial corta. Las labels de slices
+           *  dimmed bajan a opacity 0.25 para que sigan la atenuación
+           *  del slice correspondiente. Slices muy chicos (< 2%) ocultan
+           *  la label para evitar overlap visual. */}
+          {slices.map((slice, i) => {
+            if (slice.pct < 2) return null;
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && slice.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            const mid = (slice.startAngle + slice.endAngle) / 2;
+            const cosMid = Math.cos(mid);
+            const sinMid = Math.sin(mid);
+            const innerX = cx + (outerR + 1) * cosMid;
+            const innerY = cy + (outerR + 1) * sinMid;
+            const outerX = cx + (outerR + LEADER_OUT) * cosMid;
+            const outerY = cy + (outerR + LEADER_OUT) * sinMid;
+            const labelX = cx + (outerR + LABEL_OUT) * cosMid;
+            const labelY = cy + (outerR + LABEL_OUT) * sinMid;
+            const anchor =
+              cosMid > 0.15 ? "start" : cosMid < -0.15 ? "end" : "middle";
+            const opacity = dimmed ? 0.25 : 1;
+            return (
+              <G key={`olabel-${slice.key}`} opacity={opacity}>
+                <Line
+                  x1={innerX}
+                  y1={innerY}
+                  x2={outerX}
+                  y2={outerY}
+                  stroke={c.text}
+                  strokeWidth={0.6}
+                  strokeLinecap="round"
+                />
+                <SvgText
+                  x={labelX}
+                  y={labelY}
+                  fontFamily={fontFamily[600]}
+                  fontSize={9}
+                  fill={c.text}
+                  textAnchor={anchor}
+                  alignmentBaseline="middle"
+                >
+                  {formatSliceOuterPct(slice.pct)}
+                </SvgText>
+              </G>
+            );
+          })}
         </Svg>
 
         {/* Center text — por default balance + 'Distribución'. Cuando
@@ -2581,6 +2642,9 @@ function FloorPie({
                 </Text>
               </>
             ) : (
+              /* Default state — balance compact arriba + delta del
+               * día abajo (▲/▼ en tone color + pct). Coincide con el
+               * delta del hero. */
               <>
                 <Text
                   style={[s.pieCenterPrimary, { color: c.text }]}
@@ -2589,12 +2653,24 @@ function FloorPie({
                 >
                   {formatCenterMoney(totalDisplay, currency)}
                 </Text>
-                <Text
-                  style={[s.pieCenterSecondary, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  Distribución
-                </Text>
+                <View style={s.pieCenterDeltaRow}>
+                  <Text
+                    style={[
+                      s.pieCenterDeltaTri,
+                      { color: dayUp ? c.brand : c.red },
+                    ]}
+                  >
+                    {dayUp ? "▲" : "▼"}
+                  </Text>
+                  <Text
+                    style={[
+                      s.pieCenterDeltaPct,
+                      { color: dayUp ? c.brand : c.red },
+                    ]}
+                  >
+                    {fmtPctAbs(dayPct)}
+                  </Text>
+                </View>
               </>
             )}
           </View>
@@ -3971,6 +4047,13 @@ function formatTooltipPct(p: number): string {
   return p.toFixed(1).replace(".", ",") + "%";
 }
 
+/** Pct para las outer labels del FloorPie — round a entero si >= 10,
+ *  un decimal con coma si < 10 ("36%", "4,2%"). */
+function formatSliceOuterPct(p: number): string {
+  if (p >= 10) return Math.round(p).toString() + "%";
+  return p.toFixed(1).replace(".", ",") + "%";
+}
+
 /* ─── TooltipRowEntry — fila de detalle del pill compartido entre los
  *  4 charts.
  *
@@ -4730,6 +4813,24 @@ const s = StyleSheet.create({
     marginTop: 5,
     maxWidth: 134,
     textAlign: "center",
+  },
+  /* Delta hoy del donut — fila tri + pct en tone color (brand/red).
+   * Vive debajo del balance en el centro del donut, mismo lenguaje
+   * que el delta del hero pero más compacto. */
+  pieCenterDeltaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  pieCenterDeltaTri: {
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+  },
+  pieCenterDeltaPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    letterSpacing: -0.2,
   },
   /* Variante del centro cuando el user holdea un mercado en la
    * AllocationBar — % grande dominante + label del mercado abajo. */
