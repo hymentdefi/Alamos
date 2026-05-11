@@ -3659,21 +3659,31 @@ function RankingList({
             const labelColor = onDarkBg ? c.brand : inkColor;
             const showLabel = co.rx >= 60 && co.height >= 28;
             const cxPx = co.cx * scale;
-            const cyPx = (co.topY + co.height / 2) * scale;
+            const topPx = co.topY * scale;
+            const heightPx = co.height * scale;
             const pctText =
               co.pct >= 10
                 ? Math.round(co.pct).toString() + "%"
                 : co.pct.toFixed(1).replace(".", ",") + "%";
+            /* fontSize del pct escalado al rx — moneda grande pide
+             * número más dominante. Cap superior en 32 para no
+             * desbordar la cara frontal en las más anchas. */
+            const pctFontSize = Math.max(
+              16,
+              Math.min(32, co.rx / 5),
+            );
             return (
               <View
                 key={`label-${co.key}`}
                 pointerEvents="none"
                 style={{
                   position: "absolute",
-                  left: cxPx - 80,
-                  top: cyPx - 22,
-                  width: 160,
+                  left: cxPx - 90,
+                  top: topPx,
+                  width: 180,
+                  height: heightPx,
                   alignItems: "center",
+                  justifyContent: "center",
                   opacity: dimmed ? 0.35 : 1,
                 }}
               >
@@ -3681,8 +3691,9 @@ function RankingList({
                   style={{
                     color: inkColor,
                     fontFamily: fontFamily[800],
-                    fontSize: Math.max(13, Math.min(22, co.rx / 7)),
-                    letterSpacing: -0.5,
+                    fontSize: pctFontSize,
+                    letterSpacing: -0.8,
+                    lineHeight: pctFontSize + 2,
                   }}
                   numberOfLines={1}
                 >
@@ -3693,7 +3704,7 @@ function RankingList({
                     style={{
                       color: labelColor,
                       fontFamily: fontFamily[800],
-                      fontSize: 10,
+                      fontSize: 11,
                       letterSpacing: 0.6,
                       textTransform: "uppercase",
                       marginTop: 2,
