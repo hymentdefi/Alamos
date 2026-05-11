@@ -155,23 +155,25 @@ export default function RendimientoScreen() {
   const gananciaPct = startVal > 0 ? (ganancia / startVal) * 100 : 0;
   const up = ganancia >= 0;
   const color = up ? c.brand : c.red;
+  /* Mismo split que el chart del Inicio: el "chart" pill / arrows usan
+   * el verde brand vibrante; la línea del Sparkline usa dataGreen
+   * (en light coincide con brand, en dark es el verde más amigable). */
+  const sparklineColor = up ? c.dataGreen : c.red;
   const fmt = (n: number) => formatMoney(n, currency);
 
-  // Stats fijas (independientes del range).
-  const stats: Array<[string, string]> = [
-    ["Total invertido", fmt(invertido)],
-    ["YTD", "+8,4%"],
-    ["Mejor mes", "Marzo · +5,2%"],
-    ["Peor mes", "Octubre · −2,1%"],
-    ["Promedio mensual", "+1,3%"],
-    ["Días positivos", "62%"],
+  // Stats fijas (independientes del range). Single-column layout para
+  // que los valores con texto largo (ej. "Marzo · +5,2%") no queden
+  // truncados — un row por stat, label izquierda, valor derecha,
+  // hairlines entre rows. Mismo lenguaje key-value del stock detail
+  // adaptado a labels/valores más largos del rendimiento.
+  const stats: Array<{ label: string; value: string; tone?: "up" | "down" }> = [
+    { label: "Total invertido", value: fmt(invertido) },
+    { label: "YTD", value: "+8,4%", tone: "up" },
+    { label: "Mejor mes", value: "Marzo · +5,2%", tone: "up" },
+    { label: "Peor mes", value: "Octubre · −2,1%", tone: "down" },
+    { label: "Promedio mensual", value: "+1,3%", tone: "up" },
+    { label: "Días positivos", value: "62%" },
   ];
-  const pairs: Array<
-    [(typeof stats)[number], (typeof stats)[number] | null]
-  > = [];
-  for (let i = 0; i < stats.length; i += 2) {
-    pairs.push([stats[i], stats[i + 1] ?? null]);
-  }
 
   // Performance attribution mock — del doc, "+18% vino de los activos,
   // +10% vino de la devaluación del peso". Educativo en AR.
@@ -227,22 +229,25 @@ export default function RendimientoScreen() {
             </View>
           </View>
 
-          <Sparkline
-            series={series}
-            color={color}
-            height={200}
-            mode="line"
-            strokeWidth={1.6}
-            sheen
-            referenceLine
-            style={{ marginTop: 18, marginHorizontal: 0 }}
-            onScrub={(idx) => setScrubIndex(idx)}
-            onScrubEnd={() => setScrubIndex(null)}
-          />
+          <View style={s.chartWrap}>
+            <Sparkline
+              series={series}
+              color={sparklineColor}
+              height={300}
+              withFill={false}
+              sheen
+              referenceLine
+              strokeWidth={1}
+              mode="line"
+              onScrub={(idx) => setScrubIndex(idx)}
+              onScrubEnd={() => setScrubIndex(null)}
+            />
+          </View>
 
           <View style={s.rangeRow}>
             {RENDIMIENTO_RANGES.map((r) => {
               const active = r === range;
+              const fg = active ? c.bg : color;
               return (
                 <Tap
                   key={r}
@@ -258,70 +263,54 @@ export default function RendimientoScreen() {
                   ]}
                   hitSlop={8}
                 >
-                  <Text
-                    style={[
-                      s.rangeText,
-                      { color: active ? c.bg : color },
-                    ]}
-                  >
-                    {r}
-                  </Text>
+                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
                 </Tap>
               );
             })}
           </View>
 
-          {/* Stats grid */}
+          {/* Stats — single column con hairlines entre rows. Mismo
+              lenguaje key-value que el stock detail; en lugar de 2-col
+              cada stat ocupa toda la fila, así los valores largos
+              ("Marzo · +5,2%") no se truncan. Tone color en los % para
+              que la lectura sea más vivaz: brand cuando es +, red
+              cuando es −. */}
           <View style={s.card}>
             <Text style={[s.cardEyebrow, { color: c.text }]}>
               Estadísticas
             </Text>
-            {pairs.map(([left, right], i) => (
-              <View
-                key={i}
-                style={[
-                  s.statsGridRow,
-                  i < pairs.length - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: c.border,
-                  },
-                ]}
-              >
-                <View style={s.statsCell}>
+            {stats.map((stat, i) => {
+              const valueColor =
+                stat.tone === "up"
+                  ? c.brand
+                  : stat.tone === "down"
+                    ? c.red
+                    : c.text;
+              return (
+                <View
+                  key={stat.label}
+                  style={[
+                    s.statsRow,
+                    i < stats.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                >
                   <Text
                     style={[s.statsLabel, { color: c.textMuted }]}
                   >
-                    {left[0]}
+                    {stat.label}
                   </Text>
                   <Text
-                    style={[s.statsValue, { color: c.text }]}
+                    style={[s.statsValue, { color: valueColor }]}
                     numberOfLines={1}
                   >
-                    {left[1]}
+                    {stat.value}
                   </Text>
                 </View>
-                <View style={s.statsCell}>
-                  {right ? (
-                    <>
-                      <Text
-                        style={[
-                          s.statsLabel,
-                          { color: c.textMuted },
-                        ]}
-                      >
-                        {right[0]}
-                      </Text>
-                      <Text
-                        style={[s.statsValue, { color: c.text }]}
-                        numberOfLines={1}
-                      >
-                        {right[1]}
-                      </Text>
-                    </>
-                  ) : null}
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* Performance attribution FX vs activos — el insight más
@@ -417,23 +406,35 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Range pills — same que el detail.tsx */
+  /* Chart wrap — mismo lenguaje que el Inicio: position relative +
+   * overflow hidden. El chart ya vive a nivel de ScrollView (sin
+   * padding horizontal del padre), así que no necesita marginHorizontal
+   * negativo — respira edge-to-edge naturalmente. */
+  chartWrap: {
+    position: "relative",
+    overflow: "hidden",
+    marginTop: 18,
+  },
+  /* Range pills — copia del Inicio: justifyContent space-between,
+   * pill con radius.md (no pill 999) y typography más editorial. El
+   * paddingHorizontal 28 = 24 (rail estándar) + 4 (offset del Inicio
+   * para que las pills no toquen el chart). */
   rangeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 24,
-    paddingHorizontal: 20,
+    marginTop: 0,
+    paddingHorizontal: 28,
   },
   rangePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
     borderCurve: "continuous",
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
   },
   rangeText: {
     fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: 0.3,
+    fontSize: 12,
+    letterSpacing: 0.4,
   },
 
   /* Cards */
@@ -448,17 +449,16 @@ const s = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 16,
   },
-  statsGridRow: {
-    flexDirection: "row",
-    paddingVertical: 15,
-    gap: 32,
-  },
-  statsCell: {
-    flex: 1,
+  /* Stats row — single column key-value. Label izquierda 14/500 muted,
+   * valor derecha 15/700 (text o tone color para %s). Hairline divider
+   * entre rows. Mismo lenguaje que el stock detail, adaptado a 1-col
+   * para que valores largos no se trunquen. */
+  statsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    paddingVertical: 16,
+    gap: 12,
   },
   statsLabel: {
     fontFamily: fontFamily[500],
