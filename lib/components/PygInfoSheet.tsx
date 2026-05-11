@@ -19,6 +19,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Path, Rect } from "react-native-svg";
 import { fontFamily, radius, useTheme } from "../theme";
 
 interface Props {
@@ -30,11 +31,63 @@ const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
 /**
- * Bottom sheet "¿Qué es PyG?". Sin botones de cerrar — se cierra
- * deslizando hacia abajo (mismo patrón que MarketClosedSheet /
- * EarningsInfoSheet / ChartSettingsSheet). Explica al usuario que
- * el PyG es la ganancia / pérdida del día sobre el valor total del
- * portfolio.
+ * Ilustración "PyG" — mismo SVG que /icono-pyg.svg, inline con
+ * react-native-svg. Cuadrado con esquinas redondeadas: mitad superior
+ * verde con flecha hacia arriba, mitad inferior blanca con flecha hacia
+ * abajo. Comunica visualmente "ganancia o pérdida" antes del copy.
+ */
+function PygIcon({ size }: { size: number }) {
+  const STROKE = "#0E4310";
+  const GREEN = "#5FE850";
+  return (
+    <Svg width={size} height={size} viewBox="0 0 200 200">
+      <Rect
+        x={22}
+        y={22}
+        width={156}
+        height={156}
+        rx={14}
+        fill="#FFFFFF"
+        stroke={STROKE}
+        strokeWidth={3}
+      />
+      <Rect
+        x={22}
+        y={22}
+        width={156}
+        height={74}
+        rx={14}
+        fill={GREEN}
+        stroke={STROKE}
+        strokeWidth={3}
+      />
+      <Path d="M22 96 H178" stroke={STROKE} strokeWidth={3} />
+      <Path
+        d="M70 70 L88 50 L106 70 M88 50 V82"
+        stroke={STROKE}
+        strokeWidth={6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Path
+        d="M70 130 L88 150 L106 130 M88 150 V118"
+        stroke={STROKE}
+        strokeWidth={6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Bottom sheet "¿Qué es PyG?". Mismo patrón que MarketClosedSheet /
+ * EarningsInfoSheet / ChartSettingsSheet: se cierra deslizando hacia
+ * abajo, sin botones de cerrar. Header: icono PyG + título + body.
+ * Después dos párrafos cortos con label tonal (ganancia/pérdida)
+ * inline — sin bullets ni indentación.
  */
 export function PygInfoSheet({ visible, onClose }: Props) {
   const { c } = useTheme();
@@ -143,59 +196,43 @@ export function PygInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
+            <View style={s.illustrationWrap}>
+              <PygIcon size={108} />
+            </View>
+
             <Text style={[s.title, { color: c.text }]}>
               ¿Qué es PyG?
             </Text>
 
-            <Text style={[s.body, { color: c.textSecondary }]}>
+            <Text style={[s.body, { color: c.textMuted }]}>
               Es tu{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 Pérdida y Ganancia
               </Text>{" "}
-              del día. Te muestra cuánto subió o bajó el valor total de
-              tus posiciones desde la apertura, en monto y en porcentaje.
+              del día. Te muestra cuánto subió o bajó el valor total
+              de tus posiciones desde la apertura, en monto y en
+              porcentaje.
             </Text>
 
-            <View style={s.bullets}>
-              <Bullet
-                tone={c.brand}
-                label="Ganancia"
-                desc="Cuando tu portfolio vale más que al inicio del día. Se muestra en verde."
-              />
-              <Bullet
-                tone={c.red}
-                label="Pérdida"
-                desc="Cuando tu portfolio vale menos que al inicio del día. Se muestra en naranja."
-              />
-            </View>
+            <Text style={[s.note, { color: c.textMuted }]}>
+              <Text style={[s.noteLabel, { color: c.brand }]}>
+                Ganancia.
+              </Text>{" "}
+              Tu portfolio vale más que al inicio del día. Se muestra
+              en verde.
+            </Text>
 
-            <Text style={[s.footnote, { color: c.textMuted }]}>
-              El PyG cambia minuto a minuto durante la rueda y se cierra
-              al final del día. No es una ganancia realizada hasta que
-              vendas las posiciones.
+            <Text style={[s.note, { color: c.textMuted }]}>
+              <Text style={[s.noteLabel, { color: c.red }]}>
+                Pérdida.
+              </Text>{" "}
+              Tu portfolio vale menos que al inicio del día. Se
+              muestra en naranja.
             </Text>
           </View>
         </Animated.View>
       </GestureDetector>
     </Modal>
-  );
-}
-
-function Bullet({
-  label,
-  desc,
-  tone,
-}: {
-  label: string;
-  desc: string;
-  tone: string;
-}) {
-  const { c } = useTheme();
-  return (
-    <View style={s.bullet}>
-      <Text style={[s.bulletLabel, { color: tone }]}>{label}.</Text>
-      <Text style={[s.bulletDesc, { color: c.textSecondary }]}> {desc}</Text>
-    </View>
   );
 }
 
@@ -226,14 +263,19 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
   content: {
-    paddingTop: 18,
-    paddingHorizontal: 6,
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+  },
+  illustrationWrap: {
+    marginBottom: 18,
   },
   title: {
     fontFamily: fontFamily[800],
     fontSize: 26,
     letterSpacing: -1,
-    marginBottom: 14,
+    marginBottom: 10,
     textAlign: "center",
   },
   body: {
@@ -242,40 +284,25 @@ const s = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: -0.15,
     textAlign: "center",
-    paddingHorizontal: 8,
-    marginBottom: 22,
+    paddingHorizontal: 12,
   },
   bodyBold: {
     fontFamily: fontFamily[700],
   },
-  bullets: {
-    gap: 12,
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  bullet: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  bulletLabel: {
-    fontFamily: fontFamily[800],
-    fontSize: 14.5,
-    lineHeight: 21,
-    letterSpacing: -0.2,
-  },
-  bulletDesc: {
+  /* Mismo treatment que el subtitle del sheet, pero un escalón más
+   * chico — funcionan como dos párrafos secundarios después del body.
+   * Label inline en tone (brand / red); el resto del texto fluye sin
+   * indentación. */
+  note: {
     fontFamily: fontFamily[500],
-    fontSize: 14.5,
-    lineHeight: 21,
-    letterSpacing: -0.15,
-    flexShrink: 1,
-  },
-  footnote: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
     letterSpacing: -0.1,
     textAlign: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
+    marginTop: 14,
+  },
+  noteLabel: {
+    fontFamily: fontFamily[800],
   },
 });
