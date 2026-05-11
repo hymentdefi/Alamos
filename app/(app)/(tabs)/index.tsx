@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Dimensions,
   Animated,
   Easing,
   type NativeScrollEvent,
@@ -54,8 +53,8 @@ import {
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
-import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
 import {
   AlamosIcon,
@@ -125,31 +124,10 @@ function BaseHome() {
     SecureStore.setItemAsync("home:chart_range", r).catch(() => {});
   }, []);
   const [currency, setCurrency] = useState<"ARS" | "USD">("ARS");
-
-  /* Pager horizontal del balance — el swipe entre ARS y USD se hace
-   * con un ScrollView nested. Esto resuelve dos cosas a la vez:
-   *  (1) RN/iOS le dan prioridad de gesture al scroll horizontal
-   *      interno, así que ningún paneo lateral filtra al ScrollView
-   *      vertical (no más triggers accidentales del pull-to-refresh).
-   *  (2) La transición es la animación nativa de paging-scroll, que
-   *      es exactamente el "deslizamiento lento" que pidió Santi.
-   */
-  const balancePagerRef = useRef<ScrollView | null>(null);
-  const balancePageW = Dimensions.get("window").width;
-  /* Cuando el usuario tappea uno de los dots, scrolleamos a la página
-   * correspondiente. El cambio de `currency` se sincroniza en
-   * onMomentumScrollEnd, así que no hace falta llamar setCurrency
-   * acá — el momentum se encarga. */
-  const goToCurrency = useCallback(
-    (c: "ARS" | "USD") => {
-      const idx = c === "ARS" ? 0 : 1;
-      balancePagerRef.current?.scrollTo({
-        x: idx * balancePageW,
-        animated: true,
-      });
-    },
-    [balancePageW],
-  );
+  /* Sheet "Cómo ver tu portfolio" — mismo mecanismo que el portfolio
+   * tab: tap en el pill ARS/USD abre el sheet, el user elige y la
+   * preferencia se aplica al balance del hero. Sin swipe horizontal. */
+  const [currencyOpen, setCurrencyOpen] = useState(false);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   // Callbacks estables para que el Sparkline (memoizado) no se
   // re-renderee en cada cambio de state del padre. Sin esto, cada
@@ -319,14 +297,16 @@ function BaseHome() {
   const displayPct = (displayDelta / rangeStart) * 100;
   const displayIsUp = displayDelta >= 0;
   // Valores 'vigentes' por moneda — durante el scrub, cada portfolio
-  // escala por el mismo ratio que el total (current/total).
-  const scrubRatio = total > 0 ? current / total : 1;
-  const arsCurrent = arsTotal * scrubRatio;
-  const usdCurrent = usdTotal * scrubRatio;
-  // Delta del período expresado en cada moneda.
-  const deltaRatio = total > 0 ? displayDelta / total : 0;
-  const arsDelta = arsTotal * deltaRatio;
-  const usdDelta = usdTotal * deltaRatio;
+  // Unified converted balance & delta — mismo modelo que el portfolio
+  // tab. `current` y `displayDelta` están siempre en ARS (es el chart
+  // base); convertAmount los pasa a USD cuando el user selecciona esa
+  // moneda en el CurrencySheet.
+  const balanceDisplay =
+    currency === "ARS" ? current : convertAmount(current, "ARS", "USD");
+  const deltaDisplay =
+    currency === "ARS"
+      ? displayDelta
+      : convertAmount(displayDelta, "ARS", "USD");
 
   const timeLabel =
     scrubIndex != null
@@ -421,102 +401,40 @@ function BaseHome() {
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
-          {/* Pager horizontal del balance — 2 páginas (ARS/USD), cada
-              una al ancho completo del celular. El swipe usa
-              paging-scroll nativo: animación de desplazamiento smooth
-              y, lo más importante, RN da prioridad de gesture al
-              scroll horizontal interno → ya no se cuela el dy al
-              ScrollView vertical (sin más triggers accidentales del
-              pull-to-refresh). */}
-          <View style={s.balancePagerWrap}>
-            <ScrollView
-              ref={balancePagerRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="normal"
-              directionalLockEnabled
-              alwaysBounceVertical={false}
-              bounces={false}
-              contentOffset={{
-                x: currency === "ARS" ? 0 : balancePageW,
-                y: 0,
-              }}
-              onMomentumScrollEnd={(e) => {
-                const idx = Math.round(
-                  e.nativeEvent.contentOffset.x / balancePageW,
-                );
-                const next: "ARS" | "USD" = idx === 0 ? "ARS" : "USD";
-                if (next !== currency) {
-                  Haptics.selectionAsync().catch(() => {});
-                  setCurrency(next);
-                }
-              }}
-            >
-              {(["ARS", "USD"] as const).map((cur) => (
-                <Pressable
-                  key={cur}
-                  style={[s.balancePage, { width: balancePageW }]}
-                  /* Tap directo sobre el saldo togglea a la OTRA moneda
-                   * — el goToCurrency anima el scroll y el onMomentumEnd
-                   * sincroniza el estado. La RN handle del Pressable
-                   * dentro del ScrollView horizontal solo dispara
-                   * onPress en taps cortos, nunca durante un swipe. */
-                  onPress={() => goToCurrency(cur === "ARS" ? "USD" : "ARS")}
-                >
-                  <View style={s.flagWrap} pointerEvents="none">
-                    <FlagIcon code={cur === "ARS" ? "AR" : "US"} size={26} />
-                    <View
-                      style={[
-                        s.flagSwapBadge,
-                        { backgroundColor: c.ink, borderColor: c.bg },
-                      ]}
-                    >
-                      <Feather name="repeat" size={7} color={c.bg} />
-                    </View>
-                  </View>
-                  <AmountDisplay
-                    value={cur === "ARS" ? arsCurrent : usdCurrent}
-                    size={40}
-                    weight={800}
-                    currency={cur}
-                  />
-                </Pressable>
-              ))}
-            </ScrollView>
+          {/* Balance unificado — convertido a la moneda seleccionada.
+              Sin swipe horizontal. */}
+          <View style={s.balanceRow}>
+            <AmountDisplay
+              value={balanceDisplay}
+              size={40}
+              weight={800}
+              currency={currency}
+            />
           </View>
 
-          {/* Indicador de moneda — dos dots abajo del saldo.
-              El activo es texto-color, el inactivo es muted. Cada
-              dot es tappable para saltar directo a esa moneda
-              (además del tap/swipe sobre el monto que togglea). */}
-          <View style={s.currencyDots}>
-            <Pressable hitSlop={10} onPress={() => goToCurrency("ARS")}>
-              <View
-                style={[
-                  s.currencyDot,
-                  {
-                    backgroundColor:
-                      currency === "ARS" ? c.text : c.textFaint,
-                    width: currency === "ARS" ? 8 : 6,
-                    height: currency === "ARS" ? 8 : 6,
-                  },
-                ]}
+          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
+              "Cómo ver tu portfolio". Mismo mecanismo que el portfolio
+              tab — el sheet aclara que es la misma cartera, sólo
+              distinta valuación. */}
+          <View style={s.currencyPillRow}>
+            <Tap
+              haptic="selection"
+              pressScale={0.96}
+              onPress={() => setCurrencyOpen(true)}
+              style={[
+                s.currencyPill,
+                { backgroundColor: c.surfaceHover },
+              ]}
+            >
+              <Text style={[s.currencyPillCode, { color: c.text }]}>
+                {currency}
+              </Text>
+              <Feather
+                name="chevron-down"
+                size={12}
+                color={c.textMuted}
               />
-            </Pressable>
-            <Pressable hitSlop={10} onPress={() => goToCurrency("USD")}>
-              <View
-                style={[
-                  s.currencyDot,
-                  {
-                    backgroundColor:
-                      currency === "USD" ? c.text : c.textFaint,
-                    width: currency === "USD" ? 8 : 6,
-                    height: currency === "USD" ? 8 : 6,
-                  },
-                ]}
-              />
-            </Pressable>
+            </Tap>
           </View>
 
           <View style={s.deltaRow}>
@@ -526,8 +444,8 @@ function BaseHome() {
             <Text style={[s.deltaText, { color: trendColor }]}>
               {maskAmount(
                 currency === "ARS"
-                  ? formatARS(Math.abs(arsDelta))
-                  : formatUSD(Math.abs(usdDelta)),
+                  ? formatARS(Math.abs(deltaDisplay))
+                  : formatUSD(Math.abs(deltaDisplay)),
                 hideAmounts,
               )}
             </Text>
@@ -606,6 +524,16 @@ function BaseHome() {
         considerCashflow={considerCashflow}
         onChangeConsiderCashflow={onChangeConsiderCashflow}
         onClose={() => setChartSettingsOpen(false)}
+      />
+
+      {/* Sheet "Cómo ver tu portfolio" — abierto desde el pill ARS/USD
+          debajo del balance. Mismo mecanismo que el portfolio tab. */}
+      <CurrencySheet
+        visible={currencyOpen}
+        onClose={() => setCurrencyOpen(false)}
+        selected={currency}
+        totalArs={total}
+        onSelect={(cur) => setCurrency(cur)}
       />
     </View>
   );
@@ -1575,50 +1503,35 @@ const s = StyleSheet.create({
     letterSpacing: -2.2,
     marginBottom: 6,
   },
-  /* Pager del balance — el wrap rompe el padding del heroBlock con
-   * marginHorizontal: -24 para que cada página sea full screen (más
-   * área de swipe + transición visualmente más lenta). El padding
-   * vuelve a aparecer dentro de cada página. */
-  balancePagerWrap: {
-    marginHorizontal: -24,
+  /* Balance unificado — fila con sólo el AmountDisplay. Sin swipe
+   * horizontal: el currency se cambia desde el pill de abajo que
+   * abre el CurrencySheet. */
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
+   * CurrencySheet para cambiar moneda con un acto deliberado.
+   * Mismo patrón que el portfolio tab. */
+  currencyPillRow: {
+    flexDirection: "row",
     marginBottom: 8,
   },
-  balancePage: {
+  currencyPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 24,
-  },
-  flagWrap: {
-    position: "relative",
-  },
-  flagSwapBadge: {
-    position: "absolute",
-    bottom: -3,
-    right: -4,
-    width: 13,
-    height: 13,
-    borderCurve: "continuous",
-    borderRadius: 7,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  /* Indicador de moneda — dos dots horizontales abajo del saldo.
-     El activo es full-color y un toque más grande (8px) que el
-     inactivo (6px), para que la jerarquía sea clara aunque la
-     diferencia sea sutil. Tap directo a cualquiera salta a esa
-     moneda. */
-  currencyDots: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 10,
+    gap: 4,
+    paddingLeft: 10,
+    paddingRight: 6,
     paddingVertical: 4,
-  },
-  currencyDot: {
     borderCurve: "continuous",
     borderRadius: 999,
+  },
+  currencyPillCode: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   balance: {
     fontFamily: fontFamily[700],
