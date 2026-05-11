@@ -3721,6 +3721,9 @@ function Treemap({
       string,
       {
         ars: number;
+        /** Sumatoria del delta del día (ars * change%/100) por categoría
+         *  — alimenta el "▲ X,X%" en la card del mosaico. */
+        dayDeltaArs: number;
         cat: AssetCategory;
         market: MarketKey;
         rows: Row[];
@@ -3730,11 +3733,13 @@ function Treemap({
       const key = h.asset.category;
       const entry = byKey.get(key) ?? {
         ars: 0,
+        dayDeltaArs: 0,
         cat: h.asset.category,
         market: chartMarketFor(h.asset),
         rows: [],
       };
       entry.ars += h.ars;
+      entry.dayDeltaArs += h.ars * (h.asset.change / 100);
       entry.rows.push({
         ticker: h.asset.ticker,
         shortTicker: shortCryptoTicker(h.asset.ticker),
@@ -3752,6 +3757,7 @@ function Treemap({
         market: v.market,
         label: categoryLabels[v.cat],
         ars: v.ars,
+        dayDeltaArs: v.dayDeltaArs,
         rows: v.rows.sort((a, b) => b.ars - a.ars),
       }))
       .sort((a, b) => b.ars - a.ars);
@@ -3878,21 +3884,38 @@ function Treemap({
             const tileW = t.w * scale - 3;
             const tileH = t.h * scale - 3;
             const pct = (t.ars / totalArsAll) * 100;
-            // Tipografía proporcional al tamaño del tile — tiles
-            // grandes muestran label + pct grandes, tiles chicos
-            // sólo el pct, micro-tiles nada. Más jerarquía visual
-            // (Robinhood usa este patrón en su treemap de Sectors).
-            const isLarge = tileW > 110 && tileH > 70;
-            const isMedium = tileW > 70 && tileH > 50;
+            /* Card style "mosaico Robinhood": grandes con header strip
+             * lighter shade + body con pct grande + label brand + value
+             * y day change abajo. Medianas en horizontal compacto.
+             * Wide-narrow (Fondos al fondo) en una sola línea.
+             * Mini solo el pct centrado. */
+            const isLarge = tileW > 120 && tileH > 90;
+            const isMedium = tileW > 80 && tileH > 60;
+            const isWideNarrow = tileW > 120 && tileH > 30 && tileH <= 60;
             const isMini = tileW > 44 && tileH > 26;
-            const showLabel = isMedium;
-            const showPct = isMini;
-            const labelSize = isLarge ? 15 : 12;
-            const pctSize = isLarge ? 24 : isMedium ? 18 : 13;
             const ink = textOnHex(t.color);
-            const inkMuted = ink === "#FAFAF7"
-              ? "rgba(250,247,247,0.62)"
-              : "rgba(14,15,12,0.55)";
+            const isCash = t.cat === "efectivo";
+            const dayPctOfCat =
+              t.ars > 0 ? (t.dayDeltaArs / t.ars) * 100 : 0;
+            const dayUp = t.dayDeltaArs >= 0;
+            /* Color del day-change matchea el "ink" del card — el
+             * triángulo ▲/▼ ya comunica la dirección. Pintar ▲ en
+             * c.brand sobre un bg verde se vuelve invisible. */
+            const dayTone = ink;
+            const pctText =
+              pct >= 10
+                ? Math.round(pct).toString() + "%"
+                : pct.toFixed(1).replace(".", ",") + "%";
+            const valueText = formatRankingValue(t.ars);
+            const dayText = isCash
+              ? "— 0,0%"
+              : `${dayUp ? "▲" : "▼"} ${Math.abs(dayPctOfCat)
+                  .toFixed(1)
+                  .replace(".", ",")}%`;
+            const cardBg = dimmed ? c.surfaceSunken : t.color;
+            const headerBg = dimmed
+              ? c.surfaceSunken
+              : shadeHex(t.color, 0.3);
             return (
               <Pressable
                 key={t.key}
@@ -3904,68 +3927,233 @@ function Treemap({
                   top: t.y * scale + 1.5,
                   width: tileW,
                   height: tileH,
-                  backgroundColor: dimmed ? c.surfaceSunken : t.color,
+                  backgroundColor: cardBg,
                   borderCurve: "continuous",
-                  borderRadius: 8,
-                  paddingHorizontal: isLarge ? 12 : 8,
-                  paddingVertical: isLarge ? 12 : 8,
-                  justifyContent: "space-between",
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: c.ink,
                   opacity: dimmed ? 0.55 : 1,
                   overflow: "hidden",
                 }}
               >
-                {/* Label arriba — eyebrow style cuando entra. Si el
-                    tile es enano, todo el contenido se omite. */}
-                {showLabel ? (
-                  <Text
-                    style={[
-                      s.treemapLabel,
-                      {
-                        color: ink,
-                        fontSize: labelSize,
-                        opacity: 0.95,
-                      },
-                    ]}
-                    numberOfLines={1}
+                {/* Header strip — versión "card" Robinhood. Lighter
+                    shade del bg arriba, ~25% del alto en cards grandes,
+                    skip en chicos/wide-narrow. */}
+                {isLarge ? (
+                  <View
+                    style={{
+                      height: Math.max(20, tileH * 0.22),
+                      backgroundColor: headerBg,
+                    }}
+                  />
+                ) : null}
+
+                {isLarge ? (
+                  <View
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: 12,
+                      paddingTop: 8,
+                      paddingBottom: 10,
+                      justifyContent: "space-between",
+                    }}
                   >
-                    {t.label}
-                  </Text>
-                ) : (
-                  <View />
-                )}
-                {/* Pct grande abajo — protagonista del tile. Si el
-                    tile es chico, el % aparece igual (centrado), si
-                    es grande va abajo a la izquierda. */}
-                {showPct ? (
-                  <View>
-                    <Text
-                      style={[
-                        s.treemapPct,
-                        {
-                          color: ink,
-                          fontSize: pctSize,
-                          letterSpacing: pctSize >= 20 ? -0.8 : -0.4,
-                        },
-                      ]}
-                    >
-                      {pct >= 10
-                        ? Math.round(pct).toString() + "%"
-                        : pct.toFixed(1).replace(".", ",") + "%"}
-                    </Text>
-                    {/* Sub-label sólo en tiles grandes — un detalle
-                        más de jerarquía. Muestra count de tickers
-                        para contextualizar el valor. */}
-                    {isLarge ? (
+                    <View>
                       <Text
-                        style={[
-                          s.treemapSub,
-                          { color: inkMuted },
-                        ]}
+                        style={{
+                          color: ink,
+                          fontFamily: fontFamily[800],
+                          fontSize: 28,
+                          letterSpacing: -1,
+                          lineHeight: 30,
+                        }}
                         numberOfLines={1}
                       >
-                        {formatRankingValue(t.ars)}
+                        {pctText}
                       </Text>
-                    ) : null}
+                      <Text
+                        style={{
+                          color: c.brand,
+                          fontFamily: fontFamily[800],
+                          fontSize: 10,
+                          letterSpacing: 0.6,
+                          textTransform: "uppercase",
+                          marginTop: 4,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {t.label}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "baseline",
+                        gap: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: ink,
+                          fontFamily: fontFamily[700],
+                          fontSize: 12,
+                          letterSpacing: -0.2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {valueText}
+                      </Text>
+                      <Text
+                        style={{
+                          color: dayTone,
+                          fontFamily: fontFamily[700],
+                          fontSize: 12,
+                          letterSpacing: -0.2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {dayText}
+                      </Text>
+                    </View>
+                  </View>
+                ) : isWideNarrow ? (
+                  /* Cards anchas y bajitas (ej. Fondos al fondo): todo
+                     en una sola fila — % | label | value | day change */
+                  <View
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: 12,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: ink,
+                        fontFamily: fontFamily[800],
+                        fontSize: 16,
+                        letterSpacing: -0.4,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {pctText}
+                    </Text>
+                    <Text
+                      style={{
+                        color: c.brand,
+                        fontFamily: fontFamily[800],
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                      }}
+                      numberOfLines={1}
+                    >
+                      {t.label}
+                    </Text>
+                    <View style={{ flex: 1 }} />
+                    <Text
+                      style={{
+                        color: ink,
+                        fontFamily: fontFamily[700],
+                        fontSize: 11,
+                        letterSpacing: -0.1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {valueText}
+                    </Text>
+                    <Text
+                      style={{
+                        color: dayTone,
+                        fontFamily: fontFamily[700],
+                        fontSize: 11,
+                        letterSpacing: -0.1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {dayText}
+                    </Text>
+                  </View>
+                ) : isMedium ? (
+                  /* Cards medianas — pct + label arriba, value abajo,
+                     todo apilado vertical con padding. */
+                  <View
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <View>
+                      <Text
+                        style={{
+                          color: ink,
+                          fontFamily: fontFamily[800],
+                          fontSize: 22,
+                          letterSpacing: -0.7,
+                          lineHeight: 24,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {pctText}
+                      </Text>
+                      <Text
+                        style={{
+                          color: c.brand,
+                          fontFamily: fontFamily[800],
+                          fontSize: 9,
+                          letterSpacing: 0.5,
+                          textTransform: "uppercase",
+                          marginTop: 3,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {t.label}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: ink,
+                          fontFamily: fontFamily[700],
+                          fontSize: 11,
+                          letterSpacing: -0.1,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {valueText}
+                      </Text>
+                    </View>
+                  </View>
+                ) : isMini ? (
+                  /* Mini: solo el pct, centrado. */
+                  <View
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: ink,
+                        fontFamily: fontFamily[800],
+                        fontSize: 14,
+                        letterSpacing: -0.3,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {pctText}
+                    </Text>
                   </View>
                 ) : null}
               </Pressable>
