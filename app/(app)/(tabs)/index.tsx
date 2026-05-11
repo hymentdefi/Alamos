@@ -466,6 +466,7 @@ function BaseHome() {
               height={300}
               withFill={false}
               sheen
+              live
               referenceLine
               strokeWidth={1}
               mode="line"

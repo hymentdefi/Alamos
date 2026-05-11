@@ -355,7 +355,7 @@ export default function DetailScreen() {
             strokeWidth={1}
             withFill={false}
             sheen
-            live={range === "1D" && !marketClosed}
+            live
             referenceLine
             style={{ marginTop: 28, marginHorizontal: -24 }}
             onScrub={(idx) => setScrubIndex(idx)}

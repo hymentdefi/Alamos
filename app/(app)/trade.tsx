@@ -257,6 +257,7 @@ export default function TradeScreen() {
           mode="line"
           strokeWidth={1.5}
           withFill={false}
+          live
           referenceLine
           onScrub={(i) => setScrubIdx(i)}
           onScrubEnd={() => setScrubIdx(null)}
