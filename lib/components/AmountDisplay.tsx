@@ -22,6 +22,14 @@ interface Props {
    *  lo que dictaría `currency`. Útil para cosas tipo "+ $", "-$".
    *  Si no pasás ni este ni `currency`, default a "$" (ARS). */
   prefix?: string;
+  /** Override del fontSize de los decimales. Por default = max(12,
+   *  size * 0.38). Útil para sizes chicos donde el clamp a 12 hace
+   *  que los decimales se vean over-sized. */
+  decimalsSize?: number;
+  /** Override del marginTop de los decimales. Por default = size *
+   *  0.14. Pasar 0 (o un valor chico) para que los decimales suban
+   *  más al estilo Robinhood (chicos arriba a la derecha). */
+  decimalsMarginTop?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -45,6 +53,8 @@ export function AmountDisplay({
   stretchY = 1,
   currency = "ARS",
   prefix,
+  decimalsSize,
+  decimalsMarginTop,
   style,
 }: Props) {
   const { c } = useTheme();
@@ -59,8 +69,8 @@ export function AmountDisplay({
 
   const txt = color ?? c.text;
   const dec = decimalsColor ?? c.textMuted;
-  const decSize = Math.max(12, Math.round(size * 0.38));
-  const decMargin = Math.round(size * 0.14);
+  const decSize = decimalsSize ?? Math.max(12, Math.round(size * 0.38));
+  const decMargin = decimalsMarginTop ?? Math.round(size * 0.14);
 
   // Privacy mode: reemplaza dígitos por • preservando separadores.
   const integerDisplay = hideAmounts
