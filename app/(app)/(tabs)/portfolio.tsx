@@ -827,17 +827,14 @@ export default function PortfolioScreen() {
             />
           ) : null}
 
-          {/* ─── PyG — Pérdida y Ganancia del día. Heading "álamos-style"
-              en color tone (brand cuando up, red cuando down). Right
-              stack con monto absoluto del delta + pct. Tap abre el
-              PygInfoSheet con el disclaimer (bottom sheet, mismo
-              treatment que MarketClosedSheet). */}
+          {/* ─── Rendimiento — link al detalle histórico. El row entero
+              es Pressable → navega a /(app)/rendimiento. A la derecha,
+              eyebrow "PyG HOY" + info-dot (alamos-style, mismo patrón
+              que "Tu dinero" del Inicio) que abre el PygInfoSheet. Debajo
+              el AmountDisplay del día con decimales chiquitos arriba. */}
           {hasHoldings ? (
             <Pressable
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setPygOpen(true);
-              }}
+              onPress={() => router.push("/(app)/rendimiento" as never)}
               style={({ pressed }) => [
                 s.linkRow,
                 {
@@ -848,19 +845,49 @@ export default function PortfolioScreen() {
             >
               <View style={s.alamosHeadingRow}>
                 <Text style={[s.linkRowHeading, { color }]}>
-                  PyG
+                  Rendimiento
                 </Text>
                 <Feather name="arrow-right" size={16} color={color} />
               </View>
-              <View style={s.linkRowValueStack}>
-                <Text style={[s.linkRowValue, { color }]}>
-                  {dayUp ? "▲" : "▼"}{" "}
-                  {formatMoney(Math.abs(daySumDisplay), currency)}{" "}
-                  ({fmtPctAbs(dayPct)})
-                </Text>
-                <Text style={[s.linkRowValueSub, { color: c.textMuted }]}>
-                  hoy
-                </Text>
+              <View style={s.pygStack}>
+                <View style={s.pygEyebrowRow}>
+                  <Text
+                    style={[s.pygEyebrow, { color: c.textMuted }]}
+                  >
+                    PyG HOY
+                  </Text>
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setPygOpen(true);
+                    }}
+                    style={[
+                      s.pygInfoDot,
+                      { backgroundColor: c.surfaceHover },
+                    ]}
+                    accessibilityLabel="Qué es PyG"
+                  >
+                    <Feather
+                      name="info"
+                      size={10}
+                      color={c.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+                <View style={s.pygAmountRow}>
+                  <Text style={[s.pygDirTri, { color }]}>
+                    {dayUp ? "▲" : "▼"}
+                  </Text>
+                  <AmountDisplay
+                    value={Math.abs(daySumDisplay)}
+                    size={20}
+                    weight={800}
+                    color={color}
+                    decimalsColor={color}
+                    currency={currency}
+                  />
+                </View>
               </View>
             </Pressable>
           ) : null}
@@ -1609,7 +1636,7 @@ function AllocCaption({
     >
       <Animated.View style={animStyle}>
         <Text
-          style={[s.allocCaption, { color: c.text }]}
+          style={[s.allocCaption, { color: c.textMuted }]}
           numberOfLines={1}
         >
           {label}
@@ -4598,9 +4625,9 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   allocCaption: {
-    fontFamily: fontFamily[600],
+    fontFamily: fontFamily[700],
     fontSize: 12,
-    letterSpacing: -0.05,
+    letterSpacing: -0.1,
     textAlign: "center",
   },
 
@@ -5005,6 +5032,47 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: "uppercase",
     marginTop: 1,
+  },
+  /* Stack del lado derecho del row Rendimiento — eyebrow "PyG HOY"
+   * + info-dot arriba, luego el AmountDisplay con la ganancia/perdida
+   * del día. Todo right-aligned. */
+  pygStack: {
+    alignItems: "flex-end",
+  },
+  pygEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 2,
+  },
+  pygEyebrow: {
+    fontFamily: fontFamily[700],
+    fontSize: 10,
+    letterSpacing: 0.6,
+  },
+  /* Info-dot alamos-style — mismo treatment que el "Tu dinero" del
+   * Inicio. Círculo 18 con bg surfaceHover + Feather "info" centrado. */
+  pygInfoDot: {
+    width: 18,
+    height: 18,
+    borderCurve: "continuous",
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pygAmountRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+  },
+  /* Triángulo ▲/▼ a la izquierda del monto. marginTop alinea con
+   * el "$" prefix del AmountDisplay (que tiene su propio marginTop
+   * = size * 0.12). Para size 20 ≈ 2.4 px, redondeo a 3. */
+  pygDirTri: {
+    fontFamily: fontFamily[800],
+    fontSize: 13,
+    lineHeight: 14,
+    marginTop: 3,
   },
   /* Badge del glyph (Crypto / Todo) — círculo de 18 que aloja el
    * símbolo ₿ o el isotipo Alamos. Bg/fg flipean en active. */
