@@ -412,7 +412,7 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <MAIndicatorIllustration size={48} />}
                     title="Media Móvil (SMA)"
-                    description="El promedio histórico del precio. Cuando lo cruza, puede indicar un cambio de tendencia."
+                    description="Su cruce indica un cambio de tendencia."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "sma" });
@@ -425,7 +425,7 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <EMAIndicatorIllustration size={48} />}
                     title="Media Móvil (EMA)"
-                    description="Un promedio que reacciona más rápido a lo reciente. Detecta cambios de tendencia antes que la Media Móvil simple."
+                    description="Detecta cambios de tendencia antes."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
@@ -443,14 +443,14 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <RSIIndicatorIllustration size={48} />}
                     title="RSI"
-                    description="Indica si un activo está sobrecomprado o sobrevendido. Útil para anticipar posibles reversiones."
+                    description="Útil para anticipar reversiones."
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
                     icon={() => <MACDIndicatorIllustration size={48} />}
                     title="MACD"
-                    description="Mide la fuerza de una tendencia. Señala cuándo podría estar por cambiar de dirección."
+                    description="Señala cambios en la fuerza del movimiento."
                     onPress={() => handlePickType("macd")}
                     c={c}
                   />
@@ -462,14 +462,14 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <BollingerIndicatorIllustration size={48} />}
                     title="Bandas de Bollinger"
-                    description="Define el rango normal del precio. Cuando se sale de las bandas, algo fuera de lo común está pasando."
+                    description="Detecta movimientos fuera de lo normal."
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
                     icon={() => <VolumeIndicatorIllustration size={48} />}
                     title="Volumen"
-                    description="Cuánto dinero se está operando. Un pico de volumen suele anticipar un movimiento fuerte."
+                    description="Picos anticipan movimientos fuertes."
                     onPress={() => handlePickType("volume")}
                     c={c}
                   />
@@ -678,7 +678,10 @@ function PickerRow({
       <View style={s.pickerIcon}>{icon()}</View>
       <View style={{ flex: 1 }}>
         <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
-        <Text style={[s.pickerRowDesc, { color: c.textMuted }]}>
+        <Text
+          style={[s.pickerRowDesc, { color: c.textMuted }]}
+          numberOfLines={2}
+        >
           {description}
         </Text>
       </View>
