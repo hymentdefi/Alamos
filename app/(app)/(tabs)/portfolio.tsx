@@ -882,12 +882,14 @@ export default function PortfolioScreen() {
                     color={color}
                     decimalsColor={color}
                     currency={currency}
+                    decimalsSize={10}
+                    decimalsMarginTop={0}
                   />
-                  <Text style={[s.pygPct, { color }]}>
-                    ({fmtPctAbs(dayPct)})
-                  </Text>
                 </View>
                 <View style={s.pygEyebrowRow}>
+                  <Text style={[s.pygPct, { color }]}>
+                    {fmtPctAbs(dayPct)}
+                  </Text>
                   <Text
                     style={[s.pygEyebrow, { color: c.textMuted }]}
                   >
@@ -4853,7 +4855,7 @@ const s = StyleSheet.create({
    * Bloque de los 3 buckets (AR / US / Crypto). Hairlines como
    * única división, sin cards. El sectionTitle abre la sección. */
   marketsBlock: {
-    marginTop: 28,
+    marginTop: 8,
     paddingHorizontal: 24,
   },
   sectionTitle: {
@@ -5161,16 +5163,13 @@ const s = StyleSheet.create({
     lineHeight: 14,
     marginTop: 3,
   },
-  /* Variación pct a la derecha del monto — entre paréntesis. Mismo
-   * size y baseline que el triángulo así flota a la altura del "$"
-   * prefix del AmountDisplay. */
+  /* Variación pct — vive a la IZQUIERDA del "PyG HOY" eyebrow, tone
+   * color (brand/red según signo). Sin paréntesis. Size matchea el
+   * eyebrow para que la fila se sienta uniforme. */
   pygPct: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    lineHeight: 14,
-    letterSpacing: -0.2,
-    marginTop: 3,
-    marginLeft: 2,
+    fontFamily: fontFamily[800],
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
   pygEyebrowRow: {
     flexDirection: "row",
