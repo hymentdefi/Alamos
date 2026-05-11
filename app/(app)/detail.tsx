@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   Pressable,
-  RefreshControl,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -25,6 +24,7 @@ import Svg, {
 } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { Tap } from "../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../lib/components/AlamosRefreshControl";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -304,12 +304,10 @@ export default function DetailScreen() {
         onScroll={onScroll}
         scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl
-            key={mode}
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={refreshTint}
-            colors={[refreshTint]}
             progressViewOffset={8}
           />
         }

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Linking,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily, radius } from "../../../lib/theme";
 import { useAuth } from "../../../lib/auth/context";
 import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
+import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { Tap } from "../../../lib/components/Tap";
 import { AppearanceSheet } from "../../../lib/components/AppearanceSheet";
 
@@ -25,7 +25,7 @@ const APP_VERSION = "v1.0.0";
 export default function AlamoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, pref } = useTheme();
+  const { c, mode, pref } = useTheme();
   const { user, logout } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
@@ -112,9 +112,10 @@ export default function AlamoScreen() {
         }}
         scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
           />
         }
       >
