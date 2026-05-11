@@ -3095,7 +3095,7 @@ function FloorBrick({
             const front = dimmed ? dimmedFront : blk.color;
             const top = dimmed ? dimmedTop : shadeHex(blk.color, 0.22);
             const labelW = blk.x1 - blk.x0;
-            const showLabel = labelW > 38 && !dimmed;
+            const showLabel = labelW > 46 && !dimmed;
             return (
               <G key={blk.key}>
                 <Polygon
@@ -3107,12 +3107,19 @@ function FloorBrick({
                   fill={top}
                 />
                 {showLabel ? (
+                  /* % centrado en la cara frontal (vertical + horizontal).
+                   * alignmentBaseline="central" anchora el centro visual
+                   * del texto a (yTop+yBot)/2; textAnchor="middle"
+                   * centra horizontalmente. fontSize 19 + weight 800 +
+                   * letterSpacing -0.4 dan el peso "mas bold" pedido. */
                   <SvgText
                     x={(blk.x0 + blk.x1) / 2}
-                    y={(yTop + yBot) / 2 + 5}
+                    y={(yTop + yBot) / 2}
                     textAnchor="middle"
-                    fontSize="14"
+                    alignmentBaseline="central"
+                    fontSize="19"
                     fontWeight="800"
+                    letterSpacing={-0.4}
                     fill={textOnHex(blk.color)}
                     fontFamily={fontFamily[800]}
                   >
@@ -3142,9 +3149,12 @@ function FloorBrick({
                 );
               })()
             : null}
+          {/* Bordes ink del ladrillo — strokeWidth 2.4 (era 1.5) para
+              que el contorno del bloque + las divisiones entre slices
+              se vean robustos, en línea con el acabado handcrafted. */}
           <G
             stroke="#0E0F0C"
-            strokeWidth={1.5}
+            strokeWidth={2.4}
             strokeLinejoin="round"
             strokeLinecap="round"
             fill="none"
