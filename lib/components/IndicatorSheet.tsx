@@ -469,7 +469,7 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <VolumeIndicatorIllustration size={48} />}
                     title="Volumen"
-                    description="Cuánto dinero se opera. Un pico suele anticipar un movimiento fuerte."
+                    description="Cuánto dinero se está operando en el mercado. Un pico suele anticipar o confirmar un movimiento fuerte."
                     onPress={() => handlePickType("volume")}
                     c={c}
                   />
@@ -680,7 +680,7 @@ function PickerRow({
         <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
         <Text
           style={[s.pickerRowDesc, { color: c.textMuted }]}
-          numberOfLines={2}
+          numberOfLines={3}
         >
           {description}
         </Text>
