@@ -2477,6 +2477,14 @@ function FloorPie({
   const activeIdxRef = useRef<number | null>(null);
   const containerWRef = useRef(0);
   const slicesRef = useRef(slices);
+  /* Drag tracking — usado por el termination request para releaserse
+   * sólo cuando el user hace un swipe horizontal REAL (no por jitter
+   * del dedo). Sin esto, el ScrollView pedía la termination con
+   * cualquier movimiento mínimo y rompía el hold. */
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragDxRef = useRef(0);
+  const dragDyRef = useRef(0);
   useEffect(() => {
     containerWRef.current = containerW;
   }, [containerW]);
@@ -2549,25 +2557,36 @@ function FloorPie({
     >
       <View
         onStartShouldSetResponder={() => true}
-        /* Si el ScrollView padre (pager horizontal) detecta un swipe
-         * horizontal, pide el responder. Devolvemos true para que el
-         * chart libere el touch y el pager pueda swipear. Mientras el
-         * dedo está quieto o se mueve verticalmente, el pager no pide
-         * termination y el hold sigue funcionando. */
-        onResponderTerminationRequest={() => true}
+        /* Smart termination: liberamos el touch sólo cuando el user
+         * hizo un swipe horizontal claro (dx > 14 px y predomina sobre
+         * dy). Tocar quieto, jitter mínimo o movimiento vertical no
+         * dispara la release — el hold queda intacto. */
+        onResponderTerminationRequest={() =>
+          Math.abs(dragDxRef.current) > 14 &&
+          Math.abs(dragDxRef.current) >
+            Math.abs(dragDyRef.current) * 1.2
+        }
         onResponderGrant={(e) => {
+          dragStartXRef.current = e.nativeEvent.locationX;
+          dragStartYRef.current = e.nativeEvent.locationY;
+          dragDxRef.current = 0;
+          dragDyRef.current = 0;
           onHoldChange?.(true);
           handleTouch(
             e.nativeEvent.locationX,
             e.nativeEvent.locationY,
           );
         }}
-        onResponderMove={(e) =>
+        onResponderMove={(e) => {
+          dragDxRef.current =
+            e.nativeEvent.locationX - dragStartXRef.current;
+          dragDyRef.current =
+            e.nativeEvent.locationY - dragStartYRef.current;
           handleTouch(
             e.nativeEvent.locationX,
             e.nativeEvent.locationY,
-          )
-        }
+          );
+        }}
         onResponderRelease={() => {
           onHoldChange?.(false);
           handleTouch(null, null);
@@ -3050,6 +3069,11 @@ function FloorBrick({
   const activeIdxRef = useRef<number | null>(null);
   const containerWRef = useRef(0);
   const blocksRef = useRef(blocks);
+  /* Drag tracking — release sólo en swipes horizontales reales. */
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragDxRef = useRef(0);
+  const dragDyRef = useRef(0);
   useEffect(() => {
     containerWRef.current = containerW;
   }, [containerW]);
@@ -3135,20 +3159,27 @@ function FloorBrick({
     >
       <View
         onStartShouldSetResponder={() => true}
-        /* Si el ScrollView padre (pager horizontal) detecta un swipe
-         * horizontal, pide el responder. Devolvemos true para que el
-         * chart libere el touch y el pager pueda swipear. Mientras el
-         * dedo está quieto o se mueve verticalmente, el pager no pide
-         * termination y el hold sigue funcionando. */
-        onResponderTerminationRequest={() => true}
+        /* Smart termination — liberamos sólo en swipes horizontales
+         * claros (dx > 14 px y predomina sobre dy). Tap quieto o
+         * jitter mínimo no rompe el hold. */
+        onResponderTerminationRequest={() =>
+          Math.abs(dragDxRef.current) > 14 &&
+          Math.abs(dragDxRef.current) >
+            Math.abs(dragDyRef.current) * 1.2
+        }
         onResponderGrant={(e) => {
+          dragStartXRef.current = e.nativeEvent.locationX;
+          dragStartYRef.current = e.nativeEvent.locationY;
+          dragDxRef.current = 0;
+          dragDyRef.current = 0;
           onHoldChange?.(true);
           handleTouch(e.nativeEvent.locationX);
         }}
         onResponderMove={(e) => {
-          // Mientras el dedo está apoyado, el ScrollView padre está
-          // bloqueado (scrollEnabled=false) — así que el highlight
-          // sigue al dedo sin escape. Soltar para volver a scrollear.
+          dragDxRef.current =
+            e.nativeEvent.locationX - dragStartXRef.current;
+          dragDyRef.current =
+            e.nativeEvent.locationY - dragStartYRef.current;
           handleTouch(e.nativeEvent.locationX);
         }}
         onResponderRelease={() => {
@@ -3565,6 +3596,11 @@ function RankingList({
   const coinsRef = useRef(coins);
   const containerWRef = useRef(0);
   const activeIdxRef = useRef<number | null>(null);
+  /* Drag tracking — release sólo en swipes horizontales reales. */
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragDxRef = useRef(0);
+  const dragDyRef = useRef(0);
   useEffect(() => {
     coinsRef.current = coins;
   }, [coins]);
@@ -3643,16 +3679,27 @@ function RankingList({
       ]}
       onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
       onStartShouldSetResponder={() => true}
-      /* Misma lógica que FloorPie/FloorBrick: termination true para
-       * que el pager horizontal pueda agarrar el swipe sin pelearse
-       * con el hold de la CoinStack. */
-      onResponderTerminationRequest={() => true}
-      onResponderGrant={(e) =>
-        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY)
+      /* Smart termination — release sólo en swipes horizontales reales
+       * (dx > 14 px y predomina sobre dy). Hold/tap-quieto/movimiento
+       * vertical no rompe el hold. */
+      onResponderTerminationRequest={() =>
+        Math.abs(dragDxRef.current) > 14 &&
+        Math.abs(dragDxRef.current) > Math.abs(dragDyRef.current) * 1.2
       }
-      onResponderMove={(e) =>
-        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY)
-      }
+      onResponderGrant={(e) => {
+        dragStartXRef.current = e.nativeEvent.locationX;
+        dragStartYRef.current = e.nativeEvent.locationY;
+        dragDxRef.current = 0;
+        dragDyRef.current = 0;
+        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
+      }}
+      onResponderMove={(e) => {
+        dragDxRef.current =
+          e.nativeEvent.locationX - dragStartXRef.current;
+        dragDyRef.current =
+          e.nativeEvent.locationY - dragStartYRef.current;
+        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
+      }}
       onResponderRelease={() => handleTouch(null, null)}
       onResponderTerminate={() => handleTouch(null, null)}
     >
@@ -3692,14 +3739,19 @@ function RankingList({
             const topFill = dimmed
               ? c.surfaceHover
               : shadeHex(co.color, 0.22);
+            const highlightFill = dimmed
+              ? c.surfaceHover
+              : shadeHex(co.color, 0.65);
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
-            /* Render order: ELLIPSE primero, SIDE RECT segundo. Así el
-             * side rect (drawn on top) cubre la mitad inferior del
-             * ellipse, ocultando su stroke curvo que antes cruzaba la
-             * cara frontal del coin y atravesaba el label. Sólo queda
-             * visible la mitad superior del ellipse (el "cap") + el
-             * stroke recto del side rect en y=topY. La label queda
-             * libre de la curva ink. */
+            /* Render order:
+             *   1. Ellipse del cap (base shade + stroke difuso).
+             *   2. Highlight ellipse arriba del cap (lighter shade,
+             *      opacity 0.85) — el "reflejo de luz" pedido.
+             *   3. Side rect on top — cubre la mitad inferior del
+             *      cap ellipse, así su stroke curvo no cruza el label.
+             *
+             *   stroke: c.text con strokeOpacity 0.45 + strokeWidth 1.1
+             *   — la línea negra se ve más difuminada, no tan dura. */
             return (
               <G key={co.key}>
                 <Ellipse
@@ -3709,13 +3761,25 @@ function RankingList({
                   ry={co.ry}
                   fill={topFill}
                   stroke={c.text}
-                  strokeWidth={1.5}
+                  strokeWidth={1.1}
+                  strokeOpacity={0.45}
                 />
+                {!dimmed ? (
+                  <Ellipse
+                    cx={co.cx}
+                    cy={co.topY - co.ry * 0.38}
+                    rx={co.rx * 0.6}
+                    ry={co.ry * 0.32}
+                    fill={highlightFill}
+                    opacity={0.85}
+                  />
+                ) : null}
                 <SvgPath
                   d={sidePath}
                   fill={sideFill}
                   stroke={c.text}
-                  strokeWidth={1.5}
+                  strokeWidth={1.1}
+                  strokeOpacity={0.45}
                   strokeLinejoin="round"
                 />
               </G>
