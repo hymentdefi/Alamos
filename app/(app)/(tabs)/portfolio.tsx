@@ -854,7 +854,7 @@ export default function PortfolioScreen() {
                 <Text style={[s.linkRowHeading, { color }]}>
                   Rendimiento
                 </Text>
-                <Feather name="arrow-right" size={15} color={color} />
+                <Feather name="arrow-right" size={16} color={color} />
               </View>
               <View style={s.linkRowValueStack}>
                 <Text style={[s.linkRowValue, { color }]}>
@@ -868,10 +868,11 @@ export default function PortfolioScreen() {
           ) : null}
 
           {/* ─── Mercados — los 3 buckets de Álamos. Detalle por
-              mercado: monto + delta + posiciones + cash. */}
+              mercado: monto + delta + posiciones + cash. Heading
+              alamos-style, mismo peso visual que "Posiciones". */}
           {hasHoldings ? (
             <View style={s.marketsBlock}>
-              <Text style={[s.sectionTitle, { color: c.text }]}>
+              <Text style={[s.alamosHeadingText, s.marketsHeading, { color: c.text }]}>
                 Mercados
               </Text>
               <MarketRow
@@ -4300,12 +4301,18 @@ const s = StyleSheet.create({
     fontSize: 22,
     letterSpacing: -0.5,
   },
+  /* Spacer abajo del heading "Mercados" — alamosHeadingText no trae
+   * marginBottom (Posiciones lo hereda del positionsHead row), pero
+   * acá el heading vive como Text suelto. */
+  marketsHeading: {
+    marginBottom: 12,
+  },
   /* Variante compacta del heading — para el link de Rendimiento que
    * vive en un row con valor al costado y necesita más balance. */
   linkRowHeading: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.3,
+    fontFamily: fontFamily[800],
+    fontSize: 17,
+    letterSpacing: -0.4,
   },
   marketRow: {
     paddingVertical: 14,
