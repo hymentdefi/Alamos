@@ -54,7 +54,6 @@ import { MarketClosedIcon } from "../../lib/components/MarketClosedIcon";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
-import { PullRefreshIndicator } from "../../lib/components/PullRefreshIndicator";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
@@ -134,7 +133,7 @@ export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
@@ -305,17 +304,10 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            /* Native RefreshControl en transparente: maneja sólo la
-             * mecánica del gesto. Feedback visual lo aporta el
-             * <PullRefreshIndicator> overlayed afuera del scroll —
-             * necesario porque dentro del Animated.ScrollView de
-             * Reanimated v3, el tintColor del UIRefreshControl no se
-             * propaga al UIKit underlying en dark mode. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.bg}
-            colors={[c.bg]}
-            progressBackgroundColor={c.bg}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressViewOffset={8}
           />
         }
@@ -436,14 +428,6 @@ export default function DetailScreen() {
           ALyC, regulada por la CNV.
         </Text>
       </Animated.ScrollView>
-
-      {/* Indicador visual de pull-to-refresh — overlay garantizado
-          visible en dark/light. Topoffset = safe area + alto del
-          topBar (paddingTop insets.top+12 + ~44 de íconos) + aire. */}
-      <PullRefreshIndicator
-        refreshing={refreshing}
-        topOffset={insets.top + 64}
-      />
 
       <TradeBottomBar
         asset={asset}

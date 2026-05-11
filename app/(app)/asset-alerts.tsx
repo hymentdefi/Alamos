@@ -43,7 +43,6 @@ import { IndicatorDetailSheet } from "../../lib/components/IndicatorDetailSheet"
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
 import { IndicatorChartIllustration } from "../../lib/components/illustrations/IndicatorChartIllustration";
 import { Toggle } from "../../lib/components/Toggle";
-import { PullRefreshIndicator } from "../../lib/components/PullRefreshIndicator";
 import type { IndicatorAlert } from "../../lib/api/alerts";
 
 type Tab = "price" | "indicator";
@@ -70,7 +69,7 @@ export default function AssetAlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const { show } = useToast();
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
 
@@ -307,16 +306,10 @@ export default function AssetAlertsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            /* Native RefreshControl en transparente: maneja sólo la
-             * mecánica del gesto. Feedback visual lo aporta el
-             * <PullRefreshIndicator> overlayed afuera del scroll —
-             * necesario porque el tintColor del UIRefreshControl no
-             * se ve en dark mode pese a múltiples workarounds. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.bg}
-            colors={[c.bg]}
-            progressBackgroundColor={c.bg}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressViewOffset={8}
           />
         }
@@ -547,15 +540,6 @@ export default function AssetAlertsScreen() {
           </>
         )}
       </ScrollView>
-
-      {/* Indicador visual de pull-to-refresh — overlay garantizado
-          visible. Topoffset = safe area + topBar + screenIntro + tabs
-          (~ insets.top+12 + 44 + 80 + 56). Lo ponemos un poco más
-          abajo del header para que caiga sobre el área del scroll. */}
-      <PullRefreshIndicator
-        refreshing={refreshing}
-        topOffset={insets.top + 196}
-      />
 
       <View
         style={[

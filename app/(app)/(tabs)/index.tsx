@@ -76,7 +76,6 @@ import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
-import { PullRefreshIndicator } from "../../../lib/components/PullRefreshIndicator";
 
 type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
 
@@ -410,20 +409,10 @@ function BaseHome() {
         scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
-            /* El native RefreshControl se mantiene SÓLO para la
-             * mecánica del gesto (pull, threshold, release). El
-             * spinner nativo va invisible (`tintColor="transparent"`)
-             * porque en dark mode iOS NO re-aplicaba el tint al
-             * UIRefreshControl subyacente — pasamos por 4 iteraciones
-             * (key={mode}, rgba, offsets, etc.) sin éxito. El feedback
-             * visual ahora lo da `<PullRefreshIndicator>` overlayed
-             * abajo, que es un ActivityIndicator con color explícito
-             * y por ende GARANTIZADO visible en cualquier tema. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.bg}
-            colors={[c.bg]}
-            progressBackgroundColor={c.bg}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
+            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
             progressViewOffset={8}
           />
         }
@@ -609,16 +598,6 @@ function BaseHome() {
         <Investments byCategory={byCategory} />
 
       </ScrollView>
-
-      {/* Indicador visual de pull-to-refresh — overlay garantizado
-          visible en dark/light. El RefreshControl nativo de arriba
-          maneja el gesto; este componente es el feedback. Topoffset
-          calculado para caer apenas debajo del topBar (insets.top+12
-          de padding superior + ~40px de alto del topBar + 8 de aire). */}
-      <PullRefreshIndicator
-        refreshing={refreshing}
-        topOffset={insets.top + 60}
-      />
 
       {/* Sheet de ajustes del chart — abierto desde el icon de
           settings al final del timeline. */}
