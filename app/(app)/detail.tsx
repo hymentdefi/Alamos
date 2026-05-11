@@ -313,9 +313,9 @@ export default function DetailScreen() {
              * propaga al UIKit underlying en dark mode. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="transparent"
-            colors={["transparent"]}
-            progressBackgroundColor="transparent"
+            tintColor={c.bg}
+            colors={[c.bg]}
+            progressBackgroundColor={c.bg}
             progressViewOffset={8}
           />
         }
