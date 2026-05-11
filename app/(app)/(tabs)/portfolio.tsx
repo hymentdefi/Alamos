@@ -2778,6 +2778,11 @@ function FloorPie({
               left: containerW / 2,
               top: ((cy - outerR - 6) * containerW) / W,
               transform: [{ translateY: -tooltipH }],
+              /* Primer hold cold-start: tooltipH = 0 hasta que onLayout
+               * dispare. Sin esto, el pill aparece al ras del anchor
+               * (sin subir) por un frame y se ve plantado en el medio.
+               * Lo ocultamos hasta tener la medida real. */
+              opacity: tooltipH > 0 ? 1 : 0,
             },
           ]}
         >
@@ -3360,6 +3365,11 @@ function FloorBrick({
                * eleva el pill por encima del dedo. */
               top: ((yTop - topShift - 6) * containerW) / W,
               transform: [{ translateY: -tooltipH }],
+              /* Cold-start: tooltipH/W son 0 hasta el primer onLayout.
+               * Sin esta opacity, el primer hold del session pinta el
+               * pill al ras del anchor (sin subir, sin clampar) por un
+               * frame antes de saltar a la posición correcta. */
+              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
@@ -3874,6 +3884,8 @@ function RankingList({
               left: tooltipLeftPx,
               top: tooltipTopPx,
               transform: [{ translateY: -tooltipH }],
+              /* Cold-start hide — ver comentario equivalente en FloorBrick. */
+              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
@@ -4417,6 +4429,8 @@ function Treemap({
               left: tooltipLeftPx,
               top: tooltipTopPx,
               transform: [{ translateY: -tooltipH }],
+              /* Cold-start hide — ver comentario equivalente en FloorBrick. */
+              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
