@@ -63,6 +63,7 @@ import {
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { CurrencySheet } from "../../../lib/components/CurrencySheet";
+import { PygInfoSheet } from "../../../lib/components/PygInfoSheet";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -173,6 +174,7 @@ export default function PortfolioScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [pygOpen, setPygOpen] = useState(false);
   /* Sheet de selección de moneda — se abre desde la pill debajo del
    * balance. Cambiar moneda ahora es un acto deliberado: tap pill →
    * elegir card → confirma. NO hay swipe horizontal del balance. */
@@ -688,19 +690,6 @@ export default function PortfolioScreen() {
             </Tap>
           </View>
 
-          <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color }]}>
-              {dayUp ? "▲" : "▼"}
-            </Text>
-            <Text style={[s.deltaText, { color }]}>
-              {formatMoney(Math.abs(daySumDisplay), currency)}
-            </Text>
-            <Text style={[s.deltaText, { color }]}>
-              ({fmtPctAbs(dayPct)})
-            </Text>
-            <Text style={[s.deltaText, { color: c.textMuted }]}>hoy</Text>
-          </View>
-
           {/* Selector de viz — debajo del hero, alineado a la derecha.
            *  Orden: Treemap / Ladrillo / Pie / Ranking (poll bars). */}
           {hasHoldings ? (
@@ -838,13 +827,17 @@ export default function PortfolioScreen() {
             />
           ) : null}
 
-          {/* ─── Rendimiento — link al detalle. Heading "álamos-style"
-              (mismo treatment que Briefing del stock detail): título
-              22/800 + arrow-right pegado, todo en color tone (brand
-              cuando up, red cuando down). Valor del día al costado. */}
+          {/* ─── PyG — Pérdida y Ganancia del día. Heading "álamos-style"
+              en color tone (brand cuando up, red cuando down). Right
+              stack con monto absoluto del delta + pct. Tap abre el
+              PygInfoSheet con el disclaimer (bottom sheet, mismo
+              treatment que MarketClosedSheet). */}
           {hasHoldings ? (
             <Pressable
-              onPress={() => router.push("/(app)/rendimiento" as never)}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setPygOpen(true);
+              }}
               style={({ pressed }) => [
                 s.linkRow,
                 {
@@ -855,13 +848,15 @@ export default function PortfolioScreen() {
             >
               <View style={s.alamosHeadingRow}>
                 <Text style={[s.linkRowHeading, { color }]}>
-                  Rendimiento
+                  PyG
                 </Text>
                 <Feather name="arrow-right" size={16} color={color} />
               </View>
               <View style={s.linkRowValueStack}>
                 <Text style={[s.linkRowValue, { color }]}>
-                  ▲ {fmtPctAbs(12.4)}
+                  {dayUp ? "▲" : "▼"}{" "}
+                  {formatMoney(Math.abs(daySumDisplay), currency)}{" "}
+                  ({fmtPctAbs(dayPct)})
                 </Text>
                 <Text style={[s.linkRowValueSub, { color: c.textMuted }]}>
                   hoy
@@ -984,6 +979,10 @@ export default function PortfolioScreen() {
           selected={currency}
           totalArs={totalArs}
           onSelect={(cur) => setCurrency(cur)}
+        />
+        <PygInfoSheet
+          visible={pygOpen}
+          onClose={() => setPygOpen(false)}
         />
       </View>
     </AssetColorProvider>
@@ -1609,9 +1608,11 @@ function AllocCaption({
       style={{ flex: pct, marginLeft }}
     >
       <Animated.View style={animStyle}>
-        <Text style={s.allocCaption} numberOfLines={1}>
-          <Text style={{ color: c.brand }}>{pct.toFixed(0)}%</Text>
-          <Text style={{ color: c.text }}> {label}</Text>
+        <Text
+          style={[s.allocCaption, { color: c.text }]}
+          numberOfLines={1}
+        >
+          {label}
         </Text>
       </Animated.View>
     </Pressable>
