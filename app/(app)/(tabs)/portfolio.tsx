@@ -667,6 +667,7 @@ export default function PortfolioScreen() {
             <AmountDisplay
               value={totalDisplay * tickerProgress}
               size={42}
+              weight={800}
               currency={currency}
             />
           </View>
@@ -4589,11 +4590,11 @@ const s = StyleSheet.create({
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -1.2,
-    /* marginBottom generoso para dejar respirar al $ del balance —
-     * el lineHeight del integer es 1.05x con stretchY, lo que hace
-     * que la cabeza del símbolo casi roce el descender de "Portfolio"
-     * con marginBottom chico. 14 px deja aire suficiente. */
-    marginBottom: 14,
+    /* Pegamos el balance al título — antes 14 para que el "$" no
+     * tocara el descender de "Portfolio". Con weight 800 del balance
+     * y el lineHeight más cerrado del AmountDisplay, 6 px alcanza
+     * para no chocar y se siente más compacto. */
+    marginBottom: 6,
   },
   heroPagerRow: {
     flexDirection: "row",
