@@ -549,6 +549,22 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
+                  {/* Hero del indicador — ilustración 64×64 centrada
+                      + descripción gris 13px. Da contexto y llena el
+                      espacio entre el header y las rows. */}
+                  {selectedType ? (
+                    <View style={s.configHero}>
+                      <View style={s.configHeroIcon}>
+                        {indicatorIllustration(selectedType, config, 64)}
+                      </View>
+                      <Text
+                        style={[s.configHeroDesc, { color: c.textMuted }]}
+                      >
+                        {indicatorDescription(selectedType, config)}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   {selectedType ? (
                     <RowsFor
                       type={selectedType}
@@ -1456,6 +1472,44 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
+/** Mismas illustrations que el picker — la rendereamos arriba de las
+ *  rows del paso 2 para dar contexto del indicador elegido. */
+function indicatorIllustration(
+  t: IndicatorType,
+  cfg: ConfigState,
+  size: number,
+): React.ReactNode {
+  if (t === "ma") {
+    return cfg.maVariant === "ema" ? (
+      <EMAIndicatorIllustration size={size} />
+    ) : (
+      <MAIndicatorIllustration size={size} />
+    );
+  }
+  if (t === "rsi") return <RSIIndicatorIllustration size={size} />;
+  if (t === "macd") return <MACDIndicatorIllustration size={size} />;
+  if (t === "bollinger")
+    return <BollingerIndicatorIllustration size={size} />;
+  return <VolumeIndicatorIllustration size={size} />;
+}
+
+/** Mismo copy que la descripción del PickerRow del paso 1 — repetido
+ *  acá para dar contexto sin obligar al usuario a volver al picker. */
+function indicatorDescription(t: IndicatorType, cfg: ConfigState): string {
+  if (t === "ma") {
+    return cfg.maVariant === "ema"
+      ? "Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
+      : "Promedio histórico del precio. Cuando lo cruza, puede indicar un cambio de tendencia.";
+  }
+  if (t === "rsi")
+    return "Detecta sobrecompra y sobreventa. Puede anticipar posibles reversiones del precio.";
+  if (t === "macd")
+    return "Mide la fuerza de la tendencia. Puede señalar cambios de dirección antes de que ocurran.";
+  if (t === "bollinger")
+    return "Marca el rango normal del precio. Salirse puede indicar un movimiento fuera de lo común.";
+  return "Cuánto dinero se está operando. Un pico suele anticipar o confirmar un movimiento fuerte.";
+}
+
 function describePreview(
   type: IndicatorType,
   ticker: string,
@@ -1624,6 +1678,29 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.2,
+  },
+
+  /* ── Hero del paso 2 — ilustración + descripción del indicador ── */
+  configHero: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 18,
+  },
+  configHeroIcon: {
+    width: 64,
+    height: 64,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  configHeroDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.05,
+    textAlign: "center",
+    marginTop: 12,
+    paddingHorizontal: 8,
   },
 
   /* ── Flat list rows ── */
