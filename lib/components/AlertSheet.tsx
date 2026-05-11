@@ -125,18 +125,6 @@ export function AlertSheet({
   /* Ancho del slider: el sheet tiene paddingHorizontal 24 a cada
    * lado. El slider rellena de borde a borde del padding. */
   const SLIDER_WIDTH = windowW - 48;
-  /* Altura compartida con IndicatorSheet — ambos sheets se sienten
-   * del mismo tamaño visual. El número 760 viene del cálculo de la
-   * altura natural de este sheet (grabber + header + priceBlock +
-   * slider + chips + keypad + cta + paddings ≈ 729 px) con un poco
-   * de aire arriba; sumamos insets.bottom para que el safe area no
-   * coma contenido del CTA. En pantallas chicas (iPhone SE), el cap
-   * de 88 % evita que el sheet pase la pantalla. Si tocás esta
-   * fórmula, ESPEJALA en IndicatorSheet.tsx. */
-  const SHARED_SHEET_HEIGHT = Math.min(
-    windowH * 0.88,
-    760 + insets.bottom,
-  );
   const { create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
@@ -459,7 +447,6 @@ export function AlertSheet({
                 backgroundColor: c.bg,
                 borderColor: c.border,
                 paddingBottom: insets.bottom + 18,
-                height: SHARED_SHEET_HEIGHT,
               },
               sheetStyle,
             ]}
