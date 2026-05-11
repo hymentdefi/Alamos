@@ -1686,14 +1686,27 @@ function RankingGlyph({
   color: string;
   size?: number;
 }) {
-  // 3 horizontal bars, descending width — el clásico ranking icon.
+  // Stack de 3 monedas — la "pila desalineada" del CoinStack viz.
+  // Decrecen en ancho de arriba hacia abajo y se ofsetean horizontal-
+  // mente para sugerir el zigzag de la implementación real.
   return (
     <Svg width={size} height={size} viewBox="0 0 18 18">
       <SvgPath
-        d="M 3 5 H 14 M 3 9 H 11 M 3 13 H 7"
+        d={
+          // Top coin (cx=8, cy=4, rx=5, ry=1.2) — side panel + ellipse
+          "M 3 4 v 1.6 a 5 1.2 0 0 0 10 0 v -1.6 " +
+          "M 3 4 a 5 1.2 0 0 0 10 0 a 5 1.2 0 0 0 -10 0 " +
+          // Middle coin (cx=10, cy=9, rx=4, ry=1)
+          "M 6 9 v 1.4 a 4 1 0 0 0 8 0 v -1.4 " +
+          "M 6 9 a 4 1 0 0 0 8 0 a 4 1 0 0 0 -8 0 " +
+          // Bottom coin (cx=7, cy=13.5, rx=3, ry=0.8)
+          "M 4 13.5 v 1.2 a 3 0.8 0 0 0 6 0 v -1.2 " +
+          "M 4 13.5 a 3 0.8 0 0 0 6 0 a 3 0.8 0 0 0 -6 0"
+        }
         stroke={color}
-        strokeWidth={1.6}
+        strokeWidth={1.2}
         strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
       />
     </Svg>
@@ -3363,18 +3376,20 @@ function FloorBrick({
   );
 }
 
-/* ─── RankingList — barras horizontales ordenadas ────────────────
+/* ─── CoinStack — pila desalineada de monedas 3D ─────────────────
  *
- * Muestra cada categoría como una row con label + pct + barra de
- * fondo proporcional. Mismo dual-dimming que FloorPie/FloorBrick:
- *   - Hold sobre una row → highlightea (resto a opacity 0.35).
- *   - dimMarket → atenúa rows de otros mercados.
+ * Cuarto viz del portfolio. Cada categoría es una moneda cilíndrica
+ * (top ellipse + side rect con bottom curvo), apilada vertical con
+ * leve zigzag horizontal (de ahí "desalineada"). Tamaño proporcional
+ * al pct: la categoría más grande arriba (más rx + más height), las
+ * más chicas abajo. Mismo dual-dimming que el resto:
+ *   - Hold sobre una moneda → highlightea (resto a opacity 0.35).
+ *   - dimMarket → atenúa monedas de otros mercados.
  * onActiveMarketChange espeja al padre.
  *
- * Layout: cada row es un Pressable con bg-bar absoluto detrás del
- * contenido (label + pct). El bg-bar usa color de la paleta + opacity
- * sólida, así la barra se "ve" del lado izquierdo y se desvanece a
- * la derecha (efecto de fill horizontal).
+ * Render order: REVERSE (smallest first, largest last) — así las
+ * monedas grandes/superiores se dibujan al final y su bottom rim
+ * cubre el top rim de la siguiente, dando el efecto "stacked".
  */
 
 interface RankingListProps {
@@ -3396,11 +3411,7 @@ function RankingList({
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [containerW, setContainerW] = useState(0);
   const [tooltipH, setTooltipH] = useState(0);
-  /* Layout cache de cada row — para anclar el tooltip en el centro
-   * del row holdeado. */
-  const [rowLayouts, setRowLayouts] = useState<
-    Record<string, { y: number; h: number }>
-  >({});
+  const [tooltipW, setTooltipW] = useState(0);
 
   type Row = {
     ticker: string;
@@ -3440,178 +3451,302 @@ function RankingList({
       byKey.set(key, entry);
     }
     return Array.from(byKey.entries())
-      .map(([key, v], i) => ({
+      .map(([key, v]) => ({
         key,
         cat: v.cat,
         market: v.market,
         label: categoryLabels[v.cat],
         ars: v.ars,
         pct: (v.ars / totalArs) * 100,
-        color: BRICK_PALETTE[i % BRICK_PALETTE.length],
         rows: v.rows.sort((a, b) => b.ars - a.ars),
-        tickers: v.rows.length,
       }))
       .sort((a, b) => b.pct - a.pct)
       .map((r, i) => ({ ...r, color: BRICK_PALETTE[i % BRICK_PALETTE.length] }));
   }, [holdings, totalArs]);
 
-  const handleHold = useCallback(
-    (idx: number | null) => {
-      setActiveIdx(idx);
-      onHoldChange?.(idx !== null);
-      onActiveMarketChange?.(idx != null ? rows[idx].market : null);
-      if (idx !== null) Haptics.selectionAsync().catch(() => {});
+  /* Layout de cada moneda — rx/ry/height proporcionales al pct con
+   * floor mínimo (para que la moneda más chica siga siendo visible).
+   * Offset horizontal con sinusoidal del index → la pila queda
+   * "desalineada" como en la referencia. */
+  const W = 340;
+  const coins = useMemo(() => {
+    let cursorY = 0;
+    return rows.map((r, i) => {
+      const rx = Math.max(20, Math.min(150, r.pct * 4));
+      const ry = rx * 0.22;
+      const height = Math.max(14, Math.min(56, r.pct * 1.5));
+      const offsetX = Math.sin(i * 2.1 + 0.7) * 16;
+      const cx = W / 2 + offsetX;
+      if (i === 0) cursorY = 24 + ry;
+      const topY = cursorY;
+      cursorY = topY + height + ry;
+      return { ...r, cx, topY, rx, ry, height };
+    });
+  }, [rows]);
+
+  const H = useMemo(() => {
+    const last = coins[coins.length - 1];
+    if (!last) return 320;
+    return last.topY + last.height + last.ry + 36;
+  }, [coins]);
+
+  const coinsRef = useRef(coins);
+  const containerWRef = useRef(0);
+  const activeIdxRef = useRef<number | null>(null);
+  useEffect(() => {
+    coinsRef.current = coins;
+  }, [coins]);
+  useEffect(() => {
+    containerWRef.current = containerW;
+  }, [containerW]);
+
+  /* Hit test — itera de la moneda más arriba (index 0, dibujada al
+   * final = visualmente al frente) hacia abajo; primera que matchea
+   * gana. Bounding box: rx ancho × (ry + height + ry) alto. */
+  const handleTouch = useCallback(
+    (px: number | null, py: number | null) => {
+      let next: number | null = null;
+      const cW = containerWRef.current;
+      const cs = coinsRef.current;
+      if (px !== null && py !== null && cW > 0) {
+        const scale = W / cW;
+        const vbX = px * scale;
+        const vbY = py * scale;
+        for (let i = 0; i < cs.length; i++) {
+          const co = cs[i];
+          if (
+            vbX >= co.cx - co.rx &&
+            vbX <= co.cx + co.rx &&
+            vbY >= co.topY - co.ry &&
+            vbY <= co.topY + co.height + co.ry
+          ) {
+            next = i;
+            break;
+          }
+        }
+      }
+      if (next === activeIdxRef.current) return;
+      activeIdxRef.current = next;
+      setActiveIdx(next);
+      onActiveMarketChange?.(next != null ? cs[next].market : null);
+      onHoldChange?.(next !== null);
+      if (next !== null) Haptics.selectionAsync().catch(() => {});
     },
-    [onHoldChange, onActiveMarketChange, rows],
+    [onActiveMarketChange, onHoldChange],
   );
 
-  const activeRow = activeIdx !== null ? rows[activeIdx] ?? null : null;
-  const activeLayout = activeRow ? rowLayouts[activeRow.key] : null;
-  /* Anchor del tooltip — centro vertical del row, translateY(-h)
-   * después lo eleva por encima del dedo. */
-  const tooltipTopPx = activeLayout
-    ? activeLayout.y + activeLayout.h / 2 - 8
+  const activeCoin = activeIdx !== null ? coins[activeIdx] ?? null : null;
+  const scale = containerW > 0 ? containerW / W : 0;
+  const tooltipLeftPx = activeCoin ? activeCoin.cx * scale : 0;
+  const tooltipTopPx = activeCoin
+    ? (activeCoin.topY - activeCoin.ry - 6) * scale
     : 0;
+  /* Clamp horizontal del pill — el anchor sigue clavado al centro
+   * de la moneda; el pill se desplaza con translateX si su minWidth
+   * lo saca del viewport. */
+  const tooltipPillOffsetX = useMemo(() => {
+    if (!activeCoin || tooltipW === 0 || containerW === 0) return 0;
+    const pad = 8;
+    const minCenter = tooltipW / 2 + pad;
+    const maxCenter = containerW - tooltipW / 2 - pad;
+    if (minCenter > maxCenter) return 0;
+    const clampedCenter = Math.max(
+      minCenter,
+      Math.min(maxCenter, tooltipLeftPx),
+    );
+    return clampedCenter - tooltipLeftPx;
+  }, [activeCoin, tooltipW, containerW, tooltipLeftPx]);
+
+  /* Render order — REVERSE: smallest first (drawn first, queda atrás),
+   * largest last (sits on top con su bottom rim covering el top de
+   * la siguiente). Index 0 (más grande arriba) → al final del array
+   * reversed → drawn last. */
+  const coinsRender = useMemo(() => [...coins].reverse(), [coins]);
 
   return (
     <View
-      style={s.rankingWrap}
+      style={[
+        s.coinStackWrap,
+        containerW > 0 && { height: (containerW * H) / W },
+      ]}
       onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(e) =>
+        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY)
+      }
+      onResponderMove={(e) =>
+        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY)
+      }
+      onResponderRelease={() => handleTouch(null, null)}
+      onResponderTerminate={() => handleTouch(null, null)}
     >
-      {rows.map((r, i) => {
-        const dimmedByActive = activeIdx !== null && activeIdx !== i;
-        const dimmedByMarket =
-          dimMarket != null && r.market !== dimMarket;
-        const dimmed = dimmedByActive || dimmedByMarket;
-        const widthPct = Math.max(2, Math.min(100, r.pct));
-        const abbrev = abbrevLabel(r.label);
-        const valueArs = formatRankingValue(r.ars);
-        return (
-          <Pressable
-            key={r.key}
-            onPressIn={() => handleHold(i)}
-            onPressOut={() => handleHold(null)}
-            onLayout={(e) => {
-              const { y, height } = e.nativeEvent.layout;
-              setRowLayouts((prev) =>
-                prev[r.key]?.y === y && prev[r.key]?.h === height
-                  ? prev
-                  : { ...prev, [r.key]: { y, h: height } },
-              );
-            }}
-            style={[
-              s.rankRow,
-              i > 0 && {
-                borderTopColor: c.border,
-                borderTopWidth: StyleSheet.hairlineWidth,
-              },
-              { opacity: dimmed ? 0.35 : 1 },
-            ]}
-          >
-            <View style={s.rankBody}>
-              {/* Category icon — squircle 36 con bg de la paleta del
-                  brick + abbreviation 2-char en blanco bold. */}
+      {containerW > 0 ? (
+        <Svg
+          width="100%"
+          height={(containerW * H) / W}
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Drop shadow elíptica al fondo — debajo de la moneda más
+              chica (última del array original). */}
+          {(() => {
+            const last = coins[coins.length - 1];
+            if (!last) return null;
+            return (
+              <Ellipse
+                cx={W / 2}
+                cy={last.topY + last.height + last.ry + 18}
+                rx={Math.max(80, last.rx * 1.6)}
+                ry={6}
+                fill="rgba(14,15,12,0.10)"
+              />
+            );
+          })()}
+          {/* Coins — reverse order así las grandes (arriba del stack)
+              quedan dibujadas al final y su bottom rim cubre el top
+              rim de la siguiente. */}
+          {coinsRender.map((co) => {
+            const i = coins.indexOf(co);
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && co.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            const sideFill = dimmed ? c.surfaceSunken : co.color;
+            const topFill = dimmed
+              ? c.surfaceHover
+              : shadeHex(co.color, 0.22);
+            const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
+            return (
+              <G key={co.key}>
+                <SvgPath
+                  d={sidePath}
+                  fill={sideFill}
+                  stroke={c.text}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                />
+                <Ellipse
+                  cx={co.cx}
+                  cy={co.topY}
+                  rx={co.rx}
+                  ry={co.ry}
+                  fill={topFill}
+                  stroke={c.text}
+                  strokeWidth={1.5}
+                />
+              </G>
+            );
+          })}
+        </Svg>
+      ) : null}
+
+      {/* Labels overlay — RN Text posicionado en pixels para evitar
+          los bugs de centrado del SvgText con family ExtraBold +
+          glyph "%". Sólo monedas con rx suficiente (≥ 38) muestran
+          el pct + label. */}
+      {containerW > 0
+        ? coins.map((co, i) => {
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && co.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            if (co.rx < 38) return null;
+            const onDarkBg = textOnHex(co.color) === "#FAFAF7";
+            const inkColor = onDarkBg ? "#FAFAF7" : "#0E0F0C";
+            const labelColor = onDarkBg ? c.brand : inkColor;
+            const showLabel = co.rx >= 60 && co.height >= 28;
+            const cxPx = co.cx * scale;
+            const cyPx = (co.topY + co.height / 2) * scale;
+            const pctText =
+              co.pct >= 10
+                ? Math.round(co.pct).toString() + "%"
+                : co.pct.toFixed(1).replace(".", ",") + "%";
+            return (
               <View
-                style={[
-                  s.rankIcon,
-                  { backgroundColor: r.color },
-                ]}
+                key={`label-${co.key}`}
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: cxPx - 80,
+                  top: cyPx - 22,
+                  width: 160,
+                  alignItems: "center",
+                  opacity: dimmed ? 0.35 : 1,
+                }}
               >
                 <Text
-                  style={[
-                    s.rankIconText,
-                    { color: textOnHex(r.color) },
-                  ]}
-                >
-                  {abbrev}
-                </Text>
-              </View>
-              <View style={s.rankCenter}>
-                <Text
-                  style={[s.rankLabel, { color: c.text }]}
+                  style={{
+                    color: inkColor,
+                    fontFamily: fontFamily[800],
+                    fontSize: Math.max(13, Math.min(22, co.rx / 7)),
+                    letterSpacing: -0.5,
+                  }}
                   numberOfLines={1}
                 >
-                  {r.label}
+                  {pctText}
                 </Text>
-                <Text
-                  style={[s.rankMeta, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {r.tickers}{" "}
-                  {r.tickers === 1 ? "posición" : "posiciones"}
-                </Text>
-              </View>
-              <View style={s.rankRight}>
-                <Text style={[s.rankPct, { color: c.text }]}>
-                  {r.pct >= 10
-                    ? Math.round(r.pct).toString()
-                    : r.pct.toFixed(1).replace(".", ",")}
-                  <Text style={[s.rankPctSign, { color: c.textMuted }]}>
-                    {" "}%
+                {showLabel ? (
+                  <Text
+                    style={{
+                      color: labelColor,
+                      fontFamily: fontFamily[800],
+                      fontSize: 10,
+                      letterSpacing: 0.6,
+                      textTransform: "uppercase",
+                      marginTop: 2,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {co.label}
                   </Text>
-                </Text>
-                <Text
-                  style={[s.rankValue, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {valueArs}
-                </Text>
+                ) : null}
               </View>
-            </View>
-            {/* Progress bar al fondo del row — fill de la categoría
-                hasta widthPct, fondo neutro. Robinhood signature
-                "weight indicator". */}
-            <View
-              style={[
-                s.rankProgressTrack,
-                { backgroundColor: c.surfaceHover },
-              ]}
-            >
-              <View
-                style={[
-                  s.rankProgressFill,
-                  {
-                    backgroundColor: r.color,
-                    width: `${widthPct}%`,
-                  },
-                ]}
-              />
-            </View>
-          </Pressable>
-        );
-      })}
+            );
+          })
+        : null}
 
-      {/* Tooltip — pill ink ENCIMA del row holdeado. Mismo lenguaje
-          que FloorPie/FloorBrick: label uppercase + pct brand + lista
-          de tickers con su variación. */}
-      {activeRow && containerW > 0 && activeLayout ? (
+      {/* Tooltip — pill ink ENCIMA de la moneda holdeada. Mismo
+          lenguaje que FloorPie/FloorBrick/Mosaico. */}
+      {activeCoin && containerW > 0 ? (
         <Animated.View
-          key={`rank-tip-${activeRow.key}`}
+          key={`coin-tip-${activeCoin.key}`}
           entering={FadeIn.duration(120)}
           exiting={FadeOut.duration(100)}
           pointerEvents="none"
-          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
           style={[
             s.tooltipAnchor,
             {
-              left: containerW / 2,
+              left: tooltipLeftPx,
               top: tooltipTopPx,
               transform: [{ translateY: -tooltipH }],
             },
           ]}
         >
-          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+          <View
+            onLayout={(e) => {
+              setTooltipH(e.nativeEvent.layout.height);
+              setTooltipW(e.nativeEvent.layout.width);
+            }}
+            style={[
+              s.tooltipPill,
+              {
+                backgroundColor: c.ink,
+                transform: [{ translateX: tooltipPillOffsetX }],
+              },
+            ]}
+          >
             <View style={s.tooltipHeader}>
               <Text style={[s.tooltipLabel, { color: c.bg }]}>
-                {activeRow.label}
+                {activeCoin.label}
               </Text>
               <Text style={[s.tooltipPct, { color: c.brand }]}>
-                {formatTooltipPct(activeRow.pct)}
+                {formatTooltipPct(activeCoin.pct)}
               </Text>
             </View>
-            {/* DINERO usa el formato cash (currency code + monto en
-                native) en lugar del change %, que no aplica para cash. */}
-            {activeRow.rows.length > 0 ? (
+            {activeCoin.rows.length > 0 ? (
               <View
                 style={[
                   s.tooltipDivider,
@@ -3619,22 +3754,22 @@ function RankingList({
                 ]}
               />
             ) : null}
-            {activeRow.rows.slice(0, 5).map((rr) => (
+            {activeCoin.rows.slice(0, 5).map((rr) => (
               <TooltipRowEntry
                 key={rr.ticker}
-                isCash={activeRow.market === "DINERO"}
+                isCash={activeCoin.market === "DINERO"}
                 row={rr}
                 c={c}
               />
             ))}
-            {activeRow.rows.length > 5 ? (
+            {activeCoin.rows.length > 5 ? (
               <Text
                 style={[
                   s.tooltipMore,
                   { color: "rgba(255,255,255,0.45)" },
                 ]}
               >
-                +{activeRow.rows.length - 5} más
+                +{activeCoin.rows.length - 5} más
               </Text>
             ) : null}
           </View>
@@ -3643,18 +3778,6 @@ function RankingList({
       ) : null}
     </View>
   );
-}
-
-/** 2-char uppercase del label para el icon — CEDEARs → CE,
- *  Acciones AR → AR, Bonos → BO, Crypto → CR, etc. Si el label
- *  tiene espacio, agarra primera letra de cada palabra (max 2).
- *  Caso default: primeras 2 chars del label. */
-function abbrevLabel(label: string): string {
-  const words = label.trim().split(/\s+/);
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase();
-  }
-  return label.slice(0, 2).toUpperCase();
 }
 
 /** Compact format del valor de un grupo en el ranking — "$ 5,7 M",
@@ -5171,85 +5294,14 @@ const s = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
   },
 
-  /* Ranking — Robinhood-style. Cada row es un Pressable tall con:
-   * icon (squircle 36 con bg color + abbr 2-char), label + meta a la
-   * izq, pct + valor a la der, y barra de progreso al fondo del row
-   * que muestra el "weight" relativo (signature de Robinhood). */
-  rankingWrap: {
+  /* CoinStack — pila desalineada de monedas 3D. El wrap tiene
+   * position: relative + overflow: visible (los labels viven como
+   * absolute siblings del SVG). El height se asigna dinámicamente
+   * desde el render (containerW * H / W). */
+  coinStackWrap: {
     position: "relative",
-    paddingHorizontal: 0,
-  },
-  rankRow: {
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 12,
-  },
-  rankBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  rankIcon: {
-    width: 36,
-    height: 36,
-    borderCurve: "continuous",
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankIconText: {
-    fontFamily: fontFamily[800],
-    fontSize: 13,
-    letterSpacing: -0.2,
-  },
-  rankCenter: {
-    flex: 1,
-    minWidth: 0,
-  },
-  rankLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  rankMeta: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 2,
-  },
-  rankRight: {
-    alignItems: "flex-end",
-    minWidth: 78,
-  },
-  rankPct: {
-    fontFamily: fontFamily[800],
-    fontSize: 18,
-    letterSpacing: -0.5,
-  },
-  rankPctSign: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.2,
-  },
-  rankValue: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.1,
-    marginTop: 2,
-  },
-  /* Progress bar al fondo del row — track + fill. 3 px alto, llega
-   * de borde a borde del row interior. */
-  rankProgressTrack: {
-    height: 3,
-    marginTop: 12,
-    borderCurve: "continuous",
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  rankProgressFill: {
-    height: 3,
-    borderCurve: "continuous",
-    borderRadius: 2,
+    width: "100%",
+    overflow: "visible",
   },
 
   /* Treemap — canvas con tiles absolutamente posicionados.
