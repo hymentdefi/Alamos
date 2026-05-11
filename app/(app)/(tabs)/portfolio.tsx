@@ -7,7 +7,6 @@ import {
 } from "react";
 import {
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -69,6 +68,7 @@ import {
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
 
@@ -636,12 +636,10 @@ export default function PortfolioScreen() {
           scrollEventThrottle={16}
           scrollEnabled={!brickHolding}
           refreshControl={
-            <RefreshControl
-              key={mode}
+            <AlamosRefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={refreshTint}
-              colors={[refreshTint]}
               progressViewOffset={8}
             />
           }

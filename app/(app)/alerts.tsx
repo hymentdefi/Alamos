@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { fontFamily, radius, useTheme } from "../../lib/theme";
 import { Tap } from "../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../lib/components/AlamosRefreshControl";
 import { useAlerts } from "../../lib/alerts/context";
 import { useToast } from "../../lib/toast/context";
 import {
@@ -37,7 +37,7 @@ import {
 export default function AlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const { alerts, isLoading, remove, refresh } = useAlerts();
   const { show: showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
@@ -95,10 +95,10 @@ export default function AlertsScreen() {
           paddingBottom: insets.bottom + 28,
         }}
         refreshControl={
-          <RefreshControl
+          <AlamosRefreshControl
             refreshing={refreshing || isLoading}
             onRefresh={onRefresh}
-            tintColor={c.textMuted}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
           />
         }
       >

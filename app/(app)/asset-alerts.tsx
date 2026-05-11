@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,6 +36,7 @@ import {
 import { useAlerts } from "../../lib/alerts/context";
 import { useToast } from "../../lib/toast/context";
 import type { PriceAlert } from "../../lib/api/alerts";
+import { AlamosRefreshControl } from "../../lib/components/AlamosRefreshControl";
 import { AlertSheet } from "../../lib/components/AlertSheet";
 import { IndicatorSheet } from "../../lib/components/IndicatorSheet";
 import { IndicatorDetailSheet } from "../../lib/components/IndicatorDetailSheet";
@@ -306,12 +306,10 @@ export default function AssetAlertsScreen() {
         }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            key={mode}
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={refreshTint}
-            colors={[refreshTint]}
             progressViewOffset={8}
           />
         }

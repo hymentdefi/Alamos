@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
-  RefreshControl,
   Animated,
   Easing,
   type NativeScrollEvent,
@@ -16,6 +15,7 @@ import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { GlassCard } from "../../../lib/components/GlassCard";
 import { ConvertCurrencyButton } from "../../../lib/components/ConvertCurrencyButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,6 +103,7 @@ function BaseHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, mode } = useTheme();
+  const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
@@ -408,11 +409,10 @@ function BaseHome() {
         onScroll={onScroll}
         scrollEventThrottle={32}
         refreshControl={
-          <RefreshControl
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
+            tintColor={refreshTint}
             progressViewOffset={8}
           />
         }

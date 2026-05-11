@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import {
 } from "../../lib/data/assets";
 import { convertAmount } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../lib/components/AlamosRefreshControl";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -57,7 +57,7 @@ interface Holding {
 export default function PosicionesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [currency] = useState<Currency>("ARS");
   const [sort, setSort] = useState<SortKey>("value");
@@ -137,10 +137,10 @@ export default function PosicionesScreen() {
         }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.textMuted}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
           />
         }
       >

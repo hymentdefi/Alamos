@@ -17,7 +17,6 @@ import {
   Image,
   Modal,
   ScrollView,
-  RefreshControl,
   PanResponder,
   Easing,
   useWindowDimensions,
@@ -54,6 +53,7 @@ import {
   type HorizontalPagerHandle,
 } from "../../../lib/components/HorizontalPager";
 import { Tap } from "../../../lib/components/Tap";
+import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 
 type Category = "mercado" | "cedears" | "bonos" | "macro" | "fci" | "crypto";
 
@@ -478,7 +478,7 @@ function NewsPage({
   onDismissHint: () => void;
   onOpenDetail: (n: NewsItem) => void;
 }) {
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const activeIdxRef = useRef(0);
 
@@ -521,11 +521,10 @@ function NewsPage({
         onScroll={onScroll}
         scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl
+          <AlamosRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={c.textMuted}
-            colors={[c.textMuted]}
+            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             progressBackgroundColor={c.surface}
           />
         }
