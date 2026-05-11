@@ -3897,21 +3897,11 @@ function Treemap({
              * variantes de verde + gris CEDEARS), uso ink (almost
              * negro) para que la label tenga peso visual. */
             const labelColor = onDarkBg ? c.brand : ink;
-            const isCash = t.cat === "efectivo";
-            const dayPctOfCat =
-              t.ars > 0 ? (t.dayDeltaArs / t.ars) * 100 : 0;
-            const dayUp = t.dayDeltaArs >= 0;
-            const dayTone = dayUp ? c.brand : c.red;
             const pctText =
               pct >= 10
                 ? Math.round(pct).toString() + "%"
                 : pct.toFixed(1).replace(".", ",") + "%";
             const valueText = formatRankingValue(t.ars);
-            const dayText = isCash
-              ? "0,0%"
-              : `${dayUp ? "▲" : "▼"} ${Math.abs(dayPctOfCat)
-                  .toFixed(1)
-                  .replace(".", ",")}%`;
             const cardBg = dimmed ? c.surfaceSunken : t.color;
             const headerBg = dimmed
               ? c.surfaceSunken
@@ -3924,35 +3914,6 @@ function Treemap({
              * (ambos surfaceSunken). */
             const showGradient = isLarge && !dimmed;
             const gradientHeight = Math.max(22, tileH * 0.55);
-            /* Chip de day change — bg cream (c.bg) con tone-colored
-             * text adentro. Garantiza contraste sobre cualquier card
-             * (verde/negro/gris). Para cash no hay direccionalidad. */
-            const renderDayChip = (
-              size: "lg" | "md" = "lg",
-            ) => (
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  paddingHorizontal: size === "lg" ? 7 : 6,
-                  paddingVertical: size === "lg" ? 2 : 1,
-                  backgroundColor: c.bg,
-                  borderCurve: "continuous",
-                  borderRadius: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: isCash ? c.textMuted : dayTone,
-                    fontFamily: fontFamily[800],
-                    fontSize: size === "lg" ? 11 : 10,
-                    letterSpacing: -0.15,
-                  }}
-                  numberOfLines={1}
-                >
-                  {dayText}
-                </Text>
-              </View>
-            );
             return (
               <Pressable
                 key={t.key}
@@ -4026,25 +3987,21 @@ function Treemap({
                         {t.label}
                       </Text>
                     </View>
-                    <View>
-                      <Text
-                        style={{
-                          color: ink,
-                          fontFamily: fontFamily[700],
-                          fontSize: 12,
-                          letterSpacing: -0.2,
-                          marginBottom: 4,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {valueText}
-                      </Text>
-                      {renderDayChip("lg")}
-                    </View>
+                    <Text
+                      style={{
+                        color: ink,
+                        fontFamily: fontFamily[700],
+                        fontSize: 12,
+                        letterSpacing: -0.2,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {valueText}
+                    </Text>
                   </View>
                 ) : isWideNarrow ? (
                   /* Cards anchas y bajitas (ej. Fondos al fondo): todo
-                     en una sola fila — % | label | value | chip */
+                     en una sola fila — % | label | value */
                   <View
                     style={{
                       flex: 1,
@@ -4089,11 +4046,10 @@ function Treemap({
                     >
                       {valueText}
                     </Text>
-                    {renderDayChip("md")}
                   </View>
                 ) : isMedium ? (
-                  /* Cards medianas — pct + label arriba, value + chip
-                     abajo, todo apilado vertical con padding. */
+                  /* Cards medianas — pct + label arriba, value abajo,
+                     todo apilado vertical con padding. */
                   <View
                     style={{
                       flex: 1,
@@ -4129,21 +4085,17 @@ function Treemap({
                         {t.label}
                       </Text>
                     </View>
-                    <View>
-                      <Text
-                        style={{
-                          color: ink,
-                          fontFamily: fontFamily[700],
-                          fontSize: 11,
-                          letterSpacing: -0.1,
-                          marginBottom: 3,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {valueText}
-                      </Text>
-                      {renderDayChip("md")}
-                    </View>
+                    <Text
+                      style={{
+                        color: ink,
+                        fontFamily: fontFamily[700],
+                        fontSize: 11,
+                        letterSpacing: -0.1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {valueText}
+                    </Text>
                   </View>
                 ) : isMini ? (
                   /* Mini: solo el pct, centrado. */
