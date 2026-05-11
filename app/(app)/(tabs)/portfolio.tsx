@@ -719,6 +719,12 @@ export default function PortfolioScreen() {
                 decelerationRate="normal"
                 bounces={false}
                 directionalLockEnabled
+                /* overflow visible — los tooltips de los charts (slice / brick
+                 * / coin / row) viven con translateY(-tooltipH) para subir
+                 * encima del dedo. Sin esto, el UIScrollView clipea cualquier
+                 * cosa que se sale de su bounding box y el pill queda tapado
+                 * por el heroBlock de arriba (saldo + título Portfolio). */
+                style={s.vizPagerScroll}
                 /* IMPORTANT: el pager SIEMPRE queda scrollable, NO se
                  * mutea con brickHolding. Antes (scrollEnabled=!brickHolding)
                  * el ScrollView no podía pedir el touch al chart, así que
@@ -4788,10 +4794,26 @@ const s = StyleSheet.create({
 
   /* Chart block — full width, sin card. Sin título ni header — el
    * chart se rendea directo bajo la allocation bar del hero. El
-   * selector Pie/Ladrillo va DEBAJO del chart alineado a la derecha. */
+   * selector Pie/Ladrillo va DEBAJO del chart alineado a la derecha.
+   *
+   * zIndex 1 — sube todo el bloque del chart por encima de heroBlock.
+   * Necesario porque los tooltips de los charts viven con translateY
+   * negativo y entran visualmente en el área del saldo/título del
+   * portfolio. Sin zIndex, RN respeta el render order (chartBlock
+   * después de heroBlock, así que ya quedaría arriba), PERO algunos
+   * Android paths y nested ScrollView coordinate spaces invierten la
+   * composición y el tooltip queda tapado. zIndex explícito lo
+   * resuelve cross-plat. */
   chartBlock: {
     paddingHorizontal: 24,
     marginTop: 8,
+    zIndex: 1,
+  },
+  /* Style del ScrollView horizontal del pager — overflow visible para
+   * que los tooltips puedan extenderse arriba del top edge del scroll
+   * sin ser clippeados por el UIScrollView native. */
+  vizPagerScroll: {
+    overflow: "visible",
   },
   /* Cada page del horizontal pager — width se asigna inline desde
    * pageW. alignItems center para que charts con menos altura queden
