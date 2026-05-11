@@ -717,7 +717,16 @@ export default function PortfolioScreen() {
                 decelerationRate="normal"
                 bounces={false}
                 directionalLockEnabled
-                scrollEnabled={!brickHolding}
+                /* IMPORTANT: el pager SIEMPRE queda scrollable, NO se
+                 * mutea con brickHolding. Antes (scrollEnabled=!brickHolding)
+                 * el ScrollView no podía pedir el touch al chart, así que
+                 * cuando empezabas un swipe sobre el chart la cosa se
+                 * trababa: el chart claimaba, no soltaba (porque el pager
+                 * estaba disabled y nunca pedía termination), y el dedo
+                 * quedaba comiendo aire. Ahora el pager queda activo y
+                 * pide termination con cualquier swipe horizontal; el
+                 * chart la concede vía onResponderTerminationRequest=true
+                 * y suelta el touch limpio. */
                 onLayout={(e) => {
                   const w = e.nativeEvent.layout.width;
                   if (w !== pageW) setPageW(w);
