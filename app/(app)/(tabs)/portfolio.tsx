@@ -2759,6 +2759,43 @@ function FloorPie({
         ) : null}
       </View>
 
+      {/* Pre-measure invisible — skeleton del tooltip pill con un
+          layout representativo (header + 2 rows). onLayout dispara una
+          vez al mount del chart y setea tooltipH ANTES de que el user
+          holdee. Sin esto, el primer hold pintaba el pill con
+          translateY(0) (porque tooltipH arrancaba en 0) hasta que el
+          onLayout del tooltip real dispare — ~120ms con FadeIn
+          tapando el bug, pero la posición seguía mal. Con esto, el
+          primer paint del pill real ya tiene un tooltipH decente. */}
+      {tooltipH === 0 ? (
+        <View
+          pointerEvents="none"
+          onLayout={(e) => setTooltipH(e.nativeEvent.layout.height)}
+          style={[s.tooltipAnchor, s.tooltipMeasurer]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={s.tooltipLabel}>—</Text>
+              <Text style={s.tooltipPct}>—</Text>
+            </View>
+            <View
+              style={[
+                s.tooltipDivider,
+                { backgroundColor: "rgba(255,255,255,0.12)" },
+              ]}
+            />
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {/* Tooltip — aparece al holdear un slice. Mismo patrón visual
           que el FloorBrick: pill ink + label uppercase + pct en
           brand + lista de tickers con su variación. Posicionado
@@ -2778,11 +2815,6 @@ function FloorPie({
               left: containerW / 2,
               top: ((cy - outerR - 6) * containerW) / W,
               transform: [{ translateY: -tooltipH }],
-              /* Primer hold cold-start: tooltipH = 0 hasta que onLayout
-               * dispare. Sin esto, el pill aparece al ras del anchor
-               * (sin subir) por un frame y se ve plantado en el medio.
-               * Lo ocultamos hasta tener la medida real. */
-              opacity: tooltipH > 0 ? 1 : 0,
             },
           ]}
         >
@@ -3349,6 +3381,41 @@ function FloorBrick({
         </Animated.View>
       ) : null}
 
+      {/* Pre-measure invisible — ver comentario en FloorPie. Setea
+          tooltipH/W antes del primer hold real así translateY/clamp
+          ya pintan en la posición correcta desde el frame uno. */}
+      {tooltipH === 0 || tooltipW === 0 ? (
+        <View
+          pointerEvents="none"
+          onLayout={(e) => {
+            setTooltipH(e.nativeEvent.layout.height);
+            setTooltipW(e.nativeEvent.layout.width);
+          }}
+          style={[s.tooltipAnchor, s.tooltipMeasurer]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={s.tooltipLabel}>—</Text>
+              <Text style={s.tooltipPct}>—</Text>
+            </View>
+            <View
+              style={[
+                s.tooltipDivider,
+                { backgroundColor: "rgba(255,255,255,0.12)" },
+              ]}
+            />
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {activeBlock && containerW > 0 ? (
         <Animated.View
           key={`tip-${activeIdx}`}
@@ -3365,11 +3432,6 @@ function FloorBrick({
                * eleva el pill por encima del dedo. */
               top: ((yTop - topShift - 6) * containerW) / W,
               transform: [{ translateY: -tooltipH }],
-              /* Cold-start: tooltipH/W son 0 hasta el primer onLayout.
-               * Sin esta opacity, el primer hold del session pinta el
-               * pill al ras del anchor (sin subir, sin clampar) por un
-               * frame antes de saltar a la posición correcta. */
-              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
@@ -3870,6 +3932,41 @@ function RankingList({
           })
         : null}
 
+      {/* Pre-measure invisible — ver FloorPie. Setea tooltipH/W antes
+          del primer hold real así el pill ya pinta arriba del dedo
+          desde frame uno. */}
+      {tooltipH === 0 || tooltipW === 0 ? (
+        <View
+          pointerEvents="none"
+          onLayout={(e) => {
+            setTooltipH(e.nativeEvent.layout.height);
+            setTooltipW(e.nativeEvent.layout.width);
+          }}
+          style={[s.tooltipAnchor, s.tooltipMeasurer]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={s.tooltipLabel}>—</Text>
+              <Text style={s.tooltipPct}>—</Text>
+            </View>
+            <View
+              style={[
+                s.tooltipDivider,
+                { backgroundColor: "rgba(255,255,255,0.12)" },
+              ]}
+            />
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {/* Tooltip — pill ink ENCIMA de la moneda holdeada. Mismo
           lenguaje que FloorPie/FloorBrick/Mosaico. */}
       {activeCoin && containerW > 0 ? (
@@ -3884,8 +3981,6 @@ function RankingList({
               left: tooltipLeftPx,
               top: tooltipTopPx,
               transform: [{ translateY: -tooltipH }],
-              /* Cold-start hide — ver comentario equivalente en FloorBrick. */
-              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
@@ -4200,9 +4295,14 @@ function Treemap({
              * shade en el top a fully transparent en ~55% del alto. La
              * transparencia se hace mezclando con el mismo color con
              * alpha 0 (interpola limpio en RGBA, no salta a otro tono).
-             * En cards dimmed lo skipeamos porque headerBg == bg
-             * (ambos surfaceSunken). */
-            const showGradient = isLarge && !dimmed;
+             *
+             * Skipear en:
+             *   - cards dimmed (headerBg == bg → no se vería)
+             *   - cards con bg oscuro (onDarkBg) — el lighten shade
+             *     producía una "luz cayendo desde arriba" que en el
+             *     fondo casi-negro del DINERO se veía como un bloque
+             *     gris flotante, no como reflejo natural. */
+            const showGradient = isLarge && !dimmed && !onDarkBg;
             const gradientHeight = Math.max(22, tileH * 0.55);
             return (
               <Pressable
@@ -4415,6 +4515,41 @@ function Treemap({
           })
         : null}
 
+      {/* Pre-measure invisible — ver FloorPie. Setea tooltipH/W antes
+          del primer hold real así el pill ya pinta arriba del dedo
+          desde frame uno. */}
+      {tooltipH === 0 || tooltipW === 0 ? (
+        <View
+          pointerEvents="none"
+          onLayout={(e) => {
+            setTooltipH(e.nativeEvent.layout.height);
+            setTooltipW(e.nativeEvent.layout.width);
+          }}
+          style={[s.tooltipAnchor, s.tooltipMeasurer]}
+        >
+          <View style={[s.tooltipPill, { backgroundColor: c.ink }]}>
+            <View style={s.tooltipHeader}>
+              <Text style={s.tooltipLabel}>—</Text>
+              <Text style={s.tooltipPct}>—</Text>
+            </View>
+            <View
+              style={[
+                s.tooltipDivider,
+                { backgroundColor: "rgba(255,255,255,0.12)" },
+              ]}
+            />
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+            <View style={s.tooltipRow}>
+              <Text style={s.tooltipTicker}>—</Text>
+              <Text style={s.tooltipChange}>—</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {/* Tooltip — pill ink ENCIMA del tile holdeado. Mismo lenguaje
           que FloorPie/FloorBrick/RankingList. */}
       {activeTile && containerW > 0 ? (
@@ -4429,8 +4564,6 @@ function Treemap({
               left: tooltipLeftPx,
               top: tooltipTopPx,
               transform: [{ translateY: -tooltipH }],
-              /* Cold-start hide — ver comentario equivalente en FloorBrick. */
-              opacity: tooltipH > 0 && tooltipW > 0 ? 1 : 0,
             },
           ]}
         >
@@ -5414,6 +5547,17 @@ const s = StyleSheet.create({
     width: 0,
     alignItems: "center",
     zIndex: 5,
+  },
+  /* Skeleton offscreen del tooltip — un mirror invisible del pill que
+   * vive siempre mounted (mientras tooltipH === 0) y dispara su
+   * onLayout al primer paint del chart. Setea tooltipH antes de que
+   * el user holdee, así translateY(-tooltipH) ya pinta el pill arriba
+   * del dedo desde el frame uno. left/top negativos lo sacan del
+   * viewport; opacity 0 + pointerEvents none lo hacen no-interactivo. */
+  tooltipMeasurer: {
+    left: -9999,
+    top: -9999,
+    opacity: 0,
   },
   tooltipPill: {
     minWidth: 168,
