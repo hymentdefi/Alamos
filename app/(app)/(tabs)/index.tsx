@@ -76,6 +76,7 @@ import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
+import { PullRefreshIndicator } from "../../../lib/components/PullRefreshIndicator";
 
 type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
 
@@ -409,31 +410,20 @@ function BaseHome() {
         scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
-            /* CAUSA RAÍZ del "spinner invisible en dark":
-             *  iOS UIRefreshControl es un componente nativo gestionado
-             *  por UIKit. Cuando React Native cambia el `tintColor`
-             *  por prop, en muchas ocasiones (especialmente cuando el
-             *  control ya fue montado en light) NO re-aplica el color
-             *  al UIRefreshControl subyacente — queda pegado al primer
-             *  tint con el que arrancó. Forzando un remount via
-             *  `key={mode}` reseteamos el native view cada vez que
-             *  cambia el tema, garantizando que el tintColor del modo
-             *  actual sí se aplique. Issue tracking conocido en RN
-             *  (e.g. facebook/react-native#27272). */
-            key={mode}
+            /* El native RefreshControl se mantiene SÓLO para la
+             * mecánica del gesto (pull, threshold, release). El
+             * spinner nativo va invisible (`tintColor="transparent"`)
+             * porque en dark mode iOS NO re-aplicaba el tint al
+             * UIRefreshControl subyacente — pasamos por 4 iteraciones
+             * (key={mode}, rgba, offsets, etc.) sin éxito. El feedback
+             * visual ahora lo da `<PullRefreshIndicator>` overlayed
+             * abajo, que es un ActivityIndicator con color explícito
+             * y por ende GARANTIZADO visible en cualquier tema. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* Color: blanco puro en dark para máximo contraste sobre
-             * el #000000 OLED; gris muted en light que se lee bien
-             * sobre el off-white. */
-            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            /* `progressViewOffset` chico — el topBar ya está en flow
-             * normal (no absolute), así que el ScrollView arranca
-             * debajo y el spinner aparece naturalmente en el área
-             * visible del scroll. Offsets grandes (insets.top+60)
-             * empujaban el spinner DENTRO del contenido y no llegaba
-             * a verse al hacer un pull corto. */
+            tintColor="transparent"
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
             progressViewOffset={8}
           />
         }
@@ -619,6 +609,16 @@ function BaseHome() {
         <Investments byCategory={byCategory} />
 
       </ScrollView>
+
+      {/* Indicador visual de pull-to-refresh — overlay garantizado
+          visible en dark/light. El RefreshControl nativo de arriba
+          maneja el gesto; este componente es el feedback. Topoffset
+          calculado para caer apenas debajo del topBar (insets.top+12
+          de padding superior + ~40px de alto del topBar + 8 de aire). */}
+      <PullRefreshIndicator
+        refreshing={refreshing}
+        topOffset={insets.top + 60}
+      />
 
       {/* Sheet de ajustes del chart — abierto desde el icon de
           settings al final del timeline. */}

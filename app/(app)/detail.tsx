@@ -54,6 +54,7 @@ import { MarketClosedIcon } from "../../lib/components/MarketClosedIcon";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
+import { PullRefreshIndicator } from "../../lib/components/PullRefreshIndicator";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
 const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
@@ -133,7 +134,7 @@ export default function DetailScreen() {
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, mode } = useTheme();
+  const { c } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
@@ -304,23 +305,17 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
-             * cuando cambia el prop con el control ya montado — queda
-             * pegado al tint inicial. `key={mode}` fuerza un remount
-             * cada vez que cambia el tema, garantizando que el color
-             * del modo actual sí se aplique. Esta es la diferencia que
-             * vuelve visible el spinner en dark. */
-            key={mode}
+            /* Native RefreshControl en transparente: maneja sólo la
+             * mecánica del gesto. Feedback visual lo aporta el
+             * <PullRefreshIndicator> overlayed afuera del scroll —
+             * necesario porque dentro del Animated.ScrollView de
+             * Reanimated v3, el tintColor del UIRefreshControl no se
+             * propaga al UIKit underlying en dark mode. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* Blanco puro en dark (máximo contraste sobre OLED),
-             * muted en light. */
-            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            /* Offset chico: el topBar ya ocupa espacio en flow normal
-             * y el ScrollView arranca debajo. Empujar el spinner +100px
-             * hacia adentro del contenido lo hacía irreconocible
-             * durante un pull corto. */
+            tintColor="transparent"
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
             progressViewOffset={8}
           />
         }
@@ -441,6 +436,14 @@ export default function DetailScreen() {
           ALyC, regulada por la CNV.
         </Text>
       </Animated.ScrollView>
+
+      {/* Indicador visual de pull-to-refresh — overlay garantizado
+          visible en dark/light. Topoffset = safe area + alto del
+          topBar (paddingTop insets.top+12 + ~44 de íconos) + aire. */}
+      <PullRefreshIndicator
+        refreshing={refreshing}
+        topOffset={insets.top + 64}
+      />
 
       <TradeBottomBar
         asset={asset}

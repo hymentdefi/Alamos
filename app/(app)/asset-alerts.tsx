@@ -43,6 +43,7 @@ import { IndicatorDetailSheet } from "../../lib/components/IndicatorDetailSheet"
 import { AlertBellIllustration } from "../../lib/components/illustrations/AlertBellIllustration";
 import { IndicatorChartIllustration } from "../../lib/components/illustrations/IndicatorChartIllustration";
 import { Toggle } from "../../lib/components/Toggle";
+import { PullRefreshIndicator } from "../../lib/components/PullRefreshIndicator";
 import type { IndicatorAlert } from "../../lib/api/alerts";
 
 type Tab = "price" | "indicator";
@@ -69,7 +70,7 @@ export default function AssetAlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
-  const { c, mode } = useTheme();
+  const { c } = useTheme();
   const { show } = useToast();
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
 
@@ -306,21 +307,16 @@ export default function AssetAlertsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
-             * cuando cambia el prop con el control ya montado — queda
-             * pegado al tint inicial. `key={mode}` fuerza un remount
-             * cada vez que cambia el tema, garantizando que el color
-             * del modo actual sí se aplique. Esta es la diferencia que
-             * vuelve visible el spinner en dark. */
-            key={mode}
+            /* Native RefreshControl en transparente: maneja sólo la
+             * mecánica del gesto. Feedback visual lo aporta el
+             * <PullRefreshIndicator> overlayed afuera del scroll —
+             * necesario porque el tintColor del UIRefreshControl no
+             * se ve en dark mode pese a múltiples workarounds. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            /* Blanco puro en dark (máximo contraste sobre OLED),
-             * muted en light. */
-            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            /* Offset chico: el ScrollView ya arranca debajo del topBar
-             * + screenIntro + tabs, no hace falta empujar más. */
+            tintColor="transparent"
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
             progressViewOffset={8}
           />
         }
@@ -551,6 +547,15 @@ export default function AssetAlertsScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Indicador visual de pull-to-refresh — overlay garantizado
+          visible. Topoffset = safe area + topBar + screenIntro + tabs
+          (~ insets.top+12 + 44 + 80 + 56). Lo ponemos un poco más
+          abajo del header para que caiga sobre el área del scroll. */}
+      <PullRefreshIndicator
+        refreshing={refreshing}
+        topOffset={insets.top + 196}
+      />
 
       <View
         style={[

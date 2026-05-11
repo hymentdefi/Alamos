@@ -69,6 +69,7 @@ import {
 import { FlagIcon } from "../../../lib/components/FlagIcon";
 import { type MarketSegmentedValue } from "../../../lib/components/MarketSegmented";
 import { Tap } from "../../../lib/components/Tap";
+import { PullRefreshIndicator } from "../../../lib/components/PullRefreshIndicator";
 import { AssetColorProvider } from "../../../lib/asset-color/context";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
 
@@ -166,7 +167,7 @@ function marketLabelFull(m: MarketKey): string {
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { c, mode } = useTheme();
+  const { c } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
   /* Sheet de selección de moneda — se abre desde la pill debajo del
@@ -636,22 +637,18 @@ export default function PortfolioScreen() {
           scrollEnabled={!brickHolding}
           refreshControl={
             <RefreshControl
-              /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
-               * cuando cambia el prop con el control ya montado — queda
-               * pegado al tint inicial. `key={mode}` fuerza remount al
-               * cambiar tema y asegura que el color del modo actual
-               * efectivamente se aplique. Ver index.tsx para detalle. */
-              key={mode}
+              /* Native RefreshControl en transparente: maneja sólo
+               * la mecánica del gesto. El feedback visual lo da el
+               * <PullRefreshIndicator> overlayed afuera del scroll
+               * — necesario porque dentro de Animated.ScrollView
+               * (Reanimated v3) el tintColor del UIRefreshControl
+               * no se aplica en dark mode por más que forcemos
+               * remount con key={mode} u otros workarounds. */
               refreshing={refreshing}
               onRefresh={onRefresh}
-              /* Blanco puro en dark (máximo contraste sobre OLED),
-               * muted en light. */
-              tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-              colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-              /* Offset chico: el topBar ya ocupa espacio en flow, el
-               * ScrollView arranca debajo. Empujar el spinner +100px
-               * hacia abajo lo hacía caer dentro del hero y no se
-               * alcanzaba a ver con un pull corto. */
+              tintColor="transparent"
+              colors={["transparent"]}
+              progressBackgroundColor="transparent"
               progressViewOffset={8}
             />
           }
@@ -1002,6 +999,15 @@ export default function PortfolioScreen() {
             </View>
           ) : null}
         </Animated.ScrollView>
+
+        {/* Indicador visual de pull-to-refresh — overlay garantizado
+            visible. Topoffset = safe area + alto del topBar (~44 con
+            paddingTop 8) + un poco de aire para que caiga apenas
+            debajo del header. */}
+        <PullRefreshIndicator
+          refreshing={refreshing}
+          topOffset={insets.top + 56}
+        />
       </View>
     </AssetColorProvider>
   );
