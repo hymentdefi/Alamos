@@ -112,11 +112,6 @@ interface Holding {
  * verdes (#00C805 vivid mint, #7EE9A6 pale, #00B864 medium) son
  * artísticos para shading y permanecen sin alinear al sistema
  * de tokens — no representan estado de activo. */
-/* Orden de las 4 visualizaciones del chart pager. El usuario las
- * navega horizontalmente con swipe. Índice del array = idx del page. */
-const VIZ_ORDER = ["treemap", "brick", "pie", "ranking"] as const;
-type VizKey = (typeof VIZ_ORDER)[number];
-
 const BRICK_PALETTE = [
   "#00C805",
   "#0E0F0C",
@@ -508,12 +503,6 @@ export default function PortfolioScreen() {
   const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
     "treemap",
   );
-  /* Pager horizontal del chart — el user desliza para cambiar entre
-   * Treemap / Ladrillo / Pie / CoinStack. Ref para scroll programático
-   * desde los dots; pageW se mide vía onLayout del ScrollView. */
-  const vizPagerRef = useRef<ScrollView | null>(null);
-  const [pageW, setPageW] = useState(0);
-
   /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
    * "highlighted" actualmente — puede venir de:
    *   - Hold sobre un segmento de la allocation bar (AR/US/Crypto)
@@ -674,11 +663,12 @@ export default function PortfolioScreen() {
             />
           </View>
 
-          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
-              para cambiar la moneda. Cambio deliberado: no hay swipe
-              horizontal del balance. El sheet aclara que es la misma
-              cartera, sólo distinta valuación. */}
-          <View style={s.currencyPillRow}>
+          {/* Top actions row — ARS/USD pill a la izquierda + segmented
+              selector de viz a la derecha, ambos a la misma altura. El
+              pill abre el CurrencySheet, el selector cambia entre las 4
+              vizs (Treemap / Ladrillo / Pie / Ranking) con un tap a su
+              ícono. */}
+          <View style={s.topActionsRow}>
             <Tap
               haptic="selection"
               pressScale={0.96}
@@ -701,143 +691,124 @@ export default function PortfolioScreen() {
                 color={c.textMuted}
               />
             </Tap>
+
+            {hasHoldings ? (
+              <View
+                style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
+              >
+                <Tap
+                  onPress={() => setViz("treemap")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "treemap" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de treemap"
+                >
+                  <TreemapGlyph
+                    color={viz === "treemap" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
+                <Tap
+                  onPress={() => setViz("brick")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "brick" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de ladrillo"
+                >
+                  <BrickGlyph
+                    color={viz === "brick" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
+                <Tap
+                  onPress={() => setViz("pie")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "pie" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de torta"
+                >
+                  <PieGlyph
+                    color={viz === "pie" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
+                <Tap
+                  onPress={() => setViz("ranking")}
+                  haptic="selection"
+                  pressScale={0.95}
+                  hitSlop={4}
+                  style={[
+                    s.vizSegBtn,
+                    viz === "ranking" && { backgroundColor: c.bg },
+                  ]}
+                  accessibilityLabel="Vista de ranking"
+                >
+                  <RankingGlyph
+                    color={viz === "ranking" ? c.text : c.textMuted}
+                    size={16}
+                  />
+                </Tap>
+              </View>
+            ) : null}
           </View>
 
           </View>
 
-          {/* ─── Chart pager — 4 vistas (Treemap / Ladrillo / Pie /
-              CoinStack) deslizables horizontalmente con pagingEnabled.
-              4 dots abajo indican la posición. Reemplaza al segmented
-              selector previo. */}
+          {/* ─── Chart — render condicional según viz seleccionado en
+              el segmented selector de arriba. Sin pager horizontal. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
-              <ScrollView
-                ref={vizPagerRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                decelerationRate="normal"
-                bounces={false}
-                directionalLockEnabled
-                /* overflow visible — los tooltips de los charts (slice / brick
-                 * / coin / row) viven con translateY(-tooltipH) para subir
-                 * encima del dedo. Sin esto, el UIScrollView clipea cualquier
-                 * cosa que se sale de su bounding box y el pill queda tapado
-                 * por el heroBlock de arriba (saldo + título Portfolio). */
-                style={s.vizPagerScroll}
-                /* IMPORTANT: el pager SIEMPRE queda scrollable, NO se
-                 * mutea con brickHolding. Antes (scrollEnabled=!brickHolding)
-                 * el ScrollView no podía pedir el touch al chart, así que
-                 * cuando empezabas un swipe sobre el chart la cosa se
-                 * trababa: el chart claimaba, no soltaba (porque el pager
-                 * estaba disabled y nunca pedía termination), y el dedo
-                 * quedaba comiendo aire. Ahora el pager queda activo y
-                 * pide termination con cualquier swipe horizontal; el
-                 * chart la concede vía onResponderTerminationRequest=true
-                 * y suelta el touch limpio. */
-                onLayout={(e) => {
-                  const w = e.nativeEvent.layout.width;
-                  if (w !== pageW) setPageW(w);
-                }}
-                onMomentumScrollEnd={(e) => {
-                  if (pageW === 0) return;
-                  const idx = Math.round(
-                    e.nativeEvent.contentOffset.x / pageW,
-                  );
-                  const next = VIZ_ORDER[idx];
-                  if (next && next !== viz) {
-                    Haptics.selectionAsync().catch(() => {});
-                    setViz(next);
-                  }
-                }}
-              >
-                {pageW > 0
-                  ? VIZ_ORDER.map((vk) => (
-                      <View
-                        key={vk}
-                        style={[
-                          s.vizPage,
-                          { width: pageW },
-                        ]}
-                      >
-                        {vk === "treemap" ? (
-                          <Treemap
-                            holdings={holdingsForCharts}
-                            totalArs={totalArsWithCash}
-                            onHoldChange={setBrickHolding}
-                            dimMarket={highlightedMarket}
-                            onActiveMarketChange={setHighlightedMarket}
-                          />
-                        ) : vk === "brick" ? (
-                          <FloorBrick
-                            holdings={holdingsForCharts}
-                            totalArs={totalArsWithCash}
-                            groupBy="category"
-                            onHoldChange={setBrickHolding}
-                            dimMarket={highlightedMarket}
-                            onActiveMarketChange={setHighlightedMarket}
-                          />
-                        ) : vk === "pie" ? (
-                          <FloorPie
-                            holdings={holdingsForCharts}
-                            totalArs={totalArsWithCash}
-                            currency={currency}
-                            groupBy="category"
-                            dayPct={dayPct}
-                            dayUp={dayUp}
-                            onHoldChange={setBrickHolding}
-                            dimMarket={highlightedMarket}
-                            onActiveMarketChange={setHighlightedMarket}
-                          />
-                        ) : (
-                          <RankingList
-                            holdings={holdingsForCharts}
-                            totalArs={totalArsWithCash}
-                            onHoldChange={setBrickHolding}
-                            dimMarket={highlightedMarket}
-                            onActiveMarketChange={setHighlightedMarket}
-                          />
-                        )}
-                      </View>
-                    ))
-                  : null}
-              </ScrollView>
-
-              {/* Dots indicator — 4 dots horizontales abajo del pager,
-                  centrados. Tap a cualquiera salta a esa página. */}
-              <View style={s.vizDotsRow}>
-                {VIZ_ORDER.map((vk, i) => {
-                  const active = vk === viz;
-                  return (
-                    <Pressable
-                      key={vk}
-                      hitSlop={10}
-                      onPress={() => {
-                        if (pageW > 0) {
-                          Haptics.selectionAsync().catch(() => {});
-                          vizPagerRef.current?.scrollTo({
-                            x: i * pageW,
-                            animated: true,
-                          });
-                          setViz(vk);
-                        }
-                      }}
-                    >
-                      <View
-                        style={[
-                          s.vizDot,
-                          {
-                            backgroundColor: active
-                              ? c.text
-                              : c.textFaint,
-                            width: active ? 8 : 6,
-                            height: active ? 8 : 6,
-                          },
-                        ]}
-                      />
-                    </Pressable>
-                  );
-                })}
+              <View style={s.chartCanvas}>
+                {viz === "treemap" ? (
+                  <Treemap
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                ) : viz === "brick" ? (
+                  <FloorBrick
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
+                    groupBy="category"
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                ) : viz === "pie" ? (
+                  <FloorPie
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
+                    currency={currency}
+                    groupBy="category"
+                    dayPct={dayPct}
+                    dayUp={dayUp}
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                ) : (
+                  <RankingList
+                    holdings={holdingsForCharts}
+                    totalArs={totalArsWithCash}
+                    onHoldChange={setBrickHolding}
+                    dimMarket={highlightedMarket}
+                    onActiveMarketChange={setHighlightedMarket}
+                  />
+                )}
               </View>
             </View>
           ) : null}
@@ -896,11 +867,10 @@ export default function PortfolioScreen() {
                 </View>
                 <View style={s.pygEyebrowRow}>
                   <Text style={[s.pygPct, { color }]}>
+                    {dayUp ? "+" : "-"}
                     {fmtPctAbs(dayPct)}
                   </Text>
-                  <Text
-                    style={[s.pygEyebrow, { color: c.textMuted }]}
-                  >
+                  <Text style={[s.pygEyebrow, { color }]}>
                     PyG HOY
                   </Text>
                   <Pressable
@@ -4765,11 +4735,15 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
-   * CurrencySheet para cambiar moneda con un acto deliberado. */
-  currencyPillRow: {
+  /* Row de acciones top — vive debajo del saldo. Lleva el pill ARS/USD
+   * a la izquierda y el segmented selector de viz a la derecha, ambos
+   * a la misma altura (alignItems center). justifyContent space-between
+   * para que cada uno se pegue a su borde. */
+  topActionsRow: {
     flexDirection: "row",
-    marginTop: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
   },
   currencyPill: {
     flexDirection: "row",
@@ -4793,52 +4767,41 @@ const s = StyleSheet.create({
   },
 
   /* Chart block — full width, sin card. Sin título ni header — el
-   * chart se rendea directo bajo la allocation bar del hero. El
-   * selector Pie/Ladrillo va DEBAJO del chart alineado a la derecha.
+   * chart se rendea directo bajo el saldo/selector del hero.
    *
    * zIndex 1 — sube todo el bloque del chart por encima de heroBlock.
    * Necesario porque los tooltips de los charts viven con translateY
    * negativo y entran visualmente en el área del saldo/título del
-   * portfolio. Sin zIndex, RN respeta el render order (chartBlock
-   * después de heroBlock, así que ya quedaría arriba), PERO algunos
-   * Android paths y nested ScrollView coordinate spaces invierten la
-   * composición y el tooltip queda tapado. zIndex explícito lo
-   * resuelve cross-plat. */
+   * portfolio. zIndex explícito asegura cross-plat que el pill quede
+   * pintado encima. */
   chartBlock: {
     paddingHorizontal: 24,
     marginTop: 8,
     zIndex: 1,
   },
-  /* Style del ScrollView horizontal del pager — overflow visible para
-   * que los tooltips puedan extenderse arriba del top edge del scroll
-   * sin ser clippeados por el UIScrollView native. */
-  vizPagerScroll: {
-    overflow: "visible",
+  /* Canvas del chart — alignSelf stretch para que ocupe todo el ancho
+   * del chartBlock. Sin overflow hidden — los tooltips de los charts
+   * necesitan poder extenderse fuera del canvas (translateY negativo
+   * los lleva arriba del dedo). */
+  chartCanvas: {
+    alignSelf: "stretch",
   },
-  /* Cada page del horizontal pager — width se asigna inline desde
-   * pageW. alignItems center para que charts con menos altura queden
-   * alineados con el resto. overflow VISIBLE — los tooltips que
-   * flotan arriba del coin/slice/bloque necesitan poder excederse del
-   * page para aparecer encima del dedo sin ser clippeados. */
-  vizPage: {
-    alignItems: "stretch",
-    justifyContent: "center",
-    overflow: "visible",
+  /* Segmented selector de viz — pill iOS-style con 4 íconos. Vive
+   * arriba a la derecha del heroBlock, al lado del pill ARS/USD. */
+  vizSeg: {
+    flexDirection: "row",
+    padding: 3,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
   },
-  /* 4 dots indicadores abajo del pager — el activo es full-color y
-   * un toque más grande (8px) que los inactivos (6px), siguiendo el
-   * pattern del Inicio currencyDots viejo. */
-  vizDotsRow: {
+  vizSegBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    marginTop: 14,
-    paddingVertical: 4,
-  },
-  vizDot: {
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderCurve: "continuous",
-    borderRadius: 999,
+    borderRadius: radius.pill,
   },
 
   /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
