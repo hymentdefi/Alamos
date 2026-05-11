@@ -118,7 +118,7 @@ export function PullRefreshIndicator({
       ]}
     >
       <View style={s.spinnerHolder}>
-        <ActivityIndicator size="small" color={tint} />
+        <ActivityIndicator size="large" color={tint} />
       </View>
     </Animated.View>
   );
@@ -140,8 +140,10 @@ const s = StyleSheet.create({
     elevation: 50,
   },
   spinnerHolder: {
-    width: 28,
-    height: 28,
+    /* 40×40 para envolver el ActivityIndicator size="large"
+     * (~37 px en iOS, 36-48 px en Android) con un toque de aire. */
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },

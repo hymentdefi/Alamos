@@ -421,9 +421,9 @@ function BaseHome() {
              * y por ende GARANTIZADO visible en cualquier tema. */
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="transparent"
-            colors={["transparent"]}
-            progressBackgroundColor="transparent"
+            tintColor={c.bg}
+            colors={[c.bg]}
+            progressBackgroundColor={c.bg}
             progressViewOffset={8}
           />
         }

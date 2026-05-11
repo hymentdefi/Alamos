@@ -646,9 +646,9 @@ export default function PortfolioScreen() {
                * remount con key={mode} u otros workarounds. */
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="transparent"
-              colors={["transparent"]}
-              progressBackgroundColor="transparent"
+              tintColor={c.bg}
+              colors={[c.bg]}
+              progressBackgroundColor={c.bg}
               progressViewOffset={8}
             />
           }
