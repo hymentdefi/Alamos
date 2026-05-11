@@ -125,6 +125,15 @@ export function AlertSheet({
   /* Ancho del slider: el sheet tiene paddingHorizontal 24 a cada
    * lado. El slider rellena de borde a borde del padding. */
   const SLIDER_WIDTH = windowW - 48;
+  /* Altura compartida con IndicatorSheet — ambos sheets se sienten
+   * VISUALMENTE iguales. 720 viene de la suma exacta del contenido
+   * natural de este sheet (8 + 24 + 56 + form 575 = 663) + paddingBottom
+   * 18 + un pelín de margen. Cap al 90 % de windowH para pantallas
+   * chicas. Si tocás esto, ESPEJALO en IndicatorSheet.tsx. */
+  const SHEET_HEIGHT = Math.min(
+    windowH * 0.9,
+    720 + insets.bottom,
+  );
   const { create, update, remove } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
@@ -447,6 +456,7 @@ export function AlertSheet({
                 backgroundColor: c.bg,
                 borderColor: c.border,
                 paddingBottom: insets.bottom + 18,
+                height: SHEET_HEIGHT,
               },
               sheetStyle,
             ]}

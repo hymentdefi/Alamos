@@ -169,6 +169,13 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
+  /* Altura compartida con AlertSheet — ambos sheets se sienten
+   * VISUALMENTE iguales. Si tocás esta fórmula, ESPEJALA en
+   * AlertSheet.tsx. */
+  const SHEET_HEIGHT = Math.min(
+    windowH * 0.9,
+    720 + insets.bottom,
+  );
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
@@ -365,7 +372,7 @@ export function IndicatorSheet({
               backgroundColor: c.bg,
               borderColor: c.border,
               paddingBottom: insets.bottom + 8,
-              maxHeight: windowH * 0.92,
+              height: SHEET_HEIGHT,
             },
             sheetStyle,
           ]}
