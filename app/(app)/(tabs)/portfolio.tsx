@@ -32,11 +32,9 @@ import Svg, {
   Ellipse,
   G,
   Line,
-  LinearGradient as SvgLinearGradient,
   Path as SvgPath,
   Polygon,
   Rect,
-  Stop,
   Text as SvgText,
 } from "react-native-svg";
 import { useRouter } from "expo-router";
@@ -824,6 +822,7 @@ export default function PortfolioScreen() {
               highlightedMarket={highlightedMarket}
               onHighlight={setHighlightedMarket}
               c={c}
+              tone={color}
             />
           ) : null}
 
@@ -885,11 +884,7 @@ export default function PortfolioScreen() {
                     ]}
                     accessibilityLabel="Qué es PyG"
                   >
-                    <Feather
-                      name="info"
-                      size={10}
-                      color={c.textSecondary}
-                    />
+                    <Feather name="info" size={10} color={color} />
                   </Pressable>
                 </View>
               </View>
@@ -941,6 +936,7 @@ export default function PortfolioScreen() {
                 router.push("/(app)/posiciones" as never)
               }
               c={c}
+              tone={color}
             />
           ) : (
             /* Empty state accionable — el doc lo destaca: "empty
@@ -1452,6 +1448,7 @@ function AllocationBar({
   highlightedMarket,
   onHighlight,
   c,
+  tone,
 }: {
   alloc: {
     arPct: number;
@@ -1463,6 +1460,10 @@ function AllocationBar({
   highlightedMarket: MarketKey | null;
   onHighlight: (m: MarketKey | null) => void;
   c: ColorMap;
+  /** Color de los segmentos. Default c.brand; el padre pasa c.red
+   *  cuando el portfolio del día está en pérdida — la barra entera
+   *  espeja el tono del rendimiento. */
+  tone: string;
 }) {
   const segments: Array<{ key: MarketKey; pct: number; label: string }> = [
     { key: "AR", pct: alloc.arPct, label: "AR" },
@@ -1494,6 +1495,7 @@ function AllocationBar({
             marginLeft={i > 0 ? 2 : 0}
             activeKey={activeKey}
             c={c}
+            tone={tone}
             onPressIn={() => {
               Haptics.selectionAsync().catch(() => {});
               onHighlight(seg.key);
@@ -1548,6 +1550,7 @@ function AllocBarSegment({
   marginLeft,
   activeKey,
   c,
+  tone,
   onPressIn,
   onPressOut,
 }: {
@@ -1556,6 +1559,9 @@ function AllocBarSegment({
   marginLeft: number;
   activeKey: SharedValue<MarketKey | null>;
   c: ColorMap;
+  /** Color del fill de los segmentos. Verde por default; el padre
+   *  pasa naranja cuando el portfolio está en pérdida. */
+  tone: string;
   onPressIn: () => void;
   onPressOut: () => void;
 }) {
@@ -1590,7 +1596,7 @@ function AllocBarSegment({
           {
             height: 6,
             width: "100%",
-            backgroundColor: c.brand,
+            backgroundColor: tone,
             borderCurve: "continuous",
             borderRadius: 3,
           },
@@ -2045,6 +2051,7 @@ function PositionsList({
   onTap,
   onSeeAll,
   c,
+  tone,
 }: {
   holdings: Holding[];
   currency: Currency;
@@ -2053,6 +2060,10 @@ function PositionsList({
    *  la pantalla dedicada con las posiciones agrupadas por categoría. */
   onSeeAll?: () => void;
   c: ColorMap;
+  /** Color del arrow del header "Posiciones →". Default c.brand; el
+   *  padre pasa c.red en pérdida para que la flecha espeje el tono
+   *  del rendimiento del día. */
+  tone: string;
 }) {
   return (
     <View style={s.positionsBlock}>
@@ -2068,7 +2079,7 @@ function PositionsList({
           <Text style={[s.alamosHeadingText, { color: c.text }]}>
             Posiciones
           </Text>
-          <Feather name="arrow-right" size={18} color={c.brand} />
+          <Feather name="arrow-right" size={18} color={tone} />
         </Pressable>
       ) : (
         <Text style={[s.alamosHeadingText, { color: c.text }]}>
@@ -3621,18 +3632,22 @@ function RankingList({
 
   /* Layout de cada moneda — rx/ry/height proporcionales al pct con
    * floor mínimo (para que la moneda más chica siga siendo visible).
-   * Offset horizontal con sinusoidal del index → la pila queda
-   * "desalineada" como en la referencia. */
+   * Offset horizontal deterministic alternado por índice (no
+   * sinusoidal random) — da un zigzag predecible y limpio, no un
+   * "scatter" que se siente accidental. Magnitud del offset también
+   * decae con i para que la pila se cierre suavemente hacia abajo. */
   const W = 340;
   const coins = useMemo(() => {
     let cursorY = 0;
     return rows.map((r, i) => {
-      const rx = Math.max(18, Math.min(100, r.pct * 3));
+      const rx = Math.max(22, Math.min(108, r.pct * 3.2));
       const ry = rx * 0.22;
-      const height = Math.max(12, Math.min(36, r.pct * 1));
-      const offsetX = Math.sin(i * 2.1 + 0.7) * 16;
+      const height = Math.max(14, Math.min(42, r.pct * 1.1));
+      const offsetSign = i % 2 === 0 ? -1 : 1;
+      const offsetMag = Math.max(6, 14 - i * 2);
+      const offsetX = offsetSign * offsetMag;
       const cx = W / 2 + offsetX;
-      if (i === 0) cursorY = 18 + ry;
+      if (i === 0) cursorY = 22 + ry;
       const topY = cursorY;
       cursorY = topY + height + ry;
       return { ...r, cx, topY, rx, ry, height };
@@ -3779,7 +3794,20 @@ function RankingList({
           })()}
           {/* Coins — reverse order así las grandes (arriba del stack)
               quedan dibujadas al final y su bottom rim cubre el top
-              rim de la siguiente. */}
+              rim de la siguiente.
+
+              Render limpio sin strokes oscuros, en línea con el
+              lenguaje flat de Robinhood:
+                1. Drop shadow individual debajo (Ellipse rgba 0.08)
+                2. Side path (curva al bottom) — color más oscuro que
+                   el cap (-0.12). El delta de tono da volumen sin
+                   necesitar línea negra de separación.
+                3. Cap ellipse — color base sin modificar, fill plano.
+
+              Nada de gradiente vertical sobre el cap, nada de stroke
+              difuminado. La "altura" la define la diferencia tonal
+              cap/side; el "stack" lo define la geometría de las
+              elipses superpuestas. */}
           {coinsRender.map((co) => {
             const i = coins.indexOf(co);
             const dimmedByActive =
@@ -3787,60 +3815,27 @@ function RankingList({
             const dimmedByMarket =
               dimMarket != null && co.market !== dimMarket;
             const dimmed = dimmedByActive || dimmedByMarket;
-            const sideFill = dimmed ? c.surfaceSunken : co.color;
-            /* Reflejo SUTIL del top de la moneda — antes 0.7 era casi
-             * blanco arriba, dando un brillo over-engineered. 0.32 da
-             * un highlight legible pero contenido; el bottom queda muy
-             * cerca del color base para que la transición vertical
-             * insinúe la curvatura sin gritar "espejo". */
-            const capLightShade = dimmed
-              ? c.surfaceHover
-              : shadeHex(co.color, 0.32);
-            const capBaseShade = dimmed
-              ? c.surfaceHover
-              : shadeHex(co.color, 0.05);
-            const gradId = `coin-cap-${co.key}`;
+            const capFill = dimmed ? c.surfaceHover : co.color;
+            const sideFill = dimmed
+              ? c.surfaceSunken
+              : shadeHex(co.color, -0.12);
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
-            /* Render order:
-             *   1. Defs: LinearGradient vertical para el cap — light
-             *      shade arriba (reflejo de luz), darker shade abajo.
-             *   2. Ellipse del cap usando el gradient como fill.
-             *   3. Side rect on top — cubre la mitad inferior del
-             *      cap ellipse, así su stroke curvo no cruza el label.
-             *
-             *   stroke: c.text con strokeOpacity 0.45 + strokeWidth 1.1
-             *   — la línea entre cap y body se ve difuminada. */
             return (
               <G key={co.key}>
-                <Defs>
-                  <SvgLinearGradient
-                    id={gradId}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <Stop offset="0" stopColor={capLightShade} />
-                    <Stop offset="1" stopColor={capBaseShade} />
-                  </SvgLinearGradient>
-                </Defs>
+                <Ellipse
+                  cx={co.cx}
+                  cy={co.topY + co.height + co.ry + 4}
+                  rx={co.rx * 0.92}
+                  ry={3.5}
+                  fill="rgba(14,15,12,0.10)"
+                />
+                <SvgPath d={sidePath} fill={sideFill} />
                 <Ellipse
                   cx={co.cx}
                   cy={co.topY}
                   rx={co.rx}
                   ry={co.ry}
-                  fill={`url(#${gradId})`}
-                  stroke={c.text}
-                  strokeWidth={1.1}
-                  strokeOpacity={0.45}
-                />
-                <SvgPath
-                  d={sidePath}
-                  fill={sideFill}
-                  stroke={c.text}
-                  strokeWidth={1.1}
-                  strokeOpacity={0.45}
-                  strokeLinejoin="round"
+                  fill={capFill}
                 />
               </G>
             );

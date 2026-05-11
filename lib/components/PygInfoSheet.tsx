@@ -31,10 +31,11 @@ const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
 /**
- * Ilustración "PyG" — mismo SVG que /icono-pyg.svg, inline con
- * react-native-svg. Cuadrado con esquinas redondeadas: mitad superior
- * verde con flecha hacia arriba, mitad inferior blanca con flecha hacia
- * abajo. Comunica visualmente "ganancia o pérdida" antes del copy.
+ * Ilustración "PyG" — replica del SVG en /icono-pyg.svg, inline con
+ * react-native-svg. Cuadrado de esquinas redondeadas: mitad superior
+ * verde con flecha hacia arriba, mitad inferior blanca con flecha
+ * hacia abajo. Comunica visualmente "ganancia o pérdida" antes del
+ * copy. Tamaño escalable vía prop `size`.
  */
 function PygIcon({ size }: { size: number }) {
   const STROKE = "#0E4310";
@@ -83,11 +84,11 @@ function PygIcon({ size }: { size: number }) {
 }
 
 /**
- * Bottom sheet "¿Qué es PyG?". Mismo patrón que MarketClosedSheet /
- * EarningsInfoSheet / ChartSettingsSheet: se cierra deslizando hacia
- * abajo, sin botones de cerrar. Header: icono PyG + título + body.
- * Después dos párrafos cortos con label tonal (ganancia/pérdida)
- * inline — sin bullets ni indentación.
+ * Bottom sheet "¿Qué es PyG?". Mismo patrón de presentación que
+ * MarketClosedSheet / EarningsInfoSheet / ChartSettingsSheet — se
+ * cierra deslizando hacia abajo, sin botones. Layout simple a la
+ * Robinhood: ilustración dominante arriba, título + body abajo.
+ * Cero distracciones secundarias (sin bullets, sin disclaimers).
  */
 export function PygInfoSheet({ visible, onClose }: Props) {
   const { c } = useTheme();
@@ -184,7 +185,7 @@ export function PygInfoSheet({ visible, onClose }: Props) {
             {
               backgroundColor: c.bg,
               borderColor: c.border,
-              paddingBottom: insets.bottom + 24,
+              paddingBottom: insets.bottom + 32,
             },
             sheetStyle,
           ]}
@@ -196,8 +197,12 @@ export function PygInfoSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={s.content}>
+            {/* Ilustración dominante — 168 px vs los 108 anteriores.
+                Robinhood usa heroes grandes en sus modales (los
+                onboarding ilustrados rondan los 180-220 px), el icono
+                tiene que ganar la jerarquía visual contra el título. */}
             <View style={s.illustrationWrap}>
-              <PygIcon size={108} />
+              <PygIcon size={168} />
             </View>
 
             <Text style={[s.title, { color: c.text }]}>
@@ -212,22 +217,6 @@ export function PygInfoSheet({ visible, onClose }: Props) {
               del día. Te muestra cuánto subió o bajó el valor total
               de tus posiciones desde la apertura, en monto y en
               porcentaje.
-            </Text>
-
-            <Text style={[s.note, { color: c.textMuted }]}>
-              <Text style={[s.noteLabel, { color: c.brand }]}>
-                Ganancia.
-              </Text>{" "}
-              Tu portfolio vale más que al inicio del día. Se muestra
-              en verde.
-            </Text>
-
-            <Text style={[s.note, { color: c.textMuted }]}>
-              <Text style={[s.noteLabel, { color: c.red }]}>
-                Pérdida.
-              </Text>{" "}
-              Tu portfolio vale menos que al inicio del día. Se
-              muestra en naranja.
             </Text>
           </View>
         </Animated.View>
@@ -264,45 +253,29 @@ const s = StyleSheet.create({
   },
   content: {
     alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 12,
     paddingHorizontal: 12,
   },
   illustrationWrap: {
-    marginBottom: 18,
+    marginBottom: 22,
   },
   title: {
     fontFamily: fontFamily[800],
-    fontSize: 26,
-    letterSpacing: -1,
-    marginBottom: 10,
+    fontSize: 28,
+    letterSpacing: -1.1,
+    marginBottom: 12,
     textAlign: "center",
   },
   body: {
     fontFamily: fontFamily[500],
-    fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: -0.15,
+    fontSize: 16,
+    lineHeight: 24,
+    letterSpacing: -0.2,
     textAlign: "center",
     paddingHorizontal: 12,
   },
   bodyBold: {
     fontFamily: fontFamily[700],
-  },
-  /* Mismo treatment que el subtitle del sheet, pero un escalón más
-   * chico — funcionan como dos párrafos secundarios después del body.
-   * Label inline en tone (brand / red); el resto del texto fluye sin
-   * indentación. */
-  note: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    marginTop: 14,
-  },
-  noteLabel: {
-    fontFamily: fontFamily[800],
   },
 });
