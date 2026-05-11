@@ -136,17 +136,7 @@ export default function DetailScreen() {
   const { c, mode } = useTheme();
   const [range, setRange] = useState<Range>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
-
-  /* Workaround del bug de Reanimated v3 + RefreshControl en iOS dark:
-   * cuando el RefreshControl vive dentro de Animated.ScrollView, el
-   * tintColor declarativo no se aplica al UIRefreshControl subyacente
-   * en cold-start. Forzamos imperativamente con setNativeProps después
-   * de mount y en cada cambio de tema. */
   const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
-  const refreshControlRef = useRef<RefreshControl>(null);
-  useEffect(() => {
-    refreshControlRef.current?.setNativeProps({ tintColor: refreshTint });
-  }, [refreshTint]);
 
   /* Pull-to-refresh — refresca el activo (precio, chart, news,
    * fundamentales, alertas relacionadas). Mantiene el spinner
@@ -315,7 +305,7 @@ export default function DetailScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            ref={refreshControlRef}
+            key={mode}
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={refreshTint}
