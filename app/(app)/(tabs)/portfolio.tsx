@@ -41,6 +41,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { fontFamily, radius, useTheme } from "../../../lib/theme";
 import {
@@ -3884,38 +3885,74 @@ function Treemap({
             const tileW = t.w * scale - 3;
             const tileH = t.h * scale - 3;
             const pct = (t.ars / totalArsAll) * 100;
-            /* Card style "mosaico Robinhood": grandes con header strip
-             * lighter shade + body con pct grande + label brand + value
-             * y day change abajo. Medianas en horizontal compacto.
-             * Wide-narrow (Fondos al fondo) en una sola línea.
-             * Mini solo el pct centrado. */
             const isLarge = tileW > 120 && tileH > 90;
             const isMedium = tileW > 80 && tileH > 60;
             const isWideNarrow = tileW > 120 && tileH > 30 && tileH <= 60;
             const isMini = tileW > 44 && tileH > 26;
             const ink = textOnHex(t.color);
+            const onDarkBg = ink === "#FAFAF7";
+            /* Label color contextual — el brand verde se perdía sobre
+             * los tiles verdes. Acá: si el bg es oscuro (DINERO black),
+             * uso brand para contraste; si el bg es claro (todas las
+             * variantes de verde + gris CEDEARS), uso ink (almost
+             * negro) para que la label tenga peso visual. */
+            const labelColor = onDarkBg ? c.brand : ink;
             const isCash = t.cat === "efectivo";
             const dayPctOfCat =
               t.ars > 0 ? (t.dayDeltaArs / t.ars) * 100 : 0;
             const dayUp = t.dayDeltaArs >= 0;
-            /* Color del day-change matchea el "ink" del card — el
-             * triángulo ▲/▼ ya comunica la dirección. Pintar ▲ en
-             * c.brand sobre un bg verde se vuelve invisible. */
-            const dayTone = ink;
+            const dayTone = dayUp ? c.brand : c.red;
             const pctText =
               pct >= 10
                 ? Math.round(pct).toString() + "%"
                 : pct.toFixed(1).replace(".", ",") + "%";
             const valueText = formatRankingValue(t.ars);
             const dayText = isCash
-              ? "— 0,0%"
+              ? "0,0%"
               : `${dayUp ? "▲" : "▼"} ${Math.abs(dayPctOfCat)
                   .toFixed(1)
                   .replace(".", ",")}%`;
             const cardBg = dimmed ? c.surfaceSunken : t.color;
             const headerBg = dimmed
               ? c.surfaceSunken
-              : shadeHex(t.color, 0.3);
+              : shadeHex(t.color, 0.32);
+            /* Gradient overlay del header — fade del headerBg lighter
+             * shade en el top a fully transparent en ~55% del alto. La
+             * transparencia se hace mezclando con el mismo color con
+             * alpha 0 (interpola limpio en RGBA, no salta a otro tono).
+             * En cards dimmed lo skipeamos porque headerBg == bg
+             * (ambos surfaceSunken). */
+            const showGradient = isLarge && !dimmed;
+            const gradientHeight = Math.max(22, tileH * 0.55);
+            /* Chip de day change — bg cream (c.bg) con tone-colored
+             * text adentro. Garantiza contraste sobre cualquier card
+             * (verde/negro/gris). Para cash no hay direccionalidad. */
+            const renderDayChip = (
+              size: "lg" | "md" = "lg",
+            ) => (
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  paddingHorizontal: size === "lg" ? 7 : 6,
+                  paddingVertical: size === "lg" ? 2 : 1,
+                  backgroundColor: c.bg,
+                  borderCurve: "continuous",
+                  borderRadius: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: isCash ? c.textMuted : dayTone,
+                    fontFamily: fontFamily[800],
+                    fontSize: size === "lg" ? 11 : 10,
+                    letterSpacing: -0.15,
+                  }}
+                  numberOfLines={1}
+                >
+                  {dayText}
+                </Text>
+              </View>
+            );
             return (
               <Pressable
                 key={t.key}
@@ -3936,15 +3973,19 @@ function Treemap({
                   overflow: "hidden",
                 }}
               >
-                {/* Header strip — versión "card" Robinhood. Lighter
-                    shade del bg arriba, ~25% del alto en cards grandes,
-                    skip en chicos/wide-narrow. */}
-                {isLarge ? (
-                  <View
+                {showGradient ? (
+                  <LinearGradient
+                    colors={[headerBg, toRgba(headerBg, 0)]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
                     style={{
-                      height: Math.max(20, tileH * 0.22),
-                      backgroundColor: headerBg,
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      height: gradientHeight,
                     }}
+                    pointerEvents="none"
                   />
                 ) : null}
 
@@ -3953,8 +3994,8 @@ function Treemap({
                     style={{
                       flex: 1,
                       paddingHorizontal: 12,
-                      paddingTop: 8,
-                      paddingBottom: 10,
+                      paddingTop: 12,
+                      paddingBottom: 12,
                       justifyContent: "space-between",
                     }}
                   >
@@ -3973,7 +4014,7 @@ function Treemap({
                       </Text>
                       <Text
                         style={{
-                          color: c.brand,
+                          color: labelColor,
                           fontFamily: fontFamily[800],
                           fontSize: 10,
                           letterSpacing: 0.6,
@@ -3985,40 +4026,25 @@ function Treemap({
                         {t.label}
                       </Text>
                     </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "baseline",
-                        gap: 8,
-                      }}
-                    >
+                    <View>
                       <Text
                         style={{
                           color: ink,
                           fontFamily: fontFamily[700],
                           fontSize: 12,
                           letterSpacing: -0.2,
+                          marginBottom: 4,
                         }}
                         numberOfLines={1}
                       >
                         {valueText}
                       </Text>
-                      <Text
-                        style={{
-                          color: dayTone,
-                          fontFamily: fontFamily[700],
-                          fontSize: 12,
-                          letterSpacing: -0.2,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {dayText}
-                      </Text>
+                      {renderDayChip("lg")}
                     </View>
                   </View>
                 ) : isWideNarrow ? (
                   /* Cards anchas y bajitas (ej. Fondos al fondo): todo
-                     en una sola fila — % | label | value | day change */
+                     en una sola fila — % | label | value | chip */
                   <View
                     style={{
                       flex: 1,
@@ -4041,7 +4067,7 @@ function Treemap({
                     </Text>
                     <Text
                       style={{
-                        color: c.brand,
+                        color: labelColor,
                         fontFamily: fontFamily[800],
                         fontSize: 10,
                         letterSpacing: 0.5,
@@ -4063,26 +4089,16 @@ function Treemap({
                     >
                       {valueText}
                     </Text>
-                    <Text
-                      style={{
-                        color: dayTone,
-                        fontFamily: fontFamily[700],
-                        fontSize: 11,
-                        letterSpacing: -0.1,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {dayText}
-                    </Text>
+                    {renderDayChip("md")}
                   </View>
                 ) : isMedium ? (
-                  /* Cards medianas — pct + label arriba, value abajo,
-                     todo apilado vertical con padding. */
+                  /* Cards medianas — pct + label arriba, value + chip
+                     abajo, todo apilado vertical con padding. */
                   <View
                     style={{
                       flex: 1,
                       paddingHorizontal: 10,
-                      paddingVertical: 8,
+                      paddingVertical: 10,
                       justifyContent: "space-between",
                     }}
                   >
@@ -4101,7 +4117,7 @@ function Treemap({
                       </Text>
                       <Text
                         style={{
-                          color: c.brand,
+                          color: labelColor,
                           fontFamily: fontFamily[800],
                           fontSize: 9,
                           letterSpacing: 0.5,
@@ -4113,24 +4129,20 @@ function Treemap({
                         {t.label}
                       </Text>
                     </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "baseline",
-                        gap: 6,
-                      }}
-                    >
+                    <View>
                       <Text
                         style={{
                           color: ink,
                           fontFamily: fontFamily[700],
                           fontSize: 11,
                           letterSpacing: -0.1,
+                          marginBottom: 3,
                         }}
                         numberOfLines={1}
                       >
                         {valueText}
                       </Text>
+                      {renderDayChip("md")}
                     </View>
                   </View>
                 ) : isMini ? (
@@ -4263,6 +4275,28 @@ function shadeHex(hex: string, amt: number): string {
 /** Texto blanco sobre fondos oscuros, ink sobre claros. */
 function textOnHex(color: string): string {
   return color === "#0E0F0C" || color === "#000000" ? "#FAFAF7" : "#0E0F0C";
+}
+
+/** Convierte un color hex o rgb(...) a rgba(...) con alpha custom.
+ *  Usado para gradients que necesitan ir de "color opaco" a "color
+ *  transparente del mismo tono" (interpolación cromática limpia). */
+function toRgba(color: string, alpha: number): string {
+  if (color.startsWith("rgba(")) {
+    const inner = color.slice(5, -1).split(",").slice(0, 3).join(",");
+    return `rgba(${inner},${alpha})`;
+  }
+  if (color.startsWith("rgb(")) {
+    const inner = color.slice(4, -1);
+    return `rgba(${inner},${alpha})`;
+  }
+  if (color.startsWith("#")) {
+    const h = color.replace("#", "");
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return color;
 }
 
 /** Devuelve el ticker corto de un par crypto. "BTC/USDT" → "BTC". */
