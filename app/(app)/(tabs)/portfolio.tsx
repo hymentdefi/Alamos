@@ -638,10 +638,16 @@ export default function PortfolioScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
+              /* En dark forzamos blanco — c.textMuted se diluye sobre
+               * el negro puro. progressViewOffset compensa el topBar
+               * sticky (insets.top + 8 + ~40 alto + colchón) para que
+               * el spinner caiga DEBAJO del topBar, no detrás. Sin
+               * progressBackgroundColor: en dark, c.surface (#0D0D0D)
+               * es casi negro y mata la pill blanca por defecto que
+               * Android dibuja, así que mejor dejar el default. */
               tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
               colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-              progressBackgroundColor={c.surface}
-              progressViewOffset={12}
+              progressViewOffset={insets.top + 60}
             />
           }
         >
