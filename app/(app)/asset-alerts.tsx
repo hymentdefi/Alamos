@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -70,6 +70,13 @@ export default function AssetAlertsScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
   const { c, mode } = useTheme();
+  /* Workaround Reanimated v3 + iOS dark: setNativeProps imperativo
+   * sobre el RefreshControl para forzar el tintColor. */
+  const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
+  const refreshControlRef = useRef<RefreshControl>(null);
+  useEffect(() => {
+    refreshControlRef.current?.setNativeProps({ tintColor: refreshTint });
+  }, [refreshTint]);
   const { show } = useToast();
   const { ticker } = useLocalSearchParams<{ ticker: string }>();
 
@@ -306,10 +313,11 @@ export default function AssetAlertsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
+            ref={refreshControlRef}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
-            colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
+            tintColor={refreshTint}
+            colors={[refreshTint]}
             progressViewOffset={8}
           />
         }
