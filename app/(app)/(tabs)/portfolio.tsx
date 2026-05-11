@@ -3684,15 +3684,15 @@ function RankingList({
               ? c.surfaceHover
               : shadeHex(co.color, 0.22);
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
+            /* Render order: ELLIPSE primero, SIDE RECT segundo. Así el
+             * side rect (drawn on top) cubre la mitad inferior del
+             * ellipse, ocultando su stroke curvo que antes cruzaba la
+             * cara frontal del coin y atravesaba el label. Sólo queda
+             * visible la mitad superior del ellipse (el "cap") + el
+             * stroke recto del side rect en y=topY. La label queda
+             * libre de la curva ink. */
             return (
               <G key={co.key}>
-                <SvgPath
-                  d={sidePath}
-                  fill={sideFill}
-                  stroke={c.text}
-                  strokeWidth={1.5}
-                  strokeLinejoin="round"
-                />
                 <Ellipse
                   cx={co.cx}
                   cy={co.topY}
@@ -3701,6 +3701,13 @@ function RankingList({
                   fill={topFill}
                   stroke={c.text}
                   strokeWidth={1.5}
+                />
+                <SvgPath
+                  d={sidePath}
+                  fill={sideFill}
+                  stroke={c.text}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
                 />
               </G>
             );
@@ -5096,7 +5103,11 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 4,
+    /* marginTop chico (era 4, ahora 0) para que "PyG HOY" + info-dot
+     * queden pegados al monto de arriba — los decimales del
+     * AmountDisplay ya tienen un baseline más bajo que el integer,
+     * así que el espacio visual entre ambos textos sigue siendo cómodo. */
+    marginTop: 0,
   },
   pygEyebrow: {
     fontFamily: fontFamily[700],
