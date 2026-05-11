@@ -410,7 +410,7 @@ export function IndicatorSheet({
                     TENDENCIA
                   </Text>
                   <PickerRow
-                    icon={() => <MAIndicatorIllustration size={48} />}
+                    icon={() => <MAIndicatorIllustration size={56} />}
                     title="Media Móvil (SMA)"
                     description="Promedio histórico del precio. Cuando lo cruza, puede indicar un cambio de tendencia."
                     onPress={() => {
@@ -423,7 +423,7 @@ export function IndicatorSheet({
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <EMAIndicatorIllustration size={48} />}
+                    icon={() => <EMAIndicatorIllustration size={56} />}
                     title="Media Móvil (EMA)"
                     description="Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
                     onPress={() => {
@@ -437,18 +437,24 @@ export function IndicatorSheet({
                   />
 
                   {/* ── Momentum ── */}
-                  <Text style={[s.pickerSection, { color: c.textMuted }]}>
+                  <Text
+                    style={[
+                      s.pickerSection,
+                      s.pickerSectionTight,
+                      { color: c.textMuted },
+                    ]}
+                  >
                     MOMENTUM
                   </Text>
                   <PickerRow
-                    icon={() => <RSIIndicatorIllustration size={48} />}
+                    icon={() => <RSIIndicatorIllustration size={56} />}
                     title="RSI"
                     description="Detecta sobrecompra y sobreventa. Puede anticipar posibles reversiones del precio."
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <MACDIndicatorIllustration size={48} />}
+                    icon={() => <MACDIndicatorIllustration size={56} />}
                     title="MACD"
                     description="Mide la fuerza de la tendencia. Puede señalar cambios de dirección antes de que ocurran."
                     onPress={() => handlePickType("macd")}
@@ -456,20 +462,26 @@ export function IndicatorSheet({
                   />
 
                   {/* ── Volatilidad y volumen ── */}
-                  <Text style={[s.pickerSection, { color: c.textMuted }]}>
+                  <Text
+                    style={[
+                      s.pickerSection,
+                      s.pickerSectionTight,
+                      { color: c.textMuted },
+                    ]}
+                  >
                     VOLATILIDAD Y VOLUMEN
                   </Text>
                   <PickerRow
-                    icon={() => <BollingerIndicatorIllustration size={48} />}
+                    icon={() => <BollingerIndicatorIllustration size={56} />}
                     title="Bandas de Bollinger"
                     description="Marca el rango normal del precio. Salirse puede indicar un movimiento fuera de lo común."
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
-                    icon={() => <VolumeIndicatorIllustration size={48} />}
+                    icon={() => <VolumeIndicatorIllustration size={56} />}
                     title="Volumen"
-                    description="Cuánto dinero se está operando en el mercado. Un pico suele anticipar o confirmar un movimiento fuerte."
+                    description="Cuánto dinero se está operando. Un pico suele anticipar o confirmar un movimiento fuerte."
                     onPress={() => handlePickType("volume")}
                     c={c}
                   />
@@ -680,7 +692,7 @@ function PickerRow({
         <Text style={[s.pickerRowTitle, { color: c.text }]}>{title}</Text>
         <Text
           style={[s.pickerRowDesc, { color: c.textMuted }]}
-          numberOfLines={3}
+          numberOfLines={2}
         >
           {description}
         </Text>
@@ -1781,24 +1793,31 @@ const s = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 4,
   },
+  /* Override del paddingTop para las secciones que NO son la primera.
+   * La primera (TENDENCIA) viene apenas después del header del picker
+   * y necesita aire; MOMENTUM y VOLATILIDAD Y VOLUMEN vienen después
+   * de su última row y sienten mejor con menos separación. */
+  pickerSectionTight: {
+    paddingTop: 4,
+  },
   pickerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderCurve: "continuous",
   },
   pickerIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
   pickerRowTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.25,
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
   pickerRowDesc: {
     fontFamily: fontFamily[500],
