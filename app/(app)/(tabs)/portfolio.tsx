@@ -276,11 +276,19 @@ export default function PortfolioScreen() {
   // que sumó/restó la cartera hoy. % se computa contra el balance
   // de ayer (totalArs - daySum).
   const daySumArs = useMemo(
-    () =>
-      holdingsSorted.reduce(
+    () => {
+      const real = holdingsSorted.reduce(
         (acc, h) => acc + h.ars * (h.asset.change / 100),
         0,
-      ),
+      );
+      // DEV-ONLY: forzar estado de pérdida para preview visual del
+      // tono naranja end-to-end (AllocationBar, info-dot, arrow de
+      // Posiciones, Rendimiento). Toggle FORCE_LOSS_PREVIEW a false
+      // o eliminar este bloque cuando termine la revisión.
+      const FORCE_LOSS_PREVIEW = true;
+      if (FORCE_LOSS_PREVIEW) return -Math.abs(real || 1);
+      return real;
+    },
     [holdingsSorted],
   );
   const yesterdayArs = totalArs - daySumArs;
