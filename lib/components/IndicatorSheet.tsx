@@ -24,7 +24,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { fontFamily, radius, useTheme } from "../theme";
 import type { Asset } from "../data/assets";
@@ -488,25 +487,6 @@ export function IndicatorSheet({
               {/* ──────── Paso 2: Config flat rows ──────── */}
               <View style={{ width: windowW, flex: 1 }}>
                 <View style={s.configHeader}>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      if (isEditing) dismiss();
-                      else {
-                        setStep(1);
-                        setExpandedRow(null);
-                      }
-                    }}
-                    hitSlop={10}
-                    style={s.headerSideBtn}
-                    accessibilityLabel="Atrás"
-                  >
-                    <Feather
-                      name={isEditing ? "x" : "arrow-left"}
-                      size={20}
-                      color={c.text}
-                    />
-                  </Pressable>
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -532,20 +512,12 @@ export function IndicatorSheet({
                         Eliminar
                       </Text>
                     </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={dismiss}
-                      hitSlop={10}
-                      style={s.headerSideBtn}
-                      accessibilityLabel="Cerrar"
-                    >
-                      <Feather name="x" size={20} color={c.text} />
-                    </Pressable>
-                  )}
+                  ) : null}
                 </View>
 
                 <ScrollView
-                  contentContainerStyle={{ paddingBottom: 140 }}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -602,14 +574,10 @@ export function IndicatorSheet({
                   ) : null}
                 </ScrollView>
 
-                {/* CTA sticky abajo, con fade de gradient desde
-                    transparente al c.bg para que el contenido del
-                    scroll se desvanezca debajo. */}
-                <LinearGradient
-                  colors={[`${c.bg}00`, c.bg]}
-                  pointerEvents="none"
-                  style={s.ctaFade}
-                />
+                {/* CTA al pie del step 2 — fuera del ScrollView, como
+                    hermano en el flex layout del wrapper. Vive dentro
+                    del width: windowW del step 2, no en absolute
+                    positioning. Patrón espejado al AlertSheet. */}
                 <View style={s.ctaContainer}>
                   {macdInvalid ? (
                     <View
@@ -1643,29 +1611,25 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* ── Paso 2 — header ── */
+  /* ── Paso 2 — header ──
+   * Mismo lenguaje visual que el pickerHeader (paso 1): título a la
+   * izquierda con weight 800, sin botones de back/X. Para volver al
+   * paso 1 o cerrar el sheet, swipe down en el grabber. En EDIT mode
+   * mostramos un pill "Eliminar" a la derecha. */
   configHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  headerSideBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
+    paddingTop: 8,
+    paddingBottom: 6,
+    gap: 12,
   },
   configTitle: {
     flex: 1,
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-    textAlign: "center",
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
   deleteBtn: {
     paddingHorizontal: 12,
@@ -1746,28 +1710,14 @@ const s = StyleSheet.create({
     marginLeft: 24,
   },
 
-  /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
+  /* CTA container — vive en el flex layout del step 2, hermano del
+   * ScrollView. paddingHorizontal espeja al AlertSheet (24 a cada
+   * lado del sheet). */
   ctaContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 8,
     gap: 8,
-  },
-  /* Fade de gradient encima del ctaContainer — el contenido del
-   * scroll se desvanece detrás del CTA sin un corte duro. Alpha
-   * 0 arriba → c.bg sólido abajo. Altura 48 da suficiente fade
-   * sin tapar demasiado contenido. Posicionado justo arriba del
-   * ctaContainer (CTA 58 + paddings ≈ 74). */
-  ctaFade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 74,
-    height: 48,
   },
 
   /* ── Editores inline ── */
