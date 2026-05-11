@@ -360,19 +360,20 @@ export function IndicatorSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
-      <GestureDetector gesture={pan}>
-        <Animated.View
-          style={[
-            s.sheet,
-            {
-              backgroundColor: c.bg,
-              borderColor: c.border,
-              paddingBottom: insets.bottom + 18,
-              height: SHEET_HEIGHT,
-            },
-            sheetStyle,
-          ]}
-        >
+      <View style={s.kbAvoid} pointerEvents="box-none">
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            style={[
+              s.sheet,
+              {
+                backgroundColor: c.bg,
+                borderColor: c.border,
+                paddingBottom: insets.bottom + 18,
+                height: SHEET_HEIGHT,
+              },
+              sheetStyle,
+            ]}
+          >
           <View style={s.grabber}>
             <View
               style={[s.grabberPill, { backgroundColor: c.borderStrong }]}
@@ -429,7 +430,13 @@ export function IndicatorSheet({
                     description="Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
-                      setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
+                      /* EMA arranca con período 20 (más reactivo) en
+                       * lugar de 50 (SMA típico). Per spec del producto. */
+                      setConfig({
+                        ...DEFAULT_CONFIG,
+                        maVariant: "ema",
+                        maPeriod: 20,
+                      });
                       setSelectedType("ma");
                       setExpandedRow(null);
                       setStep(2);
@@ -627,10 +634,11 @@ export function IndicatorSheet({
                   </Pressable>
                 </View>
               </View>
-            </Animated.View>
-          </View>
-        </Animated.View>
-      </GestureDetector>
+              </Animated.View>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
     </Modal>
   );
 }
@@ -1520,13 +1528,18 @@ function describePreview(
     return `Te avisaremos cuando el MACD cruce la línea cero a la baja para ${ticker} en ${tf}.`;
   }
   if (type === "bollinger") {
+    const bbConfig = `Bollinger(${cfg.bbPeriod}, ${cfg.bbDeviation.toFixed(1)}σ)`;
     if (cfg.bbCondition === "touch_upper")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda superior en ${tf}.`;
+      return `Te avisaremos cuando el precio toque la banda superior de ${bbConfig} en ${ticker} (${tf}).`;
     if (cfg.bbCondition === "touch_lower")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda inferior en ${tf}.`;
-    return `Te avisaremos cuando las bandas de Bollinger de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
+      return `Te avisaremos cuando el precio toque la banda inferior de ${bbConfig} en ${ticker} (${tf}).`;
+    return `Te avisaremos cuando las bandas de ${bbConfig} de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
   }
-  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}x el promedio en ${tf}.`;
+  /* Volumen — formateo "2x" si es entero, "2.5x" si tiene decimales.
+   * Evita el "2,0x" feo que tenía antes. */
+  const mult = cfg.volumeMultiplier;
+  const multStr = Number.isInteger(mult) ? `${mult}` : mult.toFixed(1);
+  return `Te avisaremos cuando el volumen de ${ticker} supere ${multStr}x el promedio en ${tf}.`;
 }
 
 const s = StyleSheet.create({
@@ -1534,11 +1547,15 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
+  /* kbAvoid wrapper — matchea el patrón del AlertSheet de Precio:
+   * el View flex:1 con justifyContent:flex-end empuja el sheet al
+   * bottom de la pantalla. pointerEvents="box-none" deja pasar los
+   * clicks al backdrop debajo para que el tap-outside cierre. */
+  kbAvoid: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
   sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -1546,12 +1563,11 @@ const s = StyleSheet.create({
   },
   grabber: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   grabberPill: {
-    width: 40,
+    width: 44,
     height: 4,
-    borderCurve: "continuous",
     borderRadius: 2,
   },
 
@@ -1560,13 +1576,16 @@ const s = StyleSheet.create({
    * (~729 px). Filas con ícono 48, descripción de 1-2 líneas,
    * agrupadas en 3 secciones (TENDENCIA / MOMENTUM / VOLATILIDAD
    * Y VOLUMEN). */
+  /* Header del paso 1 (picker) — mismo treatment que el header del
+   * AlertSheet: paddingTop 6, paddingBottom 28, title weight 700
+   * fontSize 22 letterSpacing -0.6. */
   pickerHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 28,
   },
   pickerTitle: {
-    fontFamily: fontFamily[800],
+    fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
   },
@@ -1577,14 +1596,13 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
-  /* Eyebrow de sección dentro del picker — mismo lenguaje que
-   * sectionEyebrow del paso 2, con inset horizontal 20 para
-   * alinearse al picker (que usa pH 20, no 24). */
+  /* Eyebrow de sección dentro del picker. pH 24 alinea al inset
+   * estándar del sheet (mismo que el header y las rows). */
   pickerSection: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 1.4,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 14,
     paddingBottom: 4,
   },
@@ -1599,7 +1617,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 16,
     borderCurve: "continuous",
   },
@@ -1623,22 +1641,24 @@ const s = StyleSheet.create({
   },
 
   /* ── Paso 2 — header ──
-   * Mismo lenguaje visual que el pickerHeader (paso 1): título a la
-   * izquierda con weight 800, sin botones de back/X. Para volver al
-   * paso 1 o cerrar el sheet, swipe down en el grabber. En EDIT mode
-   * mostramos un pill "Eliminar" a la derecha. */
+   * Espejado al header del AlertSheet de Precio: paddingTop 6,
+   * paddingBottom 28, alignItems baseline, title fontFamily 700
+   * fontSize 22 letterSpacing -0.6. Sin botones de back/X — para
+   * volver al paso 1 o cerrar el sheet, swipe down en el grabber.
+   * En EDIT mode mostramos un pill "Eliminar" a la derecha (mismo
+   * estilo que el AlertSheet en edit). */
   configHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 28,
     gap: 12,
   },
   configTitle: {
     flex: 1,
-    fontFamily: fontFamily[800],
+    fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
   },
@@ -1655,11 +1675,13 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* ── Hero del paso 2 — ilustración + descripción del indicador ── */
+  /* ── Hero del paso 2 — ilustración + descripción del indicador ──
+   * paddingTop 0 porque el configHeader ya tiene pB 28; el aire
+   * ya está dado. paddingBottom 18 antes de la primera flat row. */
   configHero: {
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 14,
+    paddingTop: 0,
     paddingBottom: 18,
   },
   configHeroIcon: {
@@ -1722,12 +1744,12 @@ const s = StyleSheet.create({
   },
 
   /* CTA container — vive en el flex layout del step 2, hermano del
-   * ScrollView. paddingHorizontal espeja al AlertSheet (24 a cada
-   * lado del sheet). */
+   * ScrollView. Replica el patrón del AlertSheet de Precio: el CTA
+   * pill tiene marginTop 8 (definido en s.cta), no necesitamos
+   * paddingTop/paddingBottom propios. paddingHorizontal 24 matchea
+   * el inset del sheet. */
   ctaContainer: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
     gap: 8,
   },
 
@@ -1784,7 +1806,7 @@ const s = StyleSheet.create({
 
   /* ── Preview + warning ── */
   previewWrap: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 20,
   },
   preview: {
@@ -1818,13 +1840,18 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* ── CTA — pill style match AlertSheet ── */
+  /* ── CTA — pill style match AlertSheet ──
+   * height 58 + borderRadius pill + marginTop 8 (mismo que el CTA
+   * del AlertSheet de Precio). Esto le da el aire visual entre el
+   * último elemento del scroll y el pill, sin necesidad de padding
+   * adicional en el ctaContainer. */
   cta: {
     height: 58,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 8,
   },
   ctaText: {
     fontFamily: fontFamily[800],
