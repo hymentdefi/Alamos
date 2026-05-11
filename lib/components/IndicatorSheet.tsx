@@ -169,6 +169,14 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
+  /* Altura compartida con AlertSheet — ambos sheets se sienten del
+   * mismo tamaño visual. El cálculo viene de la altura natural del
+   * AlertSheet (≈ 729 px de contenido) con aire arriba. Si tocás
+   * esta fórmula, ESPEJALA en AlertSheet.tsx. */
+  const SHARED_SHEET_HEIGHT = Math.min(
+    windowH * 0.88,
+    760 + insets.bottom,
+  );
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
@@ -365,7 +373,7 @@ export function IndicatorSheet({
               backgroundColor: c.bg,
               borderColor: c.border,
               paddingBottom: insets.bottom + 8,
-              maxHeight: windowH * 0.92,
+              height: SHARED_SHEET_HEIGHT,
             },
             sheetStyle,
           ]}
@@ -405,7 +413,7 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <MAIndicatorIllustration size={56} />}
                     title="Media Móvil (SMA)"
-                    description="Promedio del precio en un período, suaviza la tendencia general"
+                    description="Cruces sobre la media móvil simple"
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "sma" });
@@ -418,7 +426,7 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <EMAIndicatorIllustration size={56} />}
                     title="Media Móvil (EMA)"
-                    description="Promedio ponderado, más reactivo a los últimos precios"
+                    description="Cruces sobre la media móvil exponencial"
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
@@ -436,14 +444,14 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <RSIIndicatorIllustration size={56} />}
                     title="RSI"
-                    description="Mide la fuerza del movimiento, detecta sobrecompra y sobreventa"
+                    description="Avisa sobrecompra y sobreventa"
                     onPress={() => handlePickType("rsi")}
                     c={c}
                   />
                   <PickerRow
                     icon={() => <MACDIndicatorIllustration size={56} />}
                     title="MACD"
-                    description="Cruces entre dos medias móviles para anticipar cambios de tendencia"
+                    description="Cruces de medias y cambios de tendencia"
                     onPress={() => handlePickType("macd")}
                     c={c}
                   />
@@ -455,14 +463,14 @@ export function IndicatorSheet({
                   <PickerRow
                     icon={() => <BollingerIndicatorIllustration size={56} />}
                     title="Bandas de Bollinger"
-                    description="Rangos dinámicos basados en la volatilidad reciente del precio"
+                    description="Toques de banda y bajas de volatilidad"
                     onPress={() => handlePickType("bollinger")}
                     c={c}
                   />
                   <PickerRow
                     icon={() => <VolumeIndicatorIllustration size={56} />}
                     title="Volumen"
-                    description="Picos significativos respecto al volumen promedio del activo"
+                    description="Picos sobre el volumen promedio"
                     onPress={() => handlePickType("volume")}
                     c={c}
                   />

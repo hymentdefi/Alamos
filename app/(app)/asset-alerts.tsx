@@ -308,10 +308,16 @@ export default function AssetAlertsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
+            /* En dark forzamos blanco — c.textMuted no se ve sobre el
+             * negro puro. Acá el ScrollView arranca DEBAJO del topBar
+             * + screenIntro + tabs, así que un offset pequeño alcanza
+             * para que el spinner no quede pegado al borde de los
+             * tabs. Sin progressBackgroundColor: en dark c.surface
+             * (#0D0D0D) ≈ c.bg (#000000) y la pill blanca default
+             * de Android contrasta mucho mejor con el spinner. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressBackgroundColor={c.surface}
-            progressViewOffset={12}
+            progressViewOffset={20}
           />
         }
       >

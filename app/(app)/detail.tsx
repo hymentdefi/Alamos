@@ -306,10 +306,15 @@ export default function DetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
+            /* En dark forzamos blanco — c.textMuted no se ve sobre el
+             * negro puro. progressViewOffset baja el spinner debajo
+             * del topBar sticky (insets.top + 12 + ~40 alto + colchón)
+             * para que no quede tapado. Sin progressBackgroundColor:
+             * en dark c.surface (#0D0D0D) ≈ c.bg (#000000) y arruina
+             * la pill que Android dibuja detrás del spinner. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressBackgroundColor={c.surface}
-            progressViewOffset={12}
+            progressViewOffset={insets.top + 60}
           />
         }
       >

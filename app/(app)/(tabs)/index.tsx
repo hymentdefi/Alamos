@@ -413,11 +413,23 @@ function BaseHome() {
             onRefresh={onRefresh}
             /* En light, c.textMuted gris se ve bien sobre el bg
              * off-white. En dark, ese muted desaparece sobre el
-             * negro puro — forzamos #FFFFFF para máximo contraste. */
+             * negro puro — forzamos #FFFFFF para máximo contraste.
+             *
+             * progressViewOffset = insets.top + topBar paddingTop (12)
+             * + topBar height (≈40) + colchón (8) = ~insets.top+60.
+             * Antes era 12 fijo y el spinner caía DETRÁS del topBar
+             * (que tiene bg c.bg sólido) — invisible en dark sobre
+             * #000000. Bajándolo MÁS abajo del topBar el spinner
+             * cae sobre el contenido del scroll y se lee.
+             *
+             * NO seteamos progressBackgroundColor: en dark el
+             * c.surface (#0D0D0D) era casi idéntico al c.bg (#000000)
+             * y arruinaba el contraste de la pill del spinner en
+             * Android. Default Android = pill blanco → mejor lectura
+             * de cualquier tintColor. */
             tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
             colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-            progressBackgroundColor={c.surface}
-            progressViewOffset={12}
+            progressViewOffset={insets.top + 60}
           />
         }
       >
