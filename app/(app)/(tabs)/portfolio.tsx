@@ -3107,19 +3107,20 @@ function FloorBrick({
                   fill={top}
                 />
                 {showLabel ? (
-                  /* % centrado en la cara frontal (vertical + horizontal).
-                   * alignmentBaseline="central" anchora el centro visual
-                   * del texto a (yTop+yBot)/2; textAnchor="middle"
-                   * centra horizontalmente. fontSize 19 + weight 800 +
-                   * letterSpacing -0.4 dan el peso "mas bold" pedido. */
+                  /* % centrado en la cara frontal. textAnchor="middle"
+                   * + x=(x0+x1)/2 da centrado horizontal preciso. La y
+                   * usa offset manual fontSize*0.34 sobre el centro
+                   * vertical del wall — alignmentBaseline en RNSVG
+                   * tiene bugs cross-plataforma (iOS shifteaba el
+                   * texto horizontalmente en algunos casos). El peso
+                   * del 800 sale del fontFamily directo, sin
+                   * fontWeight (puede colisionar con el family-weight
+                   * y forzar fallback al system font). */
                   <SvgText
                     x={(blk.x0 + blk.x1) / 2}
-                    y={(yTop + yBot) / 2}
+                    y={(yTop + yBot) / 2 + 6.5}
                     textAnchor="middle"
-                    alignmentBaseline="central"
                     fontSize="19"
-                    fontWeight="800"
-                    letterSpacing={-0.4}
                     fill={textOnHex(blk.color)}
                     fontFamily={fontFamily[800]}
                   >
