@@ -411,7 +411,7 @@ export function IndicatorSheet({
                   </Text>
                   <PickerRow
                     icon={() => <MAIndicatorIllustration size={56} />}
-                    title="Media Móvil (SMA)"
+                    title="Media móvil simple"
                     description="Promedio histórico del precio. Cuando lo cruza, puede indicar un cambio de tendencia."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
@@ -424,7 +424,7 @@ export function IndicatorSheet({
                   />
                   <PickerRow
                     icon={() => <EMAIndicatorIllustration size={56} />}
-                    title="Media Móvil (EMA)"
+                    title="Media móvil exponencial"
                     description="Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
@@ -1561,8 +1561,8 @@ function buildInputFromConfig(
 
 function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   if (t === "ma") {
-    if (cfg && cfg.maVariant === "ema") return "Media Móvil (EMA)";
-    return "Media Móvil (SMA)";
+    if (cfg && cfg.maVariant === "ema") return "Media móvil exponencial";
+    return "Media móvil simple";
   }
   if (t === "rsi") return "RSI";
   if (t === "macd") return "MACD";

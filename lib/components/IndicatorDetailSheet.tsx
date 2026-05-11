@@ -343,9 +343,11 @@ function describeMeta(alert: IndicatorAlert, ticker: string): Meta {
   const tf = alert.timeframe;
   if (alert.type === "ma") {
     const v = alert.variant.toUpperCase();
+    const variantWord =
+      alert.variant === "ema" ? "exponencial" : "simple";
     const above = alert.condition === "above";
     return {
-      indicatorName: `Media Móvil (${v} ${alert.period})`,
+      indicatorName: `Media móvil ${variantWord} (${alert.period})`,
       short: above
         ? `Precio cruza sobre ${v} ${alert.period}`
         : `Precio cruza bajo ${v} ${alert.period}`,
