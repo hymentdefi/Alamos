@@ -3716,12 +3716,17 @@ function RankingList({
               dimMarket != null && co.market !== dimMarket;
             const dimmed = dimmedByActive || dimmedByMarket;
             const sideFill = dimmed ? c.surfaceSunken : co.color;
+            /* Reflejo SUTIL del top de la moneda — antes 0.7 era casi
+             * blanco arriba, dando un brillo over-engineered. 0.32 da
+             * un highlight legible pero contenido; el bottom queda muy
+             * cerca del color base para que la transición vertical
+             * insinúe la curvatura sin gritar "espejo". */
             const capLightShade = dimmed
               ? c.surfaceHover
-              : shadeHex(co.color, 0.7);
+              : shadeHex(co.color, 0.32);
             const capBaseShade = dimmed
               ? c.surfaceHover
-              : shadeHex(co.color, 0.15);
+              : shadeHex(co.color, 0.05);
             const gradId = `coin-cap-${co.key}`;
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
             /* Render order:
