@@ -2501,10 +2501,11 @@ function FloorPie({
           height={containerW > 0 ? (containerW * H) / W : undefined}
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Slices del donut — flat, sin outline ni drop shadow. La
-           *  separación entre slices viene de un stroke del color de
-           *  fondo (c.bg) de 2.5pt que actúa como "gap" cortando el
-           *  ring. Estética Robinhood: limpio, sin chrome decorativo.
+          {/* Slices del donut — flat con bordes marcados. Cada slice
+           *  lleva un stroke de c.text (almost-ink en light, almost-
+           *  white en dark) de 1.2 pt que perfila tanto los radios
+           *  entre slices como los arcos outer/inner. Da un acabado
+           *  más constructivo/handcrafted que el "gap por bg color".
            *
            *  Dimming de 2 fuentes:
            *   - activeIdx: el slice activo del propio touch del pie.
@@ -2530,8 +2531,8 @@ function FloorPie({
                   slice.endAngle,
                 )}
                 fill={fill}
-                stroke={c.bg}
-                strokeWidth={2.5}
+                stroke={c.text}
+                strokeWidth={1.2}
                 strokeLinejoin="round"
               />
             );
