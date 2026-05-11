@@ -1573,6 +1573,12 @@ function AllocBarSegment({
     <Pressable
       onPressIn={onPressIn}
       onPressOut={onPressOut}
+      /* La barra mide sólo 6 px de alto → con hitSlop expandimos el
+       * touch area a ~30 px verticales (18 arriba para no caer en el
+       * chart, 6 abajo para encontrarse con el caption en el medio
+       * del gap). Resuelve el "hold y no agarra nada" que pasa cuando
+       * tenés que clavar el dedo exactamente sobre los 6 px. */
+      hitSlop={{ top: 18, bottom: 6, left: 0, right: 0 }}
       style={{ flex: pct, marginLeft }}
     >
       <Animated.View
@@ -1632,6 +1638,11 @@ function AllocCaption({
     <Pressable
       onPressIn={onPressIn}
       onPressOut={onPressOut}
+      /* Expandimos el touch area también acá: 6 px arriba para
+       * encontrar el hitSlop del bar segment en el medio del gap, y
+       * 14 px abajo + 6 a cada lado para que el caption sea fácil de
+       * agarrar incluso si es una palabra corta. */
+      hitSlop={{ top: 6, bottom: 14, left: 6, right: 6 }}
       style={{ flex: pct, marginLeft }}
     >
       <Animated.View style={animStyle}>
