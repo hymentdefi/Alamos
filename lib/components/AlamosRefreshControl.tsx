@@ -46,7 +46,11 @@ export function AlamosRefreshControl(props: RefreshControlProps) {
       setTint(target);
       return;
     }
-    const id = setTimeout(() => setTint(target), 0);
+    /* Delay 100ms: 0 ms quedaba batcheado por React 18 + Fabric en el
+     * mismo commit del initial mount, lo que reactivaba el bug. 100 ms
+     * es imperceptible al usuario (el spinner no existe hasta que tira
+     * del scroll) y queda holgadamente fuera del batching window. */
+    const id = setTimeout(() => setTint(target), 100);
     return () => clearTimeout(id);
   }, [target]);
 
