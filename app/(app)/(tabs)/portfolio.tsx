@@ -61,6 +61,7 @@ import {
   findCategoryBySlug,
 } from "../../../lib/data/marketCategories";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
+import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -170,6 +171,7 @@ export default function PortfolioScreen() {
   const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
   const [refreshing, setRefreshing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("ARS");
+  const [currencyOpen, setCurrencyOpen] = useState(false);
   /* Sheet de selección de moneda — se abre desde la pill debajo del
    * balance. Cambiar moneda ahora es un acto deliberado: tap pill →
    * elegir card → confirma. NO hay swipe horizontal del balance. */
@@ -490,11 +492,11 @@ export default function PortfolioScreen() {
   // se bloquea (scrollEnabled=false) para que el dedo no scrollee
   // accidentalmente mientras el usuario explora la distribución.
   const [brickHolding, setBrickHolding] = useState(false);
-  // Visualización seleccionada — cards (ranking) por default, primera
-  // opción del segmented. El usuario alterna entre Cards / Ladrillo /
-  // Pie / Treemap.
+  // Visualización seleccionada — treemap por default, primera opción
+  // del segmented. El usuario alterna entre Treemap / Ladrillo / Pie /
+  // Ranking (poll bars).
   const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
-    "ranking",
+    "treemap",
   );
 
   /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
@@ -656,52 +658,33 @@ export default function PortfolioScreen() {
             />
           </View>
 
-          {/* Currency segmented — pill ARS|USD inline estilo Robinhood.
-              Tap directo togglea sin sheet intermedio. El segmento
-              activo lleva un "thumb" elevado (bg c.bg con shadow), el
-              inactivo queda translúcido. */}
+          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
+              para cambiar la moneda. Cambio deliberado: no hay swipe
+              horizontal del balance. El sheet aclara que es la misma
+              cartera, sólo distinta valuación. */}
           <View style={s.currencyPillRow}>
-            <View
+            <Tap
+              haptic="selection"
+              pressScale={0.96}
+              onPress={() => setCurrencyOpen(true)}
               style={[
-                s.currencySeg,
-                { backgroundColor: c.surfaceHover },
+                s.currencyPill,
+                {
+                  backgroundColor: c.surfaceHover,
+                },
               ]}
             >
-              {(["ARS", "USD"] as const).map((cur) => {
-                const active = currency === cur;
-                return (
-                  <Tap
-                    key={cur}
-                    haptic="selection"
-                    pressScale={0.97}
-                    onPress={() => setCurrency(cur)}
-                    style={[
-                      s.currencySegBtn,
-                      active && {
-                        backgroundColor: c.bg,
-                        shadowColor: "#0E0F0C",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.08,
-                        shadowRadius: 2,
-                        elevation: 1,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.currencySegLabel,
-                        {
-                          color: active ? c.text : c.textMuted,
-                          fontFamily: fontFamily[active ? 800 : 600],
-                        },
-                      ]}
-                    >
-                      {cur}
-                    </Text>
-                  </Tap>
-                );
-              })}
-            </View>
+              <Text
+                style={[s.currencyPillCode, { color: c.text }]}
+              >
+                {currency}
+              </Text>
+              <Feather
+                name="chevron-down"
+                size={12}
+                color={c.textMuted}
+              />
+            </Tap>
           </View>
 
           <View style={s.deltaRow}>
@@ -718,25 +701,25 @@ export default function PortfolioScreen() {
           </View>
 
           {/* Selector de viz — debajo del hero, alineado a la derecha.
-           *  Orden: Cards (ranking) / Ladrillo / Pie / Treemap. */}
+           *  Orden: Treemap / Ladrillo / Pie / Ranking (poll bars). */}
           {hasHoldings ? (
             <View style={s.heroSelectorRow}>
               <View
                 style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
               >
                 <Tap
-                  onPress={() => setViz("ranking")}
+                  onPress={() => setViz("treemap")}
                   haptic="selection"
                   pressScale={0.95}
                   hitSlop={4}
                   style={[
                     s.vizSegBtn,
-                    viz === "ranking" && { backgroundColor: c.bg },
+                    viz === "treemap" && { backgroundColor: c.bg },
                   ]}
-                  accessibilityLabel="Vista de cards"
+                  accessibilityLabel="Vista de treemap"
                 >
-                  <RankingGlyph
-                    color={viz === "ranking" ? c.text : c.textMuted}
+                  <TreemapGlyph
+                    color={viz === "treemap" ? c.text : c.textMuted}
                     size={16}
                   />
                 </Tap>
@@ -773,18 +756,18 @@ export default function PortfolioScreen() {
                   />
                 </Tap>
                 <Tap
-                  onPress={() => setViz("treemap")}
+                  onPress={() => setViz("ranking")}
                   haptic="selection"
                   pressScale={0.95}
                   hitSlop={4}
                   style={[
                     s.vizSegBtn,
-                    viz === "treemap" && { backgroundColor: c.bg },
+                    viz === "ranking" && { backgroundColor: c.bg },
                   ]}
-                  accessibilityLabel="Vista de treemap"
+                  accessibilityLabel="Vista de ranking"
                 >
-                  <TreemapGlyph
-                    color={viz === "treemap" ? c.text : c.textMuted}
+                  <RankingGlyph
+                    color={viz === "ranking" ? c.text : c.textMuted}
                     size={16}
                   />
                 </Tap>
@@ -868,10 +851,10 @@ export default function PortfolioScreen() {
               ]}
             >
               <View style={s.alamosHeadingRow}>
-                <Text style={[s.alamosHeadingText, { color }]}>
+                <Text style={[s.linkRowHeading, { color }]}>
                   Rendimiento
                 </Text>
-                <Feather name="arrow-right" size={18} color={color} />
+                <Feather name="arrow-right" size={15} color={color} />
               </View>
               <View style={s.linkRowValueStack}>
                 <Text style={[s.linkRowValue, { color }]}>
@@ -991,6 +974,13 @@ export default function PortfolioScreen() {
           ) : null}
         </Animated.ScrollView>
 
+        <CurrencySheet
+          visible={currencyOpen}
+          onClose={() => setCurrencyOpen(false)}
+          selected={currency}
+          totalArs={totalArs}
+          onSelect={(cur) => setCurrency(cur)}
+        />
       </View>
     </AssetColorProvider>
   );
@@ -4171,30 +4161,26 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* Selector ARS/USD — segmented pill estilo Robinhood debajo del
-   * saldo. Track translúcido + thumb elevado en el activo (bg c.bg
-   * con shadow sutil). Tap directo togglea sin sheet intermedio. */
+  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
+   * CurrencySheet para cambiar moneda con un acto deliberado. */
   currencyPillRow: {
     flexDirection: "row",
-    marginTop: 12,
+    marginTop: 10,
   },
-  currencySeg: {
+  currencyPill: {
     flexDirection: "row",
-    padding: 3,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  currencySegBtn: {
-    minWidth: 48,
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    gap: 4,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 4,
     borderCurve: "continuous",
     borderRadius: radius.pill,
   },
-  currencySegLabel: {
-    fontSize: 12,
-    letterSpacing: -0.1,
+  currencyPillCode: {
+    fontFamily: fontFamily[700],
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   /* Ladrillo full-bleed — sigue al hero scrollable. Sin
    * marginHorizontal porque el ScrollView no tiene padding lateral. */
@@ -4303,9 +4289,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   /* Heading "álamos-style" — mismo treatment que el "Briefing" del
-   * stock detail. Pareja título grande + arrow pegado a la derecha,
-   * todo en color tone (brand cuando up, red cuando down) o en text
-   * para los headings neutrales (Posiciones). */
+   * stock detail. Pareja título + arrow pegado a la derecha. */
   alamosHeadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4315,6 +4299,13 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.5,
+  },
+  /* Variante compacta del heading — para el link de Rendimiento que
+   * vive en un row con valor al costado y necesita más balance. */
+  linkRowHeading: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.3,
   },
   marketRow: {
     paddingVertical: 14,
