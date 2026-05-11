@@ -636,18 +636,23 @@ export default function PortfolioScreen() {
           scrollEnabled={!brickHolding}
           refreshControl={
             <RefreshControl
+              /* CAUSA RAÍZ: iOS UIRefreshControl no reaplica `tintColor`
+               * cuando cambia el prop con el control ya montado — queda
+               * pegado al tint inicial. `key={mode}` fuerza remount al
+               * cambiar tema y asegura que el color del modo actual
+               * efectivamente se aplique. Ver index.tsx para detalle. */
+              key={mode}
               refreshing={refreshing}
               onRefresh={onRefresh}
-              /* En dark forzamos blanco — c.textMuted se diluye sobre
-               * el negro puro. progressViewOffset compensa el topBar
-               * sticky (insets.top + 8 + ~40 alto + colchón) para que
-               * el spinner caiga DEBAJO del topBar, no detrás. Sin
-               * progressBackgroundColor: en dark, c.surface (#0D0D0D)
-               * es casi negro y mata la pill blanca por defecto que
-               * Android dibuja, así que mejor dejar el default. */
+              /* Blanco puro en dark (máximo contraste sobre OLED),
+               * muted en light. */
               tintColor={mode === "dark" ? "#FFFFFF" : c.textMuted}
               colors={[mode === "dark" ? "#FFFFFF" : c.textMuted]}
-              progressViewOffset={insets.top + 60}
+              /* Offset chico: el topBar ya ocupa espacio en flow, el
+               * ScrollView arranca debajo. Empujar el spinner +100px
+               * hacia abajo lo hacía caer dentro del hero y no se
+               * alcanzaba a ver con un pull corto. */
+              progressViewOffset={8}
             />
           }
         >
