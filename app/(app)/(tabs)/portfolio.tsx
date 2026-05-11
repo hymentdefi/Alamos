@@ -2879,13 +2879,19 @@ function FloorBrick({
   const [tooltipH, setTooltipH] = useState(0);
   const [tooltipW, setTooltipW] = useState(0);
 
+  /* Geometría — ladrillo más profundo (depth 50 vs 32 previo) para
+   * que se sienta como un bloque sólido en vez de una pared chata.
+   * wallW reducido a 260 para que la proporción depth:width sea más
+   * chunky. yTop bajado y H subido un toque para que el top inclinado
+   * (yTop - topShift = 14.5) y la sombra (yBot + 14 + ry) quepan
+   * holgados en el viewBox. */
   const W = 340;
-  const H = 180;
-  const wallW = 280;
+  const H = 190;
+  const wallW = 260;
   const wallH = 100;
-  const depth = 32;
+  const depth = 50;
   const xL = (W - (wallW + depth)) / 2;
-  const yTop = 36;
+  const yTop = 42;
   const yBot = yTop + wallH;
   const topShift = depth * 0.55;
 
@@ -3076,9 +3082,9 @@ function FloorBrick({
         >
           <Ellipse
             cx={xL + (wallW + depth) / 2}
-            cy={yBot + 14}
-            rx={wallW / 2 + 14}
-            ry={7}
+            cy={yBot + 16}
+            rx={wallW / 2 + 18}
+            ry={9}
             fill="rgba(14,15,12,0.10)"
           />
           {blocks.map((blk, i) => {
