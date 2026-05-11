@@ -2947,19 +2947,18 @@ function FloorBrick({
   const [tooltipH, setTooltipH] = useState(0);
   const [tooltipW, setTooltipW] = useState(0);
 
-  /* Geometría — ladrillo más profundo (depth 50 vs 32 previo) para
-   * que se sienta como un bloque sólido en vez de una pared chata.
-   * wallW reducido a 260 para que la proporción depth:width sea más
-   * chunky. yTop bajado y H subido un toque para que el top inclinado
-   * (yTop - topShift = 14.5) y la sombra (yBot + 14 + ry) quepan
-   * holgados en el viewBox. */
+  /* Geometría — ladrillo profundo y ALTO para ocupar el mismo espacio
+   * vertical que el resto de las vizs del pager. Antes era 190 alto y
+   * dejaba un gap blanco arriba/abajo de ~90 px. Ahora viewBox 270 alto,
+   * wallH 160 (era 100) y yTop 60 (era 42). El brick ocupa de y=27 a
+   * y=243 (top inclinado a sombra), llenando el page sin clip. */
   const W = 340;
-  const H = 190;
+  const H = 270;
   const wallW = 260;
-  const wallH = 100;
-  const depth = 50;
+  const wallH = 160;
+  const depth = 56;
   const xL = (W - (wallW + depth)) / 2;
-  const yTop = 42;
+  const yTop = 60;
   const yBot = yTop + wallH;
   const topShift = depth * 0.55;
 
@@ -3526,12 +3525,12 @@ function RankingList({
   const coins = useMemo(() => {
     let cursorY = 0;
     return rows.map((r, i) => {
-      const rx = Math.max(20, Math.min(150, r.pct * 4));
+      const rx = Math.max(18, Math.min(100, r.pct * 3));
       const ry = rx * 0.22;
-      const height = Math.max(14, Math.min(56, r.pct * 1.5));
+      const height = Math.max(12, Math.min(36, r.pct * 1));
       const offsetX = Math.sin(i * 2.1 + 0.7) * 16;
       const cx = W / 2 + offsetX;
-      if (i === 0) cursorY = 24 + ry;
+      if (i === 0) cursorY = 18 + ry;
       const topY = cursorY;
       cursorY = topY + height + ry;
       return { ...r, cx, topY, rx, ry, height };
@@ -3541,7 +3540,7 @@ function RankingList({
   const H = useMemo(() => {
     const last = coins[coins.length - 1];
     if (!last) return 320;
-    return last.topY + last.height + last.ry + 36;
+    return last.topY + last.height + last.ry + 24;
   }, [coins]);
 
   const coinsRef = useRef(coins);
@@ -3900,7 +3899,10 @@ function Treemap({
   const [tooltipH, setTooltipH] = useState(0);
   const [tooltipW, setTooltipW] = useState(0);
 
-  const aspect = 16 / 10; // wide-ish, ocupa el ancho sin ser muy alto
+  /* aspect 1.22 — más alto que el clásico 16:10 para que ocupe espacio
+   * similar al resto de las vizs del pager (Pie / CoinStack ~280 alto)
+   * y no quede gap blanco arriba/abajo dentro del page. */
+  const aspect = 1.22;
   const W = 340;
   const H = W / aspect;
 
