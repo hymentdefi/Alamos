@@ -110,6 +110,11 @@ interface Holding {
  * verdes (#00C805 vivid mint, #7EE9A6 pale, #00B864 medium) son
  * artísticos para shading y permanecen sin alinear al sistema
  * de tokens — no representan estado de activo. */
+/* Orden de las 4 visualizaciones del chart pager. El usuario las
+ * navega horizontalmente con swipe. Índice del array = idx del page. */
+const VIZ_ORDER = ["treemap", "brick", "pie", "ranking"] as const;
+type VizKey = (typeof VIZ_ORDER)[number];
+
 const BRICK_PALETTE = [
   "#00C805",
   "#0E0F0C",
@@ -501,6 +506,11 @@ export default function PortfolioScreen() {
   const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
     "treemap",
   );
+  /* Pager horizontal del chart — el user desliza para cambiar entre
+   * Treemap / Ladrillo / Pie / CoinStack. Ref para scroll programático
+   * desde los dots; pageW se mide vía onLayout del ScrollView. */
+  const vizPagerRef = useRef<ScrollView | null>(null);
+  const [pageW, setPageW] = useState(0);
 
   /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
    * "highlighted" actualmente — puede venir de:
@@ -690,125 +700,126 @@ export default function PortfolioScreen() {
             </Tap>
           </View>
 
-          {/* Selector de viz — debajo del hero, alineado a la derecha.
-           *  Orden: Treemap / Ladrillo / Pie / Ranking (poll bars). */}
-          {hasHoldings ? (
-            <View style={s.heroSelectorRow}>
-              <View
-                style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
-              >
-                <Tap
-                  onPress={() => setViz("treemap")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "treemap" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de treemap"
-                >
-                  <TreemapGlyph
-                    color={viz === "treemap" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("brick")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "brick" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de ladrillo"
-                >
-                  <BrickGlyph
-                    color={viz === "brick" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("pie")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "pie" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de torta"
-                >
-                  <PieGlyph
-                    color={viz === "pie" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("ranking")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "ranking" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de ranking"
-                >
-                  <RankingGlyph
-                    color={viz === "ranking" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-              </View>
-            </View>
-          ) : null}
-
           </View>
 
-          {/* ─── Chart pie / brick — sin selector adentro. */}
+          {/* ─── Chart pager — 4 vistas (Treemap / Ladrillo / Pie /
+              CoinStack) deslizables horizontalmente con pagingEnabled.
+              4 dots abajo indican la posición. Reemplaza al segmented
+              selector previo. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
-              <View style={s.chartCanvas}>
-                {viz === "pie" ? (
-                  <FloorPie
-                    holdings={holdingsForCharts}
-                    totalArs={totalArsWithCash}
-                    currency={currency}
-                    groupBy="category"
-                    dayPct={dayPct}
-                    dayUp={dayUp}
-                    onHoldChange={setBrickHolding}
-                    dimMarket={highlightedMarket}
-                    onActiveMarketChange={setHighlightedMarket}
-                  />
-                ) : viz === "brick" ? (
-                  <FloorBrick
-                    holdings={holdingsForCharts}
-                    totalArs={totalArsWithCash}
-                    groupBy="category"
-                    onHoldChange={setBrickHolding}
-                    dimMarket={highlightedMarket}
-                    onActiveMarketChange={setHighlightedMarket}
-                  />
-                ) : viz === "ranking" ? (
-                  <RankingList
-                    holdings={holdingsForCharts}
-                    totalArs={totalArsWithCash}
-                    onHoldChange={setBrickHolding}
-                    dimMarket={highlightedMarket}
-                    onActiveMarketChange={setHighlightedMarket}
-                  />
-                ) : (
-                  <Treemap
-                    holdings={holdingsForCharts}
-                    totalArs={totalArsWithCash}
-                    onHoldChange={setBrickHolding}
-                    dimMarket={highlightedMarket}
-                    onActiveMarketChange={setHighlightedMarket}
-                  />
-                )}
+              <ScrollView
+                ref={vizPagerRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="normal"
+                bounces={false}
+                directionalLockEnabled
+                scrollEnabled={!brickHolding}
+                onLayout={(e) => {
+                  const w = e.nativeEvent.layout.width;
+                  if (w !== pageW) setPageW(w);
+                }}
+                onMomentumScrollEnd={(e) => {
+                  if (pageW === 0) return;
+                  const idx = Math.round(
+                    e.nativeEvent.contentOffset.x / pageW,
+                  );
+                  const next = VIZ_ORDER[idx];
+                  if (next && next !== viz) {
+                    Haptics.selectionAsync().catch(() => {});
+                    setViz(next);
+                  }
+                }}
+              >
+                {pageW > 0
+                  ? VIZ_ORDER.map((vk) => (
+                      <View
+                        key={vk}
+                        style={[
+                          s.vizPage,
+                          { width: pageW },
+                        ]}
+                      >
+                        {vk === "treemap" ? (
+                          <Treemap
+                            holdings={holdingsForCharts}
+                            totalArs={totalArsWithCash}
+                            onHoldChange={setBrickHolding}
+                            dimMarket={highlightedMarket}
+                            onActiveMarketChange={setHighlightedMarket}
+                          />
+                        ) : vk === "brick" ? (
+                          <FloorBrick
+                            holdings={holdingsForCharts}
+                            totalArs={totalArsWithCash}
+                            groupBy="category"
+                            onHoldChange={setBrickHolding}
+                            dimMarket={highlightedMarket}
+                            onActiveMarketChange={setHighlightedMarket}
+                          />
+                        ) : vk === "pie" ? (
+                          <FloorPie
+                            holdings={holdingsForCharts}
+                            totalArs={totalArsWithCash}
+                            currency={currency}
+                            groupBy="category"
+                            dayPct={dayPct}
+                            dayUp={dayUp}
+                            onHoldChange={setBrickHolding}
+                            dimMarket={highlightedMarket}
+                            onActiveMarketChange={setHighlightedMarket}
+                          />
+                        ) : (
+                          <RankingList
+                            holdings={holdingsForCharts}
+                            totalArs={totalArsWithCash}
+                            onHoldChange={setBrickHolding}
+                            dimMarket={highlightedMarket}
+                            onActiveMarketChange={setHighlightedMarket}
+                          />
+                        )}
+                      </View>
+                    ))
+                  : null}
+              </ScrollView>
+
+              {/* Dots indicator — 4 dots horizontales abajo del pager,
+                  centrados. Tap a cualquiera salta a esa página. */}
+              <View style={s.vizDotsRow}>
+                {VIZ_ORDER.map((vk, i) => {
+                  const active = vk === viz;
+                  return (
+                    <Pressable
+                      key={vk}
+                      hitSlop={10}
+                      onPress={() => {
+                        if (pageW > 0) {
+                          Haptics.selectionAsync().catch(() => {});
+                          vizPagerRef.current?.scrollTo({
+                            x: i * pageW,
+                            animated: true,
+                          });
+                          setViz(vk);
+                        }
+                      }}
+                    >
+                      <View
+                        style={[
+                          s.vizDot,
+                          {
+                            backgroundColor: active
+                              ? c.text
+                              : c.textFaint,
+                            width: active ? 8 : 6,
+                            height: active ? 8 : 6,
+                          },
+                        ]}
+                      />
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           ) : null}
@@ -850,6 +861,22 @@ export default function PortfolioScreen() {
                 <Feather name="arrow-right" size={16} color={color} />
               </View>
               <View style={s.pygStack}>
+                <View style={s.pygAmountRow}>
+                  <Text style={[s.pygDirTri, { color }]}>
+                    {dayUp ? "▲" : "▼"}
+                  </Text>
+                  <AmountDisplay
+                    value={Math.abs(daySumDisplay)}
+                    size={20}
+                    weight={800}
+                    color={color}
+                    decimalsColor={color}
+                    currency={currency}
+                  />
+                  <Text style={[s.pygPct, { color }]}>
+                    ({fmtPctAbs(dayPct)})
+                  </Text>
+                </View>
                 <View style={s.pygEyebrowRow}>
                   <Text
                     style={[s.pygEyebrow, { color: c.textMuted }]}
@@ -874,19 +901,6 @@ export default function PortfolioScreen() {
                       color={c.textSecondary}
                     />
                   </Pressable>
-                </View>
-                <View style={s.pygAmountRow}>
-                  <Text style={[s.pygDirTri, { color }]}>
-                    {dayUp ? "▲" : "▼"}
-                  </Text>
-                  <AmountDisplay
-                    value={Math.abs(daySumDisplay)}
-                    size={20}
-                    weight={800}
-                    color={color}
-                    decimalsColor={color}
-                    currency={currency}
-                  />
                 </View>
               </View>
             </Pressable>
@@ -4676,47 +4690,27 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 8,
   },
-  /* Selector Pie/Ladrillo en el hero — vive ARRIBA de la
-   * allocation bar, alineado a la derecha. Controla la viz del
-   * chart que vive abajo del hero. */
-  heroSelectorRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 16,
+  /* Cada page del horizontal pager — width se asigna inline desde
+   * pageW. alignItems center para que charts con menos altura
+   * queden alineados con el resto. */
+  vizPage: {
+    alignItems: "stretch",
+    justifyContent: "center",
   },
-  /* Segmented Pie/Ladrillo — pill estilo iOS. Activo con bg c.bg
-   * y texto bold; inactivo translúcido con texto muted. */
-  vizSeg: {
-    flexDirection: "row",
-    padding: 3,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  vizSegBtn: {
+  /* 4 dots indicadores abajo del pager — el activo es full-color y
+   * un toque más grande (8px) que los inactivos (6px), siguiendo el
+   * pattern del Inicio currencyDots viejo. */
+  vizDotsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  vizDot: {
     borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  vizSegLabel: {
-    fontSize: 12,
-    letterSpacing: -0.1,
-  },
-  /* Toggle viejo (vizToggleRow) — kept para compatibilidad si algo
-   * todavía lo referencia. No se usa en el JSX actual. */
-  vizToggleRow: {
-    flexDirection: "row",
-    gap: 14,
-  },
-  chartCanvas: {
-    /* Chart full-width — ocupa todo el ancho del chartBlock (con
-     * sus padding 24 a cada lado). Pie y brick son cuadrados, así
-     * que el alto sigue al ancho — chart grande y dominante en la
-     * pantalla, en línea con su rol de centerpiece del portfolio. */
-    alignSelf: "stretch",
+    borderRadius: 999,
   },
 
   /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
@@ -5044,17 +5038,41 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     marginTop: 1,
   },
-  /* Stack del lado derecho del row Rendimiento — eyebrow "PyG HOY"
-   * + info-dot arriba, luego el AmountDisplay con la ganancia/perdida
-   * del día. Todo right-aligned. */
+  /* Stack del lado derecho del row Rendimiento — amount + pct arriba,
+   * eyebrow "PyG HOY" + info-dot abajo. Todo right-aligned. */
   pygStack: {
     alignItems: "flex-end",
+  },
+  pygAmountRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+  },
+  /* Triángulo ▲/▼ a la izquierda del monto. marginTop alinea con
+   * el "$" prefix del AmountDisplay (que tiene su propio marginTop
+   * = size * 0.12). Para size 20 ≈ 2.4 px, redondeo a 3. */
+  pygDirTri: {
+    fontFamily: fontFamily[800],
+    fontSize: 13,
+    lineHeight: 14,
+    marginTop: 3,
+  },
+  /* Variación pct a la derecha del monto — entre paréntesis. Mismo
+   * size y baseline que el triángulo así flota a la altura del "$"
+   * prefix del AmountDisplay. */
+  pygPct: {
+    fontFamily: fontFamily[700],
+    fontSize: 13,
+    lineHeight: 14,
+    letterSpacing: -0.2,
+    marginTop: 3,
+    marginLeft: 2,
   },
   pygEyebrowRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginBottom: 2,
+    marginTop: 4,
   },
   pygEyebrow: {
     fontFamily: fontFamily[700],
@@ -5070,20 +5088,6 @@ const s = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-  },
-  pygAmountRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 4,
-  },
-  /* Triángulo ▲/▼ a la izquierda del monto. marginTop alinea con
-   * el "$" prefix del AmountDisplay (que tiene su propio marginTop
-   * = size * 0.12). Para size 20 ≈ 2.4 px, redondeo a 3. */
-  pygDirTri: {
-    fontFamily: fontFamily[800],
-    fontSize: 13,
-    lineHeight: 14,
-    marginTop: 3,
   },
   /* Badge del glyph (Crypto / Todo) — círculo de 18 que aloja el
    * símbolo ₿ o el isotipo Alamos. Bg/fg flipean en active. */
