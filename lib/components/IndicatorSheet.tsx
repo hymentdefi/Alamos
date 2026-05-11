@@ -367,7 +367,7 @@ export function IndicatorSheet({
             {
               backgroundColor: c.bg,
               borderColor: c.border,
-              paddingBottom: insets.bottom + 8,
+              paddingBottom: insets.bottom + 18,
               height: SHEET_HEIGHT,
             },
             sheetStyle,
@@ -382,12 +382,16 @@ export function IndicatorSheet({
           <View style={{ overflow: "hidden", flex: 1 }}>
             <Animated.View
               style={[
-                { flexDirection: "row", width: windowW * 2 },
+                {
+                  flexDirection: "row",
+                  width: windowW * 2,
+                  flex: 1,
+                },
                 sliderStyle,
               ]}
             >
               {/* ──────── Paso 1: Picker ──────── */}
-              <View style={{ width: windowW }}>
+              <View style={{ width: windowW, height: "100%" }}>
                 <View style={s.pickerHeader}>
                   <Text style={[s.pickerTitle, { color: c.text }]}>
                     Elegir indicador
@@ -398,6 +402,7 @@ export function IndicatorSheet({
                   </Text>
                 </View>
                 <ScrollView
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                 >
@@ -485,7 +490,13 @@ export function IndicatorSheet({
               </View>
 
               {/* ──────── Paso 2: Config flat rows ──────── */}
-              <View style={{ width: windowW, flex: 1 }}>
+              {/* height: "100%" — toma la altura del Animated.View row
+                  parent (que a su vez es flex: 1 dentro del overflow
+                  wrapper de altura SHEET_HEIGHT). Sin esto, el step 2
+                  no tiene altura constrained y el ScrollView con
+                  flex: 1 no funciona, dejando el CTA empujado fuera
+                  del sheet (overflow hidden) o flotando mal. */}
+              <View style={{ width: windowW, height: "100%" }}>
                 <View style={s.configHeader}>
                   <Text
                     style={[s.configTitle, { color: c.text }]}
