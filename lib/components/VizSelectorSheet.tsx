@@ -42,31 +42,13 @@ const DISMISS_VELOCITY = 600;
 
 interface Option {
   key: VizKey;
-  label: string;
-  description: string;
 }
 
 const OPTIONS: Option[] = [
-  {
-    key: "pie",
-    label: "Torta",
-    description: "Distribución circular del portfolio",
-  },
-  {
-    key: "treemap",
-    label: "Mosaico",
-    description: "Bloques proporcionales al peso de cada categoría",
-  },
-  {
-    key: "brick",
-    label: "Ladrillo",
-    description: "Vista horizontal en una sola barra apilada",
-  },
-  {
-    key: "ranking",
-    label: "Pila",
-    description: "Monedas apiladas según el tamaño de cada categoría",
-  },
+  { key: "pie" },
+  { key: "treemap" },
+  { key: "brick" },
+  { key: "ranking" },
 ];
 
 /**
@@ -198,13 +180,9 @@ export function VizSelectorSheet({
             <Text style={[s.title, { color: c.text }]}>
               Cómo ver tu cartera
             </Text>
-            <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Elegí la forma que más te guste para ver el peso de cada
-              categoría sobre el total.
-            </Text>
           </View>
 
-          <View style={s.list}>
+          <View style={s.tilesRow}>
             {OPTIONS.map((opt) => {
               const selected = opt.key === viz;
               const Glyph = glyphs[opt.key];
@@ -213,45 +191,16 @@ export function VizSelectorSheet({
                   key={opt.key}
                   onPress={() => select(opt.key)}
                   style={({ pressed }) => [
-                    s.row,
+                    s.tile,
                     {
-                      backgroundColor: c.surface,
-                      borderColor: selected ? tone : c.border,
-                      borderWidth: selected ? 1.6 : StyleSheet.hairlineWidth,
+                      backgroundColor: selected ? c.surface : c.surfaceHover,
+                      borderColor: selected ? tone : "transparent",
+                      borderWidth: selected ? 1.6 : 0,
                       opacity: pressed ? 0.7 : 1,
                     },
                   ]}
                 >
-                  <View
-                    style={[
-                      s.glyphWrap,
-                      { backgroundColor: c.surfaceHover },
-                    ]}
-                  >
-                    <Glyph color={c.text} size={20} />
-                  </View>
-                  <View style={s.rowText}>
-                    <Text style={[s.rowLabel, { color: c.text }]}>
-                      {opt.label}
-                    </Text>
-                    <Text
-                      style={[s.rowDesc, { color: c.textMuted }]}
-                      numberOfLines={2}
-                    >
-                      {opt.description}
-                    </Text>
-                  </View>
-                  {selected ? (
-                    <View
-                      style={[s.checkBubble, { backgroundColor: tone }]}
-                    >
-                      <Text style={[s.checkText, { color: c.onColor }]}>
-                        ✓
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={s.checkPlaceholder} />
-                  )}
+                  <Glyph color={c.text} size={28} />
                 </Pressable>
               );
             })}
@@ -291,71 +240,29 @@ const s = StyleSheet.create({
   },
   hero: {
     paddingTop: 8,
-    paddingBottom: 20,
+    paddingBottom: 24,
     paddingHorizontal: 4,
+    alignItems: "center",
   },
   title: {
     fontFamily: fontFamily[800],
     fontSize: 24,
     letterSpacing: -0.8,
-    marginBottom: 6,
   },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.15,
-  },
-  list: {
-    gap: 10,
-  },
-  row: {
+  /* Row de 4 tiles, gap chico, todos del mismo ancho (flex: 1). El
+   * tile seleccionado lleva borde brand + bg c.surface; los demás
+   * quedan en c.surfaceHover plano sin borde. */
+  tilesRow: {
     flexDirection: "row",
+    gap: 10,
+    paddingBottom: 8,
+  },
+  tile: {
+    flex: 1,
+    aspectRatio: 1,
     alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    justifyContent: "center",
     borderCurve: "continuous",
     borderRadius: radius.lg,
-  },
-  glyphWrap: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.3,
-    marginBottom: 2,
-  },
-  rowDesc: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.1,
-  },
-  checkBubble: {
-    width: 22,
-    height: 22,
-    borderCurve: "continuous",
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkPlaceholder: {
-    width: 22,
-    height: 22,
-  },
-  checkText: {
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 14,
   },
 });
