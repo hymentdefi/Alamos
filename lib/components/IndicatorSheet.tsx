@@ -556,10 +556,9 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — ilustración 3D bleed + sentence preview
-                      centrada en voz declarativa. SIN eyebrow,
-                      SIN sub-line con timeframe (el dato del tf vive
-                      en la sentence ya). Flota directo sobre c.bg. */}
+                  {/* HERO — ilustración 3D contenida en círculo con
+                      tint verde tenue (~6% de c.brand). 96×96 contenedor
+                      + 64×64 illustration adentro, centrada. */}
                   {selectedType ? (
                     <Animated.View
                       key={`hero-${isEditing ? "edit" : "create"}`}
@@ -570,21 +569,28 @@ export function IndicatorSheet({
                       }
                       style={s.heroIllustration}
                     >
-                      {selectedType === "ma" ? (
-                        config.maVariant === "ema" ? (
-                          <EMAIndicatorIllustration size={112} />
+                      <View
+                        style={[
+                          s.heroIllustrationCircle,
+                          { backgroundColor: `${c.brand}12` },
+                        ]}
+                      >
+                        {selectedType === "ma" ? (
+                          config.maVariant === "ema" ? (
+                            <EMAIndicatorIllustration size={64} />
+                          ) : (
+                            <MAIndicatorIllustration size={64} />
+                          )
+                        ) : selectedType === "rsi" ? (
+                          <RSIIndicatorIllustration size={64} />
+                        ) : selectedType === "macd" ? (
+                          <MACDIndicatorIllustration size={64} />
+                        ) : selectedType === "bollinger" ? (
+                          <BollingerIndicatorIllustration size={64} />
                         ) : (
-                          <MAIndicatorIllustration size={112} />
-                        )
-                      ) : selectedType === "rsi" ? (
-                        <RSIIndicatorIllustration size={112} />
-                      ) : selectedType === "macd" ? (
-                        <MACDIndicatorIllustration size={112} />
-                      ) : selectedType === "bollinger" ? (
-                        <BollingerIndicatorIllustration size={112} />
-                      ) : (
-                        <VolumeIndicatorIllustration size={112} />
-                      )}
+                          <VolumeIndicatorIllustration size={64} />
+                        )}
+                      </View>
                     </Animated.View>
                   ) : null}
 
@@ -1819,12 +1825,20 @@ const s = StyleSheet.create({
     marginLeft: 24,
   },
 
-  /* Hero — ilustración 3D 112×112 centrada con bleed (sin
-   * contenedor ni bg). Padding asimétrico: 20 arriba, 16 abajo. */
+  /* Hero — ilustración 3D 64×64 dentro de un círculo 96×96 con
+   * tint verde tenue (c.brand al ~7%). Padding asimétrico: 20
+   * arriba, 16 abajo. */
   heroIllustration: {
     alignItems: "center",
     paddingTop: 20,
     paddingBottom: 16,
+  },
+  heroIllustrationCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   /* Sentence preview — wrapper con padding propio. */
   heroSentenceWrap: {
