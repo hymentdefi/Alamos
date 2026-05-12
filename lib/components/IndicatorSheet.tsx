@@ -169,13 +169,13 @@ export function IndicatorSheet({
    * usar una altura compartida con el AlertSheet (que tenía un mar
    * de espacio vacío entre la preview y el CTA en step 2).
    *
-   * STEP 1 (picker): 6 rows + 3 section eyebrows + header. ~720 px.
-   * STEP 2 (config): hero + 4-5 rows + preview + CTA. ~660 px.
-   *
-   * Ambos capeados al 92 % de windowH para pantallas chicas. */
+   * STEP 1 (picker): pickerHeader 76 + 3 sections 87 + 6 rows 528 +
+   *   scrollPaddingBottom 24 + chrome ~84 ≈ 799 px. Bumpeado el cap a
+   *   800+insets para que el picker NO clippee la última row.
+   * STEP 2 (config): hero + 4-5 rows + preview + CTA ≈ 660 px. */
   const STEP1_HEIGHT = Math.min(
-    windowH * 0.92,
-    720 + insets.bottom,
+    windowH * 0.95,
+    800 + insets.bottom,
   );
   const STEP2_HEIGHT = Math.min(
     windowH * 0.92,
