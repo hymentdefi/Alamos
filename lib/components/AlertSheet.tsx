@@ -644,11 +644,10 @@ export function AlertSheet({
                 style={[
                   s.cta,
                   {
-                    /* CTA neutro ink/text — coherente con el botón
-                     * principal de la pantalla de alertas. El brand
-                     * verde lo dejamos para CTAs primarios del flow
-                     * de transacciones (Operar, Comprar, etc.). */
-                    backgroundColor: submitting ? c.textMuted : c.text,
+                    /* CTA brand — el botón primario va en c.brand
+                     * con ink en c.onColor (blanco en light, oscuro
+                     * en dark). */
+                    backgroundColor: c.brand,
                     opacity: submitting ? 0.7 : 1,
                   },
                 ]}
@@ -656,7 +655,7 @@ export function AlertSheet({
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                <Text style={[s.ctaText, { color: c.bg }]}>
+                <Text style={[s.ctaText, { color: c.onColor }]}>
                   {submitting
                     ? isEditing
                       ? "Guardando…"
