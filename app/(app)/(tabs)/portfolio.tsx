@@ -3777,16 +3777,17 @@ function RankingList({
 
               Render limpio sin strokes oscuros, en línea con el
               lenguaje flat de Robinhood:
-                1. Drop shadow individual debajo (Ellipse rgba 0.08)
-                2. Side path (curva al bottom) — color más oscuro que
+                1. Side path (curva al bottom) — color más oscuro que
                    el cap (-0.12). El delta de tono da volumen sin
                    necesitar línea negra de separación.
-                3. Cap ellipse — color base sin modificar, fill plano.
+                2. Cap ellipse — color base sin modificar, fill plano.
 
-              Nada de gradiente vertical sobre el cap, nada de stroke
-              difuminado. La "altura" la define la diferencia tonal
-              cap/side; el "stack" lo define la geometría de las
-              elipses superpuestas. */}
+              Antes había una sombra individual debajo de cada coin
+              (Ellipse rgba 0.10) pero no tiene sentido visual: las
+              coins están apiladas, no flotando independientemente.
+              Sólo queda la sombra de piso debajo de la última coin
+              (renderada antes del map, encima de este comentario)
+              para anclar el stack al suelo. */}
           {coinsRender.map((co) => {
             const i = coins.indexOf(co);
             const dimmedByActive =
@@ -3801,13 +3802,6 @@ function RankingList({
             const sidePath = `M ${co.cx - co.rx} ${co.topY} L ${co.cx - co.rx} ${co.topY + co.height} A ${co.rx} ${co.ry} 0 0 0 ${co.cx + co.rx} ${co.topY + co.height} L ${co.cx + co.rx} ${co.topY} Z`;
             return (
               <G key={co.key}>
-                <Ellipse
-                  cx={co.cx}
-                  cy={co.topY + co.height + co.ry + 4}
-                  rx={co.rx * 0.92}
-                  ry={3.5}
-                  fill="rgba(14,15,12,0.10)"
-                />
                 <SvgPath d={sidePath} fill={sideFill} />
                 <Ellipse
                   cx={co.cx}
