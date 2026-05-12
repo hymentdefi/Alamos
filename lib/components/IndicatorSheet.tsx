@@ -1594,16 +1594,16 @@ const s = StyleSheet.create({
    * (~729 px). Filas con ícono 48, descripción de 1-2 líneas,
    * agrupadas en 3 secciones (TENDENCIA / MOMENTUM / VOLATILIDAD
    * Y VOLUMEN). */
-  /* Header del paso 1 (picker) — mismo treatment que el header del
-   * AlertSheet: paddingTop 6, paddingBottom 28, title weight 700
-   * fontSize 22 letterSpacing -0.6. */
+  /* Header del paso 1 (picker) — tight: paddingTop 8, paddingBottom 6
+   * para que los 6 rows + 3 section eyebrows entren sin scroll en el
+   * SHEET_HEIGHT del paso 1. Title weight 800 para presencia visual. */
   pickerHeader: {
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   pickerTitle: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.6,
   },
@@ -1614,13 +1614,13 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
-  /* Eyebrow de sección dentro del picker. pH 24 alinea al inset
-   * estándar del sheet (mismo que el header y las rows). */
+  /* Eyebrow de sección dentro del picker. pH 20 para tightness; el
+   * config (step 2) usa pH 24 espejado al AlertSheet. */
   pickerSection: {
     fontFamily: fontFamily[700],
     fontSize: 11,
     letterSpacing: 1.4,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 4,
   },
@@ -1635,7 +1635,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderCurve: "continuous",
   },
