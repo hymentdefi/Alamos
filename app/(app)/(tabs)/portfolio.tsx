@@ -64,6 +64,8 @@ import {
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import { PygInfoSheet } from "../../../lib/components/PygInfoSheet";
+import { GearIcon } from "../../../lib/components/GearIcon";
+import { VizSelectorSheet } from "../../../lib/components/VizSelectorSheet";
 import {
   MiniSparkline,
   seriesFromSeed,
@@ -507,8 +509,12 @@ export default function PortfolioScreen() {
   // del segmented. El usuario alterna entre Treemap / Ladrillo / Pie /
   // Ranking (poll bars).
   const [viz, setViz] = useState<"pie" | "brick" | "ranking" | "treemap">(
-    "treemap",
+    "pie",
   );
+  /* Sheet del selector de viz — abierto desde el gear que vive en el
+   *  topActionsRow, al lado del pill ARS/USD. Mismo lenguaje que el
+   *  ChartSettingsSheet del Inicio. */
+  const [vizSheetOpen, setVizSheetOpen] = useState(false);
   /* Cross-highlight bar ↔ chart. Mantiene QUÉ mercado está
    * "highlighted" actualmente — puede venir de:
    *   - Hold sobre un segmento de la allocation bar (AR/US/Crypto)
@@ -699,74 +705,17 @@ export default function PortfolioScreen() {
             </Tap>
 
             {hasHoldings ? (
-              <View
-                style={[s.vizSeg, { backgroundColor: c.surfaceHover }]}
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setVizSheetOpen(true);
+                }}
+                hitSlop={10}
+                style={s.vizGearBtn}
+                accessibilityLabel="Cambiar forma de ver el portfolio"
               >
-                <Tap
-                  onPress={() => setViz("treemap")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "treemap" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de treemap"
-                >
-                  <TreemapGlyph
-                    color={viz === "treemap" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("brick")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "brick" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de ladrillo"
-                >
-                  <BrickGlyph
-                    color={viz === "brick" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("pie")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "pie" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de torta"
-                >
-                  <PieGlyph
-                    color={viz === "pie" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-                <Tap
-                  onPress={() => setViz("ranking")}
-                  haptic="selection"
-                  pressScale={0.95}
-                  hitSlop={4}
-                  style={[
-                    s.vizSegBtn,
-                    viz === "ranking" && { backgroundColor: c.bg },
-                  ]}
-                  accessibilityLabel="Vista de ranking"
-                >
-                  <RankingGlyph
-                    color={viz === "ranking" ? c.text : c.textMuted}
-                    size={16}
-                  />
-                </Tap>
-              </View>
+                <GearIcon size={20} color={c.text} />
+              </Pressable>
             ) : null}
           </View>
 
@@ -1018,6 +967,19 @@ export default function PortfolioScreen() {
         <PygInfoSheet
           visible={pygOpen}
           onClose={() => setPygOpen(false)}
+        />
+        <VizSelectorSheet
+          visible={vizSheetOpen}
+          viz={viz}
+          onChangeViz={setViz}
+          onClose={() => setVizSheetOpen(false)}
+          glyphs={{
+            treemap: TreemapGlyph,
+            brick: BrickGlyph,
+            pie: PieGlyph,
+            ranking: RankingGlyph,
+          }}
+          tone={color}
         />
       </View>
     </AssetColorProvider>
@@ -4941,22 +4903,12 @@ const s = StyleSheet.create({
   chartCanvas: {
     alignSelf: "stretch",
   },
-  /* Segmented selector de viz — pill iOS-style con 4 íconos. Vive
-   * arriba a la derecha del heroBlock, al lado del pill ARS/USD. */
-  vizSeg: {
-    flexDirection: "row",
-    padding: 3,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  vizSegBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
+  /* Gear button — abre el VizSelectorSheet con las 4 formas de ver
+   * la cartera. Mismos paddings verticales que el currencyPill para
+   * que ambos se alineen visualmente en el topActionsRow. */
+  vizGearBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
 
   /* InfoRow — kept para compatibilidad con código que pueda llamarlo,
