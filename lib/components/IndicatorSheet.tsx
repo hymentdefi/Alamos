@@ -554,28 +554,28 @@ export function IndicatorSheet({
                   ) : null}
                 </View>
 
+                {/* Hero del indicador — STICKY (afuera del ScrollView).
+                    Ilustración 64×64 + descripción gris. Siempre
+                    visible mientras el usuario scrollea las rows. */}
+                {selectedType ? (
+                  <View style={s.configHero}>
+                    <View style={s.configHeroIcon}>
+                      {indicatorIllustration(selectedType, config, 64)}
+                    </View>
+                    <Text
+                      style={[s.configHeroDesc, { color: c.textMuted }]}
+                    >
+                      {indicatorDescription(selectedType, config)}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <ScrollView
                   style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* Hero del indicador — ilustración 64×64 centrada
-                      + descripción gris 13px. Da contexto y llena el
-                      espacio entre el header y las rows. */}
-                  {selectedType ? (
-                    <View style={s.configHero}>
-                      <View style={s.configHeroIcon}>
-                        {indicatorIllustration(selectedType, config, 64)}
-                      </View>
-                      <Text
-                        style={[s.configHeroDesc, { color: c.textMuted }]}
-                      >
-                        {indicatorDescription(selectedType, config)}
-                      </Text>
-                    </View>
-                  ) : null}
-
                   {selectedType ? (
                     <RowsFor
                       type={selectedType}
