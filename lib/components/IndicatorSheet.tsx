@@ -524,6 +524,24 @@ export function IndicatorSheet({
               {/* ──────── Paso 2: Config flat rows ──────── */}
               <View style={{ width: windowW, flex: 1 }}>
                 <View style={s.configHeader}>
+                  {!isEditing ? (
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setStep(1);
+                        setExpandedRow(null);
+                      }}
+                      hitSlop={12}
+                      accessibilityLabel="Volver al selector de indicador"
+                      accessibilityRole="button"
+                    >
+                      <Feather
+                        name="chevron-left"
+                        size={22}
+                        color={c.text}
+                      />
+                    </Pressable>
+                  ) : null}
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -1802,7 +1820,10 @@ const s = StyleSheet.create({
 
   /* ── Paso 2 — header ── */
   configHeader: {
-    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 6,
   },
