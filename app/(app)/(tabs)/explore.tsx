@@ -43,8 +43,6 @@ import { accounts } from "../../../lib/data/accounts";
 import { useFavorites } from "../../../lib/favorites/context";
 import { FavStar } from "../../../lib/components/FavStar";
 import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
-import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
-import { CATEGORIES_BY_MARKET } from "../../../lib/data/marketCategories";
 import { MiniSparkline, seriesFromSeed } from "../../../lib/components/Sparkline";
 import { Tap } from "../../../lib/components/Tap";
 import { MarketClosedIcon } from "../../../lib/components/MarketClosedIcon";
@@ -531,7 +529,6 @@ function MarketBody({
   listRef: (ref: ScrollView | null) => void;
 }) {
   const { c } = useTheme();
-  const router = useRouter();
 
   const inMarket = useMemo(
     () =>
@@ -542,27 +539,30 @@ function MarketBody({
     [market.id],
   );
 
-  // Cuando hay query o onlyFavs, mostramos resultados planos.
-  // Cuando no, mostramos la lista de categorías como navegación
-  // principal (cada row drilling a /(app)/market-category).
-  // Excepción: el mercado Crypto tiene una sola categoría — no
-  // tiene sentido obligar al user a tappear una pseudo-list de 1
-  // ítem; mostramos los assets directo.
-  const isCategoryView =
-    !query.trim() && !onlyFavs && market.id !== "CRYPTO";
+  /* Category filter chips — Robinhood-style. Reemplaza al category
+   * grid 2×2 anterior que drillaba a /(app)/market-category. Default
+   * "todo"; el user tapea un chip para filtrar la lista plana.
+   * Reset a "todo" cuando cambia de mercado. */
+  const [selectedCat, setSelectedCat] = useState<
+    AssetCategory | "todo"
+  >("todo");
+  useEffect(() => {
+    setSelectedCat("todo");
+  }, [market.id]);
 
   const visible = useMemo(() => {
-    if (isCategoryView) return [];
     const q = query.trim().toLowerCase();
     return inMarket.filter((a) => {
       if (onlyFavs && !isFavorite(a.ticker)) return false;
+      if (selectedCat !== "todo" && a.category !== selectedCat)
+        return false;
       if (!q) return true;
       return (
         a.ticker.toLowerCase().includes(q) ||
         a.name.toLowerCase().includes(q)
       );
     });
-  }, [isCategoryView, query, onlyFavs, isFavorite, inMarket]);
+  }, [query, onlyFavs, isFavorite, inMarket, selectedCat]);
 
   const topMovers = useMemo(
     () =>
@@ -572,20 +572,22 @@ function MarketBody({
     [inMarket],
   );
 
-  const categories = CATEGORIES_BY_MARKET[market.id];
-
-  // Pre-cómputo de cuántos assets matchea cada categoría — usamos
-  // este número como display del row si la categoría no trae un
-  // count hardcoded del brand.
-  const counts = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const cat of categories) {
-      out[cat.slug] = cat.filter
-        ? inMarket.filter(cat.filter).length
-        : 0;
+  // Pre-cómputo de cuántos assets matchea cada categoría del mercado
+  // actual — usado para sufijar el chip con el count si quisiéramos
+  // mostrarlo (por ahora solo el label).
+  const catCounts = useMemo(() => {
+    const out: Record<string, number> = { todo: inMarket.length };
+    for (const cat of market.categories) {
+      if (cat.id === "todo") continue;
+      out[cat.id] = inMarket.filter((a) => a.category === cat.id).length;
     }
     return out;
-  }, [categories, inMarket]);
+  }, [inMarket, market.categories]);
+
+  /* Mostrar chips sólo si el mercado tiene más de una categoría real
+   * (todo + ≥1 más). Para US (que tiene sólo "Acciones") los chips
+   * son redundantes — ocultos. */
+  const showChips = market.categories.length > 2;
 
   // Vista de "Destacados del día" (estilo Robinhood Trending Lists):
   // grilla 2-col de pills con icon + ticker. Solo aparece cuando el
@@ -594,15 +596,17 @@ function MarketBody({
   const isTrendingView =
     searchFocused && !query.trim() && !onlyFavs;
 
+  const catLabel =
+    market.categories.find((c) => c.id === selectedCat)?.label ?? "Todo";
   const eyebrowLabel = query
     ? `${visible.length} resultado${visible.length === 1 ? "" : "s"}`
     : onlyFavs
     ? `Tus favoritos en ${market.short}`
     : isTrendingView
     ? "Destacados del día"
-    : isCategoryView
-    ? `Categorías · ${market.label}`
-    : `Instrumentos · ${market.label}`;
+    : selectedCat === "todo"
+    ? `Instrumentos · ${market.label}`
+    : `${catLabel} · ${market.label}`;
 
   return (
     <ScrollView
@@ -611,6 +615,68 @@ function MarketBody({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Category filter chips — Robinhood-style. Reemplaza al grid 2x2
+       *  de categorías previo. Sólo se renderea cuando el mercado tiene
+       *  >1 categoría (AR + Crypto), no en US que tiene una sola, y
+       *  cuando no estamos en el trending view del search. */}
+      {showChips && !isTrendingView ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.chipsRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {market.categories.map((cat) => {
+            const active = cat.id === selectedCat;
+            const count = catCounts[cat.id] ?? 0;
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setSelectedCat(cat.id);
+                }}
+                style={[
+                  s.chip,
+                  {
+                    backgroundColor: active ? c.brand : c.surfaceHover,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    s.chipLabel,
+                    {
+                      color: active ? c.onColor : c.textSecondary,
+                      fontFamily: active
+                        ? fontFamily[800]
+                        : fontFamily[600],
+                    },
+                  ]}
+                >
+                  {cat.label}
+                </Text>
+                {count > 0 && cat.id !== "todo" ? (
+                  <Text
+                    style={[
+                      s.chipCount,
+                      {
+                        color: active
+                          ? c.onColor
+                          : c.textMuted,
+                        opacity: active ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    {count}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
       <View style={s.listBlock}>
         <View style={s.sectionHead}>
           <Text style={[s.eyebrow, { color: c.textMuted }]}>
@@ -696,55 +762,6 @@ function MarketBody({
                 </Reanimated.View>
               );
             })}
-          </View>
-        ) : isCategoryView ? (
-          /* Grilla 2-col de categorías — cards con glyph arriba +
-             label bold + descripción larga muteada. Tap drilea a
-             /market-category con el slug. Estilo inspirado en el
-             selector "¿En qué querés invertir?" de IOL. */
-          <View style={s.categoryGrid}>
-            {categories.map((cat) => (
-              <Pressable
-                key={cat.slug}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(app)/market-category",
-                    params: { slug: cat.slug },
-                  })
-                }
-                style={({ pressed }) => [
-                  s.categoryCard,
-                  {
-                    backgroundColor: c.surface,
-                    borderColor: c.border,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  },
-                ]}
-              >
-                <CategoryGlyph slug={cat.slug} size={44} />
-                <Text
-                  style={[s.categoryCardLabel, { color: c.text }]}
-                  numberOfLines={2}
-                >
-                  {cat.label}
-                </Text>
-                {cat.hint ? (
-                  <Text
-                    style={[s.categoryCardHint, { color: c.textMuted }]}
-                    numberOfLines={3}
-                  >
-                    {cat.hint}
-                  </Text>
-                ) : null}
-                {cat.count || counts[cat.slug] > 0 ? (
-                  <Text
-                    style={[s.categoryCardCount, { color: c.textFaint }]}
-                  >
-                    {cat.count ?? `${counts[cat.slug]} activos`}
-                  </Text>
-                ) : null}
-              </Pressable>
-            ))}
           </View>
         ) : visible.length === 0 ? (
           <View style={s.empty}>
@@ -1008,6 +1025,35 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
+  /* Category filter chips row — horizontal, scroll si no entran. Vive
+   * justo arriba del listBlock, antes del eyebrow. Pill activo en
+   * brand verde, inactivos en surfaceHover. */
+  chipsRow: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 4,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+  },
+  chipLabel: {
+    fontSize: 13,
+    letterSpacing: -0.15,
+  },
+  chipCount: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.1,
+  },
   sectionHead: {
     paddingHorizontal: 20,
     marginBottom: 10,
@@ -1077,45 +1123,6 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: -0.1,
     marginTop: 2,
-  },
-  /* Grilla 2-col de cards (estilo selector "En qué invertir" de IOL).
-   * Cada card tiene glyph + label + hint + count opcional, todo
-   * stack vertical. */
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 4,
-  },
-  categoryCard: {
-    width: "48.5%",
-    flexGrow: 1,
-    flexBasis: "48.5%",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 4,
-  },
-  categoryCardLabel: {
-    fontFamily: fontFamily[700],
-    fontSize: 16,
-    letterSpacing: -0.3,
-    marginTop: 10,
-  },
-  categoryCardHint: {
-    fontFamily: fontFamily[500],
-    fontSize: 12.5,
-    lineHeight: 17,
-    letterSpacing: -0.1,
-    marginTop: 2,
-  },
-  categoryCardCount: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    marginTop: 6,
   },
   icon: {
     width: 40,
