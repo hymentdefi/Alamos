@@ -1646,62 +1646,74 @@ function AllocCaption({
   );
 }
 
-/* ─── PieGlyph / BrickGlyph — toggle icons del viz selector ─────── */
+/* ─── PieGlyph / BrickGlyph / RankingGlyph / TreemapGlyph
+ *
+ *  Toggle icons del viz selector. Reescritos Robinhood-style:
+ *    - Solid filled shapes en vez de wireframes.
+ *    - Jerarquía visual por opacity (slice/segmento dominante a 1.0,
+ *      el resto a 0.55 / 0.3).
+ *    - Cero strokes oscuros, todo en una sola tonalidad.
+ *    - ViewBox 24×24 (era 18) para tener más resolución cuando los
+ *      tiles del VizSelectorSheet escalan a 28+ px en pantalla.
+ */
 
 function PieGlyph({ color, size = 18 }: { color: string; size?: number }) {
+  // Donut filled — base ring (opacity 0.3) + slice destacada (opacity 1.0).
+  // El slice ocupa de -90° a 0° (cuarto superior derecho), 25% del pie.
+  // SVG annular sector path con rx=ry circular: outer 9, inner 5.
   return (
-    <Svg width={size} height={size} viewBox="0 0 18 18">
-      <Circle
-        cx={9}
-        cy={9}
-        r={6.5}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.4}
-      />
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* Donut base — outer circle + inner circle con evenodd fill,
+       *  pinta sólo el ring. Compuesto de 2 arcos (start → opposite
+       *  → start) en cada círculo. */}
       <SvgPath
-        d="M 9 9 L 9 2.5 M 9 9 L 14.6 12.25"
-        stroke={color}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        fill="none"
+        d="M 3 12 A 9 9 0 1 0 21 12 A 9 9 0 1 0 3 12 Z M 7 12 A 5 5 0 1 0 17 12 A 5 5 0 1 0 7 12 Z"
+        fill={color}
+        opacity={0.3}
+        fillRule="evenodd"
+      />
+      {/* Slice dominante — annular sector de -90° a 0° (cuarto superior
+       *  derecho), pinta encima del ring base para que ese cuarto se
+       *  vea full opacity y el resto quede a 0.3. */}
+      <SvgPath
+        d="M 12 3 A 9 9 0 0 1 21 12 L 17 12 A 5 5 0 0 0 12 7 Z"
+        fill={color}
       />
     </Svg>
   );
 }
 
 function BrickGlyph({ color, size = 18 }: { color: string; size?: number }) {
+  // Barra horizontal apilada — 3 segmentos rounded, opacidades
+  // decrecientes. Espeja la metáfora del FloorBrick (un solo bloque
+  // dividido en categorías).
   return (
-    <Svg width={size} height={size} viewBox="0 0 18 18">
-      {/* Mini pared 3D — wall front + top inclined */}
-      <Polygon
-        points="3,7 13,7 13,14 3,14"
-        fill="none"
-        stroke={color}
-        strokeWidth={1.4}
-        strokeLinejoin="round"
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect
+        x={2.5}
+        y={9}
+        width={10}
+        height={6}
+        rx={2}
+        fill={color}
       />
-      <Polygon
-        points="3,7 13,7 15,5 5,5"
-        fill="none"
-        stroke={color}
-        strokeWidth={1.4}
-        strokeLinejoin="round"
+      <Rect
+        x={13.2}
+        y={9}
+        width={5}
+        height={6}
+        rx={2}
+        fill={color}
+        opacity={0.55}
       />
-      <Polygon
-        points="13,7 15,5 15,12 13,14"
-        fill="none"
-        stroke={color}
-        strokeWidth={1.4}
-        strokeLinejoin="round"
-      />
-      <Line
-        x1={8}
-        y1={7}
-        x2={8}
-        y2={14}
-        stroke={color}
-        strokeWidth={1.2}
+      <Rect
+        x={18.9}
+        y={9}
+        width={2.6}
+        height={6}
+        rx={1.2}
+        fill={color}
+        opacity={0.3}
       />
     </Svg>
   );
@@ -1714,29 +1726,50 @@ function RankingGlyph({
   color: string;
   size?: number;
 }) {
-  // Stack de 3 monedas — la "pila desalineada" del CoinStack viz.
-  // Decrecen en ancho de arriba hacia abajo y se ofsetean horizontal-
-  // mente para sugerir el zigzag de la implementación real.
+  // Stack de 3 monedas filled. Cada moneda = cap (Ellipse top) + side
+  // (Rect bajo el cap). Decrecen de arriba abajo: la más grande arriba,
+  // la más chica abajo. Sin strokes — el delta de opacity da la
+  // separación entre coins.
+  //
+  // Las 3 monedas comparten el mismo cx (12) y se apilan con offsets
+  // horizontales sutiles para sugerir el "zigzag" del CoinStack real.
+  // Y total ocupado: 4 → 22 = 18 units verticales.
   return (
-    <Svg width={size} height={size} viewBox="0 0 18 18">
-      <SvgPath
-        d={
-          // Top coin (cx=8, cy=4, rx=5, ry=1.2) — side panel + ellipse
-          "M 3 4 v 1.6 a 5 1.2 0 0 0 10 0 v -1.6 " +
-          "M 3 4 a 5 1.2 0 0 0 10 0 a 5 1.2 0 0 0 -10 0 " +
-          // Middle coin (cx=10, cy=9, rx=4, ry=1)
-          "M 6 9 v 1.4 a 4 1 0 0 0 8 0 v -1.4 " +
-          "M 6 9 a 4 1 0 0 0 8 0 a 4 1 0 0 0 -8 0 " +
-          // Bottom coin (cx=7, cy=13.5, rx=3, ry=0.8)
-          "M 4 13.5 v 1.2 a 3 0.8 0 0 0 6 0 v -1.2 " +
-          "M 4 13.5 a 3 0.8 0 0 0 6 0 a 3 0.8 0 0 0 -6 0"
-        }
-        stroke={color}
-        strokeWidth={1.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* Top coin — la más grande. rx=8, height=4 */}
+      <Rect
+        x={4}
+        y={4}
+        width={16}
+        height={4}
+        fill={color}
       />
+      <Ellipse cx={12} cy={4} rx={8} ry={1.8} fill={color} />
+      <Ellipse cx={12} cy={8} rx={8} ry={1.8} fill={color} opacity={0.85} />
+
+      {/* Middle coin — rx=6, height=3, shift +0.5 */}
+      <Rect
+        x={6.5}
+        y={11}
+        width={12}
+        height={3}
+        fill={color}
+        opacity={0.7}
+      />
+      <Ellipse cx={12.5} cy={11} rx={6} ry={1.4} fill={color} opacity={0.7} />
+      <Ellipse cx={12.5} cy={14} rx={6} ry={1.4} fill={color} opacity={0.55} />
+
+      {/* Bottom coin — rx=4.5, height=2.5, shift -0.5 */}
+      <Rect
+        x={7}
+        y={16.5}
+        width={9}
+        height={2.5}
+        fill={color}
+        opacity={0.45}
+      />
+      <Ellipse cx={11.5} cy={16.5} rx={4.5} ry={1.1} fill={color} opacity={0.45} />
+      <Ellipse cx={11.5} cy={19} rx={4.5} ry={1.1} fill={color} opacity={0.35} />
     </Svg>
   );
 }
@@ -1748,16 +1781,53 @@ function TreemapGlyph({
   color: string;
   size?: number;
 }) {
-  // Outer rect + 2 internal divisions — treemap mini.
+  // 4 tiles asimétricos a la Robinhood mosaic: una grande arriba-
+  // izquierda, dos medianas y una chica. Cada tile rounded, sin
+  // border, sólo fill con opacidades distintas para jerarquía.
+  const r = 1.6;
   return (
-    <Svg width={size} height={size} viewBox="0 0 18 18">
-      <SvgPath
-        d="M 3 3 H 15 V 15 H 3 Z M 3 9 H 15 M 9 3 V 9 M 11 9 V 15"
-        stroke={color}
-        strokeWidth={1.4}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        fill="none"
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* Tile dominante TL */}
+      <Rect x={3} y={3} width={10.5} height={10.5} rx={r} fill={color} />
+      {/* Tile mediano TR */}
+      <Rect
+        x={14.5}
+        y={3}
+        width={6.5}
+        height={6.5}
+        rx={r}
+        fill={color}
+        opacity={0.6}
+      />
+      {/* Tile chico BR */}
+      <Rect
+        x={14.5}
+        y={10.5}
+        width={6.5}
+        height={3}
+        rx={r}
+        fill={color}
+        opacity={0.35}
+      />
+      {/* Tile mediano-bajo BL */}
+      <Rect
+        x={3}
+        y={14.5}
+        width={10.5}
+        height={6.5}
+        rx={r}
+        fill={color}
+        opacity={0.6}
+      />
+      {/* Tile mediano BR */}
+      <Rect
+        x={14.5}
+        y={14.5}
+        width={6.5}
+        height={6.5}
+        rx={r}
+        fill={color}
+        opacity={0.35}
       />
     </Svg>
   );
