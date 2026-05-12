@@ -25,6 +25,7 @@ import { fontFamily, radius, useTheme } from "../theme";
 import { formatMoney } from "../data/assets";
 import { convertAmount } from "../data/accounts";
 import { AlamosBalanceIllustration } from "./illustrations/AlamosBalanceIllustration";
+import { FlagIcon } from "./FlagIcon";
 
 type Currency = "ARS" | "USD";
 
@@ -246,6 +247,9 @@ function CurrencyOption({
         },
       ]}
     >
+      {/* Bandera del país de la moneda — ARS = AR, USD = US. Mismo
+       *  componente FlagIcon que usan los Mercados (círculo SVG). */}
+      <FlagIcon code={code === "ARS" ? "AR" : "US"} size={36} />
       <View style={s.optionLeft}>
         <Text
           style={[
