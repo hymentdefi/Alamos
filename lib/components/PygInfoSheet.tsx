@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -298,6 +298,96 @@ function AnimatedPygIcon({
 }
 
 /**
+ * Título con efecto typewriter — caracteres aparecen uno a uno desde
+ * la izquierda. Layout center-anchored vía width:100% + textAlign
+ * center (la grilla NO se expande con cada char nuevo, el texto
+ * crece "desde el centro hacia los costados" naturalmente porque RN
+ * Text con textAlign center lo hace así).
+ *
+ *  - Delay inicial 220 ms para que arranque cuando la pop scale del
+ *    icon hero ya entró visualmente y el sheet terminó su translateY.
+ *  - 36 ms por caracter — ~430 ms total para "¿Qué es PyG?" (12 ch).
+ *  - Caret "|" blink durante el typing, fade-out al terminar.
+ *  - Reset a string vacío cuando el sheet se cierra para que la
+ *    próxima apertura re-corra la animación fresh.
+ */
+function TypewriterTitle({
+  play,
+  color,
+  fullText,
+}: {
+  play: boolean;
+  color: string;
+  fullText: string;
+}) {
+  const [chars, setChars] = useState(0);
+  const caretOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    cancelAnimation(caretOpacity);
+
+    if (!play) {
+      setChars(0);
+      caretOpacity.value = 0;
+      return;
+    }
+
+    setChars(0);
+
+    // Caret blink mientras el sheet abre (incluye el delay del typing).
+    caretOpacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 360, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0.15, { duration: 360, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+      false,
+    );
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const startTimer = setTimeout(() => {
+      let i = 0;
+      intervalId = setInterval(() => {
+        i += 1;
+        setChars(i);
+        if (i >= fullText.length) {
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+          // Después de un beat, apagamos el caret con un fade.
+          setTimeout(() => {
+            caretOpacity.value = withTiming(0, { duration: 240 });
+          }, 480);
+        }
+      }, 36);
+    }, 220);
+
+    return () => {
+      clearTimeout(startTimer);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [play, fullText, caretOpacity]);
+
+  const caretAnimStyle = useAnimatedStyle(() => ({
+    opacity: caretOpacity.value,
+  }));
+
+  return (
+    <View style={s.titleRow}>
+      <Text style={[s.title, { color }]} numberOfLines={1}>
+        {fullText.slice(0, chars)}
+      </Text>
+      <Animated.Text
+        style={[s.titleCaret, { color }, caretAnimStyle]}
+      >
+        |
+      </Animated.Text>
+    </View>
+  );
+}
+
+/**
  * Bottom sheet "¿Qué es PyG?". Patrón de presentación equivalente a
  * MarketClosedSheet / EarningsInfoSheet / ChartSettingsSheet. Hero:
  * ícono PyG animado + título + body. Sin notas, sin disclaimers.
@@ -413,9 +503,12 @@ export function PygInfoSheet({ visible, onClose }: Props) {
               <AnimatedPygIcon size={168} play={visible} />
             </View>
 
-            <Text style={[s.title, { color: c.text }]}>
-              ¿Qué es PyG?
-            </Text>
+            <TypewriterTitle
+              play={visible}
+              color={c.text}
+              fullText="¿Qué es PyG?"
+            />
+
 
             <Text style={[s.body, { color: c.textMuted }]}>
               Es tu{" "}
@@ -468,12 +561,31 @@ const s = StyleSheet.create({
   illustrationWrap: {
     marginBottom: 22,
   },
+  /* Title row — wrapper para que el caret quede inline con el texto
+   * typed sin afectar la métrica vertical del título. justifyContent
+   * center mantiene la composición center-aligned aunque el texto sea
+   * parcial (mid-typing). */
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "baseline",
+    marginBottom: 12,
+    minHeight: 34,
+  },
   title: {
     fontFamily: fontFamily[800],
     fontSize: 28,
     letterSpacing: -1.1,
-    marginBottom: 12,
     textAlign: "center",
+  },
+  /* Caret "|" del typewriter — mismo tipográfica + size que el title
+   * para que blendee. marginLeft chico para separarlo del último char
+   * sin colisionar con el descender de la "?". */
+  titleCaret: {
+    fontFamily: fontFamily[800],
+    fontSize: 28,
+    letterSpacing: -1.1,
+    marginLeft: 2,
   },
   body: {
     fontFamily: fontFamily[500],
