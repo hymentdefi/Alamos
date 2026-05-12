@@ -462,20 +462,7 @@ function BaseHome() {
             </Text>
           </View>
 
-          {/* Backing beige cálido del brand-kit detrás del chart — banda
-              editorial full-bleed. El chart vive en su propia "estación"
-              tipo viñeta, no flotando sobre el bg general. En dark se
-              traduce a un gris-cálido muy oscuro (#1A1815). */}
-          <View
-            style={[
-              s.chartWrap,
-              {
-                marginTop: 18,
-                backgroundColor: c.beige,
-                paddingVertical: 12,
-              },
-            ]}
-          >
+          <View style={[s.chartWrap, { marginTop: 18 }]}>
             <Sparkline
               series={series}
               color={sparklineColor}
@@ -576,12 +563,11 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* El ActionIcon YA es un squircle con fill brand verde y stroke
-          blanco — no necesita un wrapper de surface adicional como
-          tenía antes (la opcion 'glass' Revolut). El icono mismo
-          es el bloque visual. */}
+      {/* El ActionIcon es un squircle (borderCurve continuous) con tint
+          verde brand de fondo y glyph en c.text. El squircle ES el
+          botón — no necesita wrapper adicional. */}
       <ActionIcon name={iconName} size={51} />
-      <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
+      <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
         {label}
       </Text>
     </Tap>
