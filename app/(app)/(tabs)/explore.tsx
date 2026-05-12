@@ -19,7 +19,7 @@ import {
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { useTheme, fontFamily, radius, spacing } from "../../../lib/theme";
-import { FlagIcon } from "../../../lib/components/FlagIcon";
+import { MarketFlag } from "../../../lib/components/MarketFlag";
 
 // Verde de acción primaria — usar `c.brand` del theme. Esta constante
 // quedó como literal sólo para que no rompa style.create() — donde sí
@@ -109,8 +109,7 @@ export default function ExploreScreen() {
 function BaseExplore() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, mode } = useTheme();
-  const isDark = mode === "dark";
+  const { c } = useTheme();
   const { isFavorite } = useFavorites();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -294,41 +293,29 @@ function BaseExplore() {
             categorías abajo — el filtro por categoría se eliminó.
             La pill activa usa el mismo verde brand translúcido que la
             tab activa del nav bar para mantener identidad visual. */}
-        <View
-          style={[
-            s.marketControl,
-            { backgroundColor: c.surfaceHover },
-          ]}
-        >
-          <View style={s.marketSeg}>
-            {MARKET_TABS.map((m, i) => {
-              const active = i === activeMarketIdx;
-              return (
-                <Tap
-                  key={m.id}
-                  onPress={() => switchMarket(i)}
-                  haptic="selection"
-                  pressScale={0.96}
-                  rippleContained
-                  style={[
-                    s.marketSegBtn,
-                    active && {
-                      backgroundColor: isDark
-                        ? "rgba(14, 203, 129, 0.07)"
-                        : "rgba(0, 200, 5, 0.05)",
-                      borderColor: isDark
-                        ? "rgba(14, 203, 129, 0.12)"
-                        : "rgba(0, 200, 5, 0.10)",
-                      borderWidth: 1,
-                    },
-                  ]}
-                >
-                  <MarketGlyph market={m.id} active={active} />
+        {/* Segmented Robinhood-style: 3 tabs en fila con flag circle +
+            label centrado verticalmente y un underline brand debajo del
+            activo. Sin pills de fondo, sin bordes tinted. La identidad
+            visual la lleva el bottom border + el label bold del activo. */}
+        <View style={s.marketSeg}>
+          {MARKET_TABS.map((m, i) => {
+            const active = i === activeMarketIdx;
+            return (
+              <Tap
+                key={m.id}
+                onPress={() => switchMarket(i)}
+                haptic="selection"
+                pressScale={0.97}
+                rippleContained
+                style={s.marketTab}
+              >
+                <View style={s.marketTabRow}>
+                  <MarketFlag marketKey={m.id} size={22} />
                   <Text
                     style={[
-                      s.marketSegLabel,
+                      s.marketTabLabel,
                       {
-                        color: active ? c.brand : c.textMuted,
+                        color: active ? c.text : c.textMuted,
                         fontFamily: active
                           ? fontFamily[800]
                           : fontFamily[600],
@@ -338,10 +325,18 @@ function BaseExplore() {
                   >
                     {m.short}
                   </Text>
-                </Tap>
-              );
-            })}
-          </View>
+                </View>
+                <View
+                  style={[
+                    s.marketTabUnderline,
+                    {
+                      backgroundColor: active ? c.brand : "transparent",
+                    },
+                  ]}
+                />
+              </Tap>
+            );
+          })}
         </View>
 
         <View style={s.searchRow}>
@@ -432,82 +427,6 @@ function BaseExplore() {
     </View>
   );
 }
-
-/* ─── Glyph del mercado para los segmented tabs ─── */
-
-function MarketGlyph({
-  market,
-  active,
-}: {
-  market: AssetMarket;
-  /** Cuando active=true, le aplicamos una capa verde sutil al glyph
-   *  para diferenciar claramente el mercado seleccionado del que no.
-   *  Para AR/US es un overlay round (pill) sobre la bandera; para
-   *  crypto, como ya es un pill verde brand, no hace falta. */
-  active?: boolean;
-}) {
-  const { c } = useTheme();
-  if (market === "AR" || market === "US") {
-    return (
-      <View style={gs.flagWrap}>
-        <FlagIcon code={market === "AR" ? "AR" : "US"} size={18} />
-        {active ? (
-          <View
-            pointerEvents="none"
-            style={[
-              gs.flagTint,
-              { backgroundColor: "rgba(0, 200, 5, 0.04)" },
-            ]}
-          />
-        ) : null}
-      </View>
-    );
-  }
-  // Crypto: pill verde con ₿ — no hay bandera, así que armamos un
-  // glyph que mantenga el peso visual de las dos primeras opciones.
-  // Como el bg ya es verde brand, no necesita el tint extra.
-  return (
-    <View
-      style={[gs.cryptoBadge, { backgroundColor: c.brand }]}
-    >
-      <Text style={[gs.cryptoBadgeText, { color: c.bg }]}>₿</Text>
-    </View>
-  );
-}
-
-const gs = StyleSheet.create({
-  flagWrap: {
-    width: 18,
-    height: 18,
-    position: "relative",
-  },
-  /* Overlay verde MUY sutil sobre la bandera del mercado activo —
-   * 4% de alpha para apenas dar señal sin saturar el verde acumulado
-   * con el bg del pill y el label en brand. Round-pill matching la
-   * bandera (que tiene borderRadius 999). */
-  flagTint: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderCurve: "continuous",
-    borderRadius: 999,
-  },
-  cryptoBadge: {
-    width: 18,
-    height: 18,
-    borderCurve: "continuous",
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cryptoBadgeText: {
-    fontFamily: fontFamily[800],
-    fontSize: 11,
-    lineHeight: 13,
-  },
-});
 
 /* ─── Body: movers + lista de instrumentos ─── */
 
@@ -932,30 +851,37 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  marketControl: {
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
-    paddingTop: 4,
-    paddingBottom: 4,
-    marginBottom: 14,
-  },
+  /* Segmented Robinhood-style — fila de 3 tabs sin bg propio, sólo
+   * con underline brand abajo del activo. Sin bordes, sin pill, sin
+   * shadow. La identidad la lleva el bottom border + el label bold
+   * del tab activo. */
   marketSeg: {
     flexDirection: "row",
-    gap: 2,
+    marginBottom: 14,
   },
-  marketSegBtn: {
+  marketTab: {
     flex: 1,
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 0,
+  },
+  marketTabRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    paddingVertical: 10,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
+    paddingBottom: 10,
   },
-  marketSegLabel: {
-    fontSize: 13,
-    letterSpacing: -0.1,
+  marketTabLabel: {
+    fontSize: 14,
+    letterSpacing: -0.15,
+  },
+  /* Underline brand de 2 px — visible sólo en el tab activo. Sin
+   * animación todavía (snap directo); si querés podés agregar un
+   * translateX animado al ancho del tab. */
+  marketTabUnderline: {
+    height: 2.5,
+    width: "100%",
+    borderRadius: 1.5,
   },
   searchRow: {
     flexDirection: "row",
