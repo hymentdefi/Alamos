@@ -566,11 +566,21 @@ export function IndicatorSheet({
                       }
                       style={s.heroIllustration}
                     >
-                      <IndicatorTypeIllustration
-                        type={selectedType}
-                        variant={config.maVariant}
-                        size={112}
-                      />
+                      {selectedType === "ma" ? (
+                        config.maVariant === "ema" ? (
+                          <EMAIndicatorIllustration size={112} />
+                        ) : (
+                          <MAIndicatorIllustration size={112} />
+                        )
+                      ) : selectedType === "rsi" ? (
+                        <RSIIndicatorIllustration size={112} />
+                      ) : selectedType === "macd" ? (
+                        <MACDIndicatorIllustration size={112} />
+                      ) : selectedType === "bollinger" ? (
+                        <BollingerIndicatorIllustration size={112} />
+                      ) : (
+                        <VolumeIndicatorIllustration size={112} />
+                      )}
                     </Animated.View>
                   ) : null}
 
@@ -730,34 +740,6 @@ function PickerRow({
       <Feather name="chevron-right" size={20} color={c.textFaint} />
     </Pressable>
   );
-}
-
-/* ─── Illustration mapper por tipo de indicador ──────────────── */
-
-/** Devuelve la ilustración 3D del indicador correspondiente. En MA
- *  diferencia SMA / EMA según `variant`. Reutiliza los mismos
- *  componentes que rendea el picker en paso 1. */
-function IndicatorTypeIllustration({
-  type,
-  variant,
-  size,
-}: {
-  type: IndicatorType;
-  variant: "sma" | "ema";
-  size: number;
-}) {
-  if (type === "ma") {
-    return variant === "ema" ? (
-      <EMAIndicatorIllustration size={size} />
-    ) : (
-      <MAIndicatorIllustration size={size} />
-    );
-  }
-  if (type === "rsi") return <RSIIndicatorIllustration size={size} />;
-  if (type === "macd") return <MACDIndicatorIllustration size={size} />;
-  if (type === "bollinger")
-    return <BollingerIndicatorIllustration size={size} />;
-  return <VolumeIndicatorIllustration size={size} />;
 }
 
 /* ─── Preview sentence con segmentos + overflow handling ─────── */
