@@ -432,6 +432,7 @@ export function IndicatorSheet({
                 <ScrollView
                   contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
                 >
                   {/* ── Tendencia ── */}
                   <Text style={[s.pickerSection, { color: c.textMuted }]}>
