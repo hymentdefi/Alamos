@@ -1780,9 +1780,9 @@ const s = StyleSheet.create({
     paddingBottom: 6,
   },
   configTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
 
   /* ── Flat list rows ── */
