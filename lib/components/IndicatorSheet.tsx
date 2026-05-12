@@ -165,12 +165,21 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
-  /* Altura compartida con AlertSheet — ambos sheets se sienten
-   * VISUALMENTE iguales. Si tocás esta fórmula, ESPEJALA en
-   * AlertSheet.tsx. */
-  const SHEET_HEIGHT = Math.min(
-    windowH * 0.9,
+  /* Altura por paso. Cada uno se ajusta a SU contenido en lugar de
+   * usar una altura compartida con el AlertSheet (que tenía un mar
+   * de espacio vacío entre la preview y el CTA en step 2).
+   *
+   * STEP 1 (picker): 6 rows + 3 section eyebrows + header. ~720 px.
+   * STEP 2 (config): hero + 4-5 rows + preview + CTA. ~660 px.
+   *
+   * Ambos capeados al 92 % de windowH para pantallas chicas. */
+  const STEP1_HEIGHT = Math.min(
+    windowH * 0.92,
     720 + insets.bottom,
+  );
+  const STEP2_HEIGHT = Math.min(
+    windowH * 0.92,
+    660 + insets.bottom,
   );
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
@@ -279,6 +288,15 @@ export function IndicatorSheet({
   const sliderStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -stepProgress.value * windowW }],
   }));
+  /* Animated sheet height — interpola entre STEP1_HEIGHT y
+   * STEP2_HEIGHT mientras stepProgress va 0 → 1. La animación corre
+   * en sync con el slide horizontal (mismo stepProgress shared
+   * value). El sheet shrinkea suavemente al pasar al step 2 (config
+   * más corto) sin saltos. */
+  const sheetHeightStyle = useAnimatedStyle(() => ({
+    height:
+      STEP1_HEIGHT + (STEP2_HEIGHT - STEP1_HEIGHT) * stepProgress.value,
+  }));
 
   /* Toggle de fila — animado con LayoutAnimation. Single expansion. */
   const toggleRow = (key: RowKey) => {
@@ -369,9 +387,9 @@ export function IndicatorSheet({
                 backgroundColor: c.bg,
                 borderColor: c.border,
                 paddingBottom: insets.bottom + 18,
-                height: SHEET_HEIGHT,
               },
               sheetStyle,
+              sheetHeightStyle,
             ]}
           >
           <View style={s.grabber}>
