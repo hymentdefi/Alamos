@@ -779,7 +779,12 @@ export default function PortfolioScreen() {
               highlightedMarket={highlightedMarket}
               onHighlight={setHighlightedMarket}
               c={c}
-              tone={color}
+              /* AllocationBar SIEMPRE va en brand verde (la barra es
+               * "distribución del portfolio", no rendimiento del día).
+               * En pérdida el resto del row Rendimiento se tiñe naranja
+               * pero los segmentos AR/US/Crypto/Dinero quedan en el
+               * verde característico de la marca. */
+              tone={c.brand}
             />
           ) : null}
 
@@ -835,13 +840,10 @@ export default function PortfolioScreen() {
                       Haptics.selectionAsync().catch(() => {});
                       setPygOpen(true);
                     }}
-                    style={[
-                      s.pygInfoDot,
-                      { backgroundColor: c.surfaceHover },
-                    ]}
+                    style={s.pygInfoDot}
                     accessibilityLabel="Qué es PyG"
                   >
-                    <Feather name="info" size={10} color={color} />
+                    <Feather name="info" size={13} color={color} />
                   </Pressable>
                 </View>
               </View>
@@ -5298,13 +5300,12 @@ const s = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.6,
   },
-  /* Info-dot alamos-style — mismo treatment que el "Tu dinero" del
-   * Inicio. Círculo 18 con bg surfaceHover + Feather "info" centrado. */
+  /* Info-dot — sólo el ícono Feather, sin bubble de fondo. La pasada
+   * de tono (verde / naranja) la lleva el ícono mismo, no hace falta
+   * un círculo gris atrás. Pequeño padding lateral para separarlo del
+   * label "PyG HOY". */
   pygInfoDot: {
-    width: 18,
-    height: 18,
-    borderCurve: "continuous",
-    borderRadius: 9,
+    paddingLeft: 2,
     alignItems: "center",
     justifyContent: "center",
   },
