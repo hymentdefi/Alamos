@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  LayoutAnimation,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -20,8 +17,6 @@ import {
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
-  FadeOutUp,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -49,31 +44,20 @@ import { BollingerIndicatorIllustration } from "./illustrations/BollingerIndicat
 import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllustration";
 
 /**
- * IndicatorSheet — rediseño Robinhood-style con dos pasos.
+ * IndicatorSheet — sheet de creación/edición de alertas técnicas en
+ * dos pasos.
  *
- *   Paso 1 — Picker: lista tappable de 5 indicadores con icono
- *            squircle + label + descripción + chevron.
+ *   Paso 1 — Picker: lista de 6 indicadores con icono, nombre y
+ *            descripción corta.
  *
- *   Paso 2 — Config: lista FLAT de filas tappables (label izq +
- *            value der + chevron). Tap en una fila expande inline
- *            el editor correspondiente (segmented / chips + stepper
- *            / lista de opciones), animado con LayoutAnimation.
- *            Single-expansion: solo una fila abierta a la vez. Sin
- *            section headers en caps, sin radios circulares,
- *            estética iOS Settings / Robinhood.
+ *   Paso 2 — Config: hero rectangular con ilustración + statement
+ *            "Te avisaremos cuando ..." + cards "Señal" y "Ejecución"
+ *            con todos los controles siempre visibles (no accordion).
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
  * con todos los parámetros pre-cargados.
  */
-
-// Habilitar LayoutAnimation en Android.
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface Props {
   visible: boolean;
@@ -144,22 +128,6 @@ const DEFAULT_CONFIG: ConfigState = {
   volumeMultiplier: 2,
 };
 
-/** Id de cada fila flat configurable. */
-type RowKey =
-  | "ma_periodo"
-  | "ma_condicion"
-  | "rsi_periodo"
-  | "rsi_umbral"
-  | "rsi_condicion"
-  | "macd_params"
-  | "macd_condicion"
-  | "bb_periodo"
-  | "bb_desviacion"
-  | "bb_condicion"
-  | "vol_multiplicador"
-  | "timeframe"
-  | "frecuencia";
-
 export function IndicatorSheet({
   visible,
   asset,
@@ -185,7 +153,6 @@ export function IndicatorSheet({
     null,
   );
   const [config, setConfig] = useState<ConfigState>(DEFAULT_CONFIG);
-  const [expandedRow, setExpandedRow] = useState<RowKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Hidratación al abrir.
@@ -200,7 +167,6 @@ export function IndicatorSheet({
         setSelectedType(null);
         setConfig(DEFAULT_CONFIG);
       }
-      setExpandedRow(null);
     }
   }, [visible, editingAlert]);
 
@@ -286,7 +252,6 @@ export function IndicatorSheet({
             easing: Easing.out(Easing.cubic),
           });
           runOnJS(setStep)(1);
-          runOnJS(setExpandedRow)(null);
         } else {
           stepProgress.value = withTiming(1, {
             duration: 220,
@@ -328,15 +293,6 @@ export function IndicatorSheet({
     transform: [{ translateX: -stepProgress.value * windowW }],
   }));
 
-  /* Toggle de fila — animado con LayoutAnimation. Single expansion. */
-  const toggleRow = (key: RowKey) => {
-    Haptics.selectionAsync().catch(() => {});
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(220, "easeInEaseOut", "opacity"),
-    );
-    setExpandedRow((prev) => (prev === key ? null : key));
-  };
-
   /* ─── Handlers ─── */
 
   const handleSubmit = async () => {
@@ -371,7 +327,6 @@ export function IndicatorSheet({
   const handlePickType = (t: IndicatorType) => {
     Haptics.selectionAsync().catch(() => {});
     setSelectedType(t);
-    setExpandedRow(null);
     setStep(2);
   };
 
@@ -448,7 +403,6 @@ export function IndicatorSheet({
                       Haptics.selectionAsync().catch(() => {});
                       setConfig({ ...DEFAULT_CONFIG, maVariant: "sma" });
                       setSelectedType("ma");
-                      setExpandedRow(null);
                       setStep(2);
                     }}
                     c={c}
@@ -465,7 +419,6 @@ export function IndicatorSheet({
                         maPeriod: 20,
                       });
                       setSelectedType("ma");
-                      setExpandedRow(null);
                       setStep(2);
                     }}
                     c={c}
@@ -531,7 +484,6 @@ export function IndicatorSheet({
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => {});
                         setStep(1);
-                        setExpandedRow(null);
                       }}
                       hitSlop={12}
                       accessibilityLabel="Volver al selector de indicador"
@@ -559,9 +511,8 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — ilustración 3D contenida en círculo con
-                      tint verde tenue (~6% de c.brand). 96×96 contenedor
-                      + 64×64 illustration adentro, centrada. */}
+                  {/* HERO — rectángulo full-width con tint brand sutil
+                      conteniendo la ilustración 3D del indicador. */}
                   {selectedType ? (
                     <Animated.View
                       key={`hero-${isEditing ? "edit" : "create"}`}
@@ -570,33 +521,32 @@ export function IndicatorSheet({
                           ? FadeIn.duration(180)
                           : FadeIn.duration(220).delay(0)
                       }
-                      style={s.heroIllustration}
+                      style={[
+                        s.heroRect,
+                        { backgroundColor: `${c.brand}10` },
+                      ]}
                     >
-                      <View
-                        style={[
-                          s.heroIllustrationCircle,
-                          { backgroundColor: `${c.brand}12` },
-                        ]}
-                      >
-                        {selectedType === "ma" ? (
-                          config.maVariant === "ema" ? (
-                            <EMAIndicatorIllustration size={80} />
-                          ) : (
-                            <MAIndicatorIllustration size={80} />
-                          )
-                        ) : selectedType === "rsi" ? (
-                          <RSIIndicatorIllustration size={80} />
-                        ) : selectedType === "macd" ? (
-                          <MACDIndicatorIllustration size={80} />
-                        ) : selectedType === "bollinger" ? (
-                          <BollingerIndicatorIllustration size={80} />
+                      {selectedType === "ma" ? (
+                        config.maVariant === "ema" ? (
+                          <EMAIndicatorIllustration size={88} />
                         ) : (
-                          <VolumeIndicatorIllustration size={80} />
-                        )}
-                      </View>
+                          <MAIndicatorIllustration size={88} />
+                        )
+                      ) : selectedType === "rsi" ? (
+                        <RSIIndicatorIllustration size={88} />
+                      ) : selectedType === "macd" ? (
+                        <MACDIndicatorIllustration size={88} />
+                      ) : selectedType === "bollinger" ? (
+                        <BollingerIndicatorIllustration size={88} />
+                      ) : (
+                        <VolumeIndicatorIllustration size={88} />
+                      )}
                     </Animated.View>
                   ) : null}
 
+                  {/* STATEMENT — eyebrow small + sentence con tokens
+                      coloreados en c.brand. Reemplaza el anterior centered
+                      sin eyebrow. */}
                   {selectedType ? (
                     <Animated.View
                       key={`sentence-${isEditing ? "edit" : "create"}`}
@@ -605,8 +555,13 @@ export function IndicatorSheet({
                           ? FadeIn.duration(180)
                           : FadeIn.duration(220).delay(80)
                       }
-                      style={s.heroSentenceWrap}
+                      style={s.statementBlock}
                     >
+                      <Text
+                        style={[s.statementEyebrow, { color: c.textMuted }]}
+                      >
+                        Te avisaremos cuando
+                      </Text>
                       <PreviewSentence
                         type={selectedType}
                         ticker={asset.ticker}
@@ -616,14 +571,6 @@ export function IndicatorSheet({
                     </Animated.View>
                   ) : null}
 
-                  {/* Divisor entre hero y rows */}
-                  <View
-                    style={[
-                      s.heroDivider,
-                      { backgroundColor: c.border },
-                    ]}
-                  />
-
                   {selectedType ? (
                     <Animated.View
                       entering={
@@ -632,13 +579,15 @@ export function IndicatorSheet({
                           : FadeIn.duration(220).delay(120)
                       }
                     >
-                      <RowsFor
+                      <SignalCard
                         type={selectedType}
-                        asset={asset}
                         config={config}
                         setConfig={setConfig}
-                        expandedRow={expandedRow}
-                        toggleRow={toggleRow}
+                        c={c}
+                      />
+                      <ExecutionCard
+                        config={config}
+                        setConfig={setConfig}
                         c={c}
                       />
                     </Animated.View>
@@ -798,257 +747,119 @@ function PreviewSentence({
   );
 }
 
-/* ─── Flat row genérica ───────────────────────────────────────── */
+/* ─── Cards always-visible — SignalCard + ExecutionCard ───────── */
 
-function FlatRow({
-  label,
-  value,
-  expanded,
-  onPress,
-  children,
-  c,
-}: {
-  label: string;
-  value: string;
-  expanded: boolean;
-  onPress: () => void;
-  children?: React.ReactNode;
-  c: ColorMap;
-}) {
-  // Animación de rotación del chevron — 0deg cerrado, 90deg abierto.
-  // Mismo timing que el slide del sheet (220ms cubic).
-  const rot = useSharedValue(expanded ? 1 : 0);
-  useEffect(() => {
-    rot.value = withTiming(expanded ? 1 : 0, {
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [expanded, rot]);
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rot.value * 90}deg` }],
-  }));
-
-  return (
-    <View
-      style={[
-        s.flatRowWrap,
-        expanded && { backgroundColor: c.bgWarm },
-      ]}
-    >
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        accessibilityLabel={`${label}: ${value}`}
-        style={({ pressed }) => [
-          s.flatRow,
-          {
-            backgroundColor: pressed && !expanded ? c.bgWarm : "transparent",
-          },
-        ]}
-      >
-        <Text style={[s.flatLabel, { color: c.text }]}>{label}</Text>
-        <View style={s.flatRight}>
-          {/* Animated.Text keyed por VALUE para que Reanimated detecte
-              el cambio de valor y dispare entering/exiting — slide
-              up del viejo + slide down del nuevo. */}
-          <Animated.Text
-            key={value}
-            entering={FadeInDown.duration(200).easing(
-              Easing.out(Easing.back(1.4)),
-            )}
-            exiting={FadeOutUp.duration(140)}
-            style={[
-              s.flatValue,
-              {
-                color: expanded ? c.text : c.textMuted,
-                fontFamily: expanded ? fontFamily[800] : fontFamily[700],
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {value}
-          </Animated.Text>
-          <Animated.View style={chevronStyle}>
-            <Feather name="chevron-right" size={18} color={c.textFaint} />
-          </Animated.View>
-        </View>
-      </Pressable>
-      {expanded && children ? (
-        <View style={s.flatExpand}>{children}</View>
-      ) : null}
-      {/* Hairline divider abajo — inset 24 desde la izquierda para
-          que no toque el edge (look iOS Settings). */}
-      <View style={[s.hairline, { backgroundColor: c.border }]} />
-    </View>
-  );
-}
-
-/* ─── Rows compuestas por tipo ────────────────────────────────── */
-
-function RowsFor({
+/** Card "Señal" — agrupa los parámetros que definen QUÉ disparará la
+ *  alerta (período, condición, umbral, temporalidad). Todos los
+ *  controles siempre visibles, no hay accordion. Varía por
+ *  indicador. */
+function SignalCard({
   type,
-  asset,
   config,
   setConfig,
-  expandedRow,
-  toggleRow,
   c,
 }: {
   type: IndicatorType;
-  asset: Asset;
   config: ConfigState;
   setConfig: (next: ConfigState) => void;
-  expandedRow: RowKey | null;
-  toggleRow: (k: RowKey) => void;
   c: ColorMap;
 }) {
-  /* Helpers de format por tipo. */
-  const periodoMA = config.maPeriod.toString();
-  const condicionMA =
-    config.maCondition === "above" ? "Cruza por encima" : "Cruza por debajo";
-
-  const periodoRSI = config.rsiPeriod.toString();
-  const umbralRSI = config.rsiThreshold.toString();
-  const condicionRSI =
-    config.rsiCondition === "above"
-      ? "Cruza por encima"
-      : "Cruza por debajo";
-
-  const paramsMACD = `${config.macdEmaFast}, ${config.macdEmaSlow}, ${config.macdSignal}`;
-  const condicionMACD =
-    config.macdCondition === "bullish_signal"
-      ? "Cruce alcista"
-      : config.macdCondition === "bearish_signal"
-        ? "Cruce bajista"
-        : config.macdCondition === "zero_up"
-          ? "Cruza cero al alza"
-          : "Cruza cero a la baja";
-
-  const periodoBB = config.bbPeriod.toString();
-  const desviacionBB = `${config.bbDeviation.toFixed(1).replace(".", ",")}σ`;
-  const condicionBB =
-    config.bbCondition === "touch_upper"
-      ? "Toca banda superior"
-      : config.bbCondition === "touch_lower"
-        ? "Toca banda inferior"
-        : "Squeeze (volatilidad baja)";
-
-  const multiplicadorVol = `${config.volumeMultiplier
-    .toFixed(1)
-    .replace(".", ",")}×`;
-
-  const timeframeLabel = config.timeframe;
-  const frecuenciaLabel =
-    config.frequency === "once" ? "Solo una vez" : "Cada vez que ocurra";
-
-  // `asset` se mantiene en la firma porque puede usarse a futuro
-  // para validaciones por activo. Por ahora no se referencia.
-  void asset;
   return (
-    <View style={s.flatList}>
+    <View style={[s.card, { backgroundColor: c.surface }]}>
+      <Text style={[s.cardHeader, { color: c.textMuted }]}>Señal</Text>
+
       {type === "ma" ? (
         <>
-          <FlatRow
+          <ParamRow
             label="Período"
-            value={periodoMA}
-            expanded={expandedRow === "ma_periodo"}
-            onPress={() => toggleRow("ma_periodo")}
             c={c}
+            right={
+              <Stepper
+                value={config.maPeriod}
+                onChange={(v) => setConfig({ ...config, maPeriod: v })}
+                min={5}
+                max={500}
+                step={1}
+              />
+            }
           >
-            <ChipsAndStepper
+            <ChipsRow
               chips={[9, 20, 50, 100, 200]}
               value={config.maPeriod}
               onChange={(v) => setConfig({ ...config, maPeriod: v })}
-              min={5}
-              max={500}
-              step={1}
               c={c}
             />
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionMA}
-            expanded={expandedRow === "ma_condicion"}
-            onPress={() => toggleRow("ma_condicion")}
-            c={c}
-          >
-            <OptionList
+          </ParamRow>
+          <ParamRow label="Condición" c={c}>
+            <Segmented
               options={[
-                { value: "above", label: "Precio cruza por encima" },
-                { value: "below", label: "Precio cruza por debajo" },
+                { value: "above", label: "Por encima" },
+                { value: "below", label: "Por debajo" },
               ]}
               active={config.maCondition}
               onChange={(v) =>
-                setConfig({ ...config, maCondition: v as "above" | "below" })
+                setConfig({
+                  ...config,
+                  maCondition: v as "above" | "below",
+                })
               }
               c={c}
             />
-          </FlatRow>
+          </ParamRow>
         </>
       ) : null}
 
       {type === "rsi" ? (
         <>
-          <FlatRow
+          <ParamRow
             label="Período"
-            value={periodoRSI}
-            expanded={expandedRow === "rsi_periodo"}
-            onPress={() => toggleRow("rsi_periodo")}
             c={c}
+            right={
+              <Stepper
+                value={config.rsiPeriod}
+                onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
+                min={2}
+                max={50}
+                step={1}
+              />
+            }
           >
-            <ChipsAndStepper
+            <ChipsRow
               chips={[7, 9, 14, 21]}
               value={config.rsiPeriod}
               onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
-              min={2}
-              max={50}
-              step={1}
               c={c}
             />
-          </FlatRow>
-          <FlatRow
+          </ParamRow>
+          <ParamRow
             label="Umbral"
-            value={umbralRSI}
-            expanded={expandedRow === "rsi_umbral"}
-            onPress={() => toggleRow("rsi_umbral")}
             c={c}
-          >
-            <View>
-              <ChipsLabeled
-                chips={[
-                  { v: 30, label: "30 Sobreventa" },
-                  { v: 50, label: "50 Neutro" },
-                  { v: 70, label: "70 Sobrecompra" },
-                ]}
+            right={
+              <Stepper
                 value={config.rsiThreshold}
-                onChange={(v) => setConfig({ ...config, rsiThreshold: v })}
-                c={c}
+                onChange={(v) =>
+                  setConfig({ ...config, rsiThreshold: v })
+                }
+                min={0}
+                max={100}
+                step={1}
               />
-              <View style={s.stepperWrap}>
-                <Stepper
-                  value={config.rsiThreshold}
-                  onChange={(v) =>
-                    setConfig({ ...config, rsiThreshold: v })
-                  }
-                  min={0}
-                  max={100}
-                  step={1}
-                />
-              </View>
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionRSI}
-            expanded={expandedRow === "rsi_condicion"}
-            onPress={() => toggleRow("rsi_condicion")}
-            c={c}
+            }
           >
-            <OptionList
+            <ChipsRow
+              chips={[30, 50, 70]}
+              value={config.rsiThreshold}
+              onChange={(v) =>
+                setConfig({ ...config, rsiThreshold: v })
+              }
+              c={c}
+            />
+          </ParamRow>
+          <ParamRow label="Condición" c={c}>
+            <Segmented
               options={[
-                { value: "above", label: "Cruza por encima del umbral" },
-                { value: "below", label: "Cruza por debajo del umbral" },
+                { value: "above", label: "Por encima" },
+                { value: "below", label: "Por debajo" },
               ]}
               active={config.rsiCondition}
               onChange={(v) =>
@@ -1059,83 +870,62 @@ function RowsFor({
               }
               c={c}
             />
-          </FlatRow>
+          </ParamRow>
         </>
       ) : null}
 
       {type === "macd" ? (
         <>
-          <FlatRow
-            label="Parámetros"
-            value={paramsMACD}
-            expanded={expandedRow === "macd_params"}
-            onPress={() => toggleRow("macd_params")}
+          <ParamRow
+            label="Rápida"
             c={c}
-          >
-            <View style={{ gap: 10 }}>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Rápida
-                </Text>
-                <Stepper
-                  value={config.macdEmaFast}
-                  onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
-                  min={2}
-                  max={50}
-                  step={1}
-                />
-              </View>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Lenta
-                </Text>
-                <Stepper
-                  value={config.macdEmaSlow}
-                  onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
-                  min={5}
-                  max={100}
-                  step={1}
-                />
-              </View>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Señal
-                </Text>
-                <Stepper
-                  value={config.macdSignal}
-                  onChange={(v) => setConfig({ ...config, macdSignal: v })}
-                  min={2}
-                  max={50}
-                  step={1}
-                />
-              </View>
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionMACD}
-            expanded={expandedRow === "macd_condicion"}
-            onPress={() => toggleRow("macd_condicion")}
+            right={
+              <Stepper
+                value={config.macdEmaFast}
+                onChange={(v) =>
+                  setConfig({ ...config, macdEmaFast: v })
+                }
+                min={2}
+                max={50}
+                step={1}
+              />
+            }
+          />
+          <ParamRow
+            label="Lenta"
             c={c}
-          >
+            right={
+              <Stepper
+                value={config.macdEmaSlow}
+                onChange={(v) =>
+                  setConfig({ ...config, macdEmaSlow: v })
+                }
+                min={5}
+                max={100}
+                step={1}
+              />
+            }
+          />
+          <ParamRow
+            label="Señal"
+            c={c}
+            right={
+              <Stepper
+                value={config.macdSignal}
+                onChange={(v) => setConfig({ ...config, macdSignal: v })}
+                min={2}
+                max={50}
+                step={1}
+              />
+            }
+          />
+          <ParamRow label="Condición" c={c}>
             <OptionList
               options={[
-                {
-                  value: "bullish_signal",
-                  label: "Cruce alcista (MACD cruza señal al alza)",
-                },
-                {
-                  value: "bearish_signal",
-                  label: "Cruce bajista (MACD cruza señal a la baja)",
-                },
-                {
-                  value: "zero_up",
-                  label: "MACD cruza línea cero al alza",
-                },
-                {
-                  value: "zero_down",
-                  label: "MACD cruza línea cero a la baja",
-                },
+                { value: "bullish_signal", label: "Cruce alcista" },
+                { value: "bearish_signal", label: "Cruce bajista" },
+                { value: "zero_up", label: "Cruza cero al alza" },
+                { value: "zero_down", label: "Cruza cero a la baja" },
               ]}
               active={config.macdCondition}
               onChange={(v) =>
@@ -1146,20 +936,16 @@ function RowsFor({
               }
               c={c}
             />
-          </FlatRow>
+          </ParamRow>
         </>
       ) : null}
 
       {type === "bollinger" ? (
         <>
-          <FlatRow
+          <ParamRow
             label="Período"
-            value={periodoBB}
-            expanded={expandedRow === "bb_periodo"}
-            onPress={() => toggleRow("bb_periodo")}
             c={c}
-          >
-            <View style={s.stepperWrap}>
+            right={
               <Stepper
                 value={config.bbPeriod}
                 onChange={(v) => setConfig({ ...config, bbPeriod: v })}
@@ -1167,45 +953,31 @@ function RowsFor({
                 max={100}
                 step={1}
               />
-            </View>
-          </FlatRow>
-          <FlatRow
+            }
+          />
+          <ParamRow
             label="Desviación"
-            value={desviacionBB}
-            expanded={expandedRow === "bb_desviacion"}
-            onPress={() => toggleRow("bb_desviacion")}
             c={c}
-          >
-            <View style={s.stepperWrap}>
+            right={
               <Stepper
                 value={config.bbDeviation}
-                onChange={(v) => setConfig({ ...config, bbDeviation: v })}
+                onChange={(v) =>
+                  setConfig({ ...config, bbDeviation: v })
+                }
                 min={0.5}
                 max={5}
                 step={0.5}
                 decimals={1}
                 suffix="σ"
               />
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionBB}
-            expanded={expandedRow === "bb_condicion"}
-            onPress={() => toggleRow("bb_condicion")}
-            c={c}
-          >
+            }
+          />
+          <ParamRow label="Condición" c={c}>
             <OptionList
               options={[
-                {
-                  value: "touch_upper",
-                  label: "Precio toca banda superior",
-                },
-                {
-                  value: "touch_lower",
-                  label: "Precio toca banda inferior",
-                },
-                { value: "squeeze", label: "Bandas se contraen (squeeze)" },
+                { value: "touch_upper", label: "Toca banda superior" },
+                { value: "touch_lower", label: "Toca banda inferior" },
+                { value: "squeeze", label: "Squeeze (volatilidad baja)" },
               ]}
               active={config.bbCondition}
               onChange={(v) =>
@@ -1216,99 +988,73 @@ function RowsFor({
               }
               c={c}
             />
-          </FlatRow>
+          </ParamRow>
         </>
       ) : null}
 
       {type === "volume" ? (
-        <>
-          <FlatRow
-            label="Multiplicador"
-            value={multiplicadorVol}
-            expanded={expandedRow === "vol_multiplicador"}
-            onPress={() => toggleRow("vol_multiplicador")}
+        <ParamRow
+          label="Multiplicador"
+          c={c}
+          right={
+            <Stepper
+              value={config.volumeMultiplier}
+              onChange={(v) =>
+                setConfig({ ...config, volumeMultiplier: v })
+              }
+              min={1.1}
+              max={20}
+              step={0.1}
+              decimals={1}
+              suffix="x"
+            />
+          }
+        >
+          <ChipsRow
+            chips={[1.5, 2, 3, 5]}
+            value={config.volumeMultiplier}
+            onChange={(v) =>
+              setConfig({ ...config, volumeMultiplier: v })
+            }
+            labelFn={(v) => `${v}x`}
             c={c}
-          >
-            <View>
-              <ChipsLabeled
-                chips={[
-                  { v: 1.5, label: "1.5x" },
-                  { v: 2, label: "2x" },
-                  { v: 3, label: "3x" },
-                  { v: 5, label: "5x" },
-                ]}
-                value={config.volumeMultiplier}
-                onChange={(v) =>
-                  setConfig({ ...config, volumeMultiplier: v })
-                }
-                c={c}
-              />
-              <View style={s.stepperWrap}>
-                <Stepper
-                  value={config.volumeMultiplier}
-                  onChange={(v) =>
-                    setConfig({ ...config, volumeMultiplier: v })
-                  }
-                  min={1.1}
-                  max={20}
-                  step={0.1}
-                  decimals={1}
-                  suffix="x"
-                />
-              </View>
-            </View>
-          </FlatRow>
-        </>
+          />
+        </ParamRow>
       ) : null}
 
-      <FlatRow
-        label="Temporalidad"
-        value={timeframeLabel}
-        expanded={expandedRow === "timeframe"}
-        onPress={() => toggleRow("timeframe")}
-        c={c}
-      >
-        <View style={s.chipsWrap}>
-          {TIMEFRAMES.map((tf) => {
-            const active = config.timeframe === tf;
-            return (
-              <Pressable
-                key={tf}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setConfig({ ...config, timeframe: tf });
-                }}
-                style={({ pressed }) => [
-                  s.chip,
-                  {
-                    /* removed border — solid bg only */
-                    backgroundColor: active ? c.text : c.surface,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <Text
-                  style={[s.chipText, { color: active ? c.bg : c.text }]}
-                >
-                  {tf}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </FlatRow>
+      <ParamRow label="Temporalidad" c={c}>
+        <ChipsRow
+          chips={TIMEFRAMES}
+          value={config.timeframe}
+          onChange={(v) =>
+            setConfig({ ...config, timeframe: v as Timeframe })
+          }
+          c={c}
+        />
+      </ParamRow>
+    </View>
+  );
+}
 
-      <FlatRow
-        label="Frecuencia"
-        value={frecuenciaLabel}
-        expanded={expandedRow === "frecuencia"}
-        onPress={() => toggleRow("frecuencia")}
-        c={c}
-      >
-        <OptionList
+/** Card "Ejecución" — agrupa los parámetros sobre CÓMO se notifica
+ *  (frecuencia). Por ahora solo una fila. */
+function ExecutionCard({
+  config,
+  setConfig,
+  c,
+}: {
+  config: ConfigState;
+  setConfig: (next: ConfigState) => void;
+  c: ColorMap;
+}) {
+  return (
+    <View style={[s.card, { backgroundColor: c.surface }]}>
+      <Text style={[s.cardHeader, { color: c.textMuted }]}>Ejecución</Text>
+      <ParamRow label="Frecuencia" c={c}>
+        <Segmented
           options={[
             { value: "once", label: "Solo una vez" },
-            { value: "always", label: "Cada vez que ocurra" },
+            { value: "always", label: "Cada vez" },
           ]}
           active={config.frequency}
           onChange={(v) =>
@@ -1316,106 +1062,75 @@ function RowsFor({
           }
           c={c}
         />
-      </FlatRow>
+      </ParamRow>
     </View>
   );
 }
 
-/* ─── Inline editors ──────────────────────────────────────────── */
+/* ─── Helpers internos a las cards ─────────────────────────────── */
 
-function ChipsAndStepper({
-  chips,
-  value,
-  onChange,
-  min,
-  max,
-  step,
+/** Una fila dentro de una card. Label arriba (opcionalmente con un
+ *  control compacto a la derecha — p.ej. Stepper), y el control
+ *  principal (chips / segmented / option list) debajo. */
+function ParamRow({
+  label,
   c,
+  right,
+  children,
 }: {
-  chips: number[];
-  value: number;
-  onChange: (v: number) => void;
-  min: number;
-  max: number;
-  step: number;
+  label: string;
   c: ColorMap;
+  right?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <View>
-      <View style={s.chipsWrap}>
-        {chips.map((v) => {
-          const active = value === v;
-          return (
-            <Pressable
-              key={v}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                onChange(v);
-              }}
-              style={({ pressed }) => [
-                s.chip,
-                {
-                  /* removed border — solid bg only */
-                  backgroundColor: active ? c.text : c.surface,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[s.chipText, { color: active ? c.bg : c.text }]}
-              >
-                {v}
-              </Text>
-            </Pressable>
-          );
-        })}
+    <View style={s.paramRow}>
+      <View style={s.paramRowHeader}>
+        <Text style={[s.paramLabel, { color: c.textMuted }]}>{label}</Text>
+        {right ? <View>{right}</View> : null}
       </View>
-      <View style={s.stepperWrap}>
-        <Stepper
-          value={value}
-          onChange={onChange}
-          min={min}
-          max={max}
-          step={step}
-        />
-      </View>
+      {children ? <View style={s.paramControl}>{children}</View> : null}
     </View>
   );
 }
 
-function ChipsLabeled({
-  chips,
-  value,
+/** Segmented control de 2 opciones — pill container + item interior
+ *  con bg c.text cuando está activo (texto oscuro). */
+function Segmented<T extends string>({
+  options,
+  active,
   onChange,
   c,
 }: {
-  chips: { v: number; label: string }[];
-  value: number;
-  onChange: (v: number) => void;
+  options: { value: T; label: string }[];
+  active: T;
+  onChange: (v: T) => void;
   c: ColorMap;
 }) {
   return (
-    <View style={s.chipsWrap}>
-      {chips.map((chip) => {
-        const active = value === chip.v;
+    <View style={[s.segmented, { backgroundColor: c.bgWarm }]}>
+      {options.map((opt) => {
+        const isActive = active === opt.value;
         return (
           <Pressable
-            key={chip.v}
+            key={opt.value}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              onChange(chip.v);
+              onChange(opt.value);
             }}
-            style={({ pressed }) => [
-              s.chip,
-              {
-                /* removed border — solid bg only */
-                backgroundColor: active ? c.text : c.surface,
-                opacity: pressed ? 0.7 : 1,
-              },
+            style={[
+              s.segmentedItem,
+              isActive && { backgroundColor: c.text },
             ]}
           >
-            <Text style={[s.chipText, { color: active ? c.bg : c.text }]}>
-              {chip.label}
+            <Text
+              style={[
+                s.segmentedText,
+                { color: isActive ? c.bg : c.textMuted },
+              ]}
+              numberOfLines={1}
+            >
+              {opt.label}
             </Text>
           </Pressable>
         );
@@ -1423,6 +1138,55 @@ function ChipsLabeled({
     </View>
   );
 }
+
+/** Fila de chips horizontales — el activo se renderea con bg c.text
+ *  e ink oscuro. Wrap natural si no caben todos en una línea. */
+function ChipsRow<T extends number | string>({
+  chips,
+  value,
+  onChange,
+  c,
+  labelFn,
+}: {
+  chips: readonly T[];
+  value: T;
+  onChange: (v: T) => void;
+  c: ColorMap;
+  labelFn?: (v: T) => string;
+}) {
+  return (
+    <View style={s.chipsWrap}>
+      {chips.map((v) => {
+        const active = value === v;
+        return (
+          <Pressable
+            key={String(v)}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(v);
+            }}
+            style={({ pressed }) => [
+              s.chip,
+              {
+                backgroundColor: active ? c.text : c.bgWarm,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[s.chipText, { color: active ? c.bg : c.text }]}
+            >
+              {labelFn ? labelFn(v) : String(v)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Inline editors ──────────────────────────────────────────── */
+
 
 function OptionList<T extends string>({
   options,
@@ -1785,90 +1549,102 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
-  /* ── Flat list rows ── */
-  flatList: {
-    marginTop: 4,
+  /* ── Cards always-visible (Señal + Ejecución) ── */
+  card: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
   },
-  flatRowWrap: {
-    /* sin border — el hairline va abajo via View propia con inset
-     * desde la izquierda (look iOS Settings). */
+  cardHeader: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginBottom: 6,
   },
-  flatRow: {
+  paramRow: {
+    paddingVertical: 10,
+  },
+  paramRowHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 18,
+    minHeight: 28,
+    marginBottom: 8,
+    gap: 12,
   },
-  flatLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.2,
+  paramLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
-  flatRight: {
+  paramControl: {
+    /* container para chips/segmented/option list. */
+  },
+  segmented: {
     flexDirection: "row",
+    padding: 3,
+    borderRadius: radius.md,
+    borderCurve: "continuous",
+    gap: 3,
+  },
+  segmentedItem: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: "center",
-    gap: 8,
-    maxWidth: "60%",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderCurve: "continuous",
   },
-  flatValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-    textAlign: "right",
-  },
-  flatExpand: {
-    paddingHorizontal: 24,
-    paddingTop: 4,
-    paddingBottom: 20,
-  },
-  /* Hairline inset desde la izquierda — toque iOS Settings. */
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 24,
+  segmentedText: {
+    fontFamily: fontFamily[600],
+    fontSize: 14,
+    letterSpacing: -0.1,
   },
 
-  /* Hero — ilustración 3D 80×80 dentro de un círculo 96×96 con
-   * tint verde tenue (c.brand al ~7%). Padding asimétrico: 20
-   * arriba, 16 abajo. */
-  heroIllustration: {
-    alignItems: "center",
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  heroIllustrationCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+  /* Hero rectangular full-width — bg con tint sutil de c.brand,
+   * ilustración 3D centrada adentro. ~130 alto incluyendo padding. */
+  heroRect: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    height: 130,
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  /* Sentence preview — wrapper con padding propio. */
-  heroSentenceWrap: {
+  /* Statement — eyebrow chico arriba + sentence con tokens en c.brand.
+   * Left-aligned (no centered) para feel "ficha técnica" no "poster". */
+  statementBlock: {
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 18,
+    paddingBottom: 18,
   },
-  /* Sentence default — 22/700 -0.5, lineHeight 28, centered. */
+  statementEyebrow: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginBottom: 6,
+  },
+  /* Sentence default — 20/700 -0.4, lineHeight 26, left-aligned. */
   heroSentence: {
-    fontFamily: fontFamily[700],
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.5,
-    textAlign: "center",
-  },
-  /* Sentence compacta — para casos con texto largo (>80 chars).
-   * Baja a 20/26 para evitar 4+ líneas. */
-  heroSentenceCompact: {
     fontFamily: fontFamily[700],
     fontSize: 20,
     lineHeight: 26,
     letterSpacing: -0.4,
-    textAlign: "center",
   },
-  heroDivider: {
-    height: StyleSheet.hairlineWidth,
+  /* Sentence compacta — para casos con texto largo (>80 chars).
+   * Baja a 18/24. */
+  heroSentenceCompact: {
+    fontFamily: fontFamily[700],
+    fontSize: 18,
+    lineHeight: 24,
+    letterSpacing: -0.3,
   },
 
   /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
@@ -1903,10 +1679,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
   },
-  stepperWrap: {
-    marginTop: 10,
-    alignSelf: "flex-start",
-  },
   optionList: {
     gap: 2,
   },
@@ -1923,17 +1695,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
-  macdParamRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  macdParamLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
-  },
-
   /* ── Warning ── */
   warning: {
     flexDirection: "row",
