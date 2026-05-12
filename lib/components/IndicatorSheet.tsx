@@ -430,7 +430,7 @@ export function IndicatorSheet({
                   </Text>
                 </View>
                 <ScrollView
-                  contentContainerStyle={{ paddingBottom: 12 }}
+                  contentContainerStyle={{ paddingBottom: 8 }}
                   showsVerticalScrollIndicator={false}
                   bounces
                   alwaysBounceVertical
@@ -1733,7 +1733,7 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.4,
     paddingHorizontal: 20,
-    paddingTop: 11,
+    paddingTop: 12,
     paddingBottom: 4,
   },
   /* Override del paddingTop para las secciones que NO son la primera.
@@ -1748,7 +1748,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
-    paddingVertical: 13,
+    paddingVertical: 14,
     borderCurve: "continuous",
   },
   pickerIcon: {
