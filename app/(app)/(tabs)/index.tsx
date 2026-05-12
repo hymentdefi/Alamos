@@ -556,6 +556,15 @@ function ActionButton({
   haptic: "medium" | "light";
 }) {
   const { c } = useTheme();
+  // Invertir es la única acción primaria: fondo verde brand + glyph
+  // en onColor (blanco en light, casi-negro en dark). El resto son
+  // cash management — fondo c.text (casi-negro/casi-blanco según
+  // modo) + glyph en c.bg para máximo contraste. Esa jerarquía deja
+  // a Invertir como el único punto de marca y el resto se lee como
+  // utilitario premium.
+  const isPrimary = iconName === "invertir";
+  const fill = isPrimary ? c.brand : c.text;
+  const stroke = isPrimary ? c.onColor : c.bg;
   return (
     <Tap
       style={s.actionItem}
@@ -563,10 +572,7 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* El ActionIcon es un squircle (borderCurve continuous) con tint
-          verde brand de fondo y glyph en c.text. El squircle ES el
-          botón — no necesita wrapper adicional. */}
-      <ActionIcon name={iconName} size={51} />
+      <ActionIcon name={iconName} size={51} fill={fill} stroke={stroke} />
       <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
         {label}
       </Text>
@@ -741,7 +747,7 @@ function Dinero(_: {
       </View>
 
       <View style={s.earningsHead}>
-        <Text style={[s.earningsTitle, { color: c.textMuted }]}>Tu dinero</Text>
+        <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
         <Pressable
           hitSlop={10}
           onPress={() => setInfoOpen(true)}
@@ -923,7 +929,7 @@ function Investments({
         onPress={() => router.navigate("/(app)/portfolio")}
         hitSlop={8}
       >
-        <Text style={[s.earningsTitle, { color: c.textMuted }]}>
+        <Text style={[s.earningsTitle, { color: c.text }]}>
           Tus inversiones
         </Text>
         <Ionicons

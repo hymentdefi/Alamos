@@ -6,11 +6,17 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir / Invertir).
  *
- * Squircle (borderCurve continuous) con tint suave del verde brand y
- * un símbolo (flecha down / up / arrows-swap / chart-up) en stroke
- * c.text. La squircle es el bloque visual; el SVG dentro es transparente
- * y solo aporta el glyph. Más Álamos que un círculo perfecto — la app
- * usa borderCurve continuous en TODAS las esquinas redondeadas.
+ * Círculo con un fill sólido y un glyph en stroke contrastado.
+ *
+ * Convención de uso desde el home:
+ *   - Invertir: fill = c.brand (verde sólido) + stroke = c.onColor.
+ *   - Resto: fill = c.text (casi-negro) + stroke = c.bg.
+ * Eso da jerarquía visual — Invertir es la única acción primaria,
+ * el resto son cash-management — y se ve premium tipo Robinhood/
+ * Stake: contraste fuerte fondo↔glyph en vez del tint suave previo.
+ *
+ * Si no se pasan overrides, default = tint verde brand + glyph c.text
+ * (modo "muted" — útil para contextos secundarios; no se usa en home).
  *
  * El glyph "invertir" es generado in-code (todavía no hay svg fuente
  * en el brand pack): línea quebrada ascendente terminada en flecha
@@ -52,18 +58,13 @@ export const ActionIcon = memo(function ActionIcon({
   const { mode, c } = useTheme();
   const resolvedStroke = stroke ?? c.text;
   const resolvedFill = fill ?? tintFor(mode);
-  // Ratio ~0.32 da un squircle "rounded square" — más cuadrado que
-  // un icono iOS app (0.22) pero menos que un squircle pleno (0.45).
-  // En 51 (size del home) sale ~16, alineado con radius.lg del theme.
-  const cornerRadius = Math.round(size * 0.32);
 
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: cornerRadius,
-        borderCurve: "continuous",
+        borderRadius: size / 2,
         backgroundColor: resolvedFill,
         alignItems: "center",
         justifyContent: "center",
