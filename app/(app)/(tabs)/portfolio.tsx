@@ -2349,31 +2349,24 @@ function FloorPie({
    * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
   const [tooltipH, setTooltipH] = useState(0);
 
-  // Geometría del viewBox — donut isométrico 3D. ViewBox W=240 / H=220
-  // (vs antes 200) deja respiro para la extrusión inferior + outer labels.
-  // El donut está squashed verticalmente (outerRy < outerRx) para dar la
-  // perspectiva "mirando desde arriba"; cada slice se rendea DOS veces
-  // (body más oscuro a +DEPTH píxeles, top en su posición) → el strip
-  // que asoma debajo del top en la mitad inferior del donut funciona
-  // como pared lateral del 3D. Inner/outer mantienen el mismo ratio
-  // (0.628) para que las spokes pasen por el centro como rayos.
-  const W = 240;
-  const H = 220;
+  // Geometría del viewBox — donut 3D en perspectiva fuerte (tilt
+  // pronunciado tipo Excel-3D, no isométrico suave). El squash vertical
+  // es severo: outerRy/outerRx ≈ 0.36 — vemos el chart casi de lado,
+  // con la pared lateral 3D ocupando MÁS espacio vertical que la cara
+  // de arriba. Inner/outer ratio sigue en 0.628 para que las spokes
+  // funcionen como rayos.
+  const W = 260;
+  const H = 170;
   const cx = W / 2;
   const cy = H / 2;
-  const outerRx = 78;
-  const outerRy = 60;
-  const innerRx = 49;
-  const innerRy = 38;
-  /* Extrusión vertical del 3D — qué tan abajo se sienta el body
-   * darker bajo el top face. 11 viewBox units ≈ 5% del alto del SVG;
-   * suficiente para leer la pared 3D sin que el donut se sienta más
-   * "stacked" que "tilted". */
-  const DEPTH = 11;
-  /* Distancia (en viewBox units) desde el outer edge hasta el final
-   * de la leader line. El % va un poco más afuera. */
-  const LEADER_OUT = 8;
-  const LABEL_OUT = 14;
+  const outerRx = 96;
+  const outerRy = 34;
+  const innerRx = 60;
+  const innerRy = 21;
+  /* Extrusión vertical del 3D — pared lateral fuerte (28 vs 11 del
+   * isométrico suave). El strip que asoma debajo del top en la mitad
+   * inferior es ahora el elemento visual dominante. */
+  const DEPTH = 28;
 
   type Row = {
     ticker: string;
@@ -2669,59 +2662,10 @@ function FloorPie({
             );
           })}
 
-          {/* Outer labels — % de cada slice afuera del ring, conectado
-           *  con una leader line radial corta. Las labels de slices
-           *  dimmed bajan a opacity 0.25 para que sigan la atenuación
-           *  del slice correspondiente. Slices muy chicos (< 2%) ocultan
-           *  la label para evitar overlap visual. */}
-          {slices.map((slice, i) => {
-            if (slice.pct < 2) return null;
-            const dimmedByActive =
-              activeIdx !== null && activeIdx !== i;
-            const dimmedByMarket =
-              dimMarket != null && slice.market !== dimMarket;
-            const dimmed = dimmedByActive || dimmedByMarket;
-            const mid = (slice.startAngle + slice.endAngle) / 2;
-            const cosMid = Math.cos(mid);
-            const sinMid = Math.sin(mid);
-            // Leader line + label en coordenadas elípticas: cada radio
-            // outer agrega LEADER_OUT/LABEL_OUT en su eje correspondiente
-            // para que el espacio entre donut y label sea visualmente
-            // consistente arriba/abajo y a los costados.
-            const innerX = cx + (outerRx + 1) * cosMid;
-            const innerY = cy + (outerRy + 1) * sinMid;
-            const outerX = cx + (outerRx + LEADER_OUT) * cosMid;
-            const outerY = cy + (outerRy + LEADER_OUT) * sinMid;
-            const labelX = cx + (outerRx + LABEL_OUT) * cosMid;
-            const labelY = cy + (outerRy + LABEL_OUT) * sinMid;
-            const anchor =
-              cosMid > 0.15 ? "start" : cosMid < -0.15 ? "end" : "middle";
-            const opacity = dimmed ? 0.25 : 1;
-            return (
-              <G key={`olabel-${slice.key}`} opacity={opacity}>
-                <Line
-                  x1={innerX}
-                  y1={innerY}
-                  x2={outerX}
-                  y2={outerY}
-                  stroke={c.text}
-                  strokeWidth={0.6}
-                  strokeLinecap="round"
-                />
-                <SvgText
-                  x={labelX}
-                  y={labelY}
-                  fontFamily={fontFamily[600]}
-                  fontSize={9}
-                  fill={c.text}
-                  textAnchor={anchor}
-                  alignmentBaseline="middle"
-                >
-                  {formatSliceOuterPct(slice.pct)}
-                </SvgText>
-              </G>
-            );
-          })}
+          {/* Outer labels: removidos en la versión side-tilt. Con la
+           *  perspectiva fuerte y la pared 3D dominando el espacio
+           *  inferior, las leader lines radiales chocan con el body.
+           *  El info se accede vía hold (tooltip) + center text. */}
         </Svg>
 
         {/* Center text — por default balance + 'Distribución'. Cuando
@@ -4729,13 +4673,6 @@ function shortCryptoTicker(ticker: string): string {
 
 /** Pct para el tooltip — un decimal siempre, con coma. */
 function formatTooltipPct(p: number): string {
-  return p.toFixed(1).replace(".", ",") + "%";
-}
-
-/** Pct para las outer labels del FloorPie — round a entero si >= 10,
- *  un decimal con coma si < 10 ("36%", "4,2%"). */
-function formatSliceOuterPct(p: number): string {
-  if (p >= 10) return Math.round(p).toString() + "%";
   return p.toFixed(1).replace(".", ",") + "%";
 }
 
