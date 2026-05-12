@@ -551,8 +551,15 @@ export default function PortfolioScreen() {
 
   /* ─── Display values en moneda actual ─── */
 
+  // Balance del hero = INVERTIDO + DINERO (cash). Antes el hero usaba
+  // sólo totalArs (invested), pero los charts y la AllocationBar
+  // incluyen el slice DINERO en su total, así que el número del centro
+  // del pie no matcheaba con el hero. Unifico al total con cash para
+  // que ambos lean lo mismo.
   const totalDisplay =
-    currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", currency);
+    currency === "ARS"
+      ? totalArsWithCash
+      : convertAmount(totalArsWithCash, "ARS", currency);
   const daySumDisplay =
     currency === "ARS" ? daySumArs : convertAmount(daySumArs, "ARS", currency);
 
