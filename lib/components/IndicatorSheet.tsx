@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutAnimation,
   Modal,
@@ -187,6 +187,11 @@ export function IndicatorSheet({
   const [config, setConfig] = useState<ConfigState>(DEFAULT_CONFIG);
   const [expandedRow, setExpandedRow] = useState<RowKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /* Ref para el ScrollView del picker — usado para snap-back a y:0
+   * en onScrollEndDrag / onMomentumScrollEnd, así el bounce siempre
+   * vuelve al top aunque el contenido overflowee la sheet. */
+  const pickerScrollRef = useRef<ScrollView>(null);
 
   // Hidratación al abrir.
   useEffect(() => {
@@ -430,10 +435,23 @@ export function IndicatorSheet({
                   </Text>
                 </View>
                 <ScrollView
-                  contentContainerStyle={{ paddingBottom: 8 }}
+                  ref={pickerScrollRef}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                   alwaysBounceVertical
                   overScrollMode="always"
+                  onScrollEndDrag={() => {
+                    pickerScrollRef.current?.scrollTo({
+                      y: 0,
+                      animated: true,
+                    });
+                  }}
+                  onMomentumScrollEnd={() => {
+                    pickerScrollRef.current?.scrollTo({
+                      y: 0,
+                      animated: true,
+                    });
+                  }}
                 >
                   {/* ── Tendencia ── */}
                   <Text style={[s.pickerSection, { color: c.textMuted }]}>
@@ -1732,8 +1750,8 @@ const s = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.4,
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 2,
+    paddingTop: 14,
+    paddingBottom: 4,
   },
   /* Override del paddingTop para las secciones que NO son la primera.
    * La primera (TENDENCIA) viene apenas después del header del picker
@@ -1747,7 +1765,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderCurve: "continuous",
   },
   pickerIcon: {
