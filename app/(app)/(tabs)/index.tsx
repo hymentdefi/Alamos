@@ -74,7 +74,6 @@ import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
-import { AlamosLogo } from "../../../lib/components/Logo";
 
 type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
 
@@ -349,15 +348,7 @@ function BaseHome() {
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        {/* Isotipo a la izquierda — refuerza identidad sin robar espacio.
-            La top bar antes estaba vacía a la izquierda; ahora el logo
-            ancla la marca y los iconos de acción quedan a la derecha. */}
-        <AlamosLogo
-          variant="mark"
-          tone={isDark ? "dark" : "light"}
-          size={32}
-        />
+      <View style={[s.topBar, { paddingTop: insets.top + 4 }]}>
         <View style={s.topActions}>
           <Animated.View
             style={{ transform: [{ scale: giftPulse }] }}
@@ -1014,10 +1005,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     paddingHorizontal: 20,
-    paddingBottom: 2,
+    paddingBottom: 0,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
   topActions: {
     flexDirection: "row",
