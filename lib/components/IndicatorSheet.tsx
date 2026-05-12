@@ -146,7 +146,6 @@ const DEFAULT_CONFIG: ConfigState = {
 
 /** Id de cada fila flat configurable. */
 type RowKey =
-  | "ma_tipo"
   | "ma_periodo"
   | "ma_condicion"
   | "rsi_periodo"
@@ -896,7 +895,6 @@ function RowsFor({
   c: ColorMap;
 }) {
   /* Helpers de format por tipo. */
-  const tipoMA = config.maVariant.toUpperCase();
   const periodoMA = config.maPeriod.toString();
   const condicionMA =
     config.maCondition === "above" ? "Cruza por encima" : "Cruza por debajo";
@@ -942,19 +940,6 @@ function RowsFor({
     <View style={s.flatList}>
       {type === "ma" ? (
         <>
-          <FlatRow
-            label="Tipo"
-            value={tipoMA}
-            expanded={expandedRow === "ma_tipo"}
-            onPress={() => toggleRow("ma_tipo")}
-            c={c}
-          >
-            <SegmentedSMA
-              value={config.maVariant}
-              onChange={(v) => setConfig({ ...config, maVariant: v })}
-              c={c}
-            />
-          </FlatRow>
           <FlatRow
             label="Período"
             value={periodoMA}
@@ -1328,48 +1313,6 @@ function RowsFor({
 }
 
 /* ─── Inline editors ──────────────────────────────────────────── */
-
-function SegmentedSMA({
-  value,
-  onChange,
-  c,
-}: {
-  value: "sma" | "ema";
-  onChange: (v: "sma" | "ema") => void;
-  c: ColorMap;
-}) {
-  return (
-    <View
-      style={[s.segmented, { backgroundColor: c.surfaceHover }]}
-    >
-      {(["sma", "ema"] as const).map((v) => {
-        const active = value === v;
-        return (
-          <Pressable
-            key={v}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(v);
-            }}
-            style={[s.segmentedItem, active && { backgroundColor: c.bg }]}
-          >
-            <Text
-              style={[
-                s.segmentedText,
-                {
-                  color: active ? c.text : c.textMuted,
-                  fontFamily: active ? fontFamily[700] : fontFamily[600],
-                },
-              ]}
-            >
-              {v.toUpperCase()}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
 
 function ChipsAndStepper({
   chips,
@@ -1923,24 +1866,6 @@ const s = StyleSheet.create({
   },
 
   /* ── Editores inline ── */
-  segmented: {
-    flexDirection: "row",
-    padding: 3,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    alignSelf: "flex-start",
-  },
-  segmentedItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  segmentedText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.4,
-  },
   chipsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
