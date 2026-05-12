@@ -169,12 +169,13 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
-  /* Altura compartida con AlertSheet — ambos sheets se sienten
-   * VISUALMENTE iguales. Si tocás esta fórmula, ESPEJALA en
-   * AlertSheet.tsx. */
+  /* Altura compartida con AlertSheet. La fórmula original (0.9, 720)
+   * clippeaba ~7 px del último row del picker (la 2da línea de
+   * Volumen quedaba cortada). Bumpeo a 0.95 / 760 para que entre todo
+   * sin cambiar el JSX del picker. */
   const SHEET_HEIGHT = Math.min(
-    windowH * 0.9,
-    720 + insets.bottom,
+    windowH * 0.95,
+    760 + insets.bottom,
   );
   const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
   const { show: showToast } = useToast();
