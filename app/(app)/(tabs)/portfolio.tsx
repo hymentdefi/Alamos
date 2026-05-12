@@ -2349,16 +2349,27 @@ function FloorPie({
    * y dejarlo flotando ARRIBA del slice tocado (encima del dedo). */
   const [tooltipH, setTooltipH] = useState(0);
 
-  // Geometría del viewBox — más ancho (240) y alto (200) que la versión
-  // previa para hospedar los outer labels (%s alrededor del donut, con
-  // leader lines radiales). Donut centrado en (120, 100), outer 70 /
-  // inner 44 (grosor 26). Slices flat, "cortadas" por el bg color.
+  // Geometría del viewBox — donut isométrico 3D. ViewBox W=240 / H=220
+  // (vs antes 200) deja respiro para la extrusión inferior + outer labels.
+  // El donut está squashed verticalmente (outerRy < outerRx) para dar la
+  // perspectiva "mirando desde arriba"; cada slice se rendea DOS veces
+  // (body más oscuro a +DEPTH píxeles, top en su posición) → el strip
+  // que asoma debajo del top en la mitad inferior del donut funciona
+  // como pared lateral del 3D. Inner/outer mantienen el mismo ratio
+  // (0.628) para que las spokes pasen por el centro como rayos.
   const W = 240;
-  const H = 200;
+  const H = 220;
   const cx = W / 2;
   const cy = H / 2;
-  const outerR = 70;
-  const innerR = 44;
+  const outerRx = 78;
+  const outerRy = 60;
+  const innerRx = 49;
+  const innerRy = 38;
+  /* Extrusión vertical del 3D — qué tan abajo se sienta el body
+   * darker bajo el top face. 11 viewBox units ≈ 5% del alto del SVG;
+   * suficiente para leer la pared 3D sin que el donut se sienta más
+   * "stacked" que "tilted". */
+  const DEPTH = 11;
   /* Distancia (en viewBox units) desde el outer edge hasta el final
    * de la leader line. El % va un poco más afuera. */
   const LEADER_OUT = 8;
@@ -2468,10 +2479,24 @@ function FloorPie({
         const vbY = py * scale;
         const dx = vbX - cx;
         const dy = vbY - cy;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        // Solo dentro del anillo (con un poco de tolerancia).
-        if (distance <= outerR + 4 && distance >= innerR - 4) {
-          let angle = Math.atan2(dy, dx);
+        // Distancia normalizada al outer ellipse: <= 1 está adentro,
+        // == innerRatio coincide con el inner ellipse. Permite hit test
+        // en el donut elíptico sin asumir circularidad.
+        const nx = dx / outerRx;
+        const ny = dy / outerRy;
+        const normalizedDist = Math.sqrt(nx * nx + ny * ny);
+        const innerRatio = innerRx / outerRx;
+        const tol = 0.07;
+        if (
+          normalizedDist <= 1 + tol &&
+          normalizedDist >= innerRatio - tol
+        ) {
+          // Parametric angle del ellipse — la conversión geometric→
+          // parametric viene de que un punto en el rayo desde el centro
+          // a (rx*cos θ, ry*sin θ) tiene tan(φ_geom) = (ry/rx)*tan(θ).
+          // Invirtiendo: θ = atan2(dy*rx, dx*ry). Así un click sigue
+          // mapeando al mismo slice incluso con squash.
+          let angle = Math.atan2(dy * outerRx, dx * outerRy);
           // Normalizar al rango [-π/2, 3π/2) que matchea nuestro start.
           if (angle < -Math.PI / 2) angle += 2 * Math.PI;
           const idx = sl.findIndex(
@@ -2563,11 +2588,53 @@ function FloorPie({
           height={containerW > 0 ? (containerW * H) / W : undefined}
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Slices del donut — flat con bordes marcados. Cada slice
-           *  lleva un stroke de c.text (almost-ink en light, almost-
-           *  white en dark) de 1.2 pt que perfila tanto los radios
-           *  entre slices como los arcos outer/inner. Da un acabado
-           *  más constructivo/handcrafted que el "gap por bg color".
+          {/* Drop shadow del piso — ellipse blur-soft debajo del donut
+           *  para anclarlo a una "superficie". Ancho un poco menor que
+           *  el donut, altura mínima. Reinforza el 3D. */}
+          <Ellipse
+            cx={cx}
+            cy={cy + outerRy + DEPTH + 5}
+            rx={outerRx * 0.85}
+            ry={4}
+            fill="rgba(14,15,12,0.10)"
+          />
+
+          {/* BODY slices — versión más oscura (shadeHex -0.22) renderada
+           *  shifteada DEPTH abajo. Lo que asoma debajo del top en la
+           *  mitad inferior del donut funciona como la pared lateral
+           *  del 3D. La parte de atrás queda cubierta por el top, así
+           *  que el body es invisible ahí — efecto isométrico clásico. */}
+          {slices.map((slice, i) => {
+            const dimmedByActive =
+              activeIdx !== null && activeIdx !== i;
+            const dimmedByMarket =
+              dimMarket != null && slice.market !== dimMarket;
+            const dimmed = dimmedByActive || dimmedByMarket;
+            const fill = dimmed
+              ? c.surfaceHover
+              : shadeHex(slice.color, -0.22);
+            return (
+              <SvgPath
+                key={`body-${slice.key}`}
+                d={annularSectorPath(
+                  cx,
+                  cy + DEPTH,
+                  innerRx,
+                  innerRy,
+                  outerRx,
+                  outerRy,
+                  slice.startAngle,
+                  slice.endAngle,
+                )}
+                fill={fill}
+              />
+            );
+          })}
+
+          {/* TOP slices — cara de arriba del donut isométrico, plana,
+           *  en color base. El stroke de c.text (1.2pt) perfila tanto
+           *  los radios entre slices como los arcos outer/inner — sigue
+           *  dando ese acabado constructivo del flat.
            *
            *  Dimming de 2 fuentes:
            *   - activeIdx: el slice activo del propio touch del pie.
@@ -2587,8 +2654,10 @@ function FloorPie({
                 d={annularSectorPath(
                   cx,
                   cy,
-                  innerR,
-                  outerR,
+                  innerRx,
+                  innerRy,
+                  outerRx,
+                  outerRy,
                   slice.startAngle,
                   slice.endAngle,
                 )}
@@ -2615,12 +2684,16 @@ function FloorPie({
             const mid = (slice.startAngle + slice.endAngle) / 2;
             const cosMid = Math.cos(mid);
             const sinMid = Math.sin(mid);
-            const innerX = cx + (outerR + 1) * cosMid;
-            const innerY = cy + (outerR + 1) * sinMid;
-            const outerX = cx + (outerR + LEADER_OUT) * cosMid;
-            const outerY = cy + (outerR + LEADER_OUT) * sinMid;
-            const labelX = cx + (outerR + LABEL_OUT) * cosMid;
-            const labelY = cy + (outerR + LABEL_OUT) * sinMid;
+            // Leader line + label en coordenadas elípticas: cada radio
+            // outer agrega LEADER_OUT/LABEL_OUT en su eje correspondiente
+            // para que el espacio entre donut y label sea visualmente
+            // consistente arriba/abajo y a los costados.
+            const innerX = cx + (outerRx + 1) * cosMid;
+            const innerY = cy + (outerRy + 1) * sinMid;
+            const outerX = cx + (outerRx + LEADER_OUT) * cosMid;
+            const outerY = cy + (outerRy + LEADER_OUT) * sinMid;
+            const labelX = cx + (outerRx + LABEL_OUT) * cosMid;
+            const labelY = cy + (outerRy + LABEL_OUT) * sinMid;
             const anchor =
               cosMid > 0.15 ? "start" : cosMid < -0.15 ? "end" : "middle";
             const opacity = dimmed ? 0.25 : 1;
@@ -2794,7 +2867,7 @@ function FloorPie({
             s.tooltipAnchor,
             {
               left: containerW / 2,
-              top: ((cy - outerR - 6) * containerW) / W,
+              top: ((cy - outerRy - 6) * containerW) / W,
               transform: [{ translateY: -tooltipH }],
             },
           ]}
@@ -2884,29 +2957,34 @@ function FloorPie({
   );
 }
 
-/** Path SVG de un sector anular (donut slice). */
+/** Path SVG de un sector anular elíptico (donut slice). Acepta rx/ry
+ *  separados para outer e inner — los slices isométricos del FloorPie
+ *  usan ry < rx para el squash vertical 3D. Cuando rx == ry se comporta
+ *  igual que un anillo circular. */
 function annularSectorPath(
   cx: number,
   cy: number,
-  innerR: number,
-  outerR: number,
+  innerRx: number,
+  innerRy: number,
+  outerRx: number,
+  outerRy: number,
   startAngle: number,
   endAngle: number,
 ): string {
-  const x1 = cx + outerR * Math.cos(startAngle);
-  const y1 = cy + outerR * Math.sin(startAngle);
-  const x2 = cx + outerR * Math.cos(endAngle);
-  const y2 = cy + outerR * Math.sin(endAngle);
-  const x3 = cx + innerR * Math.cos(endAngle);
-  const y3 = cy + innerR * Math.sin(endAngle);
-  const x4 = cx + innerR * Math.cos(startAngle);
-  const y4 = cy + innerR * Math.sin(startAngle);
+  const x1 = cx + outerRx * Math.cos(startAngle);
+  const y1 = cy + outerRy * Math.sin(startAngle);
+  const x2 = cx + outerRx * Math.cos(endAngle);
+  const y2 = cy + outerRy * Math.sin(endAngle);
+  const x3 = cx + innerRx * Math.cos(endAngle);
+  const y3 = cy + innerRy * Math.sin(endAngle);
+  const x4 = cx + innerRx * Math.cos(startAngle);
+  const y4 = cy + innerRy * Math.sin(startAngle);
   const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
   return [
     `M ${x1} ${y1}`,
-    `A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2}`,
+    `A ${outerRx} ${outerRy} 0 ${largeArc} 1 ${x2} ${y2}`,
     `L ${x3} ${y3}`,
-    `A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4}`,
+    `A ${innerRx} ${innerRy} 0 ${largeArc} 0 ${x4} ${y4}`,
     "Z",
   ].join(" ");
 }
