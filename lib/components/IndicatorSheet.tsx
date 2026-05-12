@@ -635,7 +635,7 @@ export function IndicatorSheet({
                     style={({ pressed }) => [
                       s.cta,
                       {
-                        backgroundColor: submitting ? c.textMuted : c.text,
+                        backgroundColor: c.brand,
                         opacity: !ctaEnabled
                           ? 0.5
                           : pressed
@@ -647,7 +647,7 @@ export function IndicatorSheet({
                       },
                     ]}
                   >
-                    <Text style={[s.ctaText, { color: c.bg }]}>
+                    <Text style={[s.ctaText, { color: c.onColor }]}>
                       {ctaLabel}
                     </Text>
                   </Pressable>
@@ -1544,9 +1544,9 @@ const s = StyleSheet.create({
     paddingBottom: 6,
   },
   configTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
 
   /* ── Cards always-visible (Señal + Ejecución) ── */
