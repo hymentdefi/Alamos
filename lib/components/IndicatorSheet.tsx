@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   UIManager,
   useWindowDimensions,
   View,
@@ -53,11 +52,12 @@ import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllu
  *
  *   Paso 2 — Config: lista FLAT de filas tappables (label izq +
  *            value der + chevron). Tap en una fila expande inline
- *            el editor correspondiente (segmented / chips + stepper
- *            / lista de opciones), animado con LayoutAnimation.
- *            Single-expansion: solo una fila abierta a la vez. Sin
- *            section headers en caps, sin radios circulares,
- *            estética iOS Settings / Robinhood.
+ *            el editor correspondiente (chips + stepper / lista de
+ *            opciones), animado con LayoutAnimation. Single-expansion:
+ *            solo una fila abierta a la vez. Sin section headers en
+ *            caps, sin radios circulares, estética iOS Settings /
+ *            Robinhood. Preview en lenguaje natural al final del
+ *            scroll y sticky CTA con gradient fade abajo.
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
@@ -143,20 +143,16 @@ const DEFAULT_CONFIG: ConfigState = {
 
 /** Id de cada fila flat configurable. */
 type RowKey =
-  | "activo"
-  | "ma_tipo"
   | "ma_periodo"
   | "ma_condicion"
   | "rsi_periodo"
   | "rsi_umbral"
   | "rsi_condicion"
-  | "macd_params"
   | "macd_condicion"
-  | "bb_periodo"
-  | "bb_desviacion"
+  | "macd_avanzado"
   | "bb_condicion"
+  | "bb_avanzado"
   | "vol_multiplicador"
-  | "vol_condicion"
   | "timeframe"
   | "frecuencia";
 
@@ -169,9 +165,8 @@ export function IndicatorSheet({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowW, height: windowH } = useWindowDimensions();
-  /* Altura compartida con AlertSheet — ambos sheets se sienten
-   * VISUALMENTE iguales. Si tocás esta fórmula, ESPEJALA en
-   * AlertSheet.tsx. */
+  /* Altura compartida con AlertSheet. Misma fórmula que cd60b9c —
+   * el step 1 picker depende de este valor exacto para verse correcto. */
   const SHEET_HEIGHT = Math.min(
     windowH * 0.9,
     720 + insets.bottom,
@@ -364,19 +359,20 @@ export function IndicatorSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
-      <GestureDetector gesture={pan}>
-        <Animated.View
-          style={[
-            s.sheet,
-            {
-              backgroundColor: c.bg,
-              borderColor: c.border,
-              paddingBottom: insets.bottom + 8,
-              height: SHEET_HEIGHT,
-            },
-            sheetStyle,
-          ]}
-        >
+      <View style={s.kbAvoid} pointerEvents="box-none">
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            style={[
+              s.sheet,
+              {
+                backgroundColor: c.bg,
+                borderColor: c.border,
+                paddingBottom: insets.bottom + 18,
+                height: SHEET_HEIGHT,
+              },
+              sheetStyle,
+            ]}
+          >
           <View style={s.grabber}>
             <View
               style={[s.grabberPill, { backgroundColor: c.borderStrong }]}
@@ -386,11 +382,18 @@ export function IndicatorSheet({
           <View style={{ overflow: "hidden", flex: 1 }}>
             <Animated.View
               style={[
-                { flexDirection: "row", width: windowW * 2 },
+                {
+                  flexDirection: "row",
+                  width: windowW * 2,
+                },
                 sliderStyle,
               ]}
             >
               {/* ──────── Paso 1: Picker ──────── */}
+              {/* Sin height: "100%" y sin flex: 1 en el ScrollView —
+                  el picker renderea naturalmente sus rows + secciones
+                  sin forzar viewport scrolling. El step 2 sí usa el
+                  full-height chain porque necesita el CTA al pie. */}
               <View style={{ width: windowW }}>
                 <View style={s.pickerHeader}>
                   <Text style={[s.pickerTitle, { color: c.text }]}>
@@ -489,27 +492,11 @@ export function IndicatorSheet({
               </View>
 
               {/* ──────── Paso 2: Config flat rows ──────── */}
+              {/* flex: 1 (estilo cd60b9c) — el slider no usa flex:1
+                  para no afectar al paso 1 picker. El CTA usa
+                  position: absolute (ver s.ctaContainer). */}
               <View style={{ width: windowW, flex: 1 }}>
                 <View style={s.configHeader}>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      if (isEditing) dismiss();
-                      else {
-                        setStep(1);
-                        setExpandedRow(null);
-                      }
-                    }}
-                    hitSlop={10}
-                    style={s.headerSideBtn}
-                    accessibilityLabel="Atrás"
-                  >
-                    <Feather
-                      name={isEditing ? "x" : "arrow-left"}
-                      size={20}
-                      color={c.text}
-                    />
-                  </Pressable>
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -535,65 +522,31 @@ export function IndicatorSheet({
                         Eliminar
                       </Text>
                     </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={dismiss}
-                      hitSlop={10}
-                      style={s.headerSideBtn}
-                      accessibilityLabel="Cerrar"
-                    >
-                      <Feather name="x" size={20} color={c.text} />
-                    </Pressable>
-                  )}
+                  ) : null}
                 </View>
 
+                {/* Hero del indicador — STICKY (afuera del ScrollView).
+                    Ilustración 64×64 + descripción gris. Siempre
+                    visible mientras el usuario scrollea las rows. */}
+                {selectedType ? (
+                  <View style={s.configHero}>
+                    <View style={s.configHeroIcon}>
+                      {indicatorIllustration(selectedType, config, 64)}
+                    </View>
+                    <Text
+                      style={[s.configHeroDesc, { color: c.textMuted }]}
+                    >
+                      {indicatorDescription(selectedType, config)}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <ScrollView
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 130 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — preview en lenguaje natural arriba del
-                      todo. Mismo lenguaje visual que la priceBlock
-                      del AlertSheet (eyebrow caps + sentencia 22/700
-                      + sub-line muted). NO border, NO bg — flota
-                      directo sobre c.bg como el hero del Precio. */}
-                  {selectedType ? (
-                    <View style={s.hero}>
-                      <Text
-                        style={[s.heroEyebrow, { color: c.textMuted }]}
-                      >
-                        TE AVISAREMOS CUANDO
-                      </Text>
-                      <Text
-                        style={[s.heroSentence, { color: c.text }]}
-                      >
-                        {renderPreviewSentence(
-                          selectedType,
-                          asset.ticker,
-                          config,
-                          c.brand,
-                          c.text,
-                        )}
-                      </Text>
-                      <Text
-                        style={[s.heroSub, { color: c.textMuted }]}
-                      >
-                        En {config.timeframe} ·{" "}
-                        {config.frequency === "once"
-                          ? "Solo una vez"
-                          : "Cada vez que ocurra"}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {/* Divisor entre hero y rows */}
-                  <View
-                    style={[
-                      s.heroDivider,
-                      { backgroundColor: c.border },
-                    ]}
-                  />
-
                   {selectedType ? (
                     <RowsFor
                       type={selectedType}
@@ -606,13 +559,35 @@ export function IndicatorSheet({
                     />
                   ) : null}
 
-                  {/* Warning MACD inline arriba del CTA si emaSlow
-                      <= emaFast — pintado fuera del scroll area pero
-                      antes del sticky CTA para que sea visible. */}
+                  {/* Preview en lenguaje natural — debajo de todas
+                      las rows. Card con borde izquierdo verde 3px y
+                      fondo surface. Texto gris tenue 13px. Se
+                      actualiza en tiempo real al cambiar parámetros. */}
+                  {selectedType ? (
+                    <View style={s.previewWrap}>
+                      <View
+                        style={[
+                          s.preview,
+                          {
+                            backgroundColor: c.surface,
+                            borderLeftColor: c.brand,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[s.previewText, { color: c.textMuted }]}
+                        >
+                          {previewSentence}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </ScrollView>
 
-                {/* Warning + CTA sticky abajo, sin chrome bar (sin
-                    borderTop) — sit on c.bg como AlertSheet. */}
+                {/* CTA al pie del step 2 — fuera del ScrollView, como
+                    hermano en el flex layout del wrapper. Vive dentro
+                    del width: windowW del step 2, no en absolute
+                    positioning. Patrón espejado al AlertSheet. */}
                 <View style={s.ctaContainer}>
                   {macdInvalid ? (
                     <View
@@ -651,10 +626,11 @@ export function IndicatorSheet({
                   </Pressable>
                 </View>
               </View>
-            </Animated.View>
-          </View>
-        </Animated.View>
-      </GestureDetector>
+              </Animated.View>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
     </Modal>
   );
 }
@@ -777,15 +753,6 @@ function FlatRow({
   );
 }
 
-/** Hairline color — gris al ~15% opacidad. Usa c.border y le baja
- *  la opacidad por encima de una capa neutra. RN no soporta alpha
- *  channel directo en hex, así que devolvemos un rgba sintético
- *  basado en si el tema es light o dark. */
-function hairlineColor(c: ColorMap): string {
-  // c.border es ya bastante sutil. Aprovechamos como está.
-  return c.border;
-}
-
 /* ─── Rows compuestas por tipo ────────────────────────────────── */
 
 function RowsFor({
@@ -805,10 +772,11 @@ function RowsFor({
   toggleRow: (k: RowKey) => void;
   c: ColorMap;
 }) {
-  const assetValue = `${asset.ticker}`;
+  /* Helpers de format de cada value que se muestra a la derecha
+   * de las flat rows. El asset.ticker no aparece en ninguna row
+   * porque ya está en el título de la sheet. */
+  void asset;
 
-  /* Helpers de format por tipo. */
-  const tipoMA = config.maVariant.toUpperCase();
   const periodoMA = config.maPeriod.toString();
   const condicionMA =
     config.maCondition === "above" ? "Cruza por encima" : "Cruza por debajo";
@@ -820,7 +788,6 @@ function RowsFor({
       ? "Cruza por encima"
       : "Cruza por debajo";
 
-  const paramsMACD = `${config.macdEmaFast}, ${config.macdEmaSlow}, ${config.macdSignal}`;
   const condicionMACD =
     config.macdCondition === "bullish_signal"
       ? "Cruce alcista"
@@ -829,51 +796,28 @@ function RowsFor({
         : config.macdCondition === "zero_up"
           ? "Cruza cero al alza"
           : "Cruza cero a la baja";
+  const avanzadoMACD = `${config.macdEmaFast}, ${config.macdEmaSlow}, ${config.macdSignal}`;
 
-  const periodoBB = config.bbPeriod.toString();
-  const desviacionBB = `${config.bbDeviation.toFixed(1).replace(".", ",")}σ`;
   const condicionBB =
     config.bbCondition === "touch_upper"
       ? "Toca banda superior"
       : config.bbCondition === "touch_lower"
         ? "Toca banda inferior"
         : "Squeeze (volatilidad baja)";
+  const avanzadoBB = `${config.bbPeriod}, ${config.bbDeviation.toFixed(1)}σ`;
 
   const multiplicadorVol = `${config.volumeMultiplier
     .toFixed(1)
     .replace(".", ",")}×`;
-  const condicionVol = "Supera promedio";
 
   const timeframeLabel = config.timeframe;
   const frecuenciaLabel =
     config.frequency === "once" ? "Solo una vez" : "Cada vez que ocurra";
 
-  // El "Activo" ya vive en el hero, así que en las rows lo
-  // eliminamos para no duplicarlo. Si en el futuro hay un asset
-  // switcher, vuelve como su propia row.
-  void assetValue;
   return (
     <View style={s.flatList}>
-      {/* Section eyebrow — PARÁMETROS */}
-      <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
-        PARÁMETROS
-      </Text>
-
       {type === "ma" ? (
         <>
-          <FlatRow
-            label="Tipo"
-            value={tipoMA}
-            expanded={expandedRow === "ma_tipo"}
-            onPress={() => toggleRow("ma_tipo")}
-            c={c}
-          >
-            <SegmentedSMA
-              value={config.maVariant}
-              onChange={(v) => setConfig({ ...config, maVariant: v })}
-              c={c}
-            />
-          </FlatRow>
           <FlatRow
             label="Período"
             value={periodoMA}
@@ -989,224 +933,114 @@ function RowsFor({
       ) : null}
 
       {type === "macd" ? (
-        <>
-          <FlatRow
-            label="Parámetros"
-            value={paramsMACD}
-            expanded={expandedRow === "macd_params"}
-            onPress={() => toggleRow("macd_params")}
+        <FlatRow
+          label="Condición"
+          value={condicionMACD}
+          expanded={expandedRow === "macd_condicion"}
+          onPress={() => toggleRow("macd_condicion")}
+          c={c}
+        >
+          <OptionList
+            options={[
+              {
+                value: "bullish_signal",
+                label: "Cruce alcista (MACD cruza señal al alza)",
+              },
+              {
+                value: "bearish_signal",
+                label: "Cruce bajista (MACD cruza señal a la baja)",
+              },
+              {
+                value: "zero_up",
+                label: "MACD cruza línea cero al alza",
+              },
+              {
+                value: "zero_down",
+                label: "MACD cruza línea cero a la baja",
+              },
+            ]}
+            active={config.macdCondition}
+            onChange={(v) =>
+              setConfig({
+                ...config,
+                macdCondition: v as ConfigState["macdCondition"],
+              })
+            }
             c={c}
-          >
-            <View style={{ gap: 10 }}>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Rápida
-                </Text>
-                <Stepper
-                  value={config.macdEmaFast}
-                  onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
-                  min={2}
-                  max={50}
-                  step={1}
-                />
-              </View>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Lenta
-                </Text>
-                <Stepper
-                  value={config.macdEmaSlow}
-                  onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
-                  min={5}
-                  max={100}
-                  step={1}
-                />
-              </View>
-              <View style={s.macdParamRow}>
-                <Text style={[s.macdParamLabel, { color: c.text }]}>
-                  Señal
-                </Text>
-                <Stepper
-                  value={config.macdSignal}
-                  onChange={(v) => setConfig({ ...config, macdSignal: v })}
-                  min={2}
-                  max={50}
-                  step={1}
-                />
-              </View>
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionMACD}
-            expanded={expandedRow === "macd_condicion"}
-            onPress={() => toggleRow("macd_condicion")}
-            c={c}
-          >
-            <OptionList
-              options={[
-                {
-                  value: "bullish_signal",
-                  label: "Cruce alcista (MACD cruza señal al alza)",
-                },
-                {
-                  value: "bearish_signal",
-                  label: "Cruce bajista (MACD cruza señal a la baja)",
-                },
-                {
-                  value: "zero_up",
-                  label: "MACD cruza línea cero al alza",
-                },
-                {
-                  value: "zero_down",
-                  label: "MACD cruza línea cero a la baja",
-                },
-              ]}
-              active={config.macdCondition}
-              onChange={(v) =>
-                setConfig({
-                  ...config,
-                  macdCondition: v as ConfigState["macdCondition"],
-                })
-              }
-              c={c}
-            />
-          </FlatRow>
-        </>
+          />
+        </FlatRow>
       ) : null}
 
       {type === "bollinger" ? (
-        <>
-          <FlatRow
-            label="Período"
-            value={periodoBB}
-            expanded={expandedRow === "bb_periodo"}
-            onPress={() => toggleRow("bb_periodo")}
+        <FlatRow
+          label="Condición"
+          value={condicionBB}
+          expanded={expandedRow === "bb_condicion"}
+          onPress={() => toggleRow("bb_condicion")}
+          c={c}
+        >
+          <OptionList
+            options={[
+              {
+                value: "touch_upper",
+                label: "Precio toca banda superior",
+              },
+              {
+                value: "touch_lower",
+                label: "Precio toca banda inferior",
+              },
+              { value: "squeeze", label: "Bandas se contraen (squeeze)" },
+            ]}
+            active={config.bbCondition}
+            onChange={(v) =>
+              setConfig({
+                ...config,
+                bbCondition: v as ConfigState["bbCondition"],
+              })
+            }
             c={c}
-          >
-            <View style={s.stepperWrap}>
-              <Stepper
-                value={config.bbPeriod}
-                onChange={(v) => setConfig({ ...config, bbPeriod: v })}
-                min={5}
-                max={100}
-                step={1}
-              />
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Desviación"
-            value={desviacionBB}
-            expanded={expandedRow === "bb_desviacion"}
-            onPress={() => toggleRow("bb_desviacion")}
-            c={c}
-          >
-            <View style={s.stepperWrap}>
-              <Stepper
-                value={config.bbDeviation}
-                onChange={(v) => setConfig({ ...config, bbDeviation: v })}
-                min={0.5}
-                max={5}
-                step={0.5}
-                decimals={1}
-                suffix="σ"
-              />
-            </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionBB}
-            expanded={expandedRow === "bb_condicion"}
-            onPress={() => toggleRow("bb_condicion")}
-            c={c}
-          >
-            <OptionList
-              options={[
-                {
-                  value: "touch_upper",
-                  label: "Precio toca banda superior",
-                },
-                {
-                  value: "touch_lower",
-                  label: "Precio toca banda inferior",
-                },
-                { value: "squeeze", label: "Bandas se contraen (squeeze)" },
-              ]}
-              active={config.bbCondition}
-              onChange={(v) =>
-                setConfig({
-                  ...config,
-                  bbCondition: v as ConfigState["bbCondition"],
-                })
-              }
-              c={c}
-            />
-          </FlatRow>
-        </>
+          />
+        </FlatRow>
       ) : null}
 
       {type === "volume" ? (
-        <>
-          <FlatRow
-            label="Multiplicador"
-            value={multiplicadorVol}
-            expanded={expandedRow === "vol_multiplicador"}
-            onPress={() => toggleRow("vol_multiplicador")}
-            c={c}
-          >
-            <View>
-              <ChipsLabeled
-                chips={[
-                  { v: 1.5, label: "1.5x" },
-                  { v: 2, label: "2x" },
-                  { v: 3, label: "3x" },
-                  { v: 5, label: "5x" },
-                ]}
+        <FlatRow
+          label="Multiplicador"
+          value={multiplicadorVol}
+          expanded={expandedRow === "vol_multiplicador"}
+          onPress={() => toggleRow("vol_multiplicador")}
+          c={c}
+        >
+          <View>
+            <ChipsLabeled
+              chips={[
+                { v: 1.5, label: "1.5x" },
+                { v: 2, label: "2x" },
+                { v: 3, label: "3x" },
+                { v: 5, label: "5x" },
+              ]}
+              value={config.volumeMultiplier}
+              onChange={(v) =>
+                setConfig({ ...config, volumeMultiplier: v })
+              }
+              c={c}
+            />
+            <View style={s.stepperWrap}>
+              <Stepper
                 value={config.volumeMultiplier}
                 onChange={(v) =>
                   setConfig({ ...config, volumeMultiplier: v })
                 }
-                c={c}
+                min={1.1}
+                max={20}
+                step={0.1}
+                decimals={1}
+                suffix="x"
               />
-              <View style={s.stepperWrap}>
-                <Stepper
-                  value={config.volumeMultiplier}
-                  onChange={(v) =>
-                    setConfig({ ...config, volumeMultiplier: v })
-                  }
-                  min={1.1}
-                  max={20}
-                  step={0.1}
-                  decimals={1}
-                  suffix="x"
-                />
-              </View>
             </View>
-          </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionVol}
-            expanded={expandedRow === "vol_condicion"}
-            onPress={() => toggleRow("vol_condicion")}
-            c={c}
-          >
-            <Text style={[s.helperText, { color: c.textMuted }]}>
-              La alerta se dispara cuando el volumen del período supera el
-              multiplicador configurado sobre el volumen promedio.
-            </Text>
-          </FlatRow>
-        </>
+          </View>
+        </FlatRow>
       ) : null}
-
-      {/* Section eyebrow — CUÁNDO */}
-      <Text
-        style={[
-          s.sectionEyebrow,
-          { color: c.textMuted, marginTop: 24 },
-        ]}
-      >
-        CUÁNDO
-      </Text>
 
       <FlatRow
         label="Temporalidad"
@@ -1228,7 +1062,6 @@ function RowsFor({
                 style={({ pressed }) => [
                   s.chip,
                   {
-                    /* removed border — solid bg only */
                     backgroundColor: active ? c.text : c.surface,
                     opacity: pressed ? 0.7 : 1,
                   },
@@ -1264,53 +1097,101 @@ function RowsFor({
           c={c}
         />
       </FlatRow>
+
+      {/* Avanzado — MACD: 3 EMAs internas. Bollinger: período y
+       *  desviación. Va al final porque es opcional / técnico. */}
+      {type === "macd" ? (
+        <FlatRow
+          label="Avanzado"
+          value={avanzadoMACD}
+          expanded={expandedRow === "macd_avanzado"}
+          onPress={() => toggleRow("macd_avanzado")}
+          c={c}
+        >
+          <View style={{ gap: 10 }}>
+            <View style={s.macdParamRow}>
+              <Text style={[s.macdParamLabel, { color: c.text }]}>
+                EMA rápida
+              </Text>
+              <Stepper
+                value={config.macdEmaFast}
+                onChange={(v) => setConfig({ ...config, macdEmaFast: v })}
+                min={2}
+                max={50}
+                step={1}
+              />
+            </View>
+            <View style={s.macdParamRow}>
+              <Text style={[s.macdParamLabel, { color: c.text }]}>
+                EMA lenta
+              </Text>
+              <Stepper
+                value={config.macdEmaSlow}
+                onChange={(v) => setConfig({ ...config, macdEmaSlow: v })}
+                min={5}
+                max={100}
+                step={1}
+              />
+            </View>
+            <View style={s.macdParamRow}>
+              <Text style={[s.macdParamLabel, { color: c.text }]}>
+                Señal
+              </Text>
+              <Stepper
+                value={config.macdSignal}
+                onChange={(v) => setConfig({ ...config, macdSignal: v })}
+                min={2}
+                max={50}
+                step={1}
+              />
+            </View>
+          </View>
+        </FlatRow>
+      ) : null}
+
+      {type === "bollinger" ? (
+        <FlatRow
+          label="Avanzado"
+          value={avanzadoBB}
+          expanded={expandedRow === "bb_avanzado"}
+          onPress={() => toggleRow("bb_avanzado")}
+          c={c}
+        >
+          <View style={{ gap: 10 }}>
+            <View style={s.macdParamRow}>
+              <Text style={[s.macdParamLabel, { color: c.text }]}>
+                Período
+              </Text>
+              <Stepper
+                value={config.bbPeriod}
+                onChange={(v) => setConfig({ ...config, bbPeriod: v })}
+                min={5}
+                max={100}
+                step={1}
+              />
+            </View>
+            <View style={s.macdParamRow}>
+              <Text style={[s.macdParamLabel, { color: c.text }]}>
+                Desviación
+              </Text>
+              <Stepper
+                value={config.bbDeviation}
+                onChange={(v) => setConfig({ ...config, bbDeviation: v })}
+                min={0.5}
+                max={5}
+                step={0.5}
+                decimals={1}
+                suffix="σ"
+              />
+            </View>
+          </View>
+        </FlatRow>
+      ) : null}
     </View>
   );
 }
 
 /* ─── Inline editors ──────────────────────────────────────────── */
-
-function SegmentedSMA({
-  value,
-  onChange,
-  c,
-}: {
-  value: "sma" | "ema";
-  onChange: (v: "sma" | "ema") => void;
-  c: ColorMap;
-}) {
-  return (
-    <View
-      style={[s.segmented, { backgroundColor: c.surfaceHover }]}
-    >
-      {(["sma", "ema"] as const).map((v) => {
-        const active = value === v;
-        return (
-          <Pressable
-            key={v}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(v);
-            }}
-            style={[s.segmentedItem, active && { backgroundColor: c.bg }]}
-          >
-            <Text
-              style={[
-                s.segmentedText,
-                {
-                  color: active ? c.text : c.textMuted,
-                  fontFamily: active ? fontFamily[700] : fontFamily[600],
-                },
-              ]}
-            >
-              {v.toUpperCase()}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
 
 function ChipsAndStepper({
   chips,
@@ -1570,128 +1451,42 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
-/** Renderiza la sentencia preview con tokens highlightados (ticker,
- *  números, símbolos) en brand color + fontFamily[800], y el resto
- *  en texto regular. Devuelve un array de Text children. */
-function renderPreviewSentence(
-  type: IndicatorType,
-  ticker: string,
+/** Mismas illustrations que el picker — la rendereamos arriba de las
+ *  rows del paso 2 para dar contexto del indicador elegido. */
+function indicatorIllustration(
+  t: IndicatorType,
   cfg: ConfigState,
-  highlightColor: string,
-  baseColor: string,
+  size: number,
 ): React.ReactNode {
-  const segments = previewSegments(type, ticker, cfg);
-  return segments.map((seg, i) => (
-    <Text
-      key={`${i}-${seg.text}`}
-      style={
-        seg.highlight
-          ? {
-              fontFamily: fontFamily[800],
-              color: highlightColor,
-            }
-          : { color: baseColor }
-      }
-    >
-      {seg.text}
-    </Text>
-  ));
+  if (t === "ma") {
+    return cfg.maVariant === "ema" ? (
+      <EMAIndicatorIllustration size={size} />
+    ) : (
+      <MAIndicatorIllustration size={size} />
+    );
+  }
+  if (t === "rsi") return <RSIIndicatorIllustration size={size} />;
+  if (t === "macd") return <MACDIndicatorIllustration size={size} />;
+  if (t === "bollinger")
+    return <BollingerIndicatorIllustration size={size} />;
+  return <VolumeIndicatorIllustration size={size} />;
 }
 
-/** Genera los segmentos del preview — partes en bold/brand vs
- *  partes en texto normal. La structure de cada return define qué
- *  va resaltado: ticker, números, períodos, umbrales, timeframe. */
-function previewSegments(
-  type: IndicatorType,
-  ticker: string,
-  cfg: ConfigState,
-): { text: string; highlight: boolean }[] {
-  const tf = cfg.timeframe;
-  const T = (text: string, highlight = false) => ({ text, highlight });
-  if (type === "ma") {
-    const v = cfg.maVariant.toUpperCase();
-    const dir =
-      cfg.maCondition === "above"
-        ? "cruce por encima"
-        : "cruce por debajo";
-    return [
-      T("El precio de "),
-      T(ticker, true),
-      T(` ${dir} de la `),
-      T(`${v}(${cfg.maPeriod})`, true),
-      T(" en "),
-      T(tf, true),
-      T("."),
-    ];
+/** Mismo copy que la descripción del PickerRow del paso 1 — repetido
+ *  acá para dar contexto sin obligar al usuario a volver al picker. */
+function indicatorDescription(t: IndicatorType, cfg: ConfigState): string {
+  if (t === "ma") {
+    return cfg.maVariant === "ema"
+      ? "Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
+      : "Promedio histórico del precio. Cuando lo cruza, puede indicar un cambio de tendencia.";
   }
-  if (type === "rsi") {
-    const dir =
-      cfg.rsiCondition === "above"
-        ? "suba por encima"
-        : "baje por debajo";
-    return [
-      T("El "),
-      T(`RSI(${cfg.rsiPeriod})`, true),
-      T(" de "),
-      T(ticker, true),
-      T(` ${dir} de `),
-      T(`${cfg.rsiThreshold}`, true),
-      T(" en "),
-      T(tf, true),
-      T("."),
-    ];
-  }
-  if (type === "macd") {
-    let dir: string;
-    if (cfg.macdCondition === "bullish_signal")
-      dir = "cruce la línea de señal al alza";
-    else if (cfg.macdCondition === "bearish_signal")
-      dir = "cruce la línea de señal a la baja";
-    else if (cfg.macdCondition === "zero_up")
-      dir = "cruce la línea cero al alza";
-    else dir = "cruce la línea cero a la baja";
-    return [
-      T("El "),
-      T("MACD", true),
-      T(` ${dir} para `),
-      T(ticker, true),
-      T(" en "),
-      T(tf, true),
-      T("."),
-    ];
-  }
-  if (type === "bollinger") {
-    if (cfg.bbCondition === "squeeze") {
-      return [
-        T("Las "),
-        T("Bandas de Bollinger", true),
-        T(" de "),
-        T(ticker, true),
-        T(" se contraigan en "),
-        T(tf, true),
-        T("."),
-      ];
-    }
-    const upper = cfg.bbCondition === "touch_upper";
-    return [
-      T("El precio de "),
-      T(ticker, true),
-      T(` toque la `),
-      T(upper ? "banda superior" : "banda inferior", true),
-      T(" en "),
-      T(tf, true),
-      T("."),
-    ];
-  }
-  return [
-    T("El volumen de "),
-    T(ticker, true),
-    T(" supere "),
-    T(`${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}×`, true),
-    T(" el promedio en "),
-    T(tf, true),
-    T("."),
-  ];
+  if (t === "rsi")
+    return "Detecta sobrecompra y sobreventa. Puede anticipar posibles reversiones del precio.";
+  if (t === "macd")
+    return "Mide la fuerza de la tendencia. Puede señalar cambios de dirección antes de que ocurran.";
+  if (t === "bollinger")
+    return "Marca el rango normal del precio. Salirse puede indicar un movimiento fuera de lo común.";
+  return "Cuánto dinero se está operando. Un pico suele anticipar o confirmar un movimiento fuerte.";
 }
 
 function describePreview(
@@ -1725,13 +1520,18 @@ function describePreview(
     return `Te avisaremos cuando el MACD cruce la línea cero a la baja para ${ticker} en ${tf}.`;
   }
   if (type === "bollinger") {
+    const bbConfig = `Bollinger(${cfg.bbPeriod}, ${cfg.bbDeviation.toFixed(1)}σ)`;
     if (cfg.bbCondition === "touch_upper")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda superior en ${tf}.`;
+      return `Te avisaremos cuando el precio toque la banda superior de ${bbConfig} en ${ticker} (${tf}).`;
     if (cfg.bbCondition === "touch_lower")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda inferior en ${tf}.`;
-    return `Te avisaremos cuando las bandas de Bollinger de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
+      return `Te avisaremos cuando el precio toque la banda inferior de ${bbConfig} en ${ticker} (${tf}).`;
+    return `Te avisaremos cuando las bandas de ${bbConfig} de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
   }
-  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}x el promedio en ${tf}.`;
+  /* Volumen — formateo "2x" si es entero, "2.5x" si tiene decimales.
+   * Evita el "2,0x" feo que tenía antes. */
+  const mult = cfg.volumeMultiplier;
+  const multStr = Number.isInteger(mult) ? `${mult}` : mult.toFixed(1);
+  return `Te avisaremos cuando el volumen de ${ticker} supere ${multStr}x el promedio en ${tf}.`;
 }
 
 const s = StyleSheet.create({
@@ -1739,11 +1539,15 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
+  /* kbAvoid wrapper — matchea el patrón del AlertSheet de Precio:
+   * el View flex:1 con justifyContent:flex-end empuja el sheet al
+   * bottom de la pantalla. pointerEvents="box-none" deja pasar los
+   * clicks al backdrop debajo para que el tap-outside cierre. */
+  kbAvoid: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
   sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -1751,12 +1555,11 @@ const s = StyleSheet.create({
   },
   grabber: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   grabberPill: {
-    width: 40,
+    width: 44,
     height: 4,
-    borderCurve: "continuous",
     borderRadius: 2,
   },
 
@@ -1765,6 +1568,9 @@ const s = StyleSheet.create({
    * (~729 px). Filas con ícono 48, descripción de 1-2 líneas,
    * agrupadas en 3 secciones (TENDENCIA / MOMENTUM / VOLATILIDAD
    * Y VOLUMEN). */
+  /* Header del paso 1 (picker) — tight: paddingTop 8, paddingBottom 6
+   * para que los 6 rows + 3 section eyebrows entren sin scroll en el
+   * SHEET_HEIGHT del paso 1. Title weight 800 para presencia visual. */
   pickerHeader: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -1782,9 +1588,8 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
-  /* Eyebrow de sección dentro del picker — mismo lenguaje que
-   * sectionEyebrow del paso 2, con inset horizontal 20 para
-   * alinearse al picker (que usa pH 20, no 24). */
+  /* Eyebrow de sección dentro del picker. pH 20 para tightness; el
+   * config (step 2) usa pH 24 espejado al AlertSheet. */
   pickerSection: {
     fontFamily: fontFamily[700],
     fontSize: 11,
@@ -1827,29 +1632,27 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* ── Paso 2 — header ── */
+  /* ── Paso 2 — header ──
+   * Espejado al header del AlertSheet de Precio: paddingTop 6,
+   * paddingBottom 28, alignItems baseline, title fontFamily 700
+   * fontSize 22 letterSpacing -0.6. Sin botones de back/X — para
+   * volver al paso 1 o cerrar el sheet, swipe down en el grabber.
+   * En EDIT mode mostramos un pill "Eliminar" a la derecha (mismo
+   * estilo que el AlertSheet en edit). */
   configHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  headerSideBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 28,
+    gap: 12,
   },
   configTitle: {
     flex: 1,
     fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-    textAlign: "center",
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
   deleteBtn: {
     paddingHorizontal: 12,
@@ -1862,6 +1665,31 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 13,
     letterSpacing: -0.2,
+  },
+
+  /* ── Hero del paso 2 — ilustración + descripción del indicador ──
+   * paddingTop 0 porque el configHeader ya tiene pB 28; el aire
+   * ya está dado. paddingBottom 18 antes de la primera flat row. */
+  configHero: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 0,
+    paddingBottom: 18,
+  },
+  configHeroIcon: {
+    width: 64,
+    height: 64,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  configHeroDesc: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.05,
+    textAlign: "center",
+    marginTop: 12,
+    paddingHorizontal: 8,
   },
 
   /* ── Flat list rows ── */
@@ -1907,47 +1735,15 @@ const s = StyleSheet.create({
     marginLeft: 24,
   },
 
-  /* Hero block — eyebrow caps + sentencia 22/700 con tokens
-   * highlightados + sub-line muted. Mismo lenguaje que el
-   * priceBlock del AlertSheet. */
-  hero: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 22,
-  },
-  heroEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
-  },
-  heroSentence: {
-    fontFamily: fontFamily[700],
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.5,
-    marginTop: 8,
-  },
-  heroSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginTop: 8,
-  },
-  heroDivider: {
-    height: StyleSheet.hairlineWidth,
-  },
-
-  /* Section eyebrow entre grupos de rows. */
-  sectionEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 8,
-  },
-
-  /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
+  /* CTA container — vive en el flex layout del step 2, hermano del
+   * ScrollView. Replica el patrón del AlertSheet de Precio: el CTA
+   * pill tiene marginTop 8 (definido en s.cta), no necesitamos
+   * paddingTop/paddingBottom propios. paddingHorizontal 24 matchea
+   * el inset del sheet. */
+  /* CTA container — position: absolute estilo cd60b9c, así no
+   * dependemos del flex chain del slider (que afectaba al step 1
+   * picker). bottom: 0 lo pega al edge del sheet; el sheet ya tiene
+   * paddingBottom: insets.bottom + 18 dándole respiración. */
   ctaContainer: {
     position: "absolute",
     left: 0,
@@ -1960,24 +1756,6 @@ const s = StyleSheet.create({
   },
 
   /* ── Editores inline ── */
-  segmented: {
-    flexDirection: "row",
-    padding: 3,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    alignSelf: "flex-start",
-  },
-  segmentedItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  segmentedText: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.4,
-  },
   chipsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2027,16 +1805,10 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.15,
   },
-  helperText: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.05,
-  },
 
   /* ── Preview + warning ── */
   previewWrap: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 20,
   },
   preview: {
@@ -2070,23 +1842,18 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* ── CTA — pill style match AlertSheet ── */
-  ctaWrap: {
-    /* legacy — ya no se usa, queda por compat de referencias. */
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
+  /* ── CTA — pill style match AlertSheet ──
+   * height 58 + borderRadius pill + marginTop 8 (mismo que el CTA
+   * del AlertSheet de Precio). Esto le da el aire visual entre el
+   * último elemento del scroll y el pill, sin necesidad de padding
+   * adicional en el ctaContainer. */
   cta: {
     height: 58,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 8,
   },
   ctaText: {
     fontFamily: fontFamily[800],
@@ -2094,5 +1861,3 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 });
-// Suppress unused TextInput import warning — we may use it for keyboard-typed numbers in a future iteration.
-void TextInput;
