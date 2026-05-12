@@ -1648,14 +1648,20 @@ function AllocCaption({
 
 /* ─── PieGlyph / BrickGlyph / RankingGlyph / TreemapGlyph
  *
- *  Toggle icons del viz selector. Reescritos Robinhood-style:
+ *  Toggle icons del viz selector. Robinhood-style:
  *    - Solid filled shapes en vez de wireframes.
- *    - Jerarquía visual por opacity (slice/segmento dominante a 1.0,
- *      el resto a 0.55 / 0.3).
- *    - Cero strokes oscuros, todo en una sola tonalidad.
- *    - ViewBox 24×24 (era 18) para tener más resolución cuando los
- *      tiles del VizSelectorSheet escalan a 28+ px en pantalla.
+ *    - Jerarquía visual por opacity (dominante a 1.0, secundarios a
+ *      0.55 / 0.3).
+ *    - El elemento DOMINANTE de cada glyph va en brand verde #00C805
+ *      (firma de identidad Álamos), los secundarios en el color del
+ *      tile (c.text). Detalle que arma la consistencia del viz
+ *      selector con el resto de la marca.
+ *    - Cero strokes oscuros, dos tonalidades nada más.
+ *    - ViewBox 24×24 para resolución alta cuando los tiles escalan
+ *      a 28+ px.
  */
+
+const GLYPH_BRAND = "#00C805";
 
 function PieGlyph({ color, size = 18 }: { color: string; size?: number }) {
   // Donut filled — base ring (opacity 0.3) + slice destacada (opacity 1.0).
@@ -1673,11 +1679,11 @@ function PieGlyph({ color, size = 18 }: { color: string; size?: number }) {
         fillRule="evenodd"
       />
       {/* Slice dominante — annular sector de -90° a 0° (cuarto superior
-       *  derecho), pinta encima del ring base para que ese cuarto se
-       *  vea full opacity y el resto quede a 0.3. */}
+       *  derecho), pinta encima del ring base. Va en brand verde para
+       *  marcar identidad Álamos sobre el ring "neutral". */}
       <SvgPath
         d="M 12 3 A 9 9 0 0 1 21 12 L 17 12 A 5 5 0 0 0 12 7 Z"
-        fill={color}
+        fill={GLYPH_BRAND}
       />
     </Svg>
   );
@@ -1689,13 +1695,14 @@ function BrickGlyph({ color, size = 18 }: { color: string; size?: number }) {
   // dividido en categorías).
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* Segmento dominante en brand verde — el más ancho del stack. */}
       <Rect
         x={2.5}
         y={9}
         width={10}
         height={6}
         rx={2}
-        fill={color}
+        fill={GLYPH_BRAND}
       />
       <Rect
         x={13.2}
@@ -1736,16 +1743,16 @@ function RankingGlyph({
   // Y total ocupado: 4 → 22 = 18 units verticales.
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      {/* Top coin — la más grande. rx=8, height=4 */}
+      {/* Top coin — la más grande, en brand verde para anclar identidad. */}
       <Rect
         x={4}
         y={4}
         width={16}
         height={4}
-        fill={color}
+        fill={GLYPH_BRAND}
       />
-      <Ellipse cx={12} cy={4} rx={8} ry={1.8} fill={color} />
-      <Ellipse cx={12} cy={8} rx={8} ry={1.8} fill={color} opacity={0.85} />
+      <Ellipse cx={12} cy={4} rx={8} ry={1.8} fill={GLYPH_BRAND} />
+      <Ellipse cx={12} cy={8} rx={8} ry={1.8} fill={GLYPH_BRAND} opacity={0.7} />
 
       {/* Middle coin — rx=6, height=3, shift +0.5 */}
       <Rect
@@ -1787,8 +1794,8 @@ function TreemapGlyph({
   const r = 1.6;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      {/* Tile dominante TL */}
-      <Rect x={3} y={3} width={10.5} height={10.5} rx={r} fill={color} />
+      {/* Tile dominante TL — en brand verde, ancla la identidad. */}
+      <Rect x={3} y={3} width={10.5} height={10.5} rx={r} fill={GLYPH_BRAND} />
       {/* Tile mediano TR */}
       <Rect
         x={14.5}
