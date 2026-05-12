@@ -577,18 +577,18 @@ export function IndicatorSheet({
                       >
                         {selectedType === "ma" ? (
                           config.maVariant === "ema" ? (
-                            <EMAIndicatorIllustration size={64} />
+                            <EMAIndicatorIllustration size={80} />
                           ) : (
-                            <MAIndicatorIllustration size={64} />
+                            <MAIndicatorIllustration size={80} />
                           )
                         ) : selectedType === "rsi" ? (
-                          <RSIIndicatorIllustration size={64} />
+                          <RSIIndicatorIllustration size={80} />
                         ) : selectedType === "macd" ? (
-                          <MACDIndicatorIllustration size={64} />
+                          <MACDIndicatorIllustration size={80} />
                         ) : selectedType === "bollinger" ? (
-                          <BollingerIndicatorIllustration size={64} />
+                          <BollingerIndicatorIllustration size={80} />
                         ) : (
-                          <VolumeIndicatorIllustration size={64} />
+                          <VolumeIndicatorIllustration size={80} />
                         )}
                       </View>
                     </Animated.View>
@@ -1825,7 +1825,7 @@ const s = StyleSheet.create({
     marginLeft: 24,
   },
 
-  /* Hero — ilustración 3D 64×64 dentro de un círculo 96×96 con
+  /* Hero — ilustración 3D 80×80 dentro de un círculo 96×96 con
    * tint verde tenue (c.brand al ~7%). Padding asimétrico: 20
    * arriba, 16 abajo. */
   heroIllustration: {
@@ -1839,6 +1839,7 @@ const s = StyleSheet.create({
     borderRadius: 48,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   /* Sentence preview — wrapper con padding propio. */
   heroSentenceWrap: {
