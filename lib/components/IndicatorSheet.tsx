@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutAnimation,
   Modal,
@@ -19,6 +19,9 @@ import {
 } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOutUp,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -143,7 +146,6 @@ const DEFAULT_CONFIG: ConfigState = {
 
 /** Id de cada fila flat configurable. */
 type RowKey =
-  | "activo"
   | "ma_tipo"
   | "ma_periodo"
   | "ma_condicion"
@@ -156,7 +158,6 @@ type RowKey =
   | "bb_desviacion"
   | "bb_condicion"
   | "vol_multiplicador"
-  | "vol_condicion"
   | "timeframe"
   | "frecuencia";
 
@@ -342,11 +343,6 @@ export function IndicatorSheet({
     setStep(2);
   };
 
-  const previewSentence = useMemo(() => {
-    if (!selectedType) return "";
-    return describePreview(selectedType, asset.ticker, config);
-  }, [selectedType, asset.ticker, config]);
-
   const macdInvalid =
     selectedType === "macd" && config.macdEmaSlow <= config.macdEmaFast;
   const ctaEnabled = !!selectedType && !macdInvalid && !submitting;
@@ -428,7 +424,11 @@ export function IndicatorSheet({
                     description="Promedio que reacciona más rápido al precio. Suele detectar cambios de tendencia antes."
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {});
-                      setConfig({ ...DEFAULT_CONFIG, maVariant: "ema" });
+                      setConfig({
+                        ...DEFAULT_CONFIG,
+                        maVariant: "ema",
+                        maPeriod: 20,
+                      });
                       setSelectedType("ma");
                       setExpandedRow(null);
                       setStep(2);
@@ -552,38 +552,45 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — preview en lenguaje natural arriba del
-                      todo. Mismo lenguaje visual que la priceBlock
-                      del AlertSheet (eyebrow caps + sentencia 22/700
-                      + sub-line muted). NO border, NO bg — flota
-                      directo sobre c.bg como el hero del Precio. */}
+                  {/* HERO — ilustración 3D bleed + sentence preview
+                      centrada en voz declarativa. SIN eyebrow,
+                      SIN sub-line con timeframe (el dato del tf vive
+                      en la sentence ya). Flota directo sobre c.bg. */}
                   {selectedType ? (
-                    <View style={s.hero}>
-                      <Text
-                        style={[s.heroEyebrow, { color: c.textMuted }]}
-                      >
-                        TE AVISAREMOS CUANDO
-                      </Text>
-                      <Text
-                        style={[s.heroSentence, { color: c.text }]}
-                      >
-                        {renderPreviewSentence(
-                          selectedType,
-                          asset.ticker,
-                          config,
-                          c.brand,
-                          c.text,
-                        )}
-                      </Text>
-                      <Text
-                        style={[s.heroSub, { color: c.textMuted }]}
-                      >
-                        En {config.timeframe} ·{" "}
-                        {config.frequency === "once"
-                          ? "Solo una vez"
-                          : "Cada vez que ocurra"}
-                      </Text>
-                    </View>
+                    <Animated.View
+                      key={`hero-${isEditing ? "edit" : "create"}`}
+                      entering={
+                        isEditing
+                          ? FadeIn.duration(180)
+                          : FadeIn.duration(220).delay(0)
+                      }
+                      style={s.heroIllustration}
+                    >
+                      <IndicatorTypeIllustration
+                        type={selectedType}
+                        variant={config.maVariant}
+                        size={112}
+                      />
+                    </Animated.View>
+                  ) : null}
+
+                  {selectedType ? (
+                    <Animated.View
+                      key={`sentence-${isEditing ? "edit" : "create"}`}
+                      entering={
+                        isEditing
+                          ? FadeIn.duration(180)
+                          : FadeIn.duration(220).delay(80)
+                      }
+                      style={s.heroSentenceWrap}
+                    >
+                      <PreviewSentence
+                        type={selectedType}
+                        ticker={asset.ticker}
+                        config={config}
+                        c={c}
+                      />
+                    </Animated.View>
                   ) : null}
 
                   {/* Divisor entre hero y rows */}
@@ -595,15 +602,23 @@ export function IndicatorSheet({
                   />
 
                   {selectedType ? (
-                    <RowsFor
-                      type={selectedType}
-                      asset={asset}
-                      config={config}
-                      setConfig={setConfig}
-                      expandedRow={expandedRow}
-                      toggleRow={toggleRow}
-                      c={c}
-                    />
+                    <Animated.View
+                      entering={
+                        isEditing
+                          ? FadeIn.duration(180)
+                          : FadeIn.duration(220).delay(120)
+                      }
+                    >
+                      <RowsFor
+                        type={selectedType}
+                        asset={asset}
+                        config={config}
+                        setConfig={setConfig}
+                        expandedRow={expandedRow}
+                        toggleRow={toggleRow}
+                        c={c}
+                      />
+                    </Animated.View>
                   ) : null}
 
                   {/* Warning MACD inline arriba del CTA si emaSlow
@@ -613,7 +628,14 @@ export function IndicatorSheet({
 
                 {/* Warning + CTA sticky abajo, sin chrome bar (sin
                     borderTop) — sit on c.bg como AlertSheet. */}
-                <View style={s.ctaContainer}>
+                <Animated.View
+                  entering={
+                    isEditing
+                      ? FadeIn.duration(180)
+                      : FadeIn.duration(220).delay(160)
+                  }
+                  style={s.ctaContainer}
+                >
                   {macdInvalid ? (
                     <View
                       style={[
@@ -637,11 +659,19 @@ export function IndicatorSheet({
                   <Pressable
                     onPress={handleSubmit}
                     disabled={!ctaEnabled}
+                    accessibilityRole="button"
                     style={({ pressed }) => [
                       s.cta,
                       {
-                        backgroundColor: c.text,
-                        opacity: !ctaEnabled ? 0.5 : pressed ? 0.85 : 1,
+                        backgroundColor: submitting ? c.textMuted : c.text,
+                        opacity: !ctaEnabled
+                          ? 0.5
+                          : pressed
+                            ? 0.85
+                            : submitting
+                              ? 0.7
+                              : 1,
+                        marginTop: 8,
                       },
                     ]}
                   >
@@ -649,7 +679,7 @@ export function IndicatorSheet({
                       {ctaLabel}
                     </Text>
                   </Pressable>
-                </View>
+                </Animated.View>
               </View>
             </Animated.View>
           </View>
@@ -702,6 +732,77 @@ function PickerRow({
   );
 }
 
+/* ─── Illustration mapper por tipo de indicador ──────────────── */
+
+/** Devuelve la ilustración 3D del indicador correspondiente. En MA
+ *  diferencia SMA / EMA según `variant`. Reutiliza los mismos
+ *  componentes que rendea el picker en paso 1. */
+function IndicatorTypeIllustration({
+  type,
+  variant,
+  size,
+}: {
+  type: IndicatorType;
+  variant: "sma" | "ema";
+  size: number;
+}) {
+  if (type === "ma") {
+    return variant === "ema" ? (
+      <EMAIndicatorIllustration size={size} />
+    ) : (
+      <MAIndicatorIllustration size={size} />
+    );
+  }
+  if (type === "rsi") return <RSIIndicatorIllustration size={size} />;
+  if (type === "macd") return <MACDIndicatorIllustration size={size} />;
+  if (type === "bollinger")
+    return <BollingerIndicatorIllustration size={size} />;
+  return <VolumeIndicatorIllustration size={size} />;
+}
+
+/* ─── Preview sentence con segmentos + overflow handling ─────── */
+
+/** Renderea la sentence preview con tokens highlightados en
+ *  c.brand + fontFamily[800]. Si el texto total supera 80
+ *  caracteres baja a 20/26 para que no rompa el layout en 4+
+ *  líneas. */
+function PreviewSentence({
+  type,
+  ticker,
+  config,
+  c,
+}: {
+  type: IndicatorType;
+  ticker: string;
+  config: ConfigState;
+  c: ColorMap;
+}) {
+  const segments = previewSegments(type, ticker, config);
+  const totalLength = segments.reduce((acc, s) => acc + s.text.length, 0);
+  const compact = totalLength > 80;
+  return (
+    <Text
+      style={[
+        compact ? s.heroSentenceCompact : s.heroSentence,
+        { color: c.text },
+      ]}
+    >
+      {segments.map((seg, i) => (
+        <Text
+          key={`${i}-${seg.text}`}
+          style={
+            seg.highlight
+              ? { fontFamily: fontFamily[800], color: c.brand }
+              : { color: c.text }
+          }
+        >
+          {seg.text}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 /* ─── Flat row genérica ───────────────────────────────────────── */
 
 function FlatRow({
@@ -741,6 +842,9 @@ function FlatRow({
     >
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${label}: ${value}`}
         style={({ pressed }) => [
           s.flatRow,
           {
@@ -750,7 +854,15 @@ function FlatRow({
       >
         <Text style={[s.flatLabel, { color: c.text }]}>{label}</Text>
         <View style={s.flatRight}>
-          <Text
+          {/* Animated.Text keyed por VALUE para que Reanimated detecte
+              el cambio de valor y dispare entering/exiting — slide
+              up del viejo + slide down del nuevo. */}
+          <Animated.Text
+            key={value}
+            entering={FadeInDown.duration(200).easing(
+              Easing.out(Easing.back(1.4)),
+            )}
+            exiting={FadeOutUp.duration(140)}
             style={[
               s.flatValue,
               {
@@ -761,7 +873,7 @@ function FlatRow({
             numberOfLines={1}
           >
             {value}
-          </Text>
+          </Animated.Text>
           <Animated.View style={chevronStyle}>
             <Feather name="chevron-right" size={18} color={c.textFaint} />
           </Animated.View>
@@ -775,15 +887,6 @@ function FlatRow({
       <View style={[s.hairline, { backgroundColor: c.border }]} />
     </View>
   );
-}
-
-/** Hairline color — gris al ~15% opacidad. Usa c.border y le baja
- *  la opacidad por encima de una capa neutra. RN no soporta alpha
- *  channel directo en hex, así que devolvemos un rgba sintético
- *  basado en si el tema es light o dark. */
-function hairlineColor(c: ColorMap): string {
-  // c.border es ya bastante sutil. Aprovechamos como está.
-  return c.border;
 }
 
 /* ─── Rows compuestas por tipo ────────────────────────────────── */
@@ -805,8 +908,6 @@ function RowsFor({
   toggleRow: (k: RowKey) => void;
   c: ColorMap;
 }) {
-  const assetValue = `${asset.ticker}`;
-
   /* Helpers de format por tipo. */
   const tipoMA = config.maVariant.toUpperCase();
   const periodoMA = config.maPeriod.toString();
@@ -842,23 +943,16 @@ function RowsFor({
   const multiplicadorVol = `${config.volumeMultiplier
     .toFixed(1)
     .replace(".", ",")}×`;
-  const condicionVol = "Supera promedio";
 
   const timeframeLabel = config.timeframe;
   const frecuenciaLabel =
     config.frequency === "once" ? "Solo una vez" : "Cada vez que ocurra";
 
-  // El "Activo" ya vive en el hero, así que en las rows lo
-  // eliminamos para no duplicarlo. Si en el futuro hay un asset
-  // switcher, vuelve como su propia row.
-  void assetValue;
+  // `asset` se mantiene en la firma porque puede usarse a futuro
+  // para validaciones por activo. Por ahora no se referencia.
+  void asset;
   return (
     <View style={s.flatList}>
-      {/* Section eyebrow — PARÁMETROS */}
-      <Text style={[s.sectionEyebrow, { color: c.textMuted }]}>
-        PARÁMETROS
-      </Text>
-
       {type === "ma" ? (
         <>
           <FlatRow
@@ -1183,30 +1277,8 @@ function RowsFor({
               </View>
             </View>
           </FlatRow>
-          <FlatRow
-            label="Condición"
-            value={condicionVol}
-            expanded={expandedRow === "vol_condicion"}
-            onPress={() => toggleRow("vol_condicion")}
-            c={c}
-          >
-            <Text style={[s.helperText, { color: c.textMuted }]}>
-              La alerta se dispara cuando el volumen del período supera el
-              multiplicador configurado sobre el volumen promedio.
-            </Text>
-          </FlatRow>
         </>
       ) : null}
-
-      {/* Section eyebrow — CUÁNDO */}
-      <Text
-        style={[
-          s.sectionEyebrow,
-          { color: c.textMuted, marginTop: 24 },
-        ]}
-      >
-        CUÁNDO
-      </Text>
 
       <FlatRow
         label="Temporalidad"
@@ -1570,34 +1642,6 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
-/** Renderiza la sentencia preview con tokens highlightados (ticker,
- *  números, símbolos) en brand color + fontFamily[800], y el resto
- *  en texto regular. Devuelve un array de Text children. */
-function renderPreviewSentence(
-  type: IndicatorType,
-  ticker: string,
-  cfg: ConfigState,
-  highlightColor: string,
-  baseColor: string,
-): React.ReactNode {
-  const segments = previewSegments(type, ticker, cfg);
-  return segments.map((seg, i) => (
-    <Text
-      key={`${i}-${seg.text}`}
-      style={
-        seg.highlight
-          ? {
-              fontFamily: fontFamily[800],
-              color: highlightColor,
-            }
-          : { color: baseColor }
-      }
-    >
-      {seg.text}
-    </Text>
-  ));
-}
-
 /** Genera los segmentos del preview — partes en bold/brand vs
  *  partes en texto normal. La structure de cada return define qué
  *  va resaltado: ticker, números, períodos, umbrales, timeframe. */
@@ -1692,46 +1736,6 @@ function previewSegments(
     T(tf, true),
     T("."),
   ];
-}
-
-function describePreview(
-  type: IndicatorType,
-  ticker: string,
-  cfg: ConfigState,
-): string {
-  const tf = cfg.timeframe;
-  if (type === "ma") {
-    const v = cfg.maVariant.toUpperCase();
-    const dir =
-      cfg.maCondition === "above"
-        ? "cruce por encima"
-        : "cruce por debajo";
-    return `Te avisaremos cuando el precio de ${ticker} ${dir} de la ${v}(${cfg.maPeriod}) en ${tf}.`;
-  }
-  if (type === "rsi") {
-    const dir =
-      cfg.rsiCondition === "above"
-        ? "suba por encima"
-        : "baje por debajo";
-    return `Te avisaremos cuando el RSI(${cfg.rsiPeriod}) de ${ticker} ${dir} de ${cfg.rsiThreshold} en ${tf}.`;
-  }
-  if (type === "macd") {
-    if (cfg.macdCondition === "bullish_signal")
-      return `Te avisaremos cuando el MACD cruce la línea de señal al alza para ${ticker} en ${tf}.`;
-    if (cfg.macdCondition === "bearish_signal")
-      return `Te avisaremos cuando el MACD cruce la línea de señal a la baja para ${ticker} en ${tf}.`;
-    if (cfg.macdCondition === "zero_up")
-      return `Te avisaremos cuando el MACD cruce la línea cero al alza para ${ticker} en ${tf}.`;
-    return `Te avisaremos cuando el MACD cruce la línea cero a la baja para ${ticker} en ${tf}.`;
-  }
-  if (type === "bollinger") {
-    if (cfg.bbCondition === "touch_upper")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda superior en ${tf}.`;
-    if (cfg.bbCondition === "touch_lower")
-      return `Te avisaremos cuando el precio de ${ticker} toque la banda inferior en ${tf}.`;
-    return `Te avisaremos cuando las bandas de Bollinger de ${ticker} se contraigan (volatilidad baja) en ${tf}.`;
-  }
-  return `Te avisaremos cuando el volumen de ${ticker} supere ${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}x el promedio en ${tf}.`;
 }
 
 const s = StyleSheet.create({
@@ -1877,7 +1881,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 18,
   },
   flatLabel: {
     fontFamily: fontFamily[600],
@@ -1907,44 +1911,38 @@ const s = StyleSheet.create({
     marginLeft: 24,
   },
 
-  /* Hero block — eyebrow caps + sentencia 22/700 con tokens
-   * highlightados + sub-line muted. Mismo lenguaje que el
-   * priceBlock del AlertSheet. */
-  hero: {
+  /* Hero — ilustración 3D 112×112 centrada con bleed (sin
+   * contenedor ni bg). Padding asimétrico: 20 arriba, 16 abajo. */
+  heroIllustration: {
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  /* Sentence preview — wrapper con padding propio. */
+  heroSentenceWrap: {
     paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 22,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
-  heroEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
-  },
+  /* Sentence default — 22/700 -0.5, lineHeight 28, centered. */
   heroSentence: {
     fontFamily: fontFamily[700],
     fontSize: 22,
     lineHeight: 28,
     letterSpacing: -0.5,
-    marginTop: 8,
+    textAlign: "center",
   },
-  heroSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginTop: 8,
+  /* Sentence compacta — para casos con texto largo (>80 chars).
+   * Baja a 20/26 para evitar 4+ líneas. */
+  heroSentenceCompact: {
+    fontFamily: fontFamily[700],
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.4,
+    textAlign: "center",
   },
   heroDivider: {
     height: StyleSheet.hairlineWidth,
-  },
-
-  /* Section eyebrow entre grupos de rows. */
-  sectionEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 1.4,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 8,
   },
 
   /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
@@ -2027,31 +2025,8 @@ const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.15,
   },
-  helperText: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.05,
-  },
 
-  /* ── Preview + warning ── */
-  previewWrap: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  preview: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderCurve: "continuous",
-    borderRadius: radius.md,
-    borderLeftWidth: 3,
-  },
-  previewText: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 19,
-    letterSpacing: -0.1,
-  },
+  /* ── Warning ── */
   warning: {
     flexDirection: "row",
     alignItems: "center",
@@ -2071,16 +2046,6 @@ const s = StyleSheet.create({
   },
 
   /* ── CTA — pill style match AlertSheet ── */
-  ctaWrap: {
-    /* legacy — ya no se usa, queda por compat de referencias. */
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
   cta: {
     height: 58,
     borderCurve: "continuous",
