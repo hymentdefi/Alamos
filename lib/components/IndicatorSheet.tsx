@@ -399,7 +399,7 @@ export function IndicatorSheet({
             {
               backgroundColor: c.bg,
               borderColor: c.border,
-              paddingBottom: insets.bottom + 8,
+              paddingBottom: insets.bottom + 18,
               height: SHEET_HEIGHT,
             },
             sheetStyle,
@@ -1861,7 +1861,7 @@ const s = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 8,
+    paddingBottom: 0,
     gap: 8,
   },
 
