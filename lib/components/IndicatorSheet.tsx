@@ -414,7 +414,7 @@ export function IndicatorSheet({
           <View style={{ overflow: "hidden", flex: 1 }}>
             <Animated.View
               style={[
-                { flexDirection: "row", width: windowW * 2 },
+                { flexDirection: "row", width: windowW * 2, flex: 1 },
                 sliderStyle,
               ]}
             >
