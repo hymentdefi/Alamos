@@ -16,7 +16,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { GlassCard } from "../../../lib/components/GlassCard";
-import { ConvertCurrencyButton } from "../../../lib/components/ConvertCurrencyButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Feather,
@@ -75,6 +74,7 @@ import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
+import { AlamosLogo } from "../../../lib/components/Logo";
 
 type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
 
@@ -350,6 +350,14 @@ function BaseHome() {
         style={StyleSheet.absoluteFill}
       />
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        {/* Isotipo a la izquierda — refuerza identidad sin robar espacio.
+            La top bar antes estaba vacía a la izquierda; ahora el logo
+            ancla la marca y los iconos de acción quedan a la derecha. */}
+        <AlamosLogo
+          variant="mark"
+          tone={isDark ? "dark" : "light"}
+          size={32}
+        />
         <View style={s.topActions}>
           <Animated.View
             style={{ transform: [{ scale: giftPulse }] }}
@@ -406,7 +414,7 @@ function BaseHome() {
           <View style={s.balanceRow}>
             <AmountDisplay
               value={balanceDisplay}
-              size={40}
+              size={56}
               weight={800}
               currency={currency}
             />
@@ -699,6 +707,15 @@ function Dinero(_: {
           la surface; sin wrapper circular como en la versión
           'Revolut glass' previa. */}
       <View style={s.actionsRow}>
+        {/* Invertir va primera: es la acción CORE de la app. El resto
+            son cash management. Tap → tab Mercado, donde el usuario
+            elige instrumento. */}
+        <ActionButton
+          iconName="invertir"
+          label="Invertir"
+          haptic="medium"
+          onPress={() => router.push("/(app)/(tabs)/explore")}
+        />
         <ActionButton
           iconName="ingresar"
           label="Ingresar"
@@ -749,12 +766,6 @@ function Dinero(_: {
           />
         ))}
       </GlassCard>
-
-      <View style={s.convertBtnWrap}>
-        <ConvertCurrencyButton
-          onPress={() => router.push("/(app)/convert")}
-        />
-      </View>
 
       <EarningsInfoSheet
         visible={infoOpen}
@@ -1006,7 +1017,7 @@ const s = StyleSheet.create({
     paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
   },
   topActions: {
     flexDirection: "row",
@@ -1212,9 +1223,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginBottom: 12,
-  },
-  convertBtnWrap: {
-    marginTop: 12,
   },
   earningsTitle: {
     fontFamily: fontFamily[800],

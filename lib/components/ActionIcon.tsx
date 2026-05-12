@@ -3,19 +3,27 @@ import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../theme";
 
 /**
- * Iconos de acción del home (Ingresar / Enviar / Convertir).
+ * Iconos de acción del home (Ingresar / Enviar / Convertir / Invertir).
  *
  * Set "tint-S" del brand pack: círculo lleno con un tint suave del
  * verde brand (10% en light, 14% en dark) y un símbolo (flecha down /
- * up / arrows-swap) en stroke verde brand de 4px. Sin anillo —
- * delgado en geometría, fuerte en presencia.
+ * up / arrows-swap / chart-up) en stroke verde brand de 4px. Sin
+ * anillo — delgado en geometría, fuerte en presencia.
  *
  * Variantes fuente:
  *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
  *   assets/icons/actions/dark/alamos-{ingresar|enviar|convertir}.svg
+ *
+ * El glyph "invertir" es generado in-code (todavía no hay svg fuente
+ * en el brand pack): línea quebrada ascendente terminada en flecha
+ * up-right, evocando un chart de growth.
  */
 
-export type ActionIconName = "ingresar" | "enviar" | "convertir";
+export type ActionIconName =
+  | "ingresar"
+  | "enviar"
+  | "convertir"
+  | "invertir";
 
 interface Props {
   name: ActionIconName;
@@ -66,12 +74,20 @@ export const ActionIcon = memo(function ActionIcon({
             <Path d="M0 10 L0 -10" />
             <Path d="M-9 -1 L0 -10 L9 -1" />
           </>
-        ) : (
+        ) : name === "convertir" ? (
           <>
             <Path d="M-10 -6 L10 -6" />
             <Path d="M4 -12 L10 -6 L4 0" />
             <Path d="M10 6 L-10 6" />
             <Path d="M-4 0 L-10 6 L-4 12" />
+          </>
+        ) : (
+          /* invertir — chart up: zigzag ascendente que termina en
+             flecha up-right. Trazado en el mismo grid (-12..12) que
+             los demás glyphs para que pese igual visualmente. */
+          <>
+            <Path d="M-11 6 L-3 -2 L2 3 L10 -7" />
+            <Path d="M3 -7 L10 -7 L10 0" />
           </>
         )}
       </G>
