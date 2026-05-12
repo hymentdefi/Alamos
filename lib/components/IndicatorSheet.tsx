@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutAnimation,
   Modal,
@@ -187,11 +187,6 @@ export function IndicatorSheet({
   const [config, setConfig] = useState<ConfigState>(DEFAULT_CONFIG);
   const [expandedRow, setExpandedRow] = useState<RowKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  /* Ref para el ScrollView del picker — usado para snap-back a y:0
-   * en onScrollEndDrag / onMomentumScrollEnd, así el bounce siempre
-   * vuelve al top aunque el contenido overflowee la sheet. */
-  const pickerScrollRef = useRef<ScrollView>(null);
 
   // Hidratación al abrir.
   useEffect(() => {
@@ -435,23 +430,13 @@ export function IndicatorSheet({
                   </Text>
                 </View>
                 <ScrollView
-                  ref={pickerScrollRef}
                   contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
                   alwaysBounceVertical
                   overScrollMode="always"
-                  onScrollEndDrag={() => {
-                    pickerScrollRef.current?.scrollTo({
-                      y: 0,
-                      animated: true,
-                    });
-                  }}
-                  onMomentumScrollEnd={() => {
-                    pickerScrollRef.current?.scrollTo({
-                      y: 0,
-                      animated: true,
-                    });
-                  }}
+                  snapToOffsets={[0]}
+                  snapToStart
+                  decelerationRate="fast"
                 >
                   {/* ── Tendencia ── */}
                   <Text style={[s.pickerSection, { color: c.textMuted }]}>
