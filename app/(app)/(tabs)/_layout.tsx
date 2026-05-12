@@ -61,6 +61,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" />
         <Tabs.Screen name="explore" />
         <Tabs.Screen name="portfolio" />
+        <Tabs.Screen name="tarjeta" />
         <Tabs.Screen name="news" />
         <Tabs.Screen name="alamo" />
       </Tabs>

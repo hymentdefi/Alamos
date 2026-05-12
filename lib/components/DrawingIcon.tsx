@@ -264,4 +264,13 @@ export const tabPaths = {
       { d: "M16 4 L9 22 L23 22 Z", len: 55 },
     ],
   },
+  tarjeta: {
+    viewBox: "0 0 28 28",
+    segments: [
+      // Outline de la tarjeta — rectángulo cerrado horizontal.
+      { d: "M4 8 L24 8 L24 21 L4 21 Z", len: 70 },
+      // Mag stripe — banda horizontal cerca del top.
+      { d: "M4 12 L24 12", len: 21 },
+    ],
+  },
 } as const satisfies Record<string, TabPath>;
