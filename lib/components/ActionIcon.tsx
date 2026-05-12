@@ -28,29 +28,30 @@ export type ActionIconName =
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del stroke (símbolo) y base del tint del
-   *  círculo. Default: brand.green canónico (#00C805 — coincide con
-   *  c.brand del theme y con el isotipo del logo). */
+  /** Override del color del stroke (símbolo). Default: c.text del
+   *  theme (casi-negro en light, casi-blanco en dark). El verde
+   *  brand queda solo en el tint del círculo — el glyph en sí es
+   *  neutro para que tenga peso editorial sin gritar marca. */
   stroke?: string;
-  /** Override del fill del círculo. Default: tint del stroke a 10%
-   *  en light y 14% en dark. */
+  /** Override del fill del círculo. Default: tint del verde brand
+   *  (10% en light, 14% en dark). */
   fill?: string;
 }
 
-const BRAND_GREEN = "#00C805";
-
-/** Tint del fill cuando no se pasa override. Misma RGB que el stroke,
- *  alpha distinto por modo. */
+/** Tint del círculo cuando no se pasa override — siempre verde brand,
+ *  independientemente del color del stroke. El acento brand vive en
+ *  el fondo, no en el glyph. */
 const tintFor = (mode: "light" | "dark") =>
   mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
 
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
-  stroke = BRAND_GREEN,
+  stroke,
   fill,
 }: Props) {
-  const { mode } = useTheme();
+  const { mode, c } = useTheme();
+  const resolvedStroke = stroke ?? c.text;
   const resolvedFill = fill ?? tintFor(mode);
 
   return (
@@ -59,7 +60,7 @@ export const ActionIcon = memo(function ActionIcon({
       <G
         transform="translate(32 32)"
         fill="none"
-        stroke={stroke}
+        stroke={resolvedStroke}
         strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"

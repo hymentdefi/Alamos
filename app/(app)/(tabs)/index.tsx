@@ -336,9 +336,13 @@ function BaseHome() {
   // glass de abajo se apoyan sobre este gradient para que la
   // sensación sea "vidrio sobre superficie tintada", no "cuadrado
   // blanco sobre fondo blanco".
+  // En light arrancamos blanco arriba (matchea la top bar limpia) y
+  // bajamos a un beige cálido sutil — la home se siente "papel" con
+  // personalidad Álamos, no fintech genérica blanca pura. En dark
+  // mantenemos el leve descenso negro → puro existente.
   const bgGradient: readonly [string, string, string] = isDark
     ? ["#0E0E0C", "#080808", "#000000"]
-    : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
+    : ["#FFFFFF", "#FBFAF6", "#F4F2EB"];
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -458,7 +462,20 @@ function BaseHome() {
             </Text>
           </View>
 
-          <View style={[s.chartWrap, { marginTop: 18 }]}>
+          {/* Backing beige cálido del brand-kit detrás del chart — banda
+              editorial full-bleed. El chart vive en su propia "estación"
+              tipo viñeta, no flotando sobre el bg general. En dark se
+              traduce a un gris-cálido muy oscuro (#1A1815). */}
+          <View
+            style={[
+              s.chartWrap,
+              {
+                marginTop: 18,
+                backgroundColor: c.beige,
+                paddingVertical: 12,
+              },
+            ]}
+          >
             <Sparkline
               series={series}
               color={sparklineColor}
