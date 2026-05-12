@@ -177,7 +177,7 @@ export function IndicatorSheet({
     windowH * 0.9,
     720 + insets.bottom,
   );
-  const { createIndicator, updateIndicator, removeIndicator } = useAlerts();
+  const { createIndicator, updateIndicator } = useAlerts();
   const { show: showToast } = useToast();
   const isEditing = !!editingAlert;
 
@@ -243,36 +243,80 @@ export function IndicatorSheet({
     backdropOpacity.value = withTiming(0, { duration: 240 });
   };
 
+  /* Modo del drag — se commitea al primer movimiento de >10px para
+   * que vertical (dismiss) y horizontal (back a paso 1) no peleen. */
+  const dragMode = useSharedValue<"idle" | "vertical" | "horizontal">(
+    "idle",
+  );
+
   const pan = Gesture.Pan()
+    .onBegin(() => {
+      "worklet";
+      dragMode.value = "idle";
+    })
     .onUpdate((e) => {
       "worklet";
-      if (e.translationY > 0) {
+      if (dragMode.value === "idle") {
+        const absX = Math.abs(e.translationX);
+        const absY = Math.abs(e.translationY);
+        const canSwipeBack = stepProgress.value === 1 && !isEditing;
+        if (canSwipeBack && absX > 10 && absX > absY && e.translationX > 0) {
+          dragMode.value = "horizontal";
+        } else if (absY > 10 && e.translationY > 0) {
+          dragMode.value = "vertical";
+        }
+      }
+      if (dragMode.value === "horizontal") {
+        stepProgress.value = Math.max(
+          0,
+          Math.min(1, 1 - e.translationX / windowW),
+        );
+      } else if (dragMode.value === "vertical" && e.translationY > 0) {
         translateY.value = e.translationY;
         backdropOpacity.value = Math.max(0, 1 - e.translationY / windowH);
       }
     })
     .onEnd((e) => {
       "worklet";
-      const shouldDismiss =
-        e.translationY > DISMISS_TRANSLATE ||
-        e.velocityY > DISMISS_VELOCITY;
-      if (shouldDismiss) {
-        translateY.value = withTiming(
-          windowH,
-          { duration: 240, easing: Easing.in(Easing.cubic) },
-          (finished) => {
-            "worklet";
-            if (finished) runOnJS(onClose)();
-          },
-        );
-        backdropOpacity.value = withTiming(0, { duration: 240 });
+      if (dragMode.value === "horizontal") {
+        const shouldGoBack =
+          e.translationX > windowW * 0.3 || e.velocityX > 600;
+        if (shouldGoBack) {
+          stepProgress.value = withTiming(0, {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+          });
+          runOnJS(setStep)(1);
+          runOnJS(setExpandedRow)(null);
+        } else {
+          stepProgress.value = withTiming(1, {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+          });
+        }
       } else {
-        translateY.value = withTiming(0, {
-          duration: 220,
-          easing: Easing.out(Easing.cubic),
-        });
-        backdropOpacity.value = withTiming(1, { duration: 220 });
+        const shouldDismiss =
+          e.translationY > DISMISS_TRANSLATE ||
+          e.velocityY > DISMISS_VELOCITY;
+        if (shouldDismiss) {
+          translateY.value = withTiming(
+            windowH,
+            { duration: 240, easing: Easing.in(Easing.cubic) },
+            (finished) => {
+              "worklet";
+              if (finished) runOnJS(onClose)();
+            },
+          );
+          backdropOpacity.value = withTiming(0, { duration: 240 });
+        } else {
+          translateY.value = withTiming(0, {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+          });
+          backdropOpacity.value = withTiming(1, { duration: 220 });
+        }
       }
+      dragMode.value = "idle";
     });
 
   const sheetStyle = useAnimatedStyle(() => ({
@@ -322,17 +366,6 @@ export function IndicatorSheet({
       showToast(msg, { variant: "error" });
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!editingAlert) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    try {
-      await removeIndicator(editingAlert.id);
-      dismiss();
-    } catch {
-      showToast("No pudimos eliminar la alerta", { variant: "error" });
     }
   };
 
@@ -491,25 +524,6 @@ export function IndicatorSheet({
               {/* ──────── Paso 2: Config flat rows ──────── */}
               <View style={{ width: windowW, flex: 1 }}>
                 <View style={s.configHeader}>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      if (isEditing) dismiss();
-                      else {
-                        setStep(1);
-                        setExpandedRow(null);
-                      }
-                    }}
-                    hitSlop={10}
-                    style={s.headerSideBtn}
-                    accessibilityLabel="Atrás"
-                  >
-                    <Feather
-                      name={isEditing ? "x" : "arrow-left"}
-                      size={20}
-                      color={c.text}
-                    />
-                  </Pressable>
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -518,33 +532,6 @@ export function IndicatorSheet({
                       ? indicatorTitle(selectedType, config)
                       : "Configurar"}
                   </Text>
-                  {isEditing ? (
-                    <Pressable
-                      onPress={handleDelete}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        s.deleteBtn,
-                        {
-                          borderColor: c.red,
-                          opacity: pressed ? 0.6 : 1,
-                        },
-                      ]}
-                      accessibilityLabel="Eliminar alerta"
-                    >
-                      <Text style={[s.deleteBtnText, { color: c.red }]}>
-                        Eliminar
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={dismiss}
-                      hitSlop={10}
-                      style={s.headerSideBtn}
-                      accessibilityLabel="Cerrar"
-                    >
-                      <Feather name="x" size={20} color={c.text} />
-                    </Pressable>
-                  )}
                 </View>
 
                 <ScrollView
@@ -1815,39 +1802,14 @@ const s = StyleSheet.create({
 
   /* ── Paso 2 — header ── */
   configHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  headerSideBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   configTitle: {
-    flex: 1,
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-    textAlign: "center",
-  },
-  deleteBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    borderWidth: 1.4,
-  },
-  deleteBtnText: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
 
   /* ── Flat list rows ── */
