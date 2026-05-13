@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-import { fontFamily, useTheme } from "../theme";
+import { fontFamily, radius, useTheme } from "../theme";
 import { Tap } from "./Tap";
 import { StatInfoSheet } from "./StatInfoSheet";
 import {
@@ -39,21 +39,20 @@ function semaforoColor(s: Semaforo, c: ReturnType<typeof useTheme>["c"]) {
 }
 
 /**
- * Tier 1 stats bento — 2×4 grid de 8 cards con las métricas principales
- * del portfolio según la spec interna (Portfolio Statistics Engine v1.0).
+ * Tier 1 stats bento — grid 2-col con las métricas principales del
+ * portfolio según la spec interna (Portfolio Statistics Engine v1.0).
  *
  * Cards:
  *   1. Total invertido (Cost basis)
  *   2. Tu ganancia (MWR)
  *   3. Performance de tus activos (TWR)
  *   4. Riesgo (Volatilidad anualizada) — semáforo
- *   5. Peor caída (Max Drawdown) — semáforo
- *   6. Relación riesgo/ganancia (Sharpe) — semáforo
- *   7. vs Mercado (Alpha vs S&P 500) — semáforo
- *   8. Dividendos (Yield TTM)
+ *   5. Relación riesgo/ganancia (Sharpe) — semáforo
+ *   6. vs Mercado (Alpha vs S&P 500) — semáforo
+ *   7. Dividendos (Yield TTM)
  *
  * Cada card tappable abre el StatInfoSheet con la explicación retail
- * + nombre técnico. Las cards de riesgo (Vol/DD/Sharpe/Alpha) tienen
+ * + nombre técnico. Las cards de riesgo (Vol/Sharpe/Alpha) tienen
  * dot semáforo verde/amarillo/rojo. Si el range es corto (<6m), se
  * muestra badge "Datos limitados" en esas mismas.
  */
@@ -129,17 +128,6 @@ export function Tier1StatsBento({
       limited: stats.limitedData,
     },
     {
-      key: "maxDrawdown",
-      label: "Peor caída",
-      primary: `−${stats.maxDrawdown.pct.toFixed(1).replace(".", ",")}%`,
-      primaryColor: c.red,
-      sub:
-        stats.maxDrawdown.recoveryDays > 0
-          ? `${stats.maxDrawdown.date} · ${stats.maxDrawdown.recoveryDays}d`
-          : stats.maxDrawdown.date,
-      semaforo: stats.maxDrawdown.semaforo,
-    },
-    {
       key: "sharpe",
       label: "Riesgo/ganancia",
       primary: stats.sharpe.value.toFixed(2).replace(".", ","),
@@ -174,11 +162,11 @@ export function Tier1StatsBento({
   return (
     <View style={s.bentoCard}>
       <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
-      {/* Lista vertical Robinhood-style: label muted izquierda,
-          valor bold derecha + sub-texto debajo, hairline entre rows.
-          Sin grid, sin cards, sin chrome — la jerarquía sale de la
-          tipografía y los hairlines. */}
-      <View style={s.list}>
+      {/* Grid Robinhood-style: cards con hairline border (sin fill),
+          rounded corners, label muted arriba + valor grande bold
+          abajo. El último card (Dividendos) ocupa el ancho completo
+          porque hay 7 cards y no entran prolijos en 2 cols. */}
+      <View style={s.grid}>
         {cards.map((card, i) => {
           const dotColor = card.semaforo
             ? semaforoColor(card.semaforo, c)
@@ -189,59 +177,48 @@ export function Tier1StatsBento({
               key={card.key}
               onPress={() => setOpenStat(card.key)}
               haptic="selection"
-              pressScale={0.98}
+              pressScale={0.97}
               style={[
-                s.row,
-                !isLast && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: c.border,
-                },
+                s.card,
+                isLast && s.cardFullWidth,
+                { borderColor: c.border },
               ]}
             >
-              <View style={s.rowLeft}>
+              <View style={s.cardHeader}>
                 <Text
-                  style={[s.rowLabel, { color: c.textMuted }]}
+                  style={[s.cardLabel, { color: c.textMuted }]}
                   numberOfLines={1}
                 >
                   {card.label}
                 </Text>
-              </View>
-              <View style={s.rowRight}>
-                <View style={s.valueRow}>
-                  <Text
-                    style={[
-                      s.rowValue,
-                      { color: card.primaryColor ?? c.text },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {card.primary}
-                  </Text>
-                  {dotColor ? (
-                    <View
-                      style={[
-                        s.semaforoDot,
-                        { backgroundColor: dotColor },
-                      ]}
-                    />
-                  ) : null}
-                </View>
-                {card.sub ? (
-                  <Text
-                    style={[s.rowSub, { color: c.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {card.sub}
-                  </Text>
-                ) : null}
-                {card.limited ? (
-                  <Text
-                    style={[s.limitedBadge, { color: c.textFaint }]}
-                  >
-                    Datos limitados
-                  </Text>
+                {dotColor ? (
+                  <View
+                    style={[s.semaforoDot, { backgroundColor: dotColor }]}
+                  />
                 ) : null}
               </View>
+              <Text
+                style={[
+                  s.cardValue,
+                  { color: card.primaryColor ?? c.text },
+                ]}
+                numberOfLines={1}
+              >
+                {card.primary}
+              </Text>
+              {card.sub ? (
+                <Text
+                  style={[s.cardSub, { color: c.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {card.sub}
+                </Text>
+              ) : null}
+              {card.limited ? (
+                <Text style={[s.limitedBadge, { color: c.textFaint }]}>
+                  Datos limitados
+                </Text>
+              ) : null}
             </Tap>
           );
         })}
@@ -281,62 +258,64 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.5,
-    marginBottom: 4,
+    marginBottom: 14,
   },
-  /* Lista vertical Robinhood-style. Sin grid, sin chrome — cada
-   * stat ocupa toda una fila ancha, label muted a la izquierda,
-   * valor bold a la derecha + sub-texto chiquito debajo, hairline
-   * entre filas. */
-  list: {
+  /* Grid Robinhood-style. 2 columnas con gap, cards outlined (sin
+   * fill, solo hairline border + rounded corners). Padding interno
+   * 14h × 14v. Última card full-width porque son 7 (no entran
+   * uniformes en 2 cols). */
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  card: {
+    width: "48.5%",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+  },
+  cardFullWidth: {
     width: "100%",
   },
-  row: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    gap: 16,
+    gap: 6,
+    marginBottom: 8,
   },
-  rowLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  rowLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  rowRight: {
-    alignItems: "flex-end",
-    flexShrink: 0,
-  },
-  valueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  rowValue: {
-    fontFamily: fontFamily[800],
-    fontSize: 18,
-    letterSpacing: -0.4,
-  },
-  rowSub: {
-    fontFamily: fontFamily[500],
+  cardLabel: {
+    fontFamily: fontFamily[600],
     fontSize: 12,
     letterSpacing: -0.05,
-    marginTop: 2,
+    flex: 1,
+    textTransform: "uppercase",
   },
   semaforoDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
+  cardValue: {
+    fontFamily: fontFamily[800],
+    fontSize: 20,
+    letterSpacing: -0.5,
+  },
+  cardSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
   limitedBadge: {
     fontFamily: fontFamily[600],
     fontSize: 9,
     letterSpacing: 0.4,
     textTransform: "uppercase",
-    marginTop: 3,
+    marginTop: 2,
   },
   /* CTA al pie del bento para navegar al Tier 2. */
   seeMore: {

@@ -261,6 +261,14 @@ export function computeTotalArs(): number {
     }, 0);
 }
 
+/** "Total invertido" lifetime — capital aportado de toda la vida del
+ *  portfolio, en moneda de display. Range-invariant: no cambia al
+ *  hacer click en otro período. Mock: lo derivamos del retorno MAX
+ *  (since launch). En producción = sum of deposits − withdrawals. */
+export function computeLifetimeInvertido(totalDisplay: number): number {
+  return totalDisplay / (1 + MOCK_BY_RANGE.MAX.twrPct / 100);
+}
+
 /** Conveniente para los consumers que solo tienen (range, toDisplay)
  *  y necesitan el shape completo de Tier1Stats sin haber computado
  *  totalArs / invertido / ganancia / twrPct previamente. */
@@ -271,13 +279,15 @@ export function getTier1Stats(
   const totalArs = computeTotalArs();
   const totalDisplay = toDisplay(totalArs);
   const twrPct = MOCK_BY_RANGE[range].twrPct;
-  /* invertido = valor de partida del período. Si rendimiento = +X%,
-   * invertido = valor_actual / (1 + X/100). */
-  const invertido = totalDisplay / (1 + twrPct / 100);
-  const ganancia = totalDisplay - invertido;
+  /* invertido del período = valor de partida del período, range
+   * dependent. Sirve para computar ganancia del período. */
+  const periodInvertido = totalDisplay / (1 + twrPct / 100);
+  const ganancia = totalDisplay - periodInvertido;
+  /* totalInvertido que se muestra al user es lifetime (range
+   * invariant) — no debería cambiar al elegir otro período. */
   return computeTier1Stats({
     range,
-    totalInvertido: invertido,
+    totalInvertido: computeLifetimeInvertido(totalDisplay),
     twrPct,
     gananciaAbs: ganancia,
     totalArs,
