@@ -325,25 +325,6 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             );
           })}
         </View>
-
-        <View style={s.legendRow}>
-          <View style={s.legendItem}>
-            <View
-              style={[s.legendDot, { backgroundColor: c.brand }]}
-            />
-            <Text style={[s.legendText, { color: c.textMuted }]}>
-              Cobrado
-            </Text>
-          </View>
-          <View style={s.legendItem}>
-            <View
-              style={[s.legendDot, { backgroundColor: c.border }]}
-            />
-            <Text style={[s.legendText, { color: c.textMuted }]}>
-              Por cobrar
-            </Text>
-          </View>
-        </View>
       </View>
 
       {scrubIdx == null ? (
@@ -698,26 +679,6 @@ const s = StyleSheet.create({
   barLabel: {
     marginTop: 8,
     fontSize: 10,
-    letterSpacing: -0.05,
-  },
-  legendRow: {
-    flexDirection: "row",
-    gap: 18,
-    marginTop: 14,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
     letterSpacing: -0.05,
   },
 
