@@ -157,17 +157,17 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
               <Text style={[s.bodyBold, { color: c.text }]}>
                 cupones
               </Text>{" "}
-              (intereses) y{" "}
+              de interés y{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 amortizaciones
               </Text>{" "}
-              (capital) en fechas fijas. Las acciones y CEDEARs pagan{" "}
+              de capital en fechas fijas. Las acciones y CEDEARs pagan{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 dividendos
               </Text>{" "}
               cuando la empresa los aprueba. Te mostramos cuándo y
-              cuánto vas a cobrar este año, todo sumado en pesos
-              (los flujos en dólares se convierten al oficial vendedor).
+              cuánto vas a cobrar este año en pesos, convirtiendo los
+              flujos en dólares al oficial vendedor.
             </Text>
           </View>
         </Animated.View>
