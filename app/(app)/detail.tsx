@@ -56,20 +56,20 @@ import { PriceAlertButton } from "../../lib/components/PriceAlertButton";
 import { TradeBottomBar } from "../../lib/components/TradeBottomBar";
 import { briefingFor, formatBriefingAge } from "../../lib/data/briefings";
 
-const ranges = ["1D", "1S", "1M", "3M", "1A", "MAX"] as const;
+const ranges = ["1D", "7D", "1M", "3M", "1A", "MAX"] as const;
 type Range = (typeof ranges)[number];
 
 /** Variación % por rango para el activo (mock, determinístico).
  *
  *  Override de testing para NVIDIA (NVDA / NVDA.US): alterna el
  *  signo a través de los rangos para verificar que el coloring
- *  driven-by-rangeUp funcione end-to-end. 1D positivo → 1S
+ *  driven-by-rangeUp funcione end-to-end. 1D positivo → 7D
  *  negativo → 1M positivo → 3M negativo. */
 function rangePctFor(ticker: string, range: Range): number {
   if (ticker === "NVDA" || ticker === "NVDA.US") {
     const overrides: Record<Range, number> = {
       "1D": 3.42,
-      "1S": -4.8,
+      "7D": -4.8,
       "1M": 6.1,
       "3M": -8.5,
       "1A": 21.4,
@@ -82,7 +82,7 @@ function rangePctFor(ticker: string, range: Range): number {
   const base = ((Math.abs(h) % 200) - 100) / 10; // -10 a 10
   const mult: Record<Range, number> = {
     "1D": 0.3,
-    "1S": 0.7,
+    "7D": 0.7,
     "1M": 1.2,
     "3M": 2.1,
     "1A": 3.5,
@@ -97,7 +97,7 @@ function rangePctFor(ticker: string, range: Range): number {
 // rangos más largos densos también para que el ojo perciba textura.
 const LENGTH_BY_RANGE: Record<Range, number> = {
   "1D": 280,
-  "1S": 200,
+  "7D": 200,
   "1M": 240,
   "3M": 260,
   "1A": 280,
@@ -117,7 +117,7 @@ function buildPriceSeries(
   // más alisado relativo al precio (porque la trend domina).
   const noiseScale =
     currentPrice *
-    (range === "1D" ? 0.012 : range === "1S" ? 0.018 : range === "1M" ? 0.022 : 0.025);
+    (range === "1D" ? 0.012 : range === "7D" ? 0.018 : range === "1M" ? 0.022 : 0.025);
   const out: number[] = [];
   for (let i = 0; i < length; i++) {
     const t = i / (length - 1);
@@ -472,7 +472,7 @@ function rangeLabel(r: Range): string {
   switch (r) {
     case "1D":
       return "hoy";
-    case "1S":
+    case "7D":
       return "esta semana";
     case "1M":
       return "este mes";
@@ -494,7 +494,7 @@ function indexLabel(r: Range, index: number, length: number): string {
       if (h === 1) return "hace 1h";
       return `hace ${h}h`;
     }
-    case "1S": {
+    case "7D": {
       const d = Math.round(t * 7);
       if (d === 0) return "hoy";
       if (d === 1) return "hace 1 día";

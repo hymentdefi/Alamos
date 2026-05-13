@@ -77,12 +77,12 @@ import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
 
-type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "YTD" | "MAX";
+type Range = "1D" | "7D" | "1M" | "3M" | "1A" | "MAX";
 
 /** Tipo de cambio ARS/USD mock. En producción vendría de la API. */
 const USD_RATE = 1200;
 
-const ranges: Range[] = ["1D", "7D", "1M", "3M", "1A", "YTD", "MAX"];
+const ranges: Range[] = ["1D", "7D", "1M", "3M", "1A", "MAX"];
 
 /** Variación % por rango — determina el trend y color del chart. */
 const rangeChanges: Record<Range, number> = {
@@ -91,7 +91,6 @@ const rangeChanges: Record<Range, number> = {
   "1M": -2.1,
   "3M": 8.45,
   "1A": 22.8,
-  YTD: 15.3,
   MAX: 64.2,
 };
 
@@ -486,26 +485,38 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {ranges.map((r) => {
-              const active = r === range;
-              const fg = active ? c.bg : chartColor;
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setRangeAndSave(r);
-                  }}
-                  style={[
-                    s.rangePill,
-                    active && { backgroundColor: chartColor },
-                  ]}
-                  hitSlop={8}
-                >
-                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
-                </Pressable>
-              );
-            })}
+            {/* Spacer invisible mirror del gear — balanza la fila
+                para que las pills queden visualmente centradas
+                sin quedar arrastradas a la izquierda por el peso
+                del gear de la derecha. */}
+            <View style={s.rangeSettingsBtn} pointerEvents="none" />
+            <View style={s.rangePillsRow}>
+              {ranges.map((r) => {
+                const active = r === range;
+                return (
+                  <Tap
+                    key={r}
+                    onPress={() => setRangeAndSave(r)}
+                    haptic="selection"
+                    pressScale={0.92}
+                    style={[
+                      s.rangePill,
+                      active && { backgroundColor: chartColor },
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Text
+                      style={[
+                        s.rangeText,
+                        { color: active ? c.bg : chartColor },
+                      ]}
+                    >
+                      {r}
+                    </Text>
+                  </Tap>
+                );
+              })}
+            </View>
             {/* Settings icon al final del timeline — gear filled
                 que matchea el chartColor (verde si up, rojo si
                 down). Abre el sheet con los ajustes del chart. */}
@@ -624,8 +635,6 @@ function rangeSubtitle(r: Range): string {
       return "3 meses";
     case "1A":
       return "12 meses";
-    case "YTD":
-      return "en el año";
     case "MAX":
       return "histórico";
   }
@@ -659,13 +668,6 @@ function indexLabel(r: Range, index: number, length: number): string {
     }
     case "1A": {
       const m = Math.round(t * 12);
-      if (m === 0) return "hoy";
-      if (m === 1) return "hace 1 mes";
-      return `hace ${m} meses`;
-    }
-    case "YTD": {
-      // Hoy es mayo (2026-05-08), así que 0-4 meses atrás cubren YTD.
-      const m = Math.round(t * 5);
       if (m === 0) return "hoy";
       if (m === 1) return "hace 1 mes";
       return `hace ${m} meses`;
@@ -1577,19 +1579,27 @@ const s = StyleSheet.create({
     fontSize: 14,
     letterSpacing: -0.2,
   },
+  /* Timeline del chart — mismo lenguaje visual que el del stock
+   * detail: 6 pills (1D / 7D / 1M / 3M / 1A / MAX) en cápsula
+   * completa, con un spacer mirror del gear a la izquierda para
+   * que las pills queden visualmente centradas mientras el gear
+   * sigue siendo accesible a la derecha. */
   rangeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 0,
     paddingHorizontal: 4,
   },
+  rangePillsRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
   rangePill: {
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    /* radius.md (12) en vez de radius.pill (999) — menos cápsula,
-     * más editorial. Las pills 100% redondeadas se sentían genéricas. */
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderCurve: "continuous",
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
   rangeSettingsBtn: {
     /* Mismos paddings que rangePill para que el gear se alinee al
@@ -1601,8 +1611,8 @@ const s = StyleSheet.create({
   },
   rangeText: {
     fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.4,
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
   row: {
     flexDirection: "row",
