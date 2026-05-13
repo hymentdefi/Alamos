@@ -343,15 +343,14 @@ export default function BuyScreen() {
         </View>
       ) : null}
 
-      {/* Toggle Monto / Cantidad — centrado debajo del header.
-          flexDirection row + justifyContent center sobre el wrapper,
-          y los dos botones igualan ancho con minWidth para que el
-          par se vea simétrico (sino "Monto en US$" queda visiblemente
-          más chico que "Cantidad en acciones"). */}
+      {/* Toggle Monto / Cantidad — el centro de pantalla cae exacto
+          en el gap entre los dos botones. Cada botón vive en su
+          mitad de la fila (flex:1), uno alineado a la derecha y el
+          otro a la izquierda, con padding equivalente a medio gap.
+          De este modo los botones pueden tener anchos distintos pero
+          el gap queda siempre centrado en pantalla. */}
       <View style={s.modeRow}>
-        <View
-          style={s.modeToggle}
-        >
+        <View style={s.modeHalfLeft}>
           <Tap
             onPress={() => switchInputMode("amount")}
             haptic="selection"
@@ -378,6 +377,8 @@ export default function BuyScreen() {
                 : "Monto en USDT"}
             </Text>
           </Tap>
+        </View>
+        <View style={s.modeHalfRight}>
           <Tap
             onPress={() => switchInputMode("qty")}
             haptic="selection"
@@ -619,32 +620,33 @@ const s = StyleSheet.create({
     lineHeight: 16,
     letterSpacing: -0.1,
   },
-  /* modeRow → row + justifyContent center para centrar el par de
-   * botones explícitamente. Antes usaba alignItems center sobre un
-   * column flex, que en teoría centra pero el comentario decía "NO
-   * centrado" y la realidad visual tampoco se sentía centrada. Esta
-   * forma es bulletproof. */
+  /* modeRow → flex row de 2 mitades. El gap visual entre botones cae
+   * en el centro exacto de pantalla porque cada mitad ocupa 50% del
+   * ancho disponible. Los botones pueden tener ancho distinto y el
+   * gap igual queda centrado. */
   modeRow: {
     flexDirection: "row",
-    justifyContent: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 4,
   },
-  modeToggle: {
-    flexDirection: "row",
-    gap: 8,
+  /* Mitad izquierda — botón pegado al gap (alineado a la derecha),
+   *  con 4px de padding right que es medio gap (8/2). */
+  modeHalfLeft: {
+    flex: 1,
+    alignItems: "flex-end",
+    paddingRight: 4,
   },
-  /* modeBtn → minWidth fuerza que los dos botones tengan al menos el
-   * mismo ancho (~140 cubre el más largo "Cantidad en acciones"). Sin
-   * esto, "Monto en US$" (corto) y "Cantidad en acciones" (largo)
-   * tenían distinto ancho y el conjunto se veía asimétrico aún estando
-   * centrado en la fila. */
+  /* Mitad derecha — botón pegado al gap (alineado a la izquierda),
+   *  con 4px de padding left que es medio gap. */
+  modeHalfRight: {
+    flex: 1,
+    alignItems: "flex-start",
+    paddingLeft: 4,
+  },
   modeBtn: {
-    minWidth: 140,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    alignItems: "center",
     borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1.5,
