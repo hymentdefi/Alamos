@@ -669,9 +669,11 @@ function NewsCard({
           </View>
         ) : null}
 
-          <View style={[card.readBtn, { backgroundColor: c.ink }]}>
-            <Feather name="chevron-up" size={16} color={c.bg} />
-            <Text style={[card.readBtnText, { color: c.bg }]}>Leer noticia</Text>
+          <View style={[card.readBtn, { backgroundColor: c.brand }]}>
+            <Feather name="chevron-up" size={16} color={c.onColor} />
+            <Text style={[card.readBtnText, { color: c.onColor }]}>
+              Leer noticia
+            </Text>
           </View>
         </Pressable>
       </View>

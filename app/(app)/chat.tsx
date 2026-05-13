@@ -311,14 +311,14 @@ export default function ChatScreen() {
           style={[
             s.sendBtn,
             {
-              backgroundColor: draft.trim() ? c.ink : c.surfaceHover,
+              backgroundColor: draft.trim() ? c.brand : c.surfaceHover,
             },
           ]}
         >
           <Feather
             name="arrow-up"
             size={20}
-            color={draft.trim() ? c.bg : c.textMuted}
+            color={draft.trim() ? c.onColor : c.textMuted}
           />
         </Pressable>
       </View>
