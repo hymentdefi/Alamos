@@ -10,13 +10,13 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
-import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { GlassCard } from "../../../lib/components/GlassCard";
+import { ConvertCurrencyButton } from "../../../lib/components/ConvertCurrencyButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Feather,
@@ -103,6 +103,7 @@ function BaseHome() {
   const insets = useSafeAreaInsets();
   const { c, mode } = useTheme();
   const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
+  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
   const { hasUnread } = useNotifications();
@@ -165,26 +166,17 @@ function BaseHome() {
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    refreshTimerRef.current = setTimeout(() => {
-      refreshTimerRef.current = null;
+    setTimeout(() => {
       setRefreshing(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
     }, 900);
   }, []);
-  useEffect(
-    () => () => {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    },
-    [],
-  );
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -195,20 +187,18 @@ function BaseHome() {
 
   // Tap sobre la tab Inicio estando en Inicio:
   //   · si no estoy arriba → scroll al tope
-  //   · si ya estoy arriba → disparar refresh
-  // Vía registerTabTap → FloatingTabBar despacha cuando detecta
-  // tap sobre la tab activa. (navigation.addListener('tabPress') no
-  // dispara con el tabBar custom, por eso usamos el registry.)
+  //   · si ya estoy arriba → disparar refresh (con animación de pull-to-refresh)
   useEffect(() => {
-    return registerTabTap("index", {
-      isAtTop: () => scrollYRef.current <= 8,
-      scrollToTop: () =>
-        scrollRef.current?.scrollTo({ y: 0, animated: true }),
-      refresh: () => {
-        if (!refreshing) onRefresh();
-      },
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (!isFocused) return;
+      if (scrollYRef.current > 8) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      } else if (!refreshing) {
+        onRefresh();
+      }
     });
-  }, [refreshing, onRefresh]);
+    return unsub;
+  }, [navigation, isFocused, refreshing, onRefresh]);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   // Portfolios separados por moneda nativa del activo. No convertimos —
@@ -347,13 +337,9 @@ function BaseHome() {
   // glass de abajo se apoyan sobre este gradient para que la
   // sensación sea "vidrio sobre superficie tintada", no "cuadrado
   // blanco sobre fondo blanco".
-  // En light arrancamos blanco arriba (matchea la top bar limpia) y
-  // bajamos a un beige cálido sutil — la home se siente "papel" con
-  // personalidad Álamos, no fintech genérica blanca pura. En dark
-  // mantenemos el leve descenso negro → puro existente.
   const bgGradient: readonly [string, string, string] = isDark
     ? ["#0E0E0C", "#080808", "#000000"]
-    : ["#FFFFFF", "#FBFAF6", "#F4F2EB"];
+    : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -363,7 +349,7 @@ function BaseHome() {
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <View style={[s.topBar, { paddingTop: insets.top + 4 }]}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={s.topActions}>
           <Animated.View
             style={{ transform: [{ scale: giftPulse }] }}
@@ -399,6 +385,7 @@ function BaseHome() {
         ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
         scrollEventThrottle={32}
         refreshControl={
@@ -419,7 +406,7 @@ function BaseHome() {
           <View style={s.balanceRow}>
             <AmountDisplay
               value={balanceDisplay}
-              size={56}
+              size={40}
               weight={800}
               currency={currency}
             />
@@ -489,33 +476,26 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {/* Spacer invisible mirror del gear — balanza la fila
-                para que los pills queden visualmente centrados sin
-                quedar arrastrados a la izquierda por el peso del
-                gear de la derecha. */}
-            <View style={s.rangeSettingsBtn} pointerEvents="none" />
-            <View style={s.rangePillsRow}>
-              {ranges.map((r) => {
-                const active = r === range;
-                const fg = active ? c.bg : chartColor;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setRangeAndSave(r);
-                    }}
-                    style={[
-                      s.rangePill,
-                      active && { backgroundColor: chartColor },
-                    ]}
-                    hitSlop={8}
-                  >
-                    <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {ranges.map((r) => {
+              const active = r === range;
+              const fg = active ? c.bg : chartColor;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setRangeAndSave(r);
+                  }}
+                  style={[
+                    s.rangePill,
+                    active && { backgroundColor: chartColor },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
+                </Pressable>
+              );
+            })}
             {/* Settings icon al final del timeline — gear filled
                 que matchea el chartColor (verde si up, rojo si
                 down). Abre el sheet con los ajustes del chart. */}
@@ -573,15 +553,6 @@ function ActionButton({
   haptic: "medium" | "light";
 }) {
   const { c } = useTheme();
-  // Invertir es la única acción primaria: fondo verde brand + glyph
-  // en onColor (blanco en light, casi-negro en dark). El resto son
-  // cash management — fondo c.text (casi-negro/casi-blanco según
-  // modo) + glyph en c.bg para máximo contraste. Esa jerarquía deja
-  // a Invertir como el único punto de marca y el resto se lee como
-  // utilitario premium.
-  const isPrimary = iconName === "invertir";
-  const fill = isPrimary ? c.brand : c.text;
-  const stroke = isPrimary ? c.onColor : c.bg;
   return (
     <Tap
       style={s.actionItem}
@@ -589,8 +560,12 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      <ActionIcon name={iconName} size={51} fill={fill} stroke={stroke} />
-      <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
+      {/* El ActionIcon YA es un squircle con fill brand verde y stroke
+          blanco — no necesita un wrapper de surface adicional como
+          tenía antes (la opcion 'glass' Revolut). El icono mismo
+          es el bloque visual. */}
+      <ActionIcon name={iconName} size={51} />
+      <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
       </Text>
     </Tap>
@@ -724,15 +699,6 @@ function Dinero(_: {
           la surface; sin wrapper circular como en la versión
           'Revolut glass' previa. */}
       <View style={s.actionsRow}>
-        {/* Invertir va primera: es la acción CORE de la app. El resto
-            son cash management. Tap → tab Mercado, donde el usuario
-            elige instrumento. */}
-        <ActionButton
-          iconName="invertir"
-          label="Invertir"
-          haptic="medium"
-          onPress={() => router.push("/(app)/(tabs)/explore")}
-        />
         <ActionButton
           iconName="ingresar"
           label="Ingresar"
@@ -764,7 +730,7 @@ function Dinero(_: {
       </View>
 
       <View style={s.earningsHead}>
-        <Text style={[s.earningsTitle, { color: c.text }]}>Tu dinero</Text>
+        <Text style={[s.earningsTitle, { color: c.textMuted }]}>Tu dinero</Text>
         <Pressable
           hitSlop={10}
           onPress={() => setInfoOpen(true)}
@@ -783,6 +749,12 @@ function Dinero(_: {
           />
         ))}
       </GlassCard>
+
+      <View style={s.convertBtnWrap}>
+        <ConvertCurrencyButton
+          onPress={() => router.push("/(app)/convert")}
+        />
+      </View>
 
       <EarningsInfoSheet
         visible={infoOpen}
@@ -946,7 +918,7 @@ function Investments({
         onPress={() => router.navigate("/(app)/portfolio")}
         hitSlop={8}
       >
-        <Text style={[s.earningsTitle, { color: c.text }]}>
+        <Text style={[s.earningsTitle, { color: c.textMuted }]}>
           Tus inversiones
         </Text>
         <Ionicons
@@ -1031,7 +1003,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     paddingHorizontal: 20,
-    paddingBottom: 0,
+    paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
@@ -1240,6 +1212,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginBottom: 12,
+  },
+  convertBtnWrap: {
+    marginTop: 12,
   },
   earningsTitle: {
     fontFamily: fontFamily[800],
@@ -1594,14 +1569,9 @@ const s = StyleSheet.create({
   },
   rangeRow: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 0,
     paddingHorizontal: 4,
-  },
-  rangePillsRow: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-around",
   },
   rangePill: {
     paddingHorizontal: 9,
