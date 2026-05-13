@@ -924,7 +924,7 @@ function Investments({
         <Ionicons
           name="arrow-forward"
           size={18}
-          color="rgba(0,200,5,0.7)"
+          color={c.brand}
         />
       </Pressable>
 

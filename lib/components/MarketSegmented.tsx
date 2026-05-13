@@ -37,8 +37,7 @@ interface Props {
 }
 
 export function MarketSegmented({ value, onChange, withAll }: Props) {
-  const { mode, c } = useTheme();
-  const isDark = mode === "dark";
+  const { c } = useTheme();
 
   const tabs: Tab[] = withAll
     ? [{ id: "all", short: "Todo" }, ...BASE_TABS]
@@ -59,13 +58,9 @@ export function MarketSegmented({ value, onChange, withAll }: Props) {
               style={[
                 s.marketSegBtn,
                 active && {
-                  backgroundColor: isDark
-                    ? "rgba(14, 203, 129, 0.07)"
-                    : "rgba(0, 200, 5, 0.05)",
-                  borderColor: isDark
-                    ? "rgba(14, 203, 129, 0.12)"
-                    : "rgba(0, 200, 5, 0.10)",
-                  borderWidth: 1,
+                  backgroundColor: "transparent",
+                  borderColor: c.brand,
+                  borderWidth: 1.5,
                 },
               ]}
             >
@@ -105,10 +100,7 @@ function MarketGlyph({
         {active ? (
           <View
             pointerEvents="none"
-            style={[
-              gs.flagTint,
-              { backgroundColor: "rgba(0, 200, 5, 0.04)" },
-            ]}
+            style={[gs.flagTint, { borderColor: c.brand, borderWidth: 1 }]}
           />
         ) : null}
       </View>
