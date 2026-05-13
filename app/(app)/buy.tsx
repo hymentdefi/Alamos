@@ -355,14 +355,12 @@ export default function BuyScreen() {
         </View>
       ) : null}
 
-      {/* Toggle Monto / Cantidad — el centro de pantalla cae exacto
-          en el gap entre los dos botones. Cada botón vive en su
-          mitad de la fila (flex:1), uno alineado a la derecha y el
-          otro a la izquierda, con padding equivalente a medio gap.
-          De este modo los botones pueden tener anchos distintos pero
-          el gap queda siempre centrado en pantalla. */}
+      {/* Toggle Monto / Cantidad: va debajo del header, NO centrado con
+          el contenido. */}
       <View style={s.modeRow}>
-        <View style={s.modeHalfLeft}>
+        <View
+          style={s.modeToggle}
+        >
           <Tap
             onPress={() => switchInputMode("amount")}
             haptic="selection"
@@ -389,8 +387,6 @@ export default function BuyScreen() {
                 : "Monto en USDT"}
             </Text>
           </Tap>
-        </View>
-        <View style={s.modeHalfRight}>
           <Tap
             onPress={() => switchInputMode("qty")}
             haptic="selection"
@@ -644,29 +640,15 @@ const s = StyleSheet.create({
     lineHeight: 16,
     letterSpacing: -0.1,
   },
-  /* modeRow → flex row de 2 mitades. El gap visual entre botones cae
-   * en el centro exacto de pantalla porque cada mitad ocupa 50% del
-   * ancho disponible. Los botones pueden tener ancho distinto y el
-   * gap igual queda centrado. */
   modeRow: {
-    flexDirection: "row",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 4,
+    alignItems: "center",
   },
-  /* Mitad izquierda — botón pegado al gap (alineado a la derecha),
-   *  con 4px de padding right que es medio gap (8/2). */
-  modeHalfLeft: {
-    flex: 1,
-    alignItems: "flex-end",
-    paddingRight: 4,
-  },
-  /* Mitad derecha — botón pegado al gap (alineado a la izquierda),
-   *  con 4px de padding left que es medio gap. */
-  modeHalfRight: {
-    flex: 1,
-    alignItems: "flex-start",
-    paddingLeft: 4,
+  modeToggle: {
+    flexDirection: "row",
+    gap: 8,
   },
   modeBtn: {
     paddingHorizontal: 16,
