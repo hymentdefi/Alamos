@@ -395,6 +395,9 @@ export interface VolumeAlert extends BaseIndicatorAlert {
   type: "volume";
   /** Multiplicador del volumen promedio. Rango 1.1–20 step 0.1. */
   multiplier: number;
+  /** Período (en días/velas según timeframe) sobre el que se
+   *  calcula el volumen promedio. Default 20. Rango 5–100. */
+  avgPeriod: number;
 }
 
 export type IndicatorAlert =
@@ -462,7 +465,10 @@ function findIndicatorDuplicate(
       );
     }
     if (a.type === "volume" && input.type === "volume") {
-      return a.multiplier === input.multiplier;
+      return (
+        a.multiplier === input.multiplier &&
+        a.avgPeriod === input.avgPeriod
+      );
     }
     return false;
   });
