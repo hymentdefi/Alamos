@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -12,6 +19,7 @@ import {
   formatShortDate,
   generatePayouts,
   monthNameFull,
+  monthNameShort,
   payoutTypeLabel,
   type PayoutEvent,
 } from "../../lib/data/payouts";
@@ -50,8 +58,37 @@ export default function CobrosScreen() {
   const [cursor, setCursor] = useState(
     () => new Date(MOCK_TODAY.getFullYear(), MOCK_TODAY.getMonth(), 1),
   );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(
+    () => MOCK_TODAY.getFullYear(),
+  );
 
   const events = useMemo(() => generatePayouts(), []);
+
+  /* Cantidad de eventos por (año, mes) — para los dots del picker.
+   * Key = "YYYY-MM". */
+  const eventCountByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of events) {
+      const k = e.date.slice(0, 7);
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return map;
+  }, [events]);
+
+  const hasEventsIn = (y: number, m: number) => {
+    const k = `${y}-${(m + 1).toString().padStart(2, "0")}`;
+    return (eventCountByMonth.get(k) ?? 0) > 0;
+  };
+
+  const openPicker = () => {
+    setPickerYear(cursor.getFullYear());
+    setPickerOpen(true);
+  };
+  const selectMonth = (y: number, m: number) => {
+    setCursor(new Date(y, m, 1));
+    setPickerOpen(false);
+  };
 
   const month = cursor.getMonth();
   const year = cursor.getFullYear();
@@ -135,7 +172,8 @@ export default function CobrosScreen() {
       >
         <Text style={[s.title, { color: c.text }]}>Cobros</Text>
 
-        {/* Month nav */}
+        {/* Month nav — el label central es tappable y abre el picker
+            de mes/año. Affordance: chevron-down al lado del texto. */}
         <View style={s.monthNav}>
           <Tap
             onPress={goPrev}
@@ -145,9 +183,18 @@ export default function CobrosScreen() {
           >
             <Feather name="chevron-left" size={22} color={c.text} />
           </Tap>
-          <Text style={[s.monthLabel, { color: c.text }]}>
-            {monthNameFull(month)} {year}
-          </Text>
+          <Tap
+            onPress={openPicker}
+            haptic="selection"
+            pressScale={0.96}
+            hitSlop={8}
+            style={s.monthLabelTap}
+          >
+            <Text style={[s.monthLabel, { color: c.text }]}>
+              {monthNameFull(month)} {year}
+            </Text>
+            <Feather name="chevron-down" size={18} color={c.text} />
+          </Tap>
           <Tap
             onPress={goNext}
             haptic="selection"
@@ -278,6 +325,110 @@ export default function CobrosScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Month/year picker — bottom sheet con nav de año arriba +
+          grid 3×4 de meses. Mes seleccionado en brand, meses con
+          eventos con dot. Tap fuera del sheet → cierra. */}
+      <Modal
+        visible={pickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerOpen(false)}
+        statusBarTranslucent
+      >
+        <View style={s.modalRoot}>
+          <Pressable
+            style={s.modalOverlay}
+            onPress={() => setPickerOpen(false)}
+          />
+          <View
+            style={[
+              s.sheet,
+              {
+                backgroundColor: c.surface,
+                paddingBottom: insets.bottom + 24,
+              },
+            ]}
+          >
+            <View
+              style={[s.sheetHandle, { backgroundColor: c.border }]}
+            />
+
+            <View style={s.pickerYearNav}>
+              <Tap
+                onPress={() => setPickerYear((y) => y - 1)}
+                haptic="selection"
+                hitSlop={12}
+                style={s.navBtn}
+              >
+                <Feather
+                  name="chevron-left"
+                  size={22}
+                  color={c.text}
+                />
+              </Tap>
+              <Text
+                style={[s.pickerYearLabel, { color: c.text }]}
+              >
+                {pickerYear}
+              </Text>
+              <Tap
+                onPress={() => setPickerYear((y) => y + 1)}
+                haptic="selection"
+                hitSlop={12}
+                style={s.navBtn}
+              >
+                <Feather
+                  name="chevron-right"
+                  size={22}
+                  color={c.text}
+                />
+              </Tap>
+            </View>
+
+            <View style={s.pickerGrid}>
+              {Array.from({ length: 12 }, (_, m) => {
+                const selected =
+                  pickerYear === year && m === month;
+                const has = !selected && hasEventsIn(pickerYear, m);
+                return (
+                  <Tap
+                    key={m}
+                    onPress={() => selectMonth(pickerYear, m)}
+                    haptic="selection"
+                    pressScale={0.94}
+                    style={[
+                      s.pickerCell,
+                      {
+                        backgroundColor: selected
+                          ? c.brand
+                          : c.surfaceHover,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.pickerMonthLabel,
+                        { color: selected ? c.onColor : c.text },
+                      ]}
+                    >
+                      {monthNameShort(m)}
+                    </Text>
+                    {has ? (
+                      <View
+                        style={[
+                          s.pickerDot,
+                          { backgroundColor: c.brand },
+                        ]}
+                      />
+                    ) : null}
+                  </Tap>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -328,6 +479,13 @@ const s = StyleSheet.create({
     height: 32,
     alignItems: "center",
     justifyContent: "center",
+  },
+  /* Wrap del label central — pone label + chevron en fila y permite
+   * pressScale en el conjunto cuando se tappea para abrir el picker. */
+  monthLabelTap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   monthLabel: {
     fontFamily: fontFamily[700],
@@ -443,5 +601,65 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.1,
+  },
+
+  /* ─── Month/year picker (bottom sheet) ─── */
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheet: {
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderCurve: "continuous",
+    paddingHorizontal: 24,
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 22,
+  },
+  pickerYearNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 22,
+  },
+  pickerYearLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 28,
+    letterSpacing: -0.8,
+  },
+  pickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  pickerCell: {
+    width: "31.5%",
+    height: 64,
+    borderCurve: "continuous",
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  pickerMonthLabel: {
+    fontFamily: fontFamily[700],
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  pickerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });
