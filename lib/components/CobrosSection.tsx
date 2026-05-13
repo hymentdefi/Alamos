@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 
 import { fontFamily, radius, useTheme } from "../theme";
 import { AmountDisplay } from "./AmountDisplay";
@@ -12,6 +14,7 @@ import {
   generatePayouts,
   isPaid,
   monthlyBuckets,
+  monthNameFull,
   payoutTypeLabel,
   summarizeYear,
   type MonthBucket,
@@ -31,13 +34,14 @@ interface Props {
  * argentino es el calendario forward: no muestra solo lo que ya
  * cobraste, sino lo que viene.
  *
- * Cinco cards en orden de jerarquía:
- *   1. Hero — cobrado YTD + sublabel "te quedan por cobrar" +
- *      bar chart de 12 meses (paid en brand, upcoming en muted).
+ * Cuatro cards en orden de jerarquía:
+ *   1. Hero — "Te queda por cobrar" en brand grande + sublabel con
+ *      lo cobrado este año + bar chart de 12 meses (paid en brand,
+ *      upcoming en border).
  *   2. Próximo cobro — destaca el siguiente evento con countdown.
- *   3. Cronograma — los próximos 5 eventos en orden de fecha.
+ *   3. Cronograma — los próximos 5 eventos + "Ver el año completo"
+ *      → navega al calendario anual estilo Apple Calendar (/cobros).
  *   4. Detalle del año — split por tipo (cupones/divs/amort).
- *   5. Tus mayores cobros — top 5 contributors del año proyectado.
  *
  * Los totales agregan a ARS via `convertAmount`. Las filas individuales
  * muestran la moneda nativa porque un cupón de AL30 en USD se lee con
@@ -45,6 +49,7 @@ interface Props {
  */
 export function CobrosSection({ currency }: Props) {
   const { c } = useTheme();
+  const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
 
   const events = useMemo(() => generatePayouts(), []);
@@ -93,13 +98,11 @@ export function CobrosSection({ currency }: Props) {
   const remainingDisplay = toDisplay(fullYear.totalArs - ytdPaid.totalArs);
 
   /* Bar chart — el bucket "scrubbeado" muestra su label/valor en el
-   * header. Si no hay scrub, mostramos el cobrado YTD por default. */
+   * header. Si no hay scrub, mostramos el monto por cobrar (el número
+   * más interesante, generalmente el más grande). */
   const scrubBucket = scrubIdx != null ? buckets[scrubIdx] : null;
   const monthFullLabel = (b: MonthBucket) =>
-    [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-    ][b.month] +
+    monthNameFull(b.month) +
     (b.year !== currentYear ? ` ${b.year}` : "");
 
   return (
@@ -122,7 +125,31 @@ export function CobrosSection({ currency }: Props) {
               currency={currency}
             />
           </>
+        ) : remainingDisplay > 0 ? (
+          <>
+            <Text style={[s.heroLabel, { color: c.textMuted }]}>
+              Te queda por cobrar
+            </Text>
+            <AmountDisplay
+              value={remainingDisplay}
+              size={36}
+              color={c.brand}
+              decimalsColor={c.brand}
+              currency={currency}
+            />
+            {ytdDisplay > 0 ? (
+              <Text style={[s.heroSub, { color: c.textMuted }]}>
+                Cobraste{" "}
+                <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+                  {formatMoney(ytdDisplay, currency)}
+                </Text>{" "}
+                este año
+              </Text>
+            ) : null}
+          </>
         ) : (
+          // Fallback fin de año: si ya no queda nada por cobrar, mostramos
+          // como hero el total cobrado para no dejar un "$0" gigante.
           <>
             <Text style={[s.heroLabel, { color: c.textMuted }]}>
               Cobraste este año
@@ -131,18 +158,9 @@ export function CobrosSection({ currency }: Props) {
               value={ytdDisplay}
               size={36}
               color={c.brand}
-              decimalsColor={c.textMuted}
+              decimalsColor={c.brand}
               currency={currency}
             />
-            {remainingDisplay > 0 ? (
-              <Text style={[s.heroSub, { color: c.textMuted }]}>
-                Te quedan{" "}
-                <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-                  {formatMoney(remainingDisplay, currency)}
-                </Text>{" "}
-                por cobrar este año
-              </Text>
-            ) : null}
           </>
         )}
 
@@ -152,7 +170,7 @@ export function CobrosSection({ currency }: Props) {
               ? Math.max(4, (b.totalArs / maxBucket) * BAR_MAX_H)
               : 2;
             const active = scrubIdx === i;
-            const baseColor = b.paid ? c.brand : c.surfaceHover;
+            const baseColor = b.paid ? c.brand : c.border;
             const labelColor = active
               ? c.text
               : b.isCurrent
@@ -206,7 +224,7 @@ export function CobrosSection({ currency }: Props) {
           </View>
           <View style={s.legendItem}>
             <View
-              style={[s.legendDot, { backgroundColor: c.surfaceHover }]}
+              style={[s.legendDot, { backgroundColor: c.border }]}
             />
             <Text style={[s.legendText, { color: c.textMuted }]}>
               Por cobrar
@@ -248,7 +266,7 @@ export function CobrosSection({ currency }: Props) {
         </View>
       ) : null}
 
-      {/* ─── Card 3: Cronograma — próximos eventos ─────────────────── */}
+      {/* ─── Card 3: Cronograma — próximos eventos + ver más ───────── */}
       {upcomingList.length > 1 ? (
         <View style={s.card}>
           <Text style={[s.eyebrow, { color: c.text }]}>Cronograma</Text>
@@ -293,6 +311,17 @@ export function CobrosSection({ currency }: Props) {
               </Text>
             </View>
           ))}
+          <Tap
+            onPress={() => router.push("/cobros")}
+            haptic="selection"
+            pressScale={0.97}
+            style={[s.seeMore, { borderTopColor: c.border }]}
+          >
+            <Text style={[s.seeMoreText, { color: c.brand }]}>
+              Ver el año completo
+            </Text>
+            <Feather name="chevron-right" size={16} color={c.brand} />
+          </Tap>
         </View>
       ) : null}
 
@@ -343,55 +372,6 @@ export function CobrosSection({ currency }: Props) {
         </Text>
       </View>
 
-      {/* ─── Card 5: Tus mayores cobros ────────────────────────────── */}
-      {fullYear.byTicker.length > 0 ? (
-        <View style={s.card}>
-          <Text style={[s.eyebrow, { color: c.text }]}>
-            Tus mayores cobros
-          </Text>
-          {fullYear.byTicker.slice(0, 5).map((row, i, arr) => {
-            const pct =
-              fullYear.totalArs > 0
-                ? (row.ars / fullYear.totalArs) * 100
-                : 0;
-            return (
-              <View
-                key={row.ticker}
-                style={[
-                  s.topRow,
-                  i < arr.length - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: c.border,
-                  },
-                ]}
-              >
-                <View style={s.topLeft}>
-                  <Text style={[s.topTicker, { color: c.text }]}>
-                    {row.ticker}
-                  </Text>
-                  <Text
-                    style={[s.topName, { color: c.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {row.assetName}
-                  </Text>
-                </View>
-                <View style={s.topRight}>
-                  <Text
-                    style={[s.topAmount, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    {formatMoney(toDisplay(row.ars), currency)}
-                  </Text>
-                  <Text style={[s.topPct, { color: c.textMuted }]}>
-                    {pct.toFixed(0)}%
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
     </>
   );
 }
@@ -431,9 +411,9 @@ const s = StyleSheet.create({
   barChart: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 6,
+    gap: 4,
     marginTop: 22,
-    height: BAR_MAX_H + 22,
+    height: BAR_MAX_H + 24,
   },
   barCol: {
     flex: 1,
@@ -447,8 +427,8 @@ const s = StyleSheet.create({
   },
   barLabel: {
     marginTop: 8,
-    fontSize: 11,
-    letterSpacing: 0.2,
+    fontSize: 10,
+    letterSpacing: -0.05,
   },
   legendRow: {
     flexDirection: "row",
@@ -587,41 +567,19 @@ const s = StyleSheet.create({
     letterSpacing: -0.05,
   },
 
-  /* ─── Top contributors ─── */
-  topRow: {
+  /* ─── Ver más (cronograma → calendario completo) ─── */
+  seeMore: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: 6,
     paddingVertical: 14,
-    gap: 12,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  topLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  topTicker: {
+  seeMoreText: {
     fontFamily: fontFamily[700],
-    fontSize: 15,
+    fontSize: 14,
     letterSpacing: -0.2,
-    marginBottom: 1,
-  },
-  topName: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
-  },
-  topRight: {
-    alignItems: "flex-end",
-  },
-  topAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-    marginBottom: 1,
-  },
-  topPct: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
   },
 });
