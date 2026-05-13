@@ -383,10 +383,9 @@ export default function NewsScreen() {
                   s.catPill,
                   active
                     ? {
-                        // Pill activa — outline brand green con tint
-                        // muy sutil adentro. El color y el frame
-                        // alcanzan; sin solid fill.
-                        backgroundColor: "rgba(0,200,5,0.06)",
+                        // Pill activa — outline puro: border brand +
+                        // texto brand, bg transparent (sin tint).
+                        backgroundColor: "transparent",
                         borderColor: c.brand,
                         borderWidth: 1.5,
                       }
