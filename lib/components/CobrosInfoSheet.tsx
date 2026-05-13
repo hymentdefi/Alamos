@@ -335,17 +335,23 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
             </Text>
 
             <Text style={[s.body, { color: c.textSecondary }]}>
-              Tus activos generan{" "}
-              <Text style={[s.bodyBold, { color: c.text }]}>
-                dividendos
-              </Text>{" "}
-              y{" "}
+              Solo algunos activos pagan. Los bonos pagan{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 cupones
               </Text>{" "}
-              cuando los emisores te pagan tu parte. Acá te mostramos
-              cuándo viene cada pago y cuánto te queda por cobrar este
-              año.
+              a fechas fijas. Las acciones y CEDEARs pagan{" "}
+              <Text style={[s.bodyBold, { color: c.text }]}>
+                dividendos
+              </Text>{" "}
+              cuando la empresa los aprueba.
+              {"\n\n"}
+              Los fondos, letras y cripto{" "}
+              <Text style={[s.bodyBold, { color: c.text }]}>
+                no pagan
+              </Text>
+              : ahí ganás cuando el precio sube.
+              {"\n\n"}
+              Acá ves cuándo y cuánto vas a cobrar este año.
             </Text>
           </View>
         </Animated.View>
