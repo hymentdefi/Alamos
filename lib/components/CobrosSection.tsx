@@ -228,7 +228,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={toDisplay(scrubBucket.totalArs)}
-              size={28}
+              size={32}
               color={scrubBucket.paid ? c.brand : c.text}
               decimalsColor={c.textMuted}
               currency={currency}
@@ -241,7 +241,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={remainingDisplay}
-              size={28}
+              size={32}
               color={c.brand}
               decimalsColor={c.brand}
               currency={currency}
@@ -256,7 +256,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={ytdDisplay}
-              size={28}
+              size={32}
               color={c.brand}
               decimalsColor={c.brand}
               currency={currency}
@@ -495,7 +495,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
   );
 }
 
-const BAR_MAX_H = 70;
+const BAR_MAX_H = 84;
 
 const s = StyleSheet.create({
   /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
@@ -514,8 +514,8 @@ const s = StyleSheet.create({
    * header de una sub-sección entera (no como label de un card). */
   sectionTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.5,
+    fontSize: 26,
+    letterSpacing: -0.7,
   },
   sectionInfoDot: {
     width: 24,
@@ -532,7 +532,7 @@ const s = StyleSheet.create({
    * reducen el gap visible entre cards de ~58pt → ~40pt. */
   card: {
     paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginTop: 4,
   },
   /* Override del primer card: pegado al section header (sin gap
@@ -543,9 +543,9 @@ const s = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-    marginBottom: 12,
+    fontSize: 20,
+    letterSpacing: -0.4,
+    marginBottom: 14,
   },
 
   /* ─── Hero ─── */
@@ -603,7 +603,7 @@ const s = StyleSheet.create({
   },
   nextTicker: {
     fontFamily: fontFamily[700],
-    fontSize: 20,
+    fontSize: 22,
     letterSpacing: -0.4,
     marginBottom: 2,
   },
@@ -617,7 +617,7 @@ const s = StyleSheet.create({
   },
   nextAmount: {
     fontFamily: fontFamily[700],
-    fontSize: 16,
+    fontSize: 17,
     letterSpacing: -0.3,
     marginBottom: 2,
   },
@@ -631,7 +631,7 @@ const s = StyleSheet.create({
   cronoRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 12,
   },
   cronoDate: {
