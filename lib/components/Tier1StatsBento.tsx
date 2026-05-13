@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-import { fontFamily, radius, useTheme } from "../theme";
+import { fontFamily, useTheme } from "../theme";
 import { Tap } from "./Tap";
 import { StatInfoSheet } from "./StatInfoSheet";
 import {
@@ -174,54 +174,74 @@ export function Tier1StatsBento({
   return (
     <View style={s.bentoCard}>
       <Text style={[s.bentoTitle, { color: c.text }]}>Estadísticas</Text>
-      <View style={s.grid}>
-        {cards.map((card) => {
+      {/* Lista vertical Robinhood-style: label muted izquierda,
+          valor bold derecha + sub-texto debajo, hairline entre rows.
+          Sin grid, sin cards, sin chrome — la jerarquía sale de la
+          tipografía y los hairlines. */}
+      <View style={s.list}>
+        {cards.map((card, i) => {
           const dotColor = card.semaforo
             ? semaforoColor(card.semaforo, c)
             : null;
+          const isLast = i === cards.length - 1;
           return (
             <Tap
               key={card.key}
               onPress={() => setOpenStat(card.key)}
               haptic="selection"
-              pressScale={0.97}
-              style={s.card}
+              pressScale={0.98}
+              style={[
+                s.row,
+                !isLast && {
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: c.border,
+                },
+              ]}
             >
-              <View style={s.cardHeader}>
+              <View style={s.rowLeft}>
                 <Text
-                  style={[s.cardLabel, { color: c.textMuted }]}
+                  style={[s.rowLabel, { color: c.textMuted }]}
                   numberOfLines={1}
                 >
                   {card.label}
                 </Text>
-                {dotColor ? (
-                  <View
-                    style={[s.semaforoDot, { backgroundColor: dotColor }]}
-                  />
+              </View>
+              <View style={s.rowRight}>
+                <View style={s.valueRow}>
+                  <Text
+                    style={[
+                      s.rowValue,
+                      { color: card.primaryColor ?? c.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {card.primary}
+                  </Text>
+                  {dotColor ? (
+                    <View
+                      style={[
+                        s.semaforoDot,
+                        { backgroundColor: dotColor },
+                      ]}
+                    />
+                  ) : null}
+                </View>
+                {card.sub ? (
+                  <Text
+                    style={[s.rowSub, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {card.sub}
+                  </Text>
+                ) : null}
+                {card.limited ? (
+                  <Text
+                    style={[s.limitedBadge, { color: c.textFaint }]}
+                  >
+                    Datos limitados
+                  </Text>
                 ) : null}
               </View>
-              <Text
-                style={[
-                  s.cardValue,
-                  { color: card.primaryColor ?? c.text },
-                ]}
-                numberOfLines={1}
-              >
-                {card.primary}
-              </Text>
-              {card.sub ? (
-                <Text
-                  style={[s.cardSub, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {card.sub}
-                </Text>
-              ) : null}
-              {card.limited ? (
-                <Text style={[s.limitedBadge, { color: c.textFaint }]}>
-                  Datos limitados
-                </Text>
-              ) : null}
             </Tap>
           );
         })}
@@ -251,12 +271,7 @@ export function Tier1StatsBento({
   );
 }
 
-const CARD_GAP = 10;
-
 const s = StyleSheet.create({
-  /* Bento card container — wrap del grid, paddings al estilo de los
-   * otros cards de rendimiento.tsx pero sin background (el grid
-   * tiene background interno por card). */
   bentoCard: {
     paddingHorizontal: 24,
     paddingVertical: 24,
@@ -266,56 +281,62 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.5,
-    marginBottom: 16,
+    marginBottom: 4,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: CARD_GAP,
+  /* Lista vertical Robinhood-style. Sin grid, sin chrome — cada
+   * stat ocupa toda una fila ancha, label muted a la izquierda,
+   * valor bold a la derecha + sub-texto chiquito debajo, hairline
+   * entre filas. */
+  list: {
+    width: "100%",
   },
-  /* Card individual — 2 cols con gap, height fija para uniformidad
-   * (la spec lo pide "uniforme"). Width: 48% para dejar margen del
-   * gap. */
-  card: {
-    width: `48.5%`,
-    height: 110,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    justifyContent: "space-between",
-  },
-  cardHeader: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 6,
+    paddingVertical: 14,
+    gap: 16,
   },
-  cardLabel: {
-    fontFamily: fontFamily[600],
+  rowLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  rowRight: {
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
+  valueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rowValue: {
+    fontFamily: fontFamily[800],
+    fontSize: 18,
+    letterSpacing: -0.4,
+  },
+  rowSub: {
+    fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.05,
-    flex: 1,
+    marginTop: 2,
   },
   semaforoDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  cardValue: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
-  },
-  cardSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: -0.05,
-  },
   limitedBadge: {
     fontFamily: fontFamily[600],
     fontSize: 9,
     letterSpacing: 0.4,
     textTransform: "uppercase",
-    marginTop: 2,
+    marginTop: 3,
   },
   /* CTA al pie del bento para navegar al Tier 2. */
   seeMore: {
