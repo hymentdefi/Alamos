@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-import { fontFamily, radius, useTheme } from "../theme";
+import { fontFamily, useTheme } from "../theme";
 import { Tap } from "./Tap";
 import { StatInfoSheet } from "./StatInfoSheet";
 import {
@@ -42,18 +42,17 @@ function semaforoColor(s: Semaforo, c: ReturnType<typeof useTheme>["c"]) {
  * Tier 1 stats bento — grid 2-col con las métricas principales del
  * portfolio según la spec interna (Portfolio Statistics Engine v1.0).
  *
- * Cards:
+ * Stats (6, en 3 filas × 2 columnas):
  *   1. Total invertido (Cost basis)
- *   2. Tu ganancia (MWR)
- *   3. Performance de tus activos (TWR)
+ *   2. Ganancia (MWR)
+ *   3. Performance (TWR)
  *   4. Riesgo (Volatilidad anualizada) — semáforo
- *   5. Relación riesgo/ganancia (Sharpe) — semáforo
- *   6. vs Mercado (Alpha vs S&P 500) — semáforo
- *   7. Dividendos (Yield TTM)
+ *   5. vs Mercado (Alpha vs S&P 500) — semáforo
+ *   6. Dividendos (Yield TTM)
  *
- * Cada card tappable abre el StatInfoSheet con la explicación retail
- * + nombre técnico. Las cards de riesgo (Vol/Sharpe/Alpha) tienen
- * dot semáforo verde/amarillo/rojo. Si el range es corto (<6m), se
+ * Cada celda tappable abre el StatInfoSheet con la explicación retail
+ * + nombre técnico. Las celdas de riesgo (Vol/Alpha) tienen dot
+ * semáforo verde/amarillo/rojo. Si el range es corto (<6m), se
  * muestra badge "Datos limitados" en esas mismas.
  */
 export function Tier1StatsBento({
@@ -128,19 +127,6 @@ export function Tier1StatsBento({
       limited: stats.limitedData,
     },
     {
-      key: "sharpe",
-      label: "Riesgo/ganancia",
-      primary: stats.sharpe.value.toFixed(2).replace(".", ","),
-      sub:
-        stats.sharpe.semaforo === "verde"
-          ? "bueno"
-          : stats.sharpe.semaforo === "amarillo"
-            ? "regular"
-            : "bajo",
-      semaforo: stats.sharpe.semaforo,
-      limited: stats.limitedData,
-    },
-    {
       key: "alpha",
       label: "vs Mercado",
       primary: formatPct(stats.alpha.pct),
@@ -162,64 +148,87 @@ export function Tier1StatsBento({
   return (
     <View style={s.bentoCard}>
       <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
-      {/* Grid Robinhood-style: cards con hairline border (sin fill),
-          rounded corners, label muted arriba + valor grande bold
-          abajo. El último card (Dividendos) ocupa el ancho completo
-          porque hay 7 cards y no entran prolijos en 2 cols. */}
+      {/* Grid Apple/Robinhood: 6 stats en 3 filas × 2 columnas, sin
+          card chrome — sólo hairlines dividiendo celdas. Vertical
+          entre columnas, horizontal entre filas. */}
       <View style={s.grid}>
-        {cards.map((card, i) => {
-          const dotColor = card.semaforo
-            ? semaforoColor(card.semaforo, c)
-            : null;
-          const isLast = i === cards.length - 1;
+        {[0, 2, 4].map((startIdx) => {
+          const row = cards.slice(startIdx, startIdx + 2);
+          const isLastRow = startIdx + 2 >= cards.length;
           return (
-            <Tap
-              key={card.key}
-              onPress={() => setOpenStat(card.key)}
-              haptic="selection"
-              pressScale={0.97}
+            <View
+              key={startIdx}
               style={[
-                s.card,
-                isLast && s.cardFullWidth,
-                { borderColor: c.border },
+                s.gridRow,
+                !isLastRow && {
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: c.border,
+                },
               ]}
             >
-              <View style={s.cardHeader}>
-                <Text
-                  style={[s.cardLabel, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {card.label}
-                </Text>
-                {dotColor ? (
-                  <View
-                    style={[s.semaforoDot, { backgroundColor: dotColor }]}
-                  />
-                ) : null}
-              </View>
-              <Text
-                style={[
-                  s.cardValue,
-                  { color: card.primaryColor ?? c.text },
-                ]}
-                numberOfLines={1}
-              >
-                {card.primary}
-              </Text>
-              {card.sub ? (
-                <Text
-                  style={[s.cardSub, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {card.sub}
-                </Text>
-              ) : null}
-              {card.limited ? (
-                <Text style={[s.limitedBadge, { color: c.textFaint }]}>
-                  Datos limitados
-                </Text>
-              ) : null}
-            </Tap>
+              {row.map((card, colIdx) => {
+                const dotColor = card.semaforo
+                  ? semaforoColor(card.semaforo, c)
+                  : null;
+                return (
+                  <Tap
+                    key={card.key}
+                    onPress={() => setOpenStat(card.key)}
+                    haptic="selection"
+                    pressScale={0.97}
+                    style={[
+                      s.gridCell,
+                      colIdx === 0 ? s.gridCellLeft : s.gridCellRight,
+                      colIdx === 1 && {
+                        borderLeftWidth: StyleSheet.hairlineWidth,
+                        borderLeftColor: c.border,
+                      },
+                    ]}
+                  >
+                    <View style={s.cellHeader}>
+                      <Text
+                        style={[s.cellLabel, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {card.label}
+                      </Text>
+                      {dotColor ? (
+                        <View
+                          style={[
+                            s.semaforoDot,
+                            { backgroundColor: dotColor },
+                          ]}
+                        />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={[
+                        s.cellValue,
+                        { color: card.primaryColor ?? c.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {card.primary}
+                    </Text>
+                    {card.sub ? (
+                      <Text
+                        style={[s.cellSub, { color: c.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {card.sub}
+                      </Text>
+                    ) : null}
+                    {card.limited ? (
+                      <Text
+                        style={[s.limitedBadge, { color: c.textFaint }]}
+                      >
+                        Datos limitados
+                      </Text>
+                    ) : null}
+                  </Tap>
+                );
+              })}
+            </View>
           );
         })}
       </View>
@@ -261,38 +270,34 @@ const s = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 14,
   },
-  /* Grid Robinhood-style. 2 columnas con gap, cards outlined (sin
-   * fill, solo hairline border + rounded corners). Padding interno
-   * 14h × 14v. Última card full-width porque son 7 (no entran
-   * uniformes en 2 cols). */
-  grid: {
+  /* Grid Apple/Robinhood-style: 3 filas × 2 columnas, sin card
+   * chrome — sólo hairlines dividiendo celdas. Cells flex 1 con
+   * paddingVertical 14, paddingHorizontal asimétrico (0 hacia el
+   * borde del bento, 14 hacia el divider central) para que el texto
+   * de cada columna alinee con los bordes externos del bento. */
+  grid: {},
+  gridRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    alignItems: "stretch",
   },
-  card: {
-    width: "48.5%",
-    paddingHorizontal: 14,
+  gridCell: {
+    flex: 1,
     paddingVertical: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
   },
-  cardFullWidth: {
-    width: "100%",
+  gridCellLeft: {
+    paddingRight: 14,
   },
-  /* Layout Robinhood-style: label muted sentence-case arriba (sin
-   * uppercase ni tracking positivo), valor grande pero no over-bold
-   * (700 en vez de 800), sub muted prolijo. Sentence case + tracking
-   * negativo en todo el bloque para mantener identidad Álamos. */
-  cardHeader: {
+  gridCellRight: {
+    paddingLeft: 14,
+  },
+  cellHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 6,
     marginBottom: 6,
   },
-  cardLabel: {
+  cellLabel: {
     fontFamily: fontFamily[500],
     fontSize: 13,
     letterSpacing: -0.15,
@@ -303,12 +308,12 @@ const s = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
-  cardValue: {
+  cellValue: {
     fontFamily: fontFamily[700],
     fontSize: 22,
     letterSpacing: -0.6,
   },
-  cardSub: {
+  cellSub: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.1,
