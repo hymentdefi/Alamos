@@ -121,27 +121,47 @@ export default function RendimientoScreen() {
   const cobrosY = useRef(0);
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const [range, setRange] = useState<RendRange>("MAX");
+  /* Default 1D — el user entra a esta pantalla desde el row de
+   * Rendimiento del portfolio (que muestra el PyG del día), así que
+   * el primer estado natural es ver el mismo período. */
+  const [range, setRange] = useState<RendRange>("1D");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [currency] = useState<Currency>("ARS");
 
-  // Total ARS de los holdings (replica el cómputo del portfolio).
-  const totalArs = useMemo(() => {
+  // Total ARS + delta del día — replica el cómputo del portfolio
+  // (incluyendo el FORCE_LOSS_PREVIEW que fuerza naranja para preview
+  // visual). Mantener en sync con portfolio.tsx hasta que el flag se
+  // saque. Sin esto, la pantalla mostraba 1D en verde mientras
+  // portfolio mostraba el mismo período en naranja.
+  const { totalArs, dayPct } = useMemo(() => {
     const holdings = assets.filter(
       (a: Asset) =>
         a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
     );
-    let acc = 0;
+    let total = 0;
+    let realDay = 0;
     for (const a of holdings) {
       const native = a.price * (a.qty ?? 0);
-      acc += convertAmount(native, assetCurrency(a), "ARS");
+      const ars = convertAmount(native, assetCurrency(a), "ARS");
+      total += ars;
+      realDay += ars * (a.change / 100);
     }
-    return acc;
+    /* FORCE_LOSS_PREVIEW: sync con portfolio.tsx — sacar cuando se
+     * desactive ese flag. */
+    const FORCE_LOSS_PREVIEW = true;
+    const daySumArs = FORCE_LOSS_PREVIEW
+      ? -Math.abs(realDay || 1)
+      : realDay;
+    const yesterdayArs = total - daySumArs;
+    const pct = yesterdayArs > 0 ? (daySumArs / yesterdayArs) * 100 : 0;
+    return { totalArs: total, dayPct: pct };
   }, []);
 
   const totalDisplay =
     currency === "ARS" ? totalArs : convertAmount(totalArs, "ARS", currency);
-  const rangePct = RENDIMIENTO_PCTS[range];
+  /* Para 1D usamos el % real del día computado arriba (mismo que
+   * portfolio); para el resto, el mock de RENDIMIENTO_PCTS. */
+  const rangePct = range === "1D" ? dayPct : RENDIMIENTO_PCTS[range];
   const invertido = totalDisplay / (1 + rangePct / 100);
 
   const series = useMemo(
