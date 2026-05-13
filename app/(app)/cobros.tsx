@@ -175,7 +175,7 @@ export default function CobrosScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[s.title, { color: c.text }]}>Cobros</Text>
+        <Text style={[s.title, { color: c.text }]}>Flujos del año</Text>
 
         {/* Month nav — el label central es tappable y abre el picker
             de mes/año. Affordance: chevron-down al lado del texto. */}

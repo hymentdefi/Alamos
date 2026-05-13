@@ -149,7 +149,7 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
             </View>
 
             <Text style={[s.title, { color: c.text }]}>
-              ¿Qué son los cobros?
+              ¿Qué son los flujos?
             </Text>
 
             <Text style={[s.body, { color: c.textSecondary }]}>

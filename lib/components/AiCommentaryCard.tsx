@@ -63,19 +63,15 @@ export function AiCommentaryCard({
       ))}
 
       <View style={[s.footerWrap, { borderTopColor: c.border }]}>
-        {/* AI provenance — el user tiene que sentir que está
-            consumiendo análisis potenciado por IA. Brand-colored
-            stamp con zap icon, weight 700 uppercase, sutil pero
-            inequívoco. */}
-        <View style={s.aiProvenance}>
-          <Feather name="zap" size={11} color={c.brand} />
-          <Text style={[s.aiProvenanceText, { color: c.brand }]}>
-            Potenciado por Álamos AI
-          </Text>
-        </View>
+        {/* Disclaimer + AI provenance integrados en una sola frase
+            premium — el user identifica que el análisis es generado
+            con IA pero queda en el lenguaje natural del texto, sin
+            stamps gritados ni emojis. La oración legal vive al final
+            para cumplir compliance. */}
         <Text style={[s.disclaimer, { color: c.textFaint }]}>
-          Análisis informativo. No constituye recomendación de
-          inversión.
+          Análisis informativo potenciado por Inteligencia Artificial
+          para que tomes mejores decisiones. No constituye
+          recomendación de inversión.
         </Text>
       </View>
     </View>
@@ -136,21 +132,6 @@ const s = StyleSheet.create({
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  /* AI provenance stamp — line con zap icon + texto uppercase brand
-   * arriba del disclaimer legal. Premium feel: el user identifica
-   * inmediatamente que el contenido es generado con IA. */
-  aiProvenance: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 6,
-  },
-  aiProvenanceText: {
-    fontFamily: fontFamily[700],
-    fontSize: 11,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
   },
   disclaimer: {
     fontFamily: fontFamily[500],

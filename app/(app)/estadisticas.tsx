@@ -14,11 +14,7 @@ import {
   type StatKey,
   type StatsRange,
 } from "../../lib/data/portfolioStats";
-import {
-  formatMoney,
-  formatPct,
-  type AssetCurrency,
-} from "../../lib/data/assets";
+import { formatPct } from "../../lib/data/assets";
 import { convertAmount } from "../../lib/data/accounts";
 
 /**
@@ -31,13 +27,13 @@ import { convertAmount } from "../../lib/data/accounts";
  *   - Top bar (back arrow)
  *   - Title "Estadísticas" h1
  *   - Period pills globales (sync con el range que viene del caller)
- *   - 5 sub-secciones:
+  *   - 4 sub-secciones:
  *       1. Rendimiento por período (tabla TWR + MWR)
  *       2. Riesgo ajustado (Sortino + Calmar + Beta)
  *       3. vs Mercado (Up-Capture + Down-Capture)
  *       4. Composición (Posiciones efectivas + Top-5 concentración)
- *       5. Income breakdown (cupones / dividendos / amortizaciones /
- *          forward 12M)
+ *      (Income breakdown vive ahora en la sección "Flujos del año"
+ *      de la pantalla anterior para no duplicar.)
  *
  * Cada métrica tappable abre el StatInfoSheet genérico con la entrada
  * correspondiente de STAT_INFO.
@@ -82,8 +78,6 @@ export default function EstadisticasScreen() {
     () => computeTier2Stats(range, toDisplay),
     [range, toDisplay],
   );
-
-  const fmt = (n: number) => formatMoney(n, currency as AssetCurrency);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -309,49 +303,9 @@ export default function EstadisticasScreen() {
           />
         </View>
 
-        {/* ─── Sub-sección 5: Income breakdown ─────────────────── */}
-        <View style={s.section}>
-          <Text style={[s.sectionTitle, { color: c.text }]}>
-            Ingresos del año
-          </Text>
-          <StatRow
-            statKey="cupones"
-            label="Cupones"
-            value={fmt(stats.income.cupones)}
-            sub="intereses de bonos"
-            onPress={() => setOpenStat("cupones")}
-            c={c}
-            isLast={false}
-          />
-          <StatRow
-            statKey="dividendos"
-            label="Dividendos"
-            value={fmt(stats.income.dividendos)}
-            sub="de acciones y CEDEARs"
-            onPress={() => setOpenStat("dividendos")}
-            c={c}
-            isLast={false}
-          />
-          <StatRow
-            statKey="amortizaciones"
-            label="Amortizaciones"
-            value={fmt(stats.income.amortizaciones)}
-            sub="devolución de capital"
-            onPress={() => setOpenStat("amortizaciones")}
-            c={c}
-            isLast={false}
-          />
-          <StatRow
-            statKey="forward12M"
-            label="Proyectado 12M"
-            value={fmt(stats.income.forward12M)}
-            sub="estimación de cobros próximo año"
-            valueColor={c.brand}
-            onPress={() => setOpenStat("forward12M")}
-            c={c}
-            isLast={true}
-          />
-        </View>
+        {/* Income breakdown se movió a la sección Flujos del año en
+            la pantalla anterior (Rendimiento). Evitamos duplicar la
+            misma data en dos lugares. */}
       </ScrollView>
 
       <StatInfoSheet
