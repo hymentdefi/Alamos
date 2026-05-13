@@ -277,39 +277,34 @@ export function monthNameShort(month: number): string {
   return MONTH_LABELS[month];
 }
 
-/** Ventana mensual centrada en hoy. Default: 5 atrás + 6 adelante = 12 bars. */
+/** Ene → Dic del año en curso. Mes ≤ hoy va como `paid` (brand),
+ *  el resto como `upcoming` (gris). El mes actual queda flaggeado
+ *  con `isCurrent` para destacarlo en el label. Modelo más intuitivo
+ *  para retail: "este año" en lugar de "rolling 12 meses centrado". */
 export function monthlyBuckets(
   events: PayoutEvent[],
   toArs: (amount: number, currency: AssetCurrency) => number,
   today: Date = MOCK_TODAY,
-  monthsBack = 5,
-  monthsFwd = 6,
 ): MonthBucket[] {
+  const year = today.getFullYear();
+  const currentMonth = today.getMonth();
   const buckets: MonthBucket[] = [];
-  const startYear = today.getFullYear();
-  const startMonth = today.getMonth() - monthsBack;
-  const total = monthsBack + monthsFwd + 1;
 
-  for (let i = 0; i < total; i++) {
-    const d = new Date(startYear, startMonth + i, 1);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const key = `${year}-${(month + 1).toString().padStart(2, "0")}`;
-    const isCurrent = i === monthsBack;
+  for (let m = 0; m < 12; m++) {
     buckets.push({
-      key,
-      month,
+      key: `${year}-${(m + 1).toString().padStart(2, "0")}`,
+      month: m,
       year,
-      label: MONTH_LABELS[month],
+      label: MONTH_LABELS[m],
       totalArs: 0,
-      paid: i <= monthsBack,
-      isCurrent,
+      paid: m <= currentMonth,
+      isCurrent: m === currentMonth,
     });
   }
 
   for (const e of events) {
-    const [y, m] = e.date.split("-");
-    const k = `${y}-${m}`;
+    if (!e.date.startsWith(`${year}-`)) continue;
+    const k = e.date.slice(0, 7);
     const b = buckets.find((bb) => bb.key === k);
     if (b) b.totalArs += toArs(e.amount, e.currency);
   }
