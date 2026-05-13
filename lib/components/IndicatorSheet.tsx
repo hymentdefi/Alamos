@@ -1560,45 +1560,55 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
 }
 
 /** Genera los segmentos del preview — partes en c.brand (highlight)
- *  vs partes en c.textSecondary. La estructura de cada return define
- *  qué va resaltado: ticker, números, períodos, umbrales, timeframe. */
+ *  vs partes en c.text (neutral). Estructura prosaica con contexto
+ *  educativo: descomprime "RSI(14)" a "RSI de 14 períodos", "70" a
+ *  "nivel 70 (sobrecompra)", "1D" a "velas de 1D", etc. Más larga
+ *  pero el usuario no tiene que googlear qué significa cada cosa
+ *  cuando le llega como push. */
 function previewSegments(
   type: IndicatorType,
   ticker: string,
   cfg: ConfigState,
 ): { text: string; highlight: boolean }[] {
-  const tf = cfg.timeframe;
+  /* "velas de TF" — descompresión común a todos los indicadores. */
+  const tfDesc = `velas de ${cfg.timeframe}`;
   const T = (text: string, highlight = false) => ({ text, highlight });
   if (type === "ma") {
-    const v = cfg.maVariant.toUpperCase();
-    const dir =
-      cfg.maCondition === "above"
-        ? "cruce por encima"
-        : "cruce por debajo";
+    const maName =
+      cfg.maVariant === "ema"
+        ? "media móvil exponencial"
+        : "media móvil simple";
+    const maDesc = `${maName} de ${cfg.maPeriod} períodos`;
+    const dirPhrase =
+      cfg.maCondition === "above" ? "por encima" : "por debajo";
     return [
       T("El precio de "),
       T(ticker, true),
-      T(` ${dir} de la `),
-      T(`${v}(${cfg.maPeriod})`, true),
+      T(` cruce ${dirPhrase} de la `),
+      T(maDesc, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
   if (type === "rsi") {
-    const dir =
-      cfg.rsiCondition === "above"
-        ? "suba por encima"
-        : "baje por debajo";
+    const rsiDesc = `RSI de ${cfg.rsiPeriod} períodos`;
+    const above = cfg.rsiCondition === "above";
+    /* "para TICKER" en vez de "de TICKER" para evitar doble-de
+     * después de "RSI de N períodos". */
+    const dirPhrase = above ? "suba por encima del" : "caiga por debajo del";
+    const thresholdDesc = `nivel ${cfg.rsiThreshold} (${
+      above ? "sobrecompra" : "sobreventa"
+    })`;
     return [
       T("El "),
-      T(`RSI(${cfg.rsiPeriod})`, true),
-      T(" de "),
+      T(rsiDesc, true),
+      T(" para "),
       T(ticker, true),
-      T(` ${dir} de `),
-      T(`${cfg.rsiThreshold}`, true),
+      T(` ${dirPhrase} `),
+      T(thresholdDesc, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
@@ -1619,7 +1629,7 @@ function previewSegments(
         T(" cruce al "),
         T(dir, true),
         T(" la línea cero en "),
-        T(tf, true),
+        T(tfDesc, true),
         T("."),
       ];
     }
@@ -1632,12 +1642,17 @@ function previewSegments(
       T(" cruce a la "),
       T(dir, true),
       T(" la línea de señal en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
   if (type === "bollinger") {
-    const formula = `Bollinger(${cfg.bbPeriod}, ${fmtDecimalChip(cfg.bbDeviation)}σ)`;
+    /* Formato expandido: "Bollinger (20 períodos, 2,0σ)" con
+     * espacio antes del paren y desviación con 1 decimal fijo
+     * (matchea el formato del stepper). */
+    const formula = `Bollinger (${cfg.bbPeriod} períodos, ${cfg.bbDeviation
+      .toFixed(1)
+      .replace(".", ",")}σ)`;
     if (cfg.bbCondition === "squeeze") {
       return [
         T("Las "),
@@ -1645,7 +1660,7 @@ function previewSegments(
         T(" de "),
         T(ticker, true),
         T(" se contraigan en "),
-        T(tf, true),
+        T(tfDesc, true),
         T("."),
       ];
     }
@@ -1658,7 +1673,7 @@ function previewSegments(
       T(" de "),
       T(formula, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
@@ -1668,9 +1683,11 @@ function previewSegments(
     T(" supere "),
     T(`${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}×`, true),
     T(" el promedio de "),
-    T(`${cfg.volumeAvgPeriod} días`, true),
+    /* "períodos" en vez de "días" — solo es exacto en daily, en
+     * otros timeframes (1H, 4H) "días" sería incorrecto. */
+    T(`${cfg.volumeAvgPeriod} períodos`, true),
     T(" en "),
-    T(tf, true),
+    T(tfDesc, true),
     T("."),
   ];
 }
