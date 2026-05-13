@@ -176,15 +176,6 @@ export default function RendimientoScreen() {
     { label: "Días positivos", value: "62%" },
   ];
 
-  // Performance attribution mock — del doc, "+18% vino de los activos,
-  // +10% vino de la devaluación del peso". Educativo en AR.
-  const fxAttribution = useMemo(() => {
-    if (currency !== "ARS" || range === "1D") return null;
-    const fxPct = rangePct * 0.4;
-    const assetPct = rangePct - fxPct;
-    return { fxPct, assetPct };
-  }, [currency, rangePct, range]);
-
   return (
     <AssetColorProvider up={up}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -314,34 +305,6 @@ export default function RendimientoScreen() {
               );
             })}
           </View>
-
-          {/* Performance attribution FX vs activos — el insight más
-              valioso en AR según el doc. Solo aplica en ARS y en
-              rangos > 1D. */}
-          {fxAttribution ? (
-            <View style={s.card}>
-              <Text style={[s.cardEyebrow, { color: c.text }]}>
-                De dónde viene
-              </Text>
-              <Text
-                style={[s.attribBody, { color: c.textSecondary }]}
-              >
-                De tu rendimiento total de{" "}
-                <Text style={{ color: c.brand }}>
-                  {formatPct(rangePct)}
-                </Text>
-                ,{" "}
-                <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-                  {formatPct(fxAttribution.assetPct)}
-                </Text>{" "}
-                vino de la apreciación de tus activos y{" "}
-                <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-                  {formatPct(fxAttribution.fxPct)}
-                </Text>{" "}
-                vino de la devaluación del peso.
-              </Text>
-            </View>
-          ) : null}
 
           {/* Cobros — dividendos, cupones y amortizaciones del
               portfolio. Calendario forward + breakdown del año
@@ -478,12 +441,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
-  },
-  attribBody: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: -0.1,
   },
 
   disclaimer: {
