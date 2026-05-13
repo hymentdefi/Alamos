@@ -10,6 +10,7 @@ import {
   assets,
   assetCurrency,
   assetMarket,
+  formatMoney,
   formatPct,
   type Asset,
 } from "../../lib/data/assets";
@@ -18,10 +19,15 @@ import {
   Sparkline,
   seriesFromSeed,
 } from "../../lib/components/Sparkline";
+import { AiCommentaryCard } from "../../lib/components/AiCommentaryCard";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { CobrosSection } from "../../lib/components/CobrosSection";
 import { Tap } from "../../lib/components/Tap";
 import { Tier1StatsBento } from "../../lib/components/Tier1StatsBento";
+import {
+  computeTier2Stats,
+  getTier1Stats,
+} from "../../lib/data/portfolioStats";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 
 /**
@@ -210,6 +216,20 @@ export default function RendimientoScreen() {
     [currency],
   );
 
+  /* Tier 1 + Tier 2 stats para el AI Commentary que vive entre los
+   * range pills y el Tier 1 bento. El bento tiene su propio cómputo
+   * interno de Tier 1 (vía computeTier1Stats) — acá necesitamos
+   * el shape completo para alimentar el commentary. */
+  const tier1Stats = useMemo(
+    () => getTier1Stats(range, toDisplay),
+    [range, toDisplay],
+  );
+  const tier2Stats = useMemo(
+    () => computeTier2Stats(range, toDisplay),
+    [range, toDisplay],
+  );
+  const fmtAmount = (n: number) => formatMoney(n, currency);
+
   return (
     <AssetColorProvider up={up}>
       <View style={[s.root, { backgroundColor: c.bg }]}>
@@ -299,6 +319,18 @@ export default function RendimientoScreen() {
               );
             })}
           </View>
+
+          {/* AI Portfolio Commentary — análisis narrativo basado en
+              las stats Tier 1 + Tier 2 del período seleccionado.
+              Vive acá entre los range pills y el Tier 1 bento: la
+              narrativa primero (qué pasó y por qué), después los
+              números (cómo se descompone). */}
+          <AiCommentaryCard
+            range={range}
+            tier1={tier1Stats}
+            tier2={tier2Stats}
+            formatAmount={fmtAmount}
+          />
 
           {/* Tier 1 stats — bento grid de 8 cards según la spec
               interna (Portfolio Statistics Engine v1.0). Tap a una
