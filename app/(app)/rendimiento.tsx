@@ -348,9 +348,9 @@ export default function RendimientoScreen() {
           />
 
           {/* Entradas Fase 3: "Proyección de tu portfolio" (Monte Carlo)
-              + "ADN de tu portfolio" (Factor Exposure). Section title
-              c.brand 22pt + chevron verde — mismo peso visual que
-              Análisis / Estadísticas / Flujos del año, pero tappable.
+              + "ADN de tu portfolio" (Factor Exposure). Mismo pattern
+              que el BriefingCard de stock detail — título c.brand 22pt
+              + arrow-right verde pegado al lado, descripción debajo.
               Labels retail per spec 5.5 + 6.4 — nunca decimos
               "Monte Carlo" o "Factor Exposure" en la UI. */}
           <Tap
@@ -359,10 +359,16 @@ export default function RendimientoScreen() {
             pressScale={0.98}
             style={s.sectionLink}
           >
-            <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
-              Proyección de tu portfolio
+            <View style={s.sectionLinkHead}>
+              <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
+                Proyección de tu portfolio
+              </Text>
+              <Feather name="arrow-right" size={20} color={c.brand} />
+            </View>
+            <Text style={[s.sectionLinkSub, { color: c.textMuted }]}>
+              Simulamos miles de escenarios posibles para estimar cómo
+              podría crecer tu inversión.
             </Text>
-            <Feather name="chevron-right" size={22} color={c.brand} />
           </Tap>
 
           <Tap
@@ -371,10 +377,16 @@ export default function RendimientoScreen() {
             pressScale={0.98}
             style={s.sectionLink}
           >
-            <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
-              ADN de tu portfolio
+            <View style={s.sectionLinkHead}>
+              <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
+                ADN de tu portfolio
+              </Text>
+              <Feather name="arrow-right" size={20} color={c.brand} />
+            </View>
+            <Text style={[s.sectionLinkSub, { color: c.textMuted }]}>
+              Analizamos las características principales de tus
+              inversiones según seis factores académicos.
             </Text>
-            <Feather name="chevron-right" size={22} color={c.brand} />
           </Tap>
 
           {/* Cobros — dividendos, cupones y amortizaciones del
@@ -497,21 +509,30 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  /* ─── Section links "Proyección de tu portfolio" + "ADN" ─── */
+  /* ─── Section links "Proyección de tu portfolio" + "ADN" ───
+   * Pattern del BriefingCard de stock detail: título + arrow-right
+   * tight (gap 6) y descripción debajo. */
   sectionLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 24,
     marginTop: 28,
     paddingVertical: 4,
+  },
+  sectionLinkHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
   },
   sectionLinkTitle: {
     fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.5,
-    flex: 1,
-    minWidth: 0,
+  },
+  sectionLinkSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: -0.1,
   },
 
   disclaimer: {
