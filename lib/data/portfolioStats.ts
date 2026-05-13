@@ -388,6 +388,18 @@ export interface Tier2Stats {
     totalYtd: number;
     forward12M: number;
   };
+  /* Attribution — qué activos aportaron o restaron al return del
+   * período. Pp = puntos porcentuales del return total. */
+  attribution: {
+    topContributor: { ticker: string; contribPp: number } | null;
+    topDetractor: { ticker: string; contribPp: number } | null;
+  };
+  /* Cash idle — efectivo en cuentas que no está invertido, en
+   * moneda de display + % del portfolio total (invertido + cash). */
+  cashIdle: {
+    display: number;
+    pctOfPortfolio: number;
+  };
 }
 
 /* Magnitudes mock por range. Mismo enfoque que Tier 1: cuando el
@@ -535,6 +547,57 @@ function computeReturnsByPeriod(): ReturnsByPeriodRow[] {
   });
 }
 
+/* Attribution: por cada holding, contribución al return del portfolio
+ * en puntos porcentuales (pp). Mock: usa el daily change como proxy
+ * del aporte del período. En prod: cálculo real con price series. */
+function computeAttribution(): Tier2Stats["attribution"] {
+  const weights = computeWeights();
+  const totalArs = weights.reduce((acc, p) => acc + p.ars, 0);
+  if (totalArs <= 0) return { topContributor: null, topDetractor: null };
+  const contribs = assets
+    .filter(
+      (a: Asset) =>
+        a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+    )
+    .map((a) => {
+      const native = a.price * (a.qty ?? 0);
+      const ars = convertAmount(native, assetCurrency(a), "ARS");
+      const contribArs = ars * (a.change / 100);
+      const contribPp = (contribArs / totalArs) * 100;
+      return { ticker: a.ticker, contribPp };
+    })
+    .sort((a, b) => b.contribPp - a.contribPp);
+  return {
+    topContributor: contribs[0] && contribs[0].contribPp > 0.05 ? contribs[0] : null,
+    topDetractor:
+      contribs.length > 0 &&
+      contribs[contribs.length - 1].contribPp < -0.05
+        ? contribs[contribs.length - 1]
+        : null,
+  };
+}
+
+/* Cash idle: efectivo no invertido (category=efectivo), convertido
+ * a moneda de display + % del portfolio total (invertido + cash). */
+function computeCashIdle(
+  toDisplay: (ars: number) => number,
+): Tier2Stats["cashIdle"] {
+  const cash = assets.filter(
+    (a: Asset) =>
+      a.held && a.category === "efectivo" && (a.qty ?? 0) > 0,
+  );
+  const cashArs = cash.reduce((acc, a) => {
+    const native = a.price * (a.qty ?? 0);
+    return acc + convertAmount(native, assetCurrency(a), "ARS");
+  }, 0);
+  const investedArs = computeTotalArs();
+  const totalArs = investedArs + cashArs;
+  return {
+    display: toDisplay(cashArs),
+    pctOfPortfolio: totalArs > 0 ? (cashArs / totalArs) * 100 : 0,
+  };
+}
+
 export function computeTier2Stats(
   range: StatsRange,
   toDisplay: (ars: number) => number,
@@ -559,6 +622,8 @@ export function computeTier2Stats(
       semaforo: concentracionSemaforo(concentracion),
     },
     income: computeIncomeBreakdown(toDisplay),
+    attribution: computeAttribution(),
+    cashIdle: computeCashIdle(toDisplay),
   };
 }
 
@@ -760,16 +825,32 @@ interface CommentaryArgs {
   formatAmount: (amount: number) => string;
 }
 
+/**
+ * Estructura del commentary (4 párrafos):
+ *   1. Performance — period return + top contributor/detractor +
+ *      benchmark (S&P 500).
+ *   2. Riesgo — vol level + Sharpe en plano + observación de
+ *      drawdown si fue significativo en el período.
+ *   3. Composición — concentración top-5 (con alerta si > 60%) +
+ *      posiciones efectivas.
+ *   4. Contextual — cash idle si es > 5% del portfolio.
+ *
+ * Reglas (compliance):
+ *   NUNCA recomendar compras o ventas, predecir movimientos del
+ *   mercado, mencionar competidores ni dar opiniones sobre la
+ *   economía. Solo observaciones descriptivas sobre el estado
+ *   actual del portfolio.
+ */
 export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] {
   const { range, tier1, tier2, formatAmount } = args;
   const out: CommentaryParagraph[] = [];
 
-  /* ── Párrafo 1: Resumen de performance + benchmark ── */
+  /* ── Párrafo 1: Performance + drivers + benchmark ── */
   const periodLabel = PERIOD_LABEL[range];
   const direction = tier1.twr.pct >= 0 ? "creció" : "cayó";
   const twrFormatted = pctText(tier1.twr.pct);
-  const alphaSign = tier1.alpha.pct > 0 ? "superando" : "por debajo de";
   const benchmarkFormatted = pctText(tier1.alpha.benchmarkPct);
+  const alphaSign = tier1.alpha.pct > 0 ? "superando" : "por debajo de";
 
   let p1 = `Tu portfolio ${direction} **${twrFormatted}** en ${periodLabel}`;
   if (Math.abs(tier1.alpha.pct) > 0.3) {
@@ -777,55 +858,64 @@ export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] 
   } else {
     p1 += `, en línea con el S&P 500 (${benchmarkFormatted}).`;
   }
+
+  /* Top contributor / detractor — solo si el aporte es ≥ 0.3 pp en
+   * valor absoluto, sino el mention no agrega información. */
+  const top = tier2.attribution.topContributor;
+  const bottom = tier2.attribution.topDetractor;
+  if (top && top.contribPp >= 0.3) {
+    p1 += ` El principal impulso vino de **${top.ticker}** (aportó ${num1(top.contribPp)} pp)`;
+    if (bottom && Math.abs(bottom.contribPp) >= 0.3) {
+      p1 += `, mientras que **${bottom.ticker}** restó ${num1(Math.abs(bottom.contribPp))} pp.`;
+    } else {
+      p1 += `.`;
+    }
+  } else if (bottom && Math.abs(bottom.contribPp) >= 0.3) {
+    p1 += ` El mayor lastre vino de **${bottom.ticker}** (restó ${num1(Math.abs(bottom.contribPp))} pp).`;
+  }
   out.push({ text: p1 });
 
-  /* ── Párrafo 2: Riesgo + Sharpe ── */
+  /* ── Párrafo 2: Riesgo (vol + Sharpe + drawdown contextual) ── */
   const volTone =
     tier1.volatility.semaforo === "verde"
       ? "bajo"
       : tier1.volatility.semaforo === "amarillo"
         ? "moderado"
         : "alto";
-  const sharpeQual =
-    tier1.sharpe.value > 1.0
-      ? "indica buena compensación por el riesgo asumido"
-      : tier1.sharpe.value > 0.5
-        ? "indica que la compensación por el riesgo es regular"
-        : "indica que el riesgo no se está pagando";
-  out.push({
-    text: `La volatilidad anualizada es **${num1(tier1.volatility.pct)}%** (riesgo ${volTone}) y el Sharpe ratio de **${num2(tier1.sharpe.value)}** ${sharpeQual}.`,
-  });
 
-  /* ── Párrafo 3: Peor caída ── */
-  if (tier1.maxDrawdown.recoveryDays > 0) {
-    out.push({
-      text: `La peor caída fue de **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}, y la recuperación tomó ${tier1.maxDrawdown.recoveryDays} días.`,
-    });
-  } else if (range !== "1D") {
-    out.push({
-      text: `La peor caída fue de **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}.`,
-    });
-  }
-
-  /* ── Párrafo 4: Concentración / diversificación ── */
-  if (tier2.concentracionTop5.pct > 60) {
-    out.push({
-      text: `Tus 5 posiciones más grandes concentran el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. Esto amplifica tanto las subas como las bajas, y reduce la protección que da la diversificación.`,
-    });
-  } else if (tier2.concentracionTop5.pct > 40) {
-    out.push({
-      text: `Tus 5 posiciones más grandes representan **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. El nivel de concentración es razonable pero monitoreable.`,
-    });
+  /* Sharpe en plano: si es bajo, el mensaje cambia de "compensación
+   * regular" a una observación directa: "estás tomando riesgo que no
+   * te está siendo compensado". Más útil para retail. */
+  let p2: string;
+  if (tier1.sharpe.value > 1.0) {
+    p2 = `La volatilidad anualizada es **${num1(tier1.volatility.pct)}%** (riesgo ${volTone}). Con un Sharpe ratio de **${num2(tier1.sharpe.value)}**, el riesgo asumido te está siendo bien compensado.`;
+  } else if (tier1.sharpe.value > 0.5) {
+    p2 = `La volatilidad anualizada es **${num1(tier1.volatility.pct)}%** (riesgo ${volTone}). El Sharpe ratio de **${num2(tier1.sharpe.value)}** es regular: el rendimiento alcanza para justificar el riesgo, pero sin margen amplio.`;
   } else {
-    out.push({
-      text: `El portfolio está diversificado: tenés **${num1(tier2.posicionesEfectivas.value)}** posiciones efectivas, lo que reduce el impacto de un solo activo en el resultado.`,
-    });
+    p2 = `La volatilidad anualizada es **${num1(tier1.volatility.pct)}%** (riesgo ${volTone}). Con un Sharpe ratio de **${num2(tier1.sharpe.value)}**, estás tomando riesgo que no te está siendo compensado.`;
   }
 
-  /* ── Párrafo 5: Income (si el portfolio paga rentas) ── */
-  if (tier1.dividendYield.pct > 0 && tier2.income.totalYtd > 0) {
+  /* Drawdown si fue significativo en el período (> 5%) y se recuperó. */
+  if (tier1.maxDrawdown.pct > 5 && tier1.maxDrawdown.recoveryDays > 0) {
+    p2 += ` La peor caída del período fue **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}, y la recuperación tomó ${tier1.maxDrawdown.recoveryDays} días.`;
+  }
+  out.push({ text: p2 });
+
+  /* ── Párrafo 3: Composición (concentración + posiciones efectivas) ── */
+  let p3: string;
+  if (tier2.concentracionTop5.pct > 60) {
+    p3 = `Tus 5 posiciones más grandes concentran el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. Una caída fuerte en cualquiera de ellas te impactaría de lleno, y la diversificación equivale a tener solo **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas**.`;
+  } else if (tier2.concentracionTop5.pct > 40) {
+    p3 = `Las 5 posiciones más grandes representan el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. La diversificación es razonable: equivale a tener **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas**.`;
+  } else {
+    p3 = `Tu portfolio está bien diversificado: las 5 posiciones más grandes representan solo el **${tier2.concentracionTop5.pct.toFixed(0)}%**, equivalente a **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas**. Esto reduce el impacto de un solo activo.`;
+  }
+  out.push({ text: p3 });
+
+  /* ── Párrafo 4: Contextual (cash idle si es > 5% del portfolio) ── */
+  if (tier2.cashIdle.pctOfPortfolio > 5) {
     out.push({
-      text: `Generaste **${formatAmount(tier2.income.totalYtd)}** en cobros este año, un yield anualizado de **${num2(tier1.dividendYield.pct)}%**. Se proyectan **${formatAmount(tier2.income.forward12M)}** en los próximos 12 meses.`,
+      text: `Tenés **${formatAmount(tier2.cashIdle.display)}** sin invertir, un **${num1(tier2.cashIdle.pctOfPortfolio)}%** del portfolio total. Es capital que no está generando rendimiento.`,
     });
   }
 
