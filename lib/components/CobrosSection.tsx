@@ -427,12 +427,14 @@ const s = StyleSheet.create({
   },
 
   /* Card container — mismo lenguaje que rendimiento.tsx (s.card)
-   * pero con marginTop más chico (10 vs 16) para que los 4 cards de
-   * la sección respiren más cerca entre sí. */
+   * pero con paddings/margen más chicos para que los 4 cards de la
+   * sección Cobros respiren como un bloque continuo en lugar de
+   * cards islotes. paddingVertical 18 (vs 24) + marginTop 4 (vs 16)
+   * reducen el gap visible entre cards de ~58pt → ~40pt. */
   card: {
     paddingHorizontal: 24,
-    paddingVertical: 24,
-    marginTop: 10,
+    paddingVertical: 18,
+    marginTop: 4,
   },
   /* Override del primer card: pegado al section header (sin gap
    * externo extra), así el título "Cobros" se siente como heading
