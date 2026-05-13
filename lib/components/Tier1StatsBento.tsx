@@ -173,7 +173,7 @@ export function Tier1StatsBento({
 
   return (
     <View style={s.bentoCard}>
-      <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
+      <Text style={[s.bentoTitle, { color: c.text }]}>Estadísticas</Text>
       <View style={s.grid}>
         {cards.map((card) => {
           const dotColor = card.semaforo

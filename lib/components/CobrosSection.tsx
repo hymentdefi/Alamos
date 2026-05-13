@@ -12,7 +12,9 @@ import Animated, {
 import { fontFamily, radius, useTheme } from "../theme";
 import { AmountDisplay } from "./AmountDisplay";
 import { CobrosInfoSheet } from "./CobrosInfoSheet";
+import { StatInfoSheet } from "./StatInfoSheet";
 import { Tap } from "./Tap";
+import type { StatKey } from "../data/portfolioStats";
 import {
   MOCK_TODAY,
   daysUntil,
@@ -130,6 +132,10 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
   const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  /* Sheet de detalle (cupones / dividendos / amortizaciones /
+   * forward12M). Cada row del card Detalle abre su entry de
+   * STAT_INFO con la explicación retail. */
+  const [openStat, setOpenStat] = useState<StatKey | null>(null);
 
   const events = useMemo(() => generatePayouts(), []);
 
@@ -177,6 +183,27 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
     return events.filter((e) => e.date.startsWith(scrubKey));
   }, [scrubKey, events]);
 
+  /* Forward 12M — sumatoria de eventos por venir en los próximos
+   * 12 meses, en ARS. Reusable en el card Detalle como
+   * "Proyectado 12M". */
+  const forward12MArs = useMemo(() => {
+    const today = MOCK_TODAY;
+    const todayIso = today.toISOString().slice(0, 10);
+    const oneYearFromNow = new Date(
+      today.getFullYear() + 1,
+      today.getMonth(),
+      today.getDate(),
+    );
+    const oneYearFromNowIso = oneYearFromNow.toISOString().slice(0, 10);
+    let total = 0;
+    for (const e of events) {
+      if (e.date > todayIso && e.date <= oneYearFromNowIso) {
+        total += toArs(e.amount, e.currency);
+      }
+    }
+    return total;
+  }, [events, toArs]);
+
   /* Si no hay eventos, no renderizamos nada — para holdings sin renta
    * (solo crypto, solo FCI, etc.) la sección no aporta. */
   if (events.length === 0) return null;
@@ -205,7 +232,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           pressScale={0.97}
           hitSlop={8}
         >
-          <Text style={[s.sectionTitle, { color: c.brand }]}>
+          <Text style={[s.sectionTitle, { color: c.text }]}>
             Flujos del año
           </Text>
         </Tap>
@@ -424,51 +451,86 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </View>
           ) : null}
 
-          {/* ─── Card 4: Por tipo — desglose de los flujos cobrados
-              YTD en cupones / dividendos / amortizaciones. Dot
-              colorado a la izquierda de cada label, totales del
-              año a la derecha. */}
+          {/* ─── Card 4: Detalle — desglose de los flujos cobrados
+              YTD por tipo (cupones / dividendos / amortizaciones) +
+              proyectado 12M. Mismo estilo que el StatRow de la
+              sub-pantalla /estadisticas: label + sub-texto a la
+              izquierda, valor a la derecha, tappable abre el
+              StatInfoSheet con explicación retail por término. */}
           {ytdPaid.totalArs > 0 ? (
             <View style={s.card}>
               <Text style={[s.eyebrow, { color: c.text }]}>
                 Detalle
               </Text>
-              {(["cupon", "dividendo", "amortizacion"] as const)
-                .filter((t) => ytdPaid.byType[t] > 0)
-                .map((t, i, arr) => (
-                  <View
-                    key={t}
+              {(
+                [
+                  {
+                    key: "cupones" as StatKey,
+                    label: "Cupones",
+                    sub: "intereses de bonos",
+                    value: ytdPaid.byType.cupon,
+                  },
+                  {
+                    key: "dividendos" as StatKey,
+                    label: "Dividendos",
+                    sub: "de acciones y CEDEARs",
+                    value: ytdPaid.byType.dividendo,
+                  },
+                  {
+                    key: "amortizaciones" as StatKey,
+                    label: "Amortizaciones",
+                    sub: "devolución de capital",
+                    value: ytdPaid.byType.amortizacion,
+                  },
+                  {
+                    key: "forward12M" as StatKey,
+                    label: "Proyectado 12M",
+                    sub: "estimación de cobros próximo año",
+                    value: forward12MArs,
+                    accent: true,
+                  },
+                ] as const
+              )
+                .filter((row) => row.value > 0)
+                .map((row, i, arr) => (
+                  <Tap
+                    key={row.key}
+                    onPress={() => setOpenStat(row.key)}
+                    haptic="selection"
+                    pressScale={0.98}
                     style={[
-                      s.tipoRow,
+                      s.detalleRow,
                       i < arr.length - 1 && {
                         borderBottomWidth: StyleSheet.hairlineWidth,
                         borderBottomColor: c.border,
                       },
                     ]}
                   >
-                    <View style={s.tipoLeft}>
-                      <View
-                        style={[
-                          s.tipoDot,
-                          { backgroundColor: TYPE_COLORS[t] },
-                        ]}
-                      />
+                    <View style={s.detalleLeft}>
                       <Text
-                        style={[s.tipoLabel, { color: c.text }]}
+                        style={[s.detalleLabel, { color: c.text }]}
                       >
-                        {payoutTypeLabel(t, true)}
+                        {row.label}
+                      </Text>
+                      <Text
+                        style={[
+                          s.detalleSub,
+                          { color: c.textMuted },
+                        ]}
+                      >
+                        {row.sub}
                       </Text>
                     </View>
                     <Text
-                      style={[s.tipoAmount, { color: c.text }]}
+                      style={[
+                        s.detalleValue,
+                        { color: row.accent ? c.brand : c.text },
+                      ]}
                       numberOfLines={1}
                     >
-                      {formatMoney(
-                        toDisplay(ytdPaid.byType[t]),
-                        currency,
-                      )}
+                      {formatMoney(toDisplay(row.value), currency)}
                     </Text>
-                  </View>
+                  </Tap>
                 ))}
             </View>
           ) : null}
@@ -541,21 +603,15 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
       />
+      <StatInfoSheet
+        statKey={openStat}
+        onClose={() => setOpenStat(null)}
+      />
     </>
   );
 }
 
 const BAR_MAX_H = 84;
-
-/* Tres shades de brand para los dots del breakdown "Por tipo": el
- * vivido para cupones (típicamente el contributor más grande), mint
- * para dividendos, deep para amortizaciones. Hex fijos porque es
- * paleta de chart, mismo criterio que el resto del proyecto. */
-const TYPE_COLORS: Record<"cupon" | "dividendo" | "amortizacion", string> = {
-  cupon: "#00C805",
-  dividendo: "#5AC53A",
-  amortizacion: "#00B864",
-};
 
 const s = StyleSheet.create({
   /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
@@ -729,35 +785,36 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* ─── Por tipo (cupones / dividendos / amortizaciones) ─── */
-  tipoRow: {
+  /* ─── Detalle (cupones / dividendos / amortizaciones / 12M) ─── */
+  /* Mismo estilo que el StatRow de /estadisticas — label + sub a
+   * la izquierda, valor a la derecha, tappable abre el StatInfoSheet
+   * con la explicación retail del término. */
+  detalleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
     gap: 12,
   },
-  tipoLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  detalleLeft: {
     flex: 1,
     minWidth: 0,
   },
-  tipoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  tipoLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  tipoAmount: {
+  detalleLabel: {
     fontFamily: fontFamily[700],
-    fontSize: 14,
+    fontSize: 15,
     letterSpacing: -0.2,
+  },
+  detalleSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+  detalleValue: {
+    fontFamily: fontFamily[800],
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
 
   emptyText: {
