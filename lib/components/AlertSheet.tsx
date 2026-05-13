@@ -588,14 +588,14 @@ export function AlertSheet({
                       style={[
                         s.quickChip,
                         {
-                          backgroundColor: tone,
+                          backgroundColor: "transparent",
                           borderColor: tone,
                         },
                       ]}
                       haptic="selection"
                       onPress={() => applyPct(pct)}
                     >
-                      <Text style={[s.quickText, { color: c.onColor }]}>
+                      <Text style={[s.quickText, { color: tone }]}>
                         {pct > 0 ? `+${pct}%` : `${pct}%`}
                       </Text>
                     </Tap>
@@ -806,8 +806,9 @@ const s = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 4,
     alignItems: "center",
+    borderCurve: "continuous",
     borderRadius: radius.pill,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   quickText: {
     fontFamily: fontFamily[700],
