@@ -69,10 +69,6 @@ export default function AdnScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.title, { color: c.brand }]}>ADN</Text>
-        <Text style={[s.subtitle, { color: c.textMuted }]}>
-          Analizamos las características principales de tus
-          inversiones según distintos factores.
-        </Text>
 
         <View style={s.factorsWrap}>
           {FACTORS_ORDER.map((key, i) => (
@@ -207,15 +203,7 @@ const s = StyleSheet.create({
     letterSpacing: -1,
     paddingHorizontal: 24,
     marginTop: 4,
-  },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    paddingHorizontal: 24,
-    marginTop: 6,
-    marginBottom: 16,
+    marginBottom: 20,
   },
 
   factorsWrap: {
