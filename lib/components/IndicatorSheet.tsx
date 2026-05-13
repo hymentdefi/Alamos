@@ -1094,9 +1094,9 @@ function ParamRow({
   );
 }
 
-/** Segmented control de 2 opciones — pill container + item interior
- *  activo con tint brand sutil + texto en c.brand. Estilo Robinhood:
- *  outline/ghost para que no compita con el CTA primario verde solid. */
+/** Segmented control de 2 opciones — container c.surface con border
+ *  c.border (visible en light, casi invisible en dark). Active item
+ *  con tint brand al ~10% + texto en c.brand. */
 function Segmented<T extends string>({
   options,
   active,
@@ -1109,7 +1109,12 @@ function Segmented<T extends string>({
   c: ColorMap;
 }) {
   return (
-    <View style={[s.segmented, { backgroundColor: c.bgWarm }]}>
+    <View
+      style={[
+        s.segmented,
+        { backgroundColor: c.surface, borderColor: c.border },
+      ]}
+    >
       {options.map((opt) => {
         const isActive = active === opt.value;
         return (
@@ -1121,7 +1126,7 @@ function Segmented<T extends string>({
             }}
             style={[
               s.segmentedItem,
-              isActive && { backgroundColor: `${c.brand}1F` },
+              isActive && { backgroundColor: `${c.brand}1A` },
             ]}
           >
             <Text
@@ -1143,10 +1148,9 @@ function Segmented<T extends string>({
   );
 }
 
-/** Fila de chips horizontales — el activo se renderea outline brand
- *  (border 1.5px c.brand + tint sutil + text c.brand). Estilo
- *  Robinhood: ghost para que no compita con el CTA primario solid.
- *  Wrap natural si no caben todos en una línea. */
+/** Fila de chips horizontales — outline-only. Active: border c.brand
+ *  1.5px + text c.brand, bg transparent. Inactive: border c.border
+ *  1.5px + text c.textMuted, bg transparent. Sin tint fill nunca. */
 function ChipsRow<T extends number | string>({
   chips,
   value,
@@ -1174,8 +1178,8 @@ function ChipsRow<T extends number | string>({
             style={({ pressed }) => [
               s.chip,
               {
-                backgroundColor: active ? `${c.brand}14` : c.bgWarm,
-                borderColor: active ? c.brand : "transparent",
+                backgroundColor: "transparent",
+                borderColor: active ? c.brand : c.border,
                 opacity: pressed ? 0.7 : 1,
               },
             ]}
@@ -1183,7 +1187,7 @@ function ChipsRow<T extends number | string>({
             <Text
               style={[
                 s.chipText,
-                { color: active ? c.brand : c.text },
+                { color: active ? c.brand : c.textMuted },
               ]}
             >
               {labelFn ? labelFn(v) : String(v)}
@@ -1599,6 +1603,7 @@ const s = StyleSheet.create({
     padding: 3,
     borderRadius: radius.md,
     borderCurve: "continuous",
+    borderWidth: 1,
     gap: 3,
   },
   segmentedItem: {
