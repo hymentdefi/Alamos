@@ -486,26 +486,33 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {ranges.map((r) => {
-              const active = r === range;
-              const fg = active ? c.bg : chartColor;
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setRangeAndSave(r);
-                  }}
-                  style={[
-                    s.rangePill,
-                    active && { backgroundColor: chartColor },
-                  ]}
-                  hitSlop={8}
-                >
-                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
-                </Pressable>
-              );
-            })}
+            {/* Spacer invisible mirror del gear — balanza la fila
+                para que los pills queden visualmente centrados sin
+                quedar arrastrados a la izquierda por el peso del
+                gear de la derecha. */}
+            <View style={s.rangeSettingsBtn} pointerEvents="none" />
+            <View style={s.rangePillsRow}>
+              {ranges.map((r) => {
+                const active = r === range;
+                const fg = active ? c.bg : chartColor;
+                return (
+                  <Pressable
+                    key={r}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setRangeAndSave(r);
+                    }}
+                    style={[
+                      s.rangePill,
+                      active && { backgroundColor: chartColor },
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             {/* Settings icon al final del timeline — gear filled
                 que matchea el chartColor (verde si up, rojo si
                 down). Abre el sheet con los ajustes del chart. */}
@@ -1579,9 +1586,14 @@ const s = StyleSheet.create({
   },
   rangeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 0,
     paddingHorizontal: 4,
+  },
+  rangePillsRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
   rangePill: {
     paddingHorizontal: 9,
