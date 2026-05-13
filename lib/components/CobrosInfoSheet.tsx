@@ -335,7 +335,7 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
             </Text>
 
             <Text style={[s.body, { color: c.textSecondary }]}>
-              Solo algunos activos pagan. Los bonos pagan{" "}
+              Los bonos pagan{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 cupones
               </Text>{" "}
@@ -344,12 +344,6 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
                 dividendos
               </Text>{" "}
               cuando la empresa los aprueba.
-              {"\n\n"}
-              Los fondos, letras y cripto{" "}
-              <Text style={[s.bodyBold, { color: c.text }]}>
-                no pagan
-              </Text>
-              : ahí ganás cuando el precio sube.
               {"\n\n"}
               Acá ves cuándo y cuánto vas a cobrar este año.
             </Text>
