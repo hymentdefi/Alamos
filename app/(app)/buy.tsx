@@ -20,6 +20,10 @@ import { nativeBalanceFor } from "../../lib/data/accounts";
 import { Tap } from "../../lib/components/Tap";
 import { PercentSlider } from "../../lib/components/PercentSlider";
 import {
+  OrderTypeSheet,
+  type OrderType,
+} from "../../lib/components/OrderTypeSheet";
+import {
   closedReasonFor,
   deferredCtaLabel,
   deferredOrderDisclaimerFor,
@@ -89,6 +93,13 @@ export default function BuyScreen() {
 
   const [inputMode, setInputMode] = useState<InputMode>("amount");
   const [input, setInput] = useState("0");
+  /* Tipo de orden — "market" (ejecuta ya) o "limit" (ejecuta cuando
+   *  el precio toca el límite). Default a "market". Si es "limit",
+   *  limitPrice guarda el precio objetivo como string (evita los
+   *  problemas de parseo del TextInput). */
+  const [orderType, setOrderType] = useState<OrderType>("market");
+  const [limitPrice, setLimitPrice] = useState<string>("");
+  const [orderTypeSheetOpen, setOrderTypeSheetOpen] = useState(false);
 
   // Mercado del asset — driver del saldo source y de la moneda nativa.
   const market = useMemo<AssetMarket>(
@@ -204,9 +215,23 @@ export default function BuyScreen() {
       qty: qtyAmount.toFixed(4),
       mode: isSell ? "sell" : "buy",
       currency: nativeCurrency,
+      orderType,
     };
+    if (orderType === "limit" && limitPrice) {
+      params.limitPrice = limitPrice;
+    }
     router.push({ pathname: "/(app)/confirm", params });
   };
+
+  /* Label del chip de tipo de orden — para "Límite" mostramos el
+   *  precio ya cargado (compactito), para "Mercado" sólo el nombre. */
+  const orderTypeChipLabel = (() => {
+    if (orderType === "market") return "Mercado";
+    const num = Number.parseFloat(limitPrice);
+    if (!Number.isFinite(num) || num <= 0) return "Límite";
+    const formatted = formatMoney(num, nativeCurrency);
+    return `Límite · ${formatted}`;
+  })();
 
   /* ─── Mercado cerrado: orden diferida ────────────────────────
    *
@@ -256,6 +281,17 @@ export default function BuyScreen() {
 
   const onContinue = () => {
     if (!hasInput || exceeds) return;
+    /* Routing del flow:
+     *  · orderType === "limit": SIEMPRE va por confirm — el flow de
+     *    review + swipe to submit + animation, pero el endpoint final
+     *    es createQueued con orderType="limit" (la maneja confirm.tsx).
+     *  · isDeferred (mercado cerrado, market order): se encola directo
+     *    sin pasar por confirm. Comportamiento legacy.
+     *  · Resto (market + open): confirm con ejecución normal. */
+    if (orderType === "limit") {
+      goToConfirm();
+      return;
+    }
     if (isDeferred) {
       queueOrder();
       return;
@@ -400,6 +436,27 @@ export default function BuyScreen() {
         </View>
       </View>
 
+      {/* Tipo de orden — chip discreto debajo del toggle Monto /
+          Cantidad. Default "Mercado". Tap abre el sheet de
+          selección y, si se elige "Límite", también el input
+          para definir el precio objetivo. */}
+      <View style={s.orderTypeRow}>
+        <Tap
+          onPress={() => setOrderTypeSheetOpen(true)}
+          haptic="selection"
+          pressScale={0.96}
+          style={s.orderTypeChip}
+        >
+          <Text style={[s.orderTypeLabel, { color: c.textMuted }]}>
+            Tipo:{" "}
+            <Text style={[s.orderTypeValue, { color: c.text }]}>
+              {orderTypeChipLabel}
+            </Text>
+          </Text>
+          <Feather name="chevron-down" size={14} color={c.textMuted} />
+        </Tap>
+      </View>
+
       {/* Spacer superior: empuja hero + slider hacia abajo. */}
       <View style={{ flex: 0.7 }} />
 
@@ -525,6 +582,20 @@ export default function BuyScreen() {
           />
         </Tap>
       </View>
+
+      <OrderTypeSheet
+        visible={orderTypeSheetOpen}
+        orderType={orderType}
+        limitPrice={limitPrice}
+        currentPrice={asset.price}
+        currency={nativeCurrency}
+        side={isSell ? "sell" : "buy"}
+        onApply={({ orderType: nextType, limitPrice: nextPrice }) => {
+          setOrderType(nextType);
+          setLimitPrice(nextPrice);
+        }}
+        onClose={() => setOrderTypeSheetOpen(false)}
+      />
     </View>
   );
 }
@@ -590,6 +661,33 @@ const s = StyleSheet.create({
   modeBtnText: {
     fontFamily: fontFamily[600],
     fontSize: 13,
+    letterSpacing: -0.1,
+  },
+  /* Chip de tipo de orden — debajo del modeToggle, centrado. Apenas
+   * un row con label "Tipo: X" + chevron, sin borde ni bg. Discreto
+   * pero presente; la mayoría de las órdenes son market y no tiene
+   * sentido competir con la jerarquía del toggle de arriba. */
+  orderTypeRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingTop: 8,
+    paddingBottom: 2,
+    paddingHorizontal: 20,
+  },
+  orderTypeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  orderTypeLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+  },
+  orderTypeValue: {
+    fontFamily: fontFamily[700],
     letterSpacing: -0.1,
   },
   hero: {
