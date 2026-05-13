@@ -551,10 +551,10 @@ export default function AssetAlertsScreen() {
           style={({ pressed }) => [
             s.cta,
             {
-              /* Botón principal — ink/text neutro. El brand verde
-               * lo reservamos para el CTA del AlertSheet (la
-               * confirmación final). */
-              backgroundColor: c.text,
+              /* Botón principal — brand verde solid (matchea el
+               * "Crear alerta" del AlertSheet/IndicatorSheet) con
+               * ink en c.onColor (blanco en light, oscuro en dark). */
+              backgroundColor: c.brand,
               opacity: pressed ? 0.86 : 1,
             },
           ]}
@@ -564,7 +564,7 @@ export default function AssetAlertsScreen() {
             else setIndicatorCreateOpen(true);
           }}
         >
-          <Text style={[s.ctaText, { color: c.bg }]}>
+          <Text style={[s.ctaText, { color: c.onColor }]}>
             Agregar alerta
           </Text>
         </Pressable>
