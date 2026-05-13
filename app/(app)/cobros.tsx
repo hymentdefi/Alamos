@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { fontFamily, radius, useTheme } from "../../lib/theme";
+import { CobrosInfoSheet } from "../../lib/components/CobrosInfoSheet";
 import { Tap } from "../../lib/components/Tap";
 import {
   MOCK_TODAY,
@@ -62,6 +63,7 @@ export default function CobrosScreen() {
   const [pickerYear, setPickerYear] = useState(
     () => MOCK_TODAY.getFullYear(),
   );
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const events = useMemo(() => generatePayouts(), []);
 
@@ -170,7 +172,22 @@ export default function CobrosScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[s.title, { color: c.text }]}>Cobros</Text>
+        {/* Title row — "Cobros" en display size + info dot a la
+            derecha (mismo patrón que "PyG HOY" en portfolio.tsx).
+            Tap del info dot abre el CobrosInfoSheet con explicación
+            sencilla. */}
+        <View style={s.titleRow}>
+          <Text style={[s.title, { color: c.text }]}>Cobros</Text>
+          <Tap
+            onPress={() => setInfoOpen(true)}
+            haptic="selection"
+            hitSlop={12}
+            style={s.infoDot}
+            accessibilityLabel="Qué son los cobros"
+          >
+            <Feather name="info" size={18} color={c.textMuted} />
+          </Tap>
+        </View>
 
         {/* Month nav — el label central es tappable y abre el picker
             de mes/año. Affordance: chevron-down al lado del texto. */}
@@ -429,6 +446,11 @@ export default function CobrosScreen() {
           </View>
         </View>
       </Modal>
+
+      <CobrosInfoSheet
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
@@ -458,13 +480,27 @@ const s = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  title: {
-    fontFamily: fontFamily[700],
-    fontSize: 32,
-    letterSpacing: -1,
+  /* Title row — title display size + info dot al lado. El info dot
+   * vive en flex sin width fijo así matchea la baseline del título. */
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     paddingHorizontal: 24,
     marginTop: 4,
     marginBottom: 24,
+  },
+  title: {
+    fontFamily: fontFamily[700],
+    fontSize: 48,
+    letterSpacing: -2,
+  },
+  infoDot: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6, // alinea el ícono con el corte óptico del título
   },
 
   monthNav: {
