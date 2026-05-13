@@ -183,7 +183,9 @@ function OrderRow({ order, asset, onCancel }: RowProps) {
         </Text>
         <Text style={[s.subline, { color: c.textMuted }]}>
           {isQueued
-            ? `Se ejecuta cuando abra el mercado · ${formatScheduledTime(order.estimatedExecutionAt)}`
+            ? order.orderType === "limit" && order.limitPrice != null
+              ? `Se ejecuta cuando el precio toque ${formatMoney(order.limitPrice, order.currency)}`
+              : `Se ejecuta cuando abra el mercado · ${formatScheduledTime(order.estimatedExecutionAt)}`
             : order.executedAt && order.executionPrice != null
               ? `Ejecutada a ${formatMoney(order.executionPrice, order.currency)}`
               : order.failureReason ?? labelFor(order.status)}

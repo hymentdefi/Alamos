@@ -37,6 +37,13 @@ const MOCK_LATENCY_MAX = 320;
 
 export type OrderSide = "buy" | "sell";
 export type OrderStatus = "queued" | "executed" | "failed" | "cancelled";
+/** Tipo de orden encolada:
+ *   - "market": ejecuta al mejor precio disponible cuando el
+ *     mercado abra (uso original — mercado cerrado).
+ *   - "limit":  ejecuta cuando el precio del activo toque el
+ *     `limitPrice` definido por el user. El precio target se
+ *     compara contra ticks reales del activo en backend. */
+export type QueuedOrderType = "market" | "limit";
 
 export interface QueuedOrder {
   id: string;
@@ -49,10 +56,19 @@ export interface QueuedOrder {
   quantity: number;
   currency: AssetCurrency;
   status: OrderStatus;
+  /** Tipo de orden — "market" (default) o "limit". Si "limit",
+   *  `limitPrice` define el target de ejecución. */
+  orderType: QueuedOrderType;
+  /** Precio objetivo para órdenes de tipo "limit" — la orden se
+   *  ejecuta cuando el precio del activo toque este valor. Sólo
+   *  presente cuando orderType === "limit". */
+  limitPrice?: number;
   /** ISO timestamp de cuando se encoló. */
   queuedAt: string;
-  /** Fecha estimada de ejecución (próxima apertura del mercado).
-   *  El backend la calcula al recibir la orden. */
+  /** Fecha estimada de ejecución. Para market diferida = próxima
+   *  apertura. Para limit: no hay fecha cierta (depende del
+   *  precio), pero pasamos la apertura como ancla informativa.
+   *  El backend la recalcula. */
   estimatedExecutionAt: string;
   /** ISO timestamp real de ejecución (se setea al ejecutar). */
   executedAt?: string;
@@ -72,6 +88,11 @@ export interface CreateQueuedOrderInput {
    *  para que el receipt mock muestre la fecha correcta sin
    *  segundo round-trip. */
   estimatedExecutionAt: string;
+  /** Tipo de orden — default "market" para preservar el
+   *  comportamiento legacy del flujo "mercado cerrado". */
+  orderType?: QueuedOrderType;
+  /** Precio objetivo cuando orderType === "limit". */
+  limitPrice?: number;
 }
 
 export class QueuedOrderApiError extends Error {
@@ -114,6 +135,16 @@ export async function createQueuedOrder(
         "invalid",
       );
     }
+    const orderType = input.orderType ?? "market";
+    if (
+      orderType === "limit" &&
+      (!isFinite(input.limitPrice ?? NaN) || (input.limitPrice ?? 0) <= 0)
+    ) {
+      throw new QueuedOrderApiError(
+        "El precio límite debe ser mayor a 0.",
+        "invalid",
+      );
+    }
     const created: QueuedOrder = {
       id: `qord-${_idSeq++}`,
       userId: MOCK_USER_ID,
@@ -122,6 +153,8 @@ export async function createQueuedOrder(
       quantity: input.quantity,
       currency: input.currency,
       status: "queued",
+      orderType,
+      limitPrice: orderType === "limit" ? input.limitPrice : undefined,
       queuedAt: new Date().toISOString(),
       estimatedExecutionAt: input.estimatedExecutionAt,
     };

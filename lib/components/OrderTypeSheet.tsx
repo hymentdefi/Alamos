@@ -186,16 +186,25 @@ export function OrderTypeSheet({
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({
+  const sheetStyle = useAnimatedStyle(() => {
     /* Combina el drag (translateY del swipe) con el offset del
-     *  teclado: cuando el teclado aparece, el sheet sube
-     *  keyboardOffset px para que el CTA "Aplicar" no quede
-     *  tapado. El drag se acumula encima, así el swipe-down sigue
-     *  funcionando incluso con teclado abierto. */
-    transform: [
-      { translateY: translateY.value - keyboardOffset.value },
-    ],
-  }));
+     *  teclado. Cuando el teclado aparece, el sheet sube SÓLO
+     *  (keyboardOffset - safeAreaBottom). Razón: el padding bottom
+     *  del sheet (insets.bottom + 18) ya tenía espacio reservado
+     *  para la safe area del home indicator; cuando el teclado
+     *  aparece, ése espacio queda redundante (el teclado lo
+     *  cubre). Restarlo nos deja el CTA sentado a ~18px sobre el
+     *  teclado en vez de "flotando" alto y con gap visual feo. */
+    const compensatedOffset =
+      keyboardOffset.value > 0
+        ? Math.max(0, keyboardOffset.value - insets.bottom)
+        : 0;
+    return {
+      transform: [
+        { translateY: translateY.value - compensatedOffset },
+      ],
+    };
+  });
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));

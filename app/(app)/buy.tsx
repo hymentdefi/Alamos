@@ -281,6 +281,17 @@ export default function BuyScreen() {
 
   const onContinue = () => {
     if (!hasInput || exceeds) return;
+    /* Routing del flow:
+     *  · orderType === "limit": SIEMPRE va por confirm — el flow de
+     *    review + swipe to submit + animation, pero el endpoint final
+     *    es createQueued con orderType="limit" (la maneja confirm.tsx).
+     *  · isDeferred (mercado cerrado, market order): se encola directo
+     *    sin pasar por confirm. Comportamiento legacy.
+     *  · Resto (market + open): confirm con ejecución normal. */
+    if (orderType === "limit") {
+      goToConfirm();
+      return;
+    }
     if (isDeferred) {
       queueOrder();
       return;
