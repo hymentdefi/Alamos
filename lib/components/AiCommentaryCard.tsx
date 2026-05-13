@@ -106,7 +106,8 @@ function renderInlineBolds(text: string, boldColor: string) {
 const s = StyleSheet.create({
   card: {
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingTop: 24,
+    paddingBottom: 4,
     marginTop: 8,
   },
   header: {

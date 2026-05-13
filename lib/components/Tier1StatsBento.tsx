@@ -251,8 +251,9 @@ export function Tier1StatsBento({
 const s = StyleSheet.create({
   bentoCard: {
     paddingHorizontal: 24,
-    paddingVertical: 24,
-    marginTop: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
+    marginTop: 28,
   },
   bentoTitle: {
     fontFamily: fontFamily[800],
