@@ -853,12 +853,44 @@ function ConfigParamList({
             }
           />
           <Separator c={c} />
-          {/* Umbral cross-validado con la condición:
-           *   Sobrecompra → chips [50,70,80], stepper [50,100]
-           *   Sobreventa  → chips [20,30,50], stepper [0,50]
-           * Si el user cambia la condición y el umbral actual queda
-           * fuera del nuevo rango, el handler de Condición lo snapea
-           * al default de esa zona (70 / 30). */}
+          {/* Condición VA ANTES del Umbral. Define la "zona" del
+           * indicador (sobrecompra / sobreventa) y el Umbral abajo
+           * se adapta a esa zona — sus chips y el rango del stepper
+           * cambian dinámicamente. Si el user cambia la condición y
+           * el umbral actual queda fuera del nuevo rango, snapea al
+           * default de la zona (70 sobrecompra, 30 sobreventa). */}
+          <ParamRow label="Condición" c={c}>
+            <Segmented
+              options={[
+                {
+                  value: "above",
+                  label: "Sobrecompra",
+                  icon: "trending-up",
+                },
+                {
+                  value: "below",
+                  label: "Sobreventa",
+                  icon: "trending-down",
+                },
+              ]}
+              active={config.rsiCondition}
+              onChange={(v) => {
+                const next = v as "above" | "below";
+                let nextThreshold = config.rsiThreshold;
+                if (next === "above" && nextThreshold < 50)
+                  nextThreshold = 70;
+                if (next === "below" && nextThreshold > 50)
+                  nextThreshold = 30;
+                setConfig({
+                  ...config,
+                  rsiCondition: next,
+                  rsiThreshold: nextThreshold,
+                });
+              }}
+              c={c}
+            />
+          </ParamRow>
+          <Separator c={c} />
           <ParamRow
             label="Umbral"
             c={c}
@@ -883,40 +915,6 @@ function ConfigParamList({
               />
             }
           />
-          <Separator c={c} />
-          <ParamRow label="Condición" c={c}>
-            <Segmented
-              options={[
-                {
-                  value: "above",
-                  label: "Sobrecompra",
-                  icon: "trending-up",
-                },
-                {
-                  value: "below",
-                  label: "Sobreventa",
-                  icon: "trending-down",
-                },
-              ]}
-              active={config.rsiCondition}
-              onChange={(v) => {
-                const next = v as "above" | "below";
-                /* Snap umbral al default de la nueva zona si el
-                 * actual queda fuera del rango válido. */
-                let nextThreshold = config.rsiThreshold;
-                if (next === "above" && nextThreshold < 50)
-                  nextThreshold = 70;
-                if (next === "below" && nextThreshold > 50)
-                  nextThreshold = 30;
-                setConfig({
-                  ...config,
-                  rsiCondition: next,
-                  rsiThreshold: nextThreshold,
-                });
-              }}
-              c={c}
-            />
-          </ParamRow>
         </>
       ) : null}
 
