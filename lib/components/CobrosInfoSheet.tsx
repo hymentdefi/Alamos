@@ -157,7 +157,11 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
               <Text style={[s.bodyBold, { color: c.text }]}>
                 cupones
               </Text>{" "}
-              a fechas fijas. Las acciones y CEDEARs pagan{" "}
+              (intereses) y{" "}
+              <Text style={[s.bodyBold, { color: c.text }]}>
+                amortizaciones
+              </Text>{" "}
+              (capital) en fechas fijas. Las acciones y CEDEARs pagan{" "}
               <Text style={[s.bodyBold, { color: c.text }]}>
                 dividendos
               </Text>{" "}
