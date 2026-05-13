@@ -25,10 +25,10 @@ const STROKE_INK = "#0E0F0C";
 const BRAND_GREEN = "#00C805";
 
 /* Pila de calendar pages — 5 capas con offset diagonal down-right
- * (suggesting depth). El front es blanco puro con stroke ink + todos
- * los detalles (grid + dots + header band). Las capas de atrás son
- * progresivamente grises con stroke alpha menor, sugiriendo que se
- * pierden en el fondo.
+ * (suggesting depth). El front es blanco puro con stroke BRAND
+ * GREEN + todos los detalles (grid + dots + header band). Las
+ * capas de atrás son progresivamente grises con stroke alpha
+ * menor, sugiriendo que se pierden en el fondo.
  *
  * Inspirado en AlamosBalanceIllustration: layered stack + floor
  * shadow para grounding. La sombra del piso es ellipse fija; la
@@ -207,30 +207,31 @@ export function CobrosCalendarIllustration({
           viewBox={`0 0 ${W} ${W}`}
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Render layers from back to front. */}
-          {LAYERS.map((L, i) => {
-            const isFront = i === LAYERS.length - 1;
-            return (
-              <Rect
-                key={i}
-                x={CARD_X + L.dx}
-                y={CARD_Y + L.dy}
-                width={CARD_W}
-                height={CARD_H}
-                rx={13}
-                fill={L.fill}
-                stroke={STROKE_INK}
-                strokeOpacity={L.strokeAlpha}
-                strokeWidth={L.strokeWidth}
-              />
-            );
-          })}
+          {/* Render layers from back to front. Stroke en BRAND_GREEN
+              para que el calendario tenga identidad cromática Álamos
+              (lo que pidió el user). Alpha gradient: back layers
+              0.22 → front 1.0. */}
+          {LAYERS.map((L, i) => (
+            <Rect
+              key={i}
+              x={CARD_X + L.dx}
+              y={CARD_Y + L.dy}
+              width={CARD_W}
+              height={CARD_H}
+              rx={13}
+              fill={L.fill}
+              stroke={BRAND_GREEN}
+              strokeOpacity={L.strokeAlpha}
+              strokeWidth={L.strokeWidth}
+            />
+          ))}
 
           {/* Header band divider — separa el "month name" area del
-              grid. Sobre la front layer únicamente. */}
+              grid. Sobre la front layer únicamente. También en
+              brand para mantener coherencia con el outer border. */}
           <Path
             d={`M${CARD_X} ${GRID_Y} H${CARD_X + CARD_W}`}
-            stroke={STROKE_INK}
+            stroke={BRAND_GREEN}
             strokeWidth={2.4}
           />
 

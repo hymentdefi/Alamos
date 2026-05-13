@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { fontFamily, radius, useTheme } from "../theme";
 import { AmountDisplay } from "./AmountDisplay";
@@ -204,11 +205,13 @@ export function CobrosSection({ currency }: Props) {
                 ? c.text
                 : c.textMuted;
             return (
-              <Tap
+              <Pressable
                 key={b.key}
-                onPress={() => setScrubIdx(active ? null : i)}
-                haptic="selection"
-                pressScale={0.94}
+                onPressIn={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setScrubIdx(i);
+                }}
+                onPressOut={() => setScrubIdx(null)}
                 style={s.barCol}
                 hitSlop={4}
               >
@@ -235,7 +238,7 @@ export function CobrosSection({ currency }: Props) {
                 >
                   {b.label}
                 </Text>
-              </Tap>
+              </Pressable>
             );
           })}
         </View>
