@@ -257,9 +257,20 @@ export interface MonthBucket {
   isCurrent: boolean;
 }
 
-const MONTH_LETTERS = [
-  "E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D",
+const MONTH_LABELS = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
 ];
+
+const MONTH_NAMES_FULL = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+/** Nombre completo del mes en español. `month` es 0-indexed (Date#getMonth). */
+export function monthNameFull(month: number): string {
+  return MONTH_NAMES_FULL[month];
+}
 
 /** Ventana mensual centrada en hoy. Default: 5 atrás + 6 adelante = 12 bars. */
 export function monthlyBuckets(
@@ -284,7 +295,7 @@ export function monthlyBuckets(
       key,
       month,
       year,
-      label: MONTH_LETTERS[month],
+      label: MONTH_LABELS[month],
       totalArs: 0,
       paid: i <= monthsBack,
       isCurrent,
