@@ -306,12 +306,11 @@ export default function BuyScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
-      {/* Header — back arrow a la izquierda, título centrado al
-          ANCHO DE PANTALLA (no entre los flancos del header). Posición
-          absoluta del título garantiza que el centro del texto cae
-          siempre en el centro de pantalla, independiente del peso
-          visual del back arrow o de cualquier otro elemento en los
-          flancos. */}
+      {/* Header — back arrow a la izquierda. El título se rendea
+          aparte como sibling absoluto del root, no acá adentro,
+          para que su centrado no quede sujeto al padding del header
+          ni a cómo Yoga resuelve `left:0/right:0` sobre un parent
+          con paddingHorizontal. */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Tap
           style={s.iconBtn}
@@ -321,18 +320,22 @@ export default function BuyScreen() {
         >
           <Feather name="arrow-left" size={22} color={c.text} />
         </Tap>
-        <View style={{ flex: 1 }} />
-        <View
-          pointerEvents="none"
-          style={[
-            s.headerTitleAbsolute,
-            { paddingTop: insets.top + 12 },
-          ]}
-        >
-          <Text style={[s.headerTitle, { color: c.text }]}>
-            {isSell ? "Vender" : "Comprar"} {asset.ticker}
-          </Text>
-        </View>
+      </View>
+
+      {/* Título centrado al ancho EXACTO de pantalla. Vive como
+          sibling del header dentro del root (que no tiene padding),
+          así el wrapper absoluto spans full screen (0, screenW) y
+          alignItems center deja el texto en screenW/2. La altura se
+          alinea con el back arrow via top inset + offset al centro
+          vertical del iconBtn (36px). pointerEvents=none deja el
+          back arrow detrás siendo tappable. */}
+      <View
+        pointerEvents="none"
+        style={[s.headerTitleScreen, { top: insets.top + 12, height: 36 }]}
+      >
+        <Text style={[s.headerTitle, { color: c.text }]}>
+          {isSell ? "Vender" : "Comprar"} {asset.ticker}
+        </Text>
       </View>
 
       {/* Banner de mercado cerrado — sólo cuando aplica. La copy se
@@ -583,16 +586,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Título absoluto que ocupa todo el ancho del header y centra su
-   * contenido — independiente de los anchos del back arrow / cualquier
-   * otro elemento en los flancos. pointerEvents=none en el wrapper
-   * para que el back arrow detrás siga siendo tappable. */
-  headerTitleAbsolute: {
+  /* Título centrado al ancho EXACTO de pantalla. Vive como sibling
+   * del header dentro del root (que no tiene paddingHorizontal), así
+   * left:0/right:0 spans 0 → screenW y alignItems center deja el
+   * texto en screenW/2. La altura se setea inline (top + height) para
+   * alinear con el back arrow del header. */
+  headerTitleScreen: {
     position: "absolute",
     left: 0,
     right: 0,
-    top: 0,
-    bottom: 8,
     alignItems: "center",
     justifyContent: "center",
   },
