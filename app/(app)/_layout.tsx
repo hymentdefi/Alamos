@@ -85,6 +85,20 @@ export default function AppLayout() {
         />
         <Stack.Screen name="trade" />
         <Stack.Screen name="briefing" />
+        {/* Rendimiento: misma protección que detail — tiene Sparkline con
+            scrub + bar chart de Cobros con tap-on-bar. El swipe vertical
+            se confunde con back desde cualquier parte. Edge-swipe del
+            borde izquierdo sigue habilitado. */}
+        <Stack.Screen
+          name="rendimiento"
+          options={{ fullScreenGestureEnabled: false }}
+        />
+        {/* Cobros (calendario): grid de días + month picker modal con
+            interacciones que se confundían con swipe-from-anywhere. */}
+        <Stack.Screen
+          name="cobros"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         {/* Asset alerts — pantalla full-screen con la lista de
             alertas custom del activo. Slide_from_bottom para
             que se sienta deep-dive. */}

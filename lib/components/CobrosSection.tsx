@@ -426,11 +426,13 @@ const s = StyleSheet.create({
     marginTop: 2, // pequeño offset óptico para alinear con la x-height
   },
 
-  /* Card container — mismo lenguaje que rendimiento.tsx (s.card). */
+  /* Card container — mismo lenguaje que rendimiento.tsx (s.card)
+   * pero con marginTop más chico (10 vs 16) para que los 4 cards de
+   * la sección respiren más cerca entre sí. */
   card: {
     paddingHorizontal: 24,
     paddingVertical: 24,
-    marginTop: 16,
+    marginTop: 10,
   },
   /* Override del primer card: pegado al section header (sin gap
    * externo extra), así el título "Cobros" se siente como heading
