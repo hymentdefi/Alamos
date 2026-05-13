@@ -12,7 +12,6 @@ import {
   assetMarket,
   formatMoney,
   formatQty,
-  type AssetCategory,
   type AssetCurrency,
   type AssetMarket,
 } from "../../lib/data/assets";
@@ -27,25 +26,6 @@ import {
 } from "../../lib/market/hours";
 import { useQueuedOrders } from "../../lib/queued-orders/context";
 import { useToast } from "../../lib/toast/context";
-
-function unitWordFor(cat: AssetCategory): string {
-  switch (cat) {
-    case "cedears":
-    case "acciones":
-      return "acciones";
-    case "bonos":
-    case "letras":
-      return "bonos";
-    case "fci":
-      return "cuotapartes";
-    case "obligaciones":
-      return "ONs";
-    case "crypto":
-      return "monedas";
-    default:
-      return "unidades";
-  }
-}
 
 /**
  * Affix de moneda para los inputs (calculadora del buy). Devuelve
@@ -122,8 +102,6 @@ export default function BuyScreen() {
 
   const exceeds =
     inputMode === "amount" ? targetAmount > maxCash : qtyAmount > maxQty;
-
-  const unitWord = unitWordFor(asset.category);
 
   /** Porcentaje de lo disponible que representa el input actual. */
   const currentPct =
@@ -375,11 +353,7 @@ export default function BuyScreen() {
                 },
               ]}
             >
-              {nativeCurrency === "ARS"
-                ? "Monto en pesos"
-                : nativeCurrency === "USD"
-                ? "Monto en US$"
-                : "Monto en USDT"}
+              Monto
             </Text>
           </Tap>
           <Tap
@@ -401,7 +375,7 @@ export default function BuyScreen() {
                 },
               ]}
             >
-              Cantidad en {unitWord}
+              Cantidad
             </Text>
           </Tap>
         </View>
@@ -640,22 +614,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 4,
+    alignItems: "center",
   },
-  /* Toggle Monto/Cantidad — alignSelf stretch + flex:1 en cada
-   * botón para que los dos sean del MISMO ancho. Si los dejábamos
-   * content-sized, "Cantidad en acciones" (~140px) era más ancho
-   * que "Monto en pesos" (~110px) y el gap entre los dos pills (el
-   * "medio" visual del segmented control) caía ~15px a la izquierda
-   * del centro real de pantalla. Con flex:1 los dos botones miden
-   * (screenWidth - 48) / 2 cada uno y el gap queda exacto en
-   * screenWidth/2. */
+  /* Toggle Monto/Cantidad — content-sized, compacto, centrado como
+   * unidad via alignItems:center del parent. Cada botón con
+   * minWidth para que los dos midan lo mismo aunque "Monto" (5
+   * chars) sea más corto que "Cantidad" (8 chars). El gap entre
+   * los dos cae exacto en screenWidth/2. */
   modeToggle: {
     flexDirection: "row",
     gap: 8,
-    alignSelf: "stretch",
   },
   modeBtn: {
-    flex: 1,
+    minWidth: 96,
     paddingHorizontal: 16,
     paddingVertical: 8,
     alignItems: "center",
