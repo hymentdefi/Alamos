@@ -10,11 +10,9 @@ import {
   assets,
   assetCurrency,
   assetMarket,
-  categoryLabels,
   formatMoney,
   formatPct,
   type Asset,
-  type AssetCategory,
 } from "../../lib/data/assets";
 import { convertAmount } from "../../lib/data/accounts";
 import {
@@ -22,6 +20,7 @@ import {
   seriesFromSeed,
 } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
+import { CobrosSection } from "../../lib/components/CobrosSection";
 import { Tap } from "../../lib/components/Tap";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 
@@ -63,20 +62,6 @@ const RENDIMIENTO_PCTS: Record<RendRange, number> = {
   "1A": 10.8,
   "MAX": 12.4,
 };
-
-/* Paleta de allocation — mirror del BRICK_PALETTE del portfolio.tsx
- * para mantener continuidad cromática cuando el user entra a esta
- * pantalla desde la cartera. Hex fijos (no tokens) porque es paleta
- * de chart, mismo criterio que portfolio.tsx. */
-const ALLOCATION_PALETTE = [
-  "#00C805",
-  "#0E0F0C",
-  "#7EE9A6",
-  "#00B864",
-  "#94A3B8",
-  "#5AC53A",
-  "#6B6C66",
-];
 
 const RENDIMIENTO_LENGTHS: Record<RendRange, number> = {
   "1D": 100,
@@ -134,36 +119,18 @@ export default function RendimientoScreen() {
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [currency] = useState<Currency>("ARS");
 
-  // Total ARS de los holdings + breakdown por categoría — un solo
-  // pase sobre los holdings. La allocation excluye efectivo igual que
-  // el total (la idea de la pantalla es el dinero invertido, no el
-  // que está parado en cash).
-  const { totalArs, allocation } = useMemo(() => {
+  // Total ARS de los holdings (replica el cómputo del portfolio).
+  const totalArs = useMemo(() => {
     const holdings = assets.filter(
       (a: Asset) =>
         a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
     );
-    const byCategory = new Map<AssetCategory, number>();
-    let total = 0;
+    let acc = 0;
     for (const a of holdings) {
       const native = a.price * (a.qty ?? 0);
-      const ars = convertAmount(native, assetCurrency(a), "ARS");
-      total += ars;
-      byCategory.set(a.category, (byCategory.get(a.category) ?? 0) + ars);
+      acc += convertAmount(native, assetCurrency(a), "ARS");
     }
-    const sorted = [...byCategory.entries()].sort(
-      ([, a], [, b]) => b - a,
-    );
-    return {
-      totalArs: total,
-      allocation: sorted.map(([cat, ars], i) => ({
-        cat,
-        label: categoryLabels[cat],
-        ars,
-        pct: total > 0 ? (ars / total) * 100 : 0,
-        color: ALLOCATION_PALETTE[i % ALLOCATION_PALETTE.length],
-      })),
-    };
+    return acc;
   }, []);
 
   const totalDisplay =
@@ -348,75 +315,6 @@ export default function RendimientoScreen() {
             })}
           </View>
 
-          {/* Composición — distribución del invertido por clase de
-              activo (CEDEARs, Bonos, FCI, Acciones AR, etc.). Bar
-              stacked arriba + legend con hairline entre rows, mismo
-              lenguaje que el card de Estadísticas. Paleta espejada de
-              portfolio.tsx para continuidad visual al entrar acá. */}
-          {allocation.length > 0 ? (
-            <View style={s.card}>
-              <Text style={[s.cardEyebrow, { color: c.text }]}>
-                Composición
-              </Text>
-              <View
-                style={[
-                  s.allocBar,
-                  { backgroundColor: c.surfaceHover },
-                ]}
-              >
-                {allocation.map((seg) => (
-                  <View
-                    key={seg.cat}
-                    style={{
-                      flex: seg.pct,
-                      backgroundColor: seg.color,
-                    }}
-                  />
-                ))}
-              </View>
-              {allocation.map((seg, i) => (
-                <View
-                  key={seg.cat}
-                  style={[
-                    s.allocRow,
-                    i < allocation.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    },
-                  ]}
-                >
-                  <View style={s.allocLabelWrap}>
-                    <View
-                      style={[
-                        s.allocDot,
-                        { backgroundColor: seg.color },
-                      ]}
-                    />
-                    <Text
-                      style={[s.allocLabel, { color: c.text }]}
-                      numberOfLines={1}
-                    >
-                      {seg.label}
-                    </Text>
-                  </View>
-                  <View style={s.allocValueWrap}>
-                    <Text
-                      style={[s.allocAmount, { color: c.text }]}
-                      numberOfLines={1}
-                    >
-                      {fmt(seg.ars)}
-                    </Text>
-                    <Text
-                      style={[s.allocPct, { color: c.textMuted }]}
-                    >
-                      {seg.pct.toFixed(1)}%
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
           {/* Performance attribution FX vs activos — el insight más
               valioso en AR según el doc. Solo aplica en ARS y en
               rangos > 1D. */}
@@ -445,10 +343,17 @@ export default function RendimientoScreen() {
             </View>
           ) : null}
 
+          {/* Cobros — dividendos, cupones y amortizaciones del
+              portfolio. Calendario forward + breakdown del año
+              proyectado. Lo que ningún ALyC AR muestra bien. */}
+          <CobrosSection currency={currency} />
+
           <Text style={[s.disclaimer, { color: c.textFaint }]}>
             Cálculo time-weighted (TWR) sobre la valuación diaria del
             portfolio. Los datos históricos son referenciales y se
-            actualizan al cierre de cada rueda.
+            actualizan al cierre de cada rueda. Los cobros futuros son
+            proyecciones según el cronograma de cada activo y pueden
+            variar por decisión del emisor o ajustes fiscales.
           </Text>
         </ScrollView>
       </View>
@@ -579,57 +484,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     letterSpacing: -0.1,
-  },
-
-  /* Composición — bar stacked + legend rows */
-  allocBar: {
-    flexDirection: "row",
-    height: 14,
-    borderCurve: "continuous",
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    marginBottom: 6,
-  },
-  allocRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    gap: 12,
-  },
-  allocLabelWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flexShrink: 1,
-  },
-  allocDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  allocLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-    flexShrink: 1,
-  },
-  allocValueWrap: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  allocAmount: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  allocPct: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    minWidth: 44,
-    textAlign: "right",
   },
 
   disclaimer: {
