@@ -33,6 +33,10 @@ interface Props {
   /** Moneda en la que se muestran los totales. Las filas individuales
    *  mantienen su moneda nativa (USD para bonos, ARS para acciones AR). */
   currency: "ARS" | "USD";
+  /** Callback que se dispara cuando el usuario selecciona un mes
+   *  (no cuando deselecciona). El parent suele usarlo para hacer
+   *  auto-scroll y dejar el header de Cobros arriba de todo. */
+  onMonthSelect?: () => void;
 }
 
 /* Bar — barra del bar chart con animación de lift cuando se activa.
@@ -122,7 +126,7 @@ function Bar({
  * muestran la moneda nativa porque un cupón de AL30 en USD se lee con
  * más fidelidad que el equivalente en pesos.
  */
-export function CobrosSection({ currency }: Props) {
+export function CobrosSection({ currency, onMonthSelect }: Props) {
   const { c } = useTheme();
   const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
@@ -309,7 +313,14 @@ export function CobrosSection({ currency }: Props) {
                 labelWeight={labelWeight}
                 isActive={active}
                 isFaded={scrubIdx != null && !active}
-                onPress={() => setScrubIdx(active ? null : i)}
+                onPress={() => {
+                  if (active) {
+                    setScrubIdx(null);
+                  } else {
+                    setScrubIdx(i);
+                    onMonthSelect?.();
+                  }
+                }}
               />
             );
           })}
