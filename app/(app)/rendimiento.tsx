@@ -25,6 +25,7 @@ import { CobrosSection } from "../../lib/components/CobrosSection";
 import { Tap } from "../../lib/components/Tap";
 import { Tier1StatsBento } from "../../lib/components/Tier1StatsBento";
 import {
+  computeLifetimeInvertido,
   computeTier2Stats,
   getTier1Stats,
 } from "../../lib/data/portfolioStats";
@@ -339,7 +340,7 @@ export default function RendimientoScreen() {
           <Tier1StatsBento
             range={range}
             currency={currency}
-            totalInvertido={invertido}
+            totalInvertido={computeLifetimeInvertido(totalDisplay)}
             gananciaAbs={ganancia}
             twrPct={rangePct}
             totalArs={totalArs}
