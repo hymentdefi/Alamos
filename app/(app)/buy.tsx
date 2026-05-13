@@ -343,8 +343,11 @@ export default function BuyScreen() {
         </View>
       ) : null}
 
-      {/* Toggle Monto / Cantidad: va debajo del header, NO centrado con
-          el contenido. */}
+      {/* Toggle Monto / Cantidad — centrado debajo del header.
+          flexDirection row + justifyContent center sobre el wrapper,
+          y los dos botones igualan ancho con minWidth para que el
+          par se vea simétrico (sino "Monto en US$" queda visiblemente
+          más chico que "Cantidad en acciones"). */}
       <View style={s.modeRow}>
         <View
           style={s.modeToggle}
@@ -616,19 +619,32 @@ const s = StyleSheet.create({
     lineHeight: 16,
     letterSpacing: -0.1,
   },
+  /* modeRow → row + justifyContent center para centrar el par de
+   * botones explícitamente. Antes usaba alignItems center sobre un
+   * column flex, que en teoría centra pero el comentario decía "NO
+   * centrado" y la realidad visual tampoco se sentía centrada. Esta
+   * forma es bulletproof. */
   modeRow: {
+    flexDirection: "row",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 4,
-    alignItems: "center",
   },
   modeToggle: {
     flexDirection: "row",
     gap: 8,
   },
+  /* modeBtn → minWidth fuerza que los dos botones tengan al menos el
+   * mismo ancho (~140 cubre el más largo "Cantidad en acciones"). Sin
+   * esto, "Monto en US$" (corto) y "Cantidad en acciones" (largo)
+   * tenían distinto ancho y el conjunto se veía asimétrico aún estando
+   * centrado en la fila. */
   modeBtn: {
+    minWidth: 140,
     paddingHorizontal: 16,
     paddingVertical: 8,
+    alignItems: "center",
     borderCurve: "continuous",
     borderRadius: radius.pill,
     borderWidth: 1.5,
