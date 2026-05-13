@@ -2481,7 +2481,7 @@ function FloorPie({
                 )}
                 fill={fill}
                 stroke={c.text}
-                strokeWidth={1.2}
+                strokeWidth={0.6}
                 strokeLinejoin="round"
               />
             );
