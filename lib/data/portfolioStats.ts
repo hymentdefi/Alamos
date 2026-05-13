@@ -1096,3 +1096,155 @@ export function simulateMonteCarlo(args: SimulateArgs): MonteCarloResult {
   };
 }
 
+/* ─── Factor Exposure Analysis (Fase 3 spec sección 6) ─────────
+ *
+ * Descompone el portfolio en 6 factores académicos: Value,
+ * Momentum, Quality, Size, Low Volatility, Yield. Mock: cada
+ * asset tiene scores 0-100 por factor (basados en su naturaleza:
+ * bonos altos en Yield + Low Vol, growth en Momentum + Quality,
+ * crypto alto en Momentum bajo en Yield, etc.). En prod los
+ * scores vienen de un data provider (FMP, Alpha Vantage).
+ *
+ * Spec 6.4: el label retail es "ADN de tu portfolio" — nunca
+ * decir "Factor Exposure" en la UI.
+ *
+ * Score escala 0-100:
+ *   - 50 = neutral (igual al benchmark, S&P 500 ponderado)
+ *   - > 50 = exposición positiva al factor
+ *   - < 50 = exposición negativa
+ */
+
+export type FactorKey =
+  | "value"
+  | "momentum"
+  | "quality"
+  | "size"
+  | "lowVol"
+  | "yield";
+
+export interface FactorScores {
+  value: number;
+  momentum: number;
+  quality: number;
+  size: number;
+  lowVol: number;
+  yield: number;
+}
+
+export const FACTOR_LABELS: Record<FactorKey, string> = {
+  value: "Empresas baratas",
+  momentum: "Tendencia reciente",
+  quality: "Empresas sólidas",
+  size: "Tamaño de empresas",
+  lowVol: "Estabilidad",
+  yield: "Ingresos por dividendos",
+};
+
+export const FACTOR_TECHNICAL: Record<FactorKey, string> = {
+  value: "Value",
+  momentum: "Momentum",
+  quality: "Quality",
+  size: "Size",
+  lowVol: "Low Volatility",
+  yield: "Yield",
+};
+
+export const FACTOR_EXPLANATIONS: Record<FactorKey, string> = {
+  value:
+    "Mide qué tan baratos están tus activos respecto a sus ganancias o valor en libros. Score alto = empresas cotizando a múltiplos bajos.",
+  momentum:
+    "Mide el impulso reciente de tus activos. Score alto = activos que vienen subiendo con fuerza en los últimos meses.",
+  quality:
+    "Mide la solidez financiera de las empresas que tenés. Score alto = empresas con buenos retornos, poca deuda y ganancias estables.",
+  size:
+    "Mide el tamaño de las empresas en tu portfolio. Score alto = más exposición a small caps (empresas chicas).",
+  lowVol:
+    "Mide qué tan estables son los precios de tus activos. Score alto = activos que se mueven poco, con menos riesgo.",
+  yield:
+    "Mide cuántos ingresos pasivos generan tus activos. Score alto = más dividendos y cupones por unidad invertida.",
+};
+
+/* Mock scores 0-100 por holding y factor. Reflejan el carácter
+ * inherente de cada activo: bonos AR/US altos en Yield + LowVol,
+ * tech US altos en Momentum + Quality, crypto altos en Momentum
+ * bajos en Yield+LowVol, etc. Cuando hay data real, esta tabla
+ * se reemplaza por z-scores calculados desde fundamentals. */
+const ASSET_FACTOR_SCORES: Record<string, FactorScores> = {
+  AAPL: { value: 28, momentum: 75, quality: 92, size: 12, lowVol: 68, yield: 32 },
+  MSFT: { value: 25, momentum: 72, quality: 95, size: 10, lowVol: 72, yield: 38 },
+  AL30: { value: 65, momentum: 42, quality: 50, size: 50, lowVol: 78, yield: 95 },
+  GD30: { value: 65, momentum: 38, quality: 50, size: 50, lowVol: 78, yield: 95 },
+  "BAL-AHO": { value: 55, momentum: 50, quality: 62, size: 60, lowVol: 75, yield: 70 },
+  "AAPL.US": { value: 28, momentum: 75, quality: 92, size: 12, lowVol: 68, yield: 32 },
+  "NVDA.US": { value: 18, momentum: 95, quality: 82, size: 18, lowVol: 32, yield: 15 },
+  "TSLA.US": { value: 22, momentum: 58, quality: 60, size: 22, lowVol: 28, yield: 0 },
+  "BTC/USDT": { value: 30, momentum: 82, quality: 45, size: 28, lowVol: 22, yield: 0 },
+  "ETH/USDT": { value: 32, momentum: 78, quality: 48, size: 35, lowVol: 25, yield: 0 },
+  "SOL/USDT": { value: 28, momentum: 88, quality: 42, size: 55, lowVol: 18, yield: 0 },
+};
+
+/** Computa los 6 scores del Factor Exposure como promedio ponderado
+ *  de los scores per-holding por sus pesos en ARS. Si un holding no
+ *  tiene scores en la tabla mock, contribuye 50 (neutral). */
+export function computeFactorExposure(): FactorScores {
+  const weights = computeWeights();
+  const totalArs = weights.reduce((acc, p) => acc + p.ars, 0);
+  if (totalArs <= 0) {
+    return {
+      value: 50,
+      momentum: 50,
+      quality: 50,
+      size: 50,
+      lowVol: 50,
+      yield: 50,
+    };
+  }
+
+  const factors: FactorKey[] = [
+    "value",
+    "momentum",
+    "quality",
+    "size",
+    "lowVol",
+    "yield",
+  ];
+  const out = {} as FactorScores;
+  for (const f of factors) {
+    let weighted = 0;
+    for (const w of weights) {
+      const score = ASSET_FACTOR_SCORES[w.ticker]?.[f] ?? 50;
+      weighted += w.w * score;
+    }
+    out[f] = weighted;
+  }
+  return out;
+}
+
+/** Qualifier retail de un score 0-100: "tilt fuerte" / "neutral" /
+ *  "tilt débil", junto con la dirección (positivo, neutral o
+ *  negativo). La frase concreta sobre qué significa el tilt para
+ *  ese factor en particular vive en el caller. */
+export function factorTiltLabel(score: number): {
+  qualifier: string;
+  direction: "positivo" | "neutral" | "negativo";
+} {
+  if (score >= 70)
+    return { qualifier: "Exposición alta", direction: "positivo" };
+  if (score >= 58)
+    return {
+      qualifier: "Tilt positivo moderado",
+      direction: "positivo",
+    };
+  if (score >= 42)
+    return {
+      qualifier: "Cerca del benchmark",
+      direction: "neutral",
+    };
+  if (score >= 30)
+    return {
+      qualifier: "Tilt negativo moderado",
+      direction: "negativo",
+    };
+  return { qualifier: "Exposición baja", direction: "negativo" };
+}
+
