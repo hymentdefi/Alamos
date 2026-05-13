@@ -111,6 +111,13 @@ export default function AppLayout() {
         <Stack.Screen name="notifications" />
         <Stack.Screen name="alerts" />
         <Stack.Screen name="queued-orders" />
+        <Stack.Screen name="conditional-orders" />
+        {/* Limit order: misma protección que buy/confirm — el keypad
+            no debe disparar swipe-back. */}
+        <Stack.Screen
+          name="limit-order"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         {/* Convert: misma protección que transfer — el slider/keypad
             puede confundirse con un swipe-from-anywhere. */}
         <Stack.Screen
