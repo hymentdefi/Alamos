@@ -1072,10 +1072,12 @@ export function SendSuccess({
       <View style={{ flex: 1 }} />
       <View style={[{ paddingBottom: insets.bottom + 14, paddingHorizontal: 20 }]}>
         <Pressable
-          style={[s.cta, { backgroundColor: c.ink }]}
+          style={[s.cta, { backgroundColor: c.brand }]}
           onPress={() => router.replace("/(app)")}
         >
-          <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+          <Text style={[s.ctaText, { color: c.onColor }]}>
+            Volver al inicio
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -1174,10 +1176,12 @@ export function DepositFromAccount({
         <View style={{ flex: 1 }} />
         <View style={[{ paddingBottom: insets.bottom + 14, paddingHorizontal: 20 }]}>
           <Pressable
-            style={[s.cta, { backgroundColor: c.ink }]}
+            style={[s.cta, { backgroundColor: c.brand }]}
             onPress={() => router.replace("/(app)")}
           >
-            <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+            <Text style={[s.ctaText, { color: c.onColor }]}>
+              Volver al inicio
+            </Text>
           </Pressable>
         </View>
       </View>

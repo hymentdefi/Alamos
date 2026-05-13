@@ -921,9 +921,9 @@ export default function PortfolioScreen() {
                     pathname: "/(app)/(tabs)/explore",
                   })
                 }
-                style={[s.emptyCta, { backgroundColor: c.text }]}
+                style={[s.emptyCta, { backgroundColor: c.brand }]}
               >
-                <Text style={[s.emptyCtaText, { color: c.bg }]}>
+                <Text style={[s.emptyCtaText, { color: c.onColor }]}>
                   Ir a Mercado
                 </Text>
               </Tap>
