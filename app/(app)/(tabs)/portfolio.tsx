@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -514,32 +515,52 @@ export default function PortfolioScreen() {
   const [viz, setViz] = useState<VizKey>("pie");
   /* Orden de las 4 vizs para el swipe horizontal sobre el chart —
    *  matchea el orden del VizSelectorSheet (Pie / Treemap / Ladrillo
-   *  / Ranking). El swipe cycla con wrap-around entre las 4. */
+   *  / Ranking). Sin wrap-around — el row layout deja claro dónde
+   *  arranca y dónde termina la pila. */
   const vizOrder = useMemo<VizKey[]>(
     () => ["pie", "treemap", "brick", "ranking"],
     [],
   );
   const vizIdx = vizOrder.indexOf(viz);
-  const changeViz = useCallback(
-    (delta: number) => {
-      const len = vizOrder.length;
-      const next = vizOrder[(vizIdx + delta + len) % len];
+
+  /* ─── Swipe horizontal: pager pre-renderizado ─────────────────
+   *
+   * Las 4 vizs viven SIEMPRE en una fila horizontal. La fila tiene
+   * width = 4 × CANVAS_W y translateX = -vizIdx × CANVAS_W para
+   * dejar la viz activa centrada. Durante el pan, translateX sigue
+   * al dedo en tiempo real (UI thread). En release, animamos a la
+   * viz vecina y disparamos setViz — como las 4 ya están montadas
+   * no hay mount-during-animation y la transición no se traba.
+   *
+   * Los responders internos de cada viz (hold para highlight)
+   * conviven con el pan via activeOffsetX/failOffsetY: el pan sólo
+   * se activa con movimiento horizontal claro y cede al
+   * ScrollView vertical en movimiento vertical mínimo. */
+  const { width: screenW } = useWindowDimensions();
+  const CANVAS_W = screenW - 48; // chartBlock paddingHorizontal × 2
+
+  const rowX = useSharedValue(-vizIdx * CANVAS_W);
+  /* Evitar que el useEffect de sync rivalice con la animación del
+   * propio swipe — cuando el cambio viene del swipe, ya animamos
+   * rowX en el worklet; el useEffect se debe saltear esa pasada. */
+  const skipSyncRef = useRef(false);
+  useEffect(() => {
+    if (skipSyncRef.current) {
+      skipSyncRef.current = false;
+      return;
+    }
+    rowX.value = withTiming(-vizIdx * CANVAS_W, { duration: 240 });
+  }, [vizIdx, CANVAS_W, rowX]);
+
+  const setVizFromSwipe = useCallback(
+    (next: VizKey) => {
+      skipSyncRef.current = true;
       setViz(next);
       Haptics.selectionAsync().catch(() => {});
     },
-    [vizIdx, vizOrder],
+    [],
   );
 
-  /* ─── Swipe horizontal del chart para cambiar viz ─────────────
-   *
-   * Pan que sigue el dedo con translateX en tiempo real. Los offsets
-   * activeOffsetX/failOffsetY le dan al gesture handler la chance de
-   * ceder el touch a los responders internos de los viz (hold para
-   * highlight) cuando el movimiento es vertical/menor, o tomar el
-   * touch cuando el user claramente quiere swipear. Al final del
-   * pan: si superó threshold de distance o velocity, anima la salida
-   * lateral y cambia al viz vecino; si no, snap back al centro. */
-  const vizPanX = useSharedValue(0);
   const swipeViz = useMemo(
     () =>
       Gesture.Pan()
@@ -547,38 +568,49 @@ export default function PortfolioScreen() {
         .failOffsetY([-16, 16])
         .onUpdate((e) => {
           "worklet";
-          vizPanX.value = e.translationX;
+          /* Rubberband suave en los bordes: si intenta pasarse del
+           * primer/último, atenuamos el delta a 1/3 para que el
+           * row resista pero sin frenar de golpe. */
+          const base = -vizIdx * CANVAS_W;
+          let next = base + e.translationX;
+          const maxX = 0;
+          const minX = -(vizOrder.length - 1) * CANVAS_W;
+          if (next > maxX) next = maxX + (next - maxX) / 3;
+          else if (next < minX) next = minX + (next - minX) / 3;
+          rowX.value = next;
         })
         .onEnd((e) => {
           "worklet";
           const distThreshold = 70;
           const velThreshold = 450;
-          const goNext =
+          const wantNext =
             e.translationX < -distThreshold || e.velocityX < -velThreshold;
-          const goPrev =
+          const wantPrev =
             e.translationX > distThreshold || e.velocityX > velThreshold;
-          if (goNext || goPrev) {
-            const dir = goNext ? 1 : -1;
-            vizPanX.value = withTiming(
-              dir * -260,
-              { duration: 160 },
-              (finished) => {
-                "worklet";
-                if (finished) {
-                  vizPanX.value = 0;
-                  runOnJS(changeViz)(dir);
-                }
-              },
-            );
+          const canNext = vizIdx < vizOrder.length - 1;
+          const canPrev = vizIdx > 0;
+
+          if (wantNext && canNext) {
+            rowX.value = withTiming(-(vizIdx + 1) * CANVAS_W, {
+              duration: 220,
+            });
+            runOnJS(setVizFromSwipe)(vizOrder[vizIdx + 1]);
+          } else if (wantPrev && canPrev) {
+            rowX.value = withTiming(-(vizIdx - 1) * CANVAS_W, {
+              duration: 220,
+            });
+            runOnJS(setVizFromSwipe)(vizOrder[vizIdx - 1]);
           } else {
-            vizPanX.value = withSpring(0, { damping: 18, stiffness: 220 });
+            rowX.value = withSpring(-vizIdx * CANVAS_W, {
+              damping: 22,
+              stiffness: 240,
+            });
           }
         }),
-    [changeViz, vizPanX],
+    [vizIdx, vizOrder, CANVAS_W, rowX, setVizFromSwipe],
   );
-  const vizPanStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: vizPanX.value }],
-    opacity: 1 - Math.min(0.35, Math.abs(vizPanX.value) / 700),
+  const rowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: rowX.value }],
   }));
   /* Sheet del selector de viz — abierto desde el gear que vive en el
    *  topActionsRow, al lado del pill ARS/USD. Mismo lenguaje que el
@@ -806,56 +838,67 @@ export default function PortfolioScreen() {
 
           </View>
 
-          {/* ─── Chart — render condicional según viz seleccionado.
-              Wrapper GestureDetector permite cambiar de viz con
-              swipe horizontal sobre el canvas. El Pan cede el touch
-              a los responders internos (hold para highlight) si el
-              movimiento es vertical, y se queda con él en swipe
-              horizontal claro. */}
+          {/* ─── Chart — pager pre-renderizado de 4 vizs.
+              Las 4 vivien siempre en la fila; el Pan anima la fila
+              entera con translateX. Como no hay mount/unmount al
+              cambiar de viz, la transición no se traba.
+              El responder interno de cada viz (hold para highlight)
+              convive con el pan gracias a activeOffsetX/failOffsetY. */}
           {hasHoldings ? (
             <View style={s.chartBlock}>
-              <GestureDetector gesture={swipeViz}>
-                <Animated.View style={[s.chartCanvas, vizPanStyle]}>
-                  {viz === "treemap" ? (
-                    <Treemap
-                      holdings={holdingsForCharts}
-                      totalArs={totalArsWithCash}
-                      onHoldChange={setBrickHolding}
-                      dimMarket={highlightedMarket}
-                      onActiveMarketChange={setHighlightedMarket}
-                    />
-                  ) : viz === "brick" ? (
-                    <FloorBrick
-                      holdings={holdingsForCharts}
-                      totalArs={totalArsWithCash}
-                      groupBy="category"
-                      onHoldChange={setBrickHolding}
-                      dimMarket={highlightedMarket}
-                      onActiveMarketChange={setHighlightedMarket}
-                    />
-                  ) : viz === "pie" ? (
-                    <FloorPie
-                      holdings={holdingsForCharts}
-                      totalArs={totalArsWithCash}
-                      currency={currency}
-                      groupBy="category"
-                      dayPct={dayPct}
-                      dayUp={dayUp}
-                      onHoldChange={setBrickHolding}
-                      dimMarket={highlightedMarket}
-                      onActiveMarketChange={setHighlightedMarket}
-                    />
-                  ) : (
-                    <RankingList
-                      holdings={holdingsForCharts}
-                      totalArs={totalArsWithCash}
-                      onHoldChange={setBrickHolding}
-                      dimMarket={highlightedMarket}
-                      onActiveMarketChange={setHighlightedMarket}
-                    />
-                  )}
-                </Animated.View>
-              </GestureDetector>
+              <View style={s.vizViewport}>
+                <GestureDetector gesture={swipeViz}>
+                  <Animated.View
+                    style={[
+                      s.vizRow,
+                      { width: CANVAS_W * vizOrder.length },
+                      rowStyle,
+                    ]}
+                  >
+                    <View style={{ width: CANVAS_W }}>
+                      <FloorPie
+                        holdings={holdingsForCharts}
+                        totalArs={totalArsWithCash}
+                        currency={currency}
+                        groupBy="category"
+                        dayPct={dayPct}
+                        dayUp={dayUp}
+                        onHoldChange={setBrickHolding}
+                        dimMarket={highlightedMarket}
+                        onActiveMarketChange={setHighlightedMarket}
+                      />
+                    </View>
+                    <View style={{ width: CANVAS_W }}>
+                      <Treemap
+                        holdings={holdingsForCharts}
+                        totalArs={totalArsWithCash}
+                        onHoldChange={setBrickHolding}
+                        dimMarket={highlightedMarket}
+                        onActiveMarketChange={setHighlightedMarket}
+                      />
+                    </View>
+                    <View style={{ width: CANVAS_W }}>
+                      <FloorBrick
+                        holdings={holdingsForCharts}
+                        totalArs={totalArsWithCash}
+                        groupBy="category"
+                        onHoldChange={setBrickHolding}
+                        dimMarket={highlightedMarket}
+                        onActiveMarketChange={setHighlightedMarket}
+                      />
+                    </View>
+                    <View style={{ width: CANVAS_W }}>
+                      <RankingList
+                        holdings={holdingsForCharts}
+                        totalArs={totalArsWithCash}
+                        onHoldChange={setBrickHolding}
+                        dimMarket={highlightedMarket}
+                        onActiveMarketChange={setHighlightedMarket}
+                      />
+                    </View>
+                  </Animated.View>
+                </GestureDetector>
+              </View>
               {/* Indicador de paginación — 4 dots, el activo en
                   brand, los demás en faint. Da feedback visual de
                   cuántas vizs hay y en cuál estás. */}
@@ -4871,6 +4914,21 @@ const s = StyleSheet.create({
    * los lleva arriba del dedo). */
   chartCanvas: {
     alignSelf: "stretch",
+  },
+  /* Viewport del pager — recorta lateralmente la fila de 4 vizs
+   * para que sólo se vea la activa. RN solo soporta 'overflow'
+   * uniforme (no overflowX/overflowY); el clipping vertical es un
+   * trade-off aceptable: los tooltips de los charts extienden
+   * unos pocos px hacia arriba y siguen visibles dentro del área
+   * del propio chart. */
+  vizViewport: {
+    alignSelf: "stretch",
+    overflow: "hidden",
+  },
+  /* Fila horizontal con las 4 vizs pre-renderizadas. translateX
+   * animado (rowStyle) la corre para mostrar la viz seleccionada. */
+  vizRow: {
+    flexDirection: "row",
   },
   /* Pagination dots — fila de 4 dots chiquitos debajo del chart para
    * mostrar visualmente cuál viz está activa. El dot activo se pinta
