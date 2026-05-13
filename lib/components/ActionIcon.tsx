@@ -5,14 +5,11 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Convertir).
  *
- * Set "tint-S" del brand pack: círculo lleno con un tint suave del
- * verde brand (10% en light, 14% en dark) y un símbolo (flecha down /
- * up / arrows-swap) en stroke verde brand de 4px. Sin anillo —
- * delgado en geometría, fuerte en presencia.
- *
- * Variantes fuente:
- *   assets/icons/actions/light/alamos-{ingresar|enviar|convertir}.svg
- *   assets/icons/actions/dark/alamos-{ingresar|enviar|convertir}.svg
+ * Outline brand puro — círculo con stroke c.brand 2.5px (sin fill ni
+ * tint) y símbolo interno (flecha down/up/arrows-swap) en stroke
+ * c.brand 4px. Mantiene la presencia del set "tint-S" del brand pack
+ * pero sin el medio-fill — sigue la regla del sistema de jerarquía:
+ * solid brand (CTA primario) o outline (importante pero secundario).
  */
 
 export type ActionIconName = "ingresar" | "enviar" | "convertir";
@@ -20,38 +17,33 @@ export type ActionIconName = "ingresar" | "enviar" | "convertir";
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del stroke (símbolo) y base del tint del
-   *  círculo. Default: brand.green canónico (#00C805 — coincide con
-   *  c.brand del theme y con el isotipo del logo). */
+  /** Override del color del stroke (símbolo + círculo). Default:
+   *  c.brand del theme (#00C805 canónico). */
   stroke?: string;
-  /** Override del fill del círculo. Default: tint del stroke a 10%
-   *  en light y 14% en dark. */
-  fill?: string;
 }
-
-const BRAND_GREEN = "#00C805";
-
-/** Tint del fill cuando no se pasa override. Misma RGB que el stroke,
- *  alpha distinto por modo. */
-const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
 
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
-  stroke = BRAND_GREEN,
-  fill,
+  stroke,
 }: Props) {
-  const { mode } = useTheme();
-  const resolvedFill = fill ?? tintFor(mode);
+  const { c } = useTheme();
+  const strokeColor = stroke ?? c.brand;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle cx={32} cy={32} r={32} fill={resolvedFill} />
+      <Circle
+        cx={32}
+        cy={32}
+        r={30.5}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={3}
+      />
       <G
         transform="translate(32 32)"
         fill="none"
-        stroke={stroke}
+        stroke={strokeColor}
         strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"

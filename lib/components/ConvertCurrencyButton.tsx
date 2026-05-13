@@ -5,20 +5,16 @@ import { fontFamily, radius, useTheme } from "../theme";
 import { Tap } from "./Tap";
 
 /**
- * CTA de "Convertir entre monedas" — pill verde de 56 px en el home,
- * abajo de la lista de divisas. Diseño del brand pack:
- *   - bg: tint del brand green (10% en light, 14% en dark)
- *   - icono: dos flechas convertibles + texto, ambos en brand green
+ * CTA "Convertir entre monedas" — pill outline brand de 56 px en el
+ * home, abajo de la lista de divisas. Outline puro (sin tint bg):
+ *   - bg: transparent
+ *   - border: 1.5px c.brand
+ *   - icono + texto: c.brand
  *
- * El verde usado es brand.green (#00C805) — el canónico de la marca.
- * El brand pack usa un verde más claro (#00C805) en los SVGs de
- * referencia, pero la regla del proyecto es no inventar otros verdes.
+ * Sigue la regla "no medio fill" del sistema de jerarquía: solid
+ * brand (CTA primario) o outline (importante pero secundario). Esto
+ * último.
  */
-
-const BRAND_GREEN = "#00C805";
-
-const tintFor = (mode: "light" | "dark") =>
-  mode === "dark" ? "rgba(0,200,5,0.14)" : "rgba(0,200,5,0.10)";
 
 interface Props {
   onPress: () => void;
@@ -27,7 +23,7 @@ interface Props {
 export const ConvertCurrencyButton = memo(function ConvertCurrencyButton({
   onPress,
 }: Props) {
-  const { mode } = useTheme();
+  const { c } = useTheme();
 
   return (
     <Tap
@@ -35,15 +31,14 @@ export const ConvertCurrencyButton = memo(function ConvertCurrencyButton({
       haptic="selection"
       pressScale={0.98}
       rippleContained
-      rippleColor="rgba(0,200,5,0.12)"
-      style={[s.btn, { backgroundColor: tintFor(mode) }]}
+      style={[s.btn, { borderColor: c.brand }]}
       accessibilityRole="button"
       accessibilityLabel="Convertir entre monedas"
     >
       <Svg width={22} height={22} viewBox="0 0 24 24">
         <G
           fill="none"
-          stroke={BRAND_GREEN}
+          stroke={c.brand}
           strokeWidth={2.2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -54,7 +49,9 @@ export const ConvertCurrencyButton = memo(function ConvertCurrencyButton({
           <Path d="M10 20 L6 16 L10 12" />
         </G>
       </Svg>
-      <Text style={s.text}>Convertir entre monedas</Text>
+      <Text style={[s.text, { color: c.brand }]}>
+        Convertir entre monedas
+      </Text>
     </Tap>
   );
 });
@@ -68,11 +65,12 @@ const s = StyleSheet.create({
     gap: 10,
     borderRadius: radius.lg,
     borderCurve: "continuous",
+    borderWidth: 1.5,
+    backgroundColor: "transparent",
   },
   text: {
     fontFamily: fontFamily[600],
     fontSize: 16,
     letterSpacing: -0.16,
-    color: BRAND_GREEN,
   },
 });
