@@ -320,13 +320,14 @@ export default function CobrosScreen() {
               Cobros de {monthNameFull(month).toLowerCase()}
             </Text>
             {monthEvents.map((e, i, arr) => {
-              /* Highlight si el día del evento matchea heldDay. Solo
-               * un evento (o varios del mismo día) se pintan en
-               * brandDim, los demás quedan dimmed para que el ojo
-               * caiga sobre la selección. */
+              /* Highlight si el día del evento matchea heldDay.
+               * Robinhood-style: bg brandDim full-bleed (extiende
+               * edge-to-edge del card via negative marginHorizontal),
+               * sin cambios de color en textos, sin dim de las otras
+               * filas. La hairline divider se omite en la fila
+               * highlighted para no romper el bloque visual. */
               const evDay = Number(e.date.split("-")[2]);
               const isHighlighted = heldDay === evDay;
-              const isDimmed = heldDay !== null && !isHighlighted;
               const hairline =
                 i < arr.length - 1 && !isHighlighted
                   ? {
@@ -334,30 +335,21 @@ export default function CobrosScreen() {
                       borderBottomColor: c.border,
                     }
                   : null;
-              const highlightStyle = isHighlighted
-                ? {
-                    backgroundColor: c.brandDim,
-                    borderCurve: "continuous" as const,
-                    borderRadius: radius.sm,
-                  }
-                : null;
               return (
                 <View
                   key={e.id}
                   style={[
                     s.eventRow,
                     hairline,
-                    highlightStyle,
-                    isDimmed && { opacity: 0.4 },
+                    isHighlighted && {
+                      backgroundColor: c.brandDim,
+                      marginHorizontal: -24,
+                      paddingHorizontal: 24,
+                    },
                   ]}
                 >
                   <View style={s.eventDate}>
-                    <Text
-                      style={[
-                        s.eventDateText,
-                        { color: isHighlighted ? c.brand : c.text },
-                      ]}
-                    >
+                    <Text style={[s.eventDateText, { color: c.text }]}>
                       {formatShortDate(e.date)}
                     </Text>
                     <Text
@@ -368,10 +360,7 @@ export default function CobrosScreen() {
                   </View>
                   <View style={s.eventMid}>
                     <Text
-                      style={[
-                        s.eventTicker,
-                        { color: isHighlighted ? c.brand : c.text },
-                      ]}
+                      style={[s.eventTicker, { color: c.text }]}
                       numberOfLines={1}
                     >
                       {e.ticker}
@@ -384,10 +373,7 @@ export default function CobrosScreen() {
                     </Text>
                   </View>
                   <Text
-                    style={[
-                      s.eventAmount,
-                      { color: isHighlighted ? c.brand : c.text },
-                    ]}
+                    style={[s.eventAmount, { color: c.text }]}
                     numberOfLines={1}
                   >
                     {formatMoney(e.amount, e.currency)}
