@@ -222,7 +222,7 @@ export function CobrosSection({ currency }: Props) {
           style={s.sectionInfoDot}
           accessibilityLabel="Qué son los cobros"
         >
-          <Feather name="info" size={18} color={c.brand} />
+          <Feather name="info" size={15} color={c.brand} />
         </Tap>
       </View>
 
@@ -604,7 +604,7 @@ const s = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 5,
     paddingHorizontal: 24,
     marginTop: 32,
   },
@@ -617,10 +617,15 @@ const s = StyleSheet.create({
     letterSpacing: -0.8,
   },
   sectionInfoDot: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
+    /* Pequeño offset óptico para que el icono caiga sobre el
+     * centro visual de "Cobros" (el line-box es más alto que la
+     * cap-height, así que alignItems: center deja el icon un
+     * poco más arriba de lo que se siente correcto). */
+    marginTop: 4,
   },
 
   /* Card container — mismo lenguaje que rendimiento.tsx (s.card)
