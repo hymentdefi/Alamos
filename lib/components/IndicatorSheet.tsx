@@ -1055,16 +1055,31 @@ function ConfigParamList({
             onChipChange={(v) =>
               setConfig({ ...config, bbDeviation: Number(v) })
             }
-            chipLabelFn={(v) => fmtDecimalChip(Number(v))}
+            /* Mismo formato 1-decimal que el stepper para que el chip
+             * activo lea como el valor que muestra el stepper (2 ↔
+             * "2,0"). Antes el chip mostraba "2" mientras el stepper
+             * decía "2,0σ", inconsistencia visual. */
+            chipLabelFn={(v) => Number(v).toFixed(1).replace(".", ",")}
             stepper={
               <Stepper
                 value={config.bbDeviation}
                 onChange={(v) =>
                   setConfig({ ...config, bbDeviation: v })
                 }
-                min={0.5}
-                max={5}
-                step={0.5}
+                /* Rangos ajustados según review técnica:
+                 *   min 1.0  — debajo de 1σ las bandas están
+                 *              tan apretadas que se tocan todo
+                 *              el tiempo, alertas inservibles.
+                 *   max 3.0  — la literatura nunca documenta
+                 *              uso > 3σ. Arriba es tierra de
+                 *              nadie.
+                 *   step 0.1 — Bollinger explícitamente
+                 *              recomienda ajustes finos (1.9σ
+                 *              para P=10, 2.1σ para P=50).
+                 *              Ninguna plataforma pro usa 0.5. */
+                min={1}
+                max={3}
+                step={0.1}
                 decimals={1}
                 suffix="σ"
               />
