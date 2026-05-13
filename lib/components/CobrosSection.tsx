@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { fontFamily, radius, useTheme } from "../theme";
 import { AmountDisplay } from "./AmountDisplay";
+import { CobrosInfoSheet } from "./CobrosInfoSheet";
 import { Tap } from "./Tap";
 import {
   MOCK_TODAY,
@@ -51,6 +52,7 @@ export function CobrosSection({ currency }: Props) {
   const { c } = useTheme();
   const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const events = useMemo(() => generatePayouts(), []);
 
@@ -107,10 +109,27 @@ export function CobrosSection({ currency }: Props) {
 
   return (
     <>
+      {/* ─── Section header — title display + info dot ─────────────
+          Vive afuera de los cards porque es el header de toda la
+          sección Cobros, no de un card en particular. El info dot
+          abre el CobrosInfoSheet con la explicación sencilla
+          (patrón estándar de Álamos, mismo que PygInfoSheet en
+          portfolio o BalanceInfoSheet en inicio). */}
+      <View style={s.sectionHeader}>
+        <Text style={[s.sectionTitle, { color: c.text }]}>Cobros</Text>
+        <Tap
+          onPress={() => setInfoOpen(true)}
+          haptic="selection"
+          hitSlop={12}
+          style={s.sectionInfoDot}
+          accessibilityLabel="Qué son los cobros"
+        >
+          <Feather name="info" size={18} color={c.textMuted} />
+        </Tap>
+      </View>
+
       {/* ─── Card 1: Hero + bar chart ─────────────────────────────── */}
       <View style={s.card}>
-        <Text style={[s.eyebrow, { color: c.text }]}>Cobros</Text>
-
         {scrubBucket ? (
           <>
             <Text style={[s.heroLabel, { color: c.textMuted }]}>
@@ -372,6 +391,10 @@ export function CobrosSection({ currency }: Props) {
         </Text>
       </View>
 
+      <CobrosInfoSheet
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </>
   );
 }
@@ -379,6 +402,31 @@ export function CobrosSection({ currency }: Props) {
 const BAR_MAX_H = 96;
 
 const s = StyleSheet.create({
+  /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
+   * los cards porque es el header de toda la sección. Padding lateral
+   * 24pt para alinear con el rail estándar. marginTop 32 para separar
+   * del card anterior ("De dónde viene"). */
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 24,
+    marginTop: 32,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 48,
+    letterSpacing: -2,
+  },
+  sectionInfoDot: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6, // alinea óptico con el corte del título display
+  },
+
   /* Card container — mismo lenguaje que rendimiento.tsx (s.card). */
   card: {
     paddingHorizontal: 24,
