@@ -44,9 +44,7 @@ export default function Button({
   const fg =
     variant === "primary" || variant === "accent"
       ? c.onColor /* texto sobre verde brand: blanco en light, negro en dark */
-      : variant === "ghost"
-      ? c.text
-      : c.ink;
+      : c.text; /* secondary y ghost: theme-aware (ink puro era invisible en dark) */
   const hasBorder = variant === "secondary";
   const border = hasBorder ? c.border : undefined;
 
