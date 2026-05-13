@@ -38,8 +38,6 @@ import { accounts } from "../../lib/data/accounts";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { SwipeToSubmit } from "../../lib/components/SwipeToSubmit";
 import { playSound } from "../../lib/sounds/SoundManager";
-import { useQueuedOrders } from "../../lib/queued-orders/context";
-import { nextOpenFor } from "../../lib/market/hours";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -264,8 +262,6 @@ export default function ConfirmScreen() {
     amount,
     mode,
     currency,
-    orderType,
-    limitPrice,
     bridgeFrom,
     bridgeRate,
     bridgeFeePct,
@@ -277,12 +273,6 @@ export default function ConfirmScreen() {
     amount?: string;
     mode?: string;
     currency?: string;
-    /** Tipo de orden — "market" (default) o "limit". Se setea desde
-     *  buy.tsx via el OrderTypeSheet. */
-    orderType?: string;
-    /** Precio objetivo del límite (string, puede llegar con punto
-     *  decimal). Sólo aplica cuando orderType === "limit". */
-    limitPrice?: string;
     bridgeFrom?: string;
     bridgeRate?: string;
     bridgeFeePct?: string;
@@ -304,23 +294,8 @@ export default function ConfirmScreen() {
     (currency as AssetCurrency | undefined) ??
     (asset ? assetCurrency(asset) : "ARS");
 
-  /* Tipo de orden — "limit" cambia el flujo: skipea la fase
-   *  "Orden recibida" y termina en "Orden enviada" (la orden
-   *  queda encolada esperando a que el precio toque el límite,
-   *  no se ejecuta acá mismo). */
-  const isLimit = orderType === "limit";
-  const limitPriceNum = Number.parseFloat(limitPrice ?? "");
-  const limitPriceValid = Number.isFinite(limitPriceNum) && limitPriceNum > 0;
-  /* Para órdenes de límite, la cantidad debería calcularse contra
-   *  el precio objetivo, no contra el precio de mercado actual.
-   *  Sino, si vendés "$1000 a $50 cada uno" la cantidad sería
-   *  amount/marketPrice y no amount/limitPrice. */
-  const effectivePrice =
-    isLimit && limitPriceValid ? limitPriceNum : asset?.price ?? 1;
-  const queued = useQueuedOrders();
-
   const numAmount = Number(amount) || asset?.price || 0;
-  const estQty = asset ? numAmount / effectivePrice : 0;
+  const estQty = asset ? numAmount / asset.price : 0;
   // Comisión de la operación de compra/venta (separada del spread del
   // puente — el spread ya está absorbido en bridgeDebit).
   const fee = numAmount * 0.005;
@@ -524,87 +499,39 @@ export default function ConfirmScreen() {
     await Promise.all([wait(PHASE_SENDING_MS), wait(MIN_LOADING_MS)]);
     if (completedRef.current) return;
 
-    /* Branch del flujo según tipo de orden:
-     *
-     *   Market → Enviando → Recibida → Ejecutada
-     *            (sigue el path original con el peak Ejecutada al
-     *            final, porque la orden EFECTIVAMENTE se ejecuta).
-     *
-     *   Limit  → Enviando → Enviada (final)
-     *            (skip "Recibida" porque no hay tal cosa en el flujo
-     *            de queue; la orden queda esperando que el precio
-     *            toque el límite, no se "ejecutó"). createQueued
-     *            corre en background mientras la UI muestra
-     *            "Enviada" — el usuario ya tiene su feedback. */
-    if (!isLimit) {
-      // Phase 2: sending → received. Medium haptic con un pequeño
-      // delay (RECIBIDA_HAPTIC_DELAY_MS=200ms) para que coincida con
-      // cuando el texto entrante "Recibida..." ya empezó a aparecer
-      // visualmente. Sin el delay el haptic dispara antes de que el
-      // ojo enganche el nuevo texto y no se asocian. Funciona como
-      // BUILD-UP del peak Heavy a +700ms.
-      setPhase("received");
-      setStatusText("Orden Recibida...");
-      setTimeout(() => {
-        if (completedRef.current && phase !== "received") return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      }, RECIBIDA_HAPTIC_DELAY_MS);
+    // Phase 2: sending → received. Medium haptic con un pequeño
+    // delay (RECIBIDA_HAPTIC_DELAY_MS=200ms) para que coincida con
+    // cuando el texto entrante "Recibida..." ya empezó a aparecer
+    // visualmente. Sin el delay el haptic dispara antes de que el
+    // ojo enganche el nuevo texto y no se asocian. Funciona como
+    // BUILD-UP del peak Heavy a +700ms.
+    setPhase("received");
+    setStatusText("Orden Recibida...");
+    setTimeout(() => {
+      if (completedRef.current && phase !== "received") return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }, RECIBIDA_HAPTIC_DELAY_MS);
 
-      await wait(PHASE_RECEIVED_MS);
-      if (completedRef.current) return;
-    } else {
-      /* En el flujo limit encolamos la orden mientras animamos.
-       *  El error de red lo silenciamos visualmente para no
-       *  romper la animación — el usuario verá la orden en
-       *  pendientes (o no, si falló) en el dashboard. Para
-       *  producción habría que sumar un toast post-animación. */
-      try {
-        await queued.create({
-          assetId: asset.ticker,
-          side: isSell ? "sell" : "buy",
-          quantity: estQty,
-          currency: nativeCurrency,
-          orderType: "limit",
-          limitPrice: limitPriceNum,
-          estimatedExecutionAt: nextOpenFor(asset).toISOString(),
-        });
-      } catch {
-        // Silent — el flujo visual sigue para no quedar trabado.
-      }
-    }
+    await wait(PHASE_RECEIVED_MS);
+    if (completedRef.current) return;
 
-    // Phase 3: morph logo to checkmark.
+    // Phase 3: received → done + morph logo to checkmark.
     setPhase("done");
     completedRef.current = true;
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    setStatusText(isLimit ? "Orden Enviada" : "Orden Ejecutada");
+    setStatusText("Orden Ejecutada");
 
-    /* Feedback distinto según el flow:
-     *  · Ejecutada: peak Heavy + ding co-localizados. El haptic
-     *    dispara INMEDIATO, el sonido HAPTIC_AUDIO_LEAD_MS (40ms)
-     *    después — compensación de latencia táctil/auditiva del
-     *    cerebro para que se perciban simultáneos. Patrón Apple Pay.
-     *  · Enviada: Success notification (3-tap pattern) — un peak
-     *    más suave, sin sonido. La orden queda pending, no es un
-     *    "celebrate" como la ejecutada. */
-    if (isLimit) {
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    }
-    if (!isLimit) {
-      /* Sonido sólo para market — la "Orden Enviada" del límite
-       * usa sólo el haptic Success, sin ding, para reservar el
-       * sonido como el feedback exclusivo de "trade ejecutado". */
-      setTimeout(() => {
-        playSound("order_success");
-      }, HAPTIC_AUDIO_LEAD_MS);
-    }
+    // PEAK: haptic Heavy + sonido del ding co-localizados. El
+    // haptic dispara INMEDIATO, el sonido HAPTIC_AUDIO_LEAD_MS
+    // (40ms) después — compensación de latencia táctil/auditiva
+    // del cerebro para que se perciban simultáneos. Patrón Apple Pay.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setTimeout(() => {
+      playSound("order_success");
+    }, HAPTIC_AUDIO_LEAD_MS);
 
     // Arc → full static circle.
     fullCircleOpacity.value = withTiming(1, {
@@ -649,10 +576,6 @@ export default function ConfirmScreen() {
         amount: String(numAmount),
         qty: estQty.toFixed(4),
         mode: isSell ? "sell" : "buy",
-        orderType: isLimit ? "limit" : "market",
-        ...(isLimit && limitPriceValid
-          ? { limitPrice: String(limitPriceNum) }
-          : {}),
       },
     });
   };
@@ -776,20 +699,8 @@ export default function ConfirmScreen() {
 
   const rows: { label: string; value: string; strong?: boolean }[] = [
     {
-      label: "Tipo de orden",
-      value:
-        isLimit && limitPriceValid
-          ? `Límite · ${formatMoney(limitPriceNum, nativeCurrency)}`
-          : isLimit
-            ? "Límite"
-            : "Mercado",
-    },
-    {
-      label: isLimit && limitPriceValid ? "Precio objetivo" : "Precio estimado",
-      value: formatMoney(
-        isLimit && limitPriceValid ? limitPriceNum : asset.price,
-        nativeCurrency,
-      ),
+      label: "Precio estimado",
+      value: formatMoney(asset.price, nativeCurrency),
     },
     { label: "Cantidad", value: `${estQty.toFixed(4)} unidades` },
     {
