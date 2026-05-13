@@ -149,7 +149,7 @@ export const TradeBottomBar = memo(function TradeBottomBar({
   const currency = useMemo(() => nativeCurrencyFor(market), [market]);
   const isEmpty = balance <= 0;
 
-  const accent = assetColor ? assetColor.color : c.text;
+  const accent = assetColor ? assetColor.color : c.brand;
   /* Texto sobre el accent del botón (verde brand o naranja/rojo
    * del down state). Usa c.onColor: blanco en light, casi-negro
    * en dark. En dark, el negro sobre el verde vivo le da peso al
