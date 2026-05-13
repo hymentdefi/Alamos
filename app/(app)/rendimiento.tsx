@@ -204,9 +204,12 @@ export default function RendimientoScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={s.heroBlock}>
-            <Text style={[s.eyebrow, { color: c.textMuted }]}>
-              RENDIMIENTO
-            </Text>
+            {/* Title "Rendimiento" — mismo tamaño que "Portfolio" en
+                la tab de Cartera (32pt), peso fontFamily[800] como
+                "Briefing" del stock detail. Color tone: brand cuando
+                el rendimiento es positivo, naranja (c.red) cuando
+                es negativo. */}
+            <Text style={[s.heroTitle, { color }]}>Rendimiento</Text>
 
             <View style={s.heroAmountRow}>
               <Text style={[s.tri, { color }]}>{up ? "▲" : "▼"}</Text>
@@ -366,12 +369,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 4,
   },
-  eyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginBottom: 10,
+  /* Title del hero — peso fontFamily[800] como Briefing del stock
+   * detail, tamaño 32pt como el "Portfolio" de la tab de Cartera.
+   * El color lo dicta el caller según el signo del rendimiento. */
+  heroTitle: {
+    fontFamily: fontFamily[800],
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1.2,
+    marginBottom: 6,
   },
   heroAmountRow: {
     flexDirection: "row",
