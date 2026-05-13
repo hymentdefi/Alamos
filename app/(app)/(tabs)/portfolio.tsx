@@ -523,16 +523,25 @@ export default function PortfolioScreen() {
     MarketKey | null
   >(null);
 
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTimeout(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
       setRefreshing(false);
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
       ).catch(() => {});
     }, 900);
   }, []);
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     return registerTabTap("portfolio", {

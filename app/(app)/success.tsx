@@ -35,12 +35,22 @@ function buildReceiptId(seed: string): string {
 }
 
 export default function SuccessScreen() {
-  const { ticker, amount, qty, mode } = useLocalSearchParams<{
-    ticker: string;
-    amount: string;
-    qty: string;
-    mode?: string;
-  }>();
+  const { ticker, amount, qty, mode, orderType, limitPrice } =
+    useLocalSearchParams<{
+      ticker: string;
+      amount: string;
+      qty: string;
+      mode?: string;
+      /** "market" (default) o "limit". Limit cambia el copy a
+       *  "Orden enviada" — la orden queda esperando que el precio
+       *  toque el límite. */
+      orderType?: string;
+      limitPrice?: string;
+    }>();
+  const isLimit = orderType === "limit";
+  const limitPriceNum = Number.parseFloat(limitPrice ?? "");
+  const limitPriceValid =
+    Number.isFinite(limitPriceNum) && limitPriceNum > 0;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -63,7 +73,7 @@ export default function SuccessScreen() {
   // El snapshot mantiene el layout "primera compra" durante toda
   // la vida de esta instancia de la pantalla.
   const [isFirstTrade] = useState(
-    () => !!user && !user.hasFirstTrade && !isSell,
+    () => !!user && !user.hasFirstTrade && !isSell && !isLimit,
   );
   const firstName = user?.fullName?.split(" ")[0]?.trim() || "vos";
   const subheadlineBold =
@@ -254,11 +264,25 @@ export default function SuccessScreen() {
     { label: "Activo", value: asset?.name ?? "—" },
     { label: "Monto", value: formatMoney(numAmount, orderCurrency) },
     {
-      label: "Precio de ejecución",
-      value: asset ? formatMoney(asset.price, orderCurrency) : "—",
+      /* Para limit: precio objetivo (no se ejecutó todavía). Para
+       * market: precio de ejecución real (asset.price del momento). */
+      label: isLimit ? "Precio objetivo" : "Precio de ejecución",
+      value: isLimit && limitPriceValid
+        ? formatMoney(limitPriceNum, orderCurrency)
+        : asset
+          ? formatMoney(asset.price, orderCurrency)
+          : "—",
     },
     {
-      label: isSell ? "Unidades vendidas" : "Unidades compradas",
+      /* En limit las unidades son las que se van a comprar/vender
+       * cuando el precio toque el límite — no se "compraron" ya. */
+      label: isLimit
+        ? isSell
+          ? "Unidades a vender"
+          : "Unidades a comprar"
+        : isSell
+          ? "Unidades vendidas"
+          : "Unidades compradas",
       value: `${numQty.toFixed(4)} ${ticker}`,
     },
   ];
@@ -294,7 +318,25 @@ export default function SuccessScreen() {
             />
           </Svg>
         </Animated.View>
-        {isFirstTrade ? (
+        {isLimit ? (
+          /* Orden de límite — quedó en pendientes, espera que el
+           * precio toque el target. Copy refleja eso para no
+           * confundir con "ya se ejecutó". */
+          <>
+            <Text style={[s.title, { color: c.text }]}>Orden enviada</Text>
+            <Text style={[s.subtitle, { color: c.textMuted }]}>
+              Tu orden límite de{" "}
+              <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+                {ticker}
+              </Text>{" "}
+              se va a ejecutar cuando el precio toque{" "}
+              {limitPriceValid
+                ? formatMoney(limitPriceNum, orderCurrency)
+                : "el límite"}
+              .
+            </Text>
+          </>
+        ) : isFirstTrade ? (
           <>
             <Text style={[s.title, { color: c.text }]}>
               Felicitaciones, {firstName}.
@@ -366,29 +408,44 @@ export default function SuccessScreen() {
           </Text>
         </Pressable>
 
-        {/* Compartir comprobante — link editorial sin chrome, alineado
-            central. La acción está, sin gritar. */}
-        <Pressable
-          style={s.shareLink}
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/receipt",
-              params: {
-                ticker: ticker ?? "",
-                amount: String(numAmount),
-                qty: String(numQty),
-                mode: isSell ? "sell" : "buy",
-                receiptId,
-              },
-            })
-          }
-          hitSlop={8}
-        >
-          <Text style={[s.shareLinkText, { color: c.textMuted }]}>
-            Compartir comprobante
-          </Text>
-          <AlamosIcon name="arrow" size={13} color={c.textMuted} />
-        </Pressable>
+        {/* Link secundario — distinto según el flow:
+            · Market ejecutado → comprobante de la operación.
+            · Limit encolado    → la pantalla de pendientes para
+              chequear el estado de la orden hasta que se ejecute. */}
+        {isLimit ? (
+          <Pressable
+            style={s.shareLink}
+            onPress={() => router.push("/(app)/queued-orders")}
+            hitSlop={8}
+          >
+            <Text style={[s.shareLinkText, { color: c.textMuted }]}>
+              Ver órdenes pendientes
+            </Text>
+            <AlamosIcon name="arrow" size={13} color={c.textMuted} />
+          </Pressable>
+        ) : (
+          <Pressable
+            style={s.shareLink}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/receipt",
+                params: {
+                  ticker: ticker ?? "",
+                  amount: String(numAmount),
+                  qty: String(numQty),
+                  mode: isSell ? "sell" : "buy",
+                  receiptId,
+                },
+              })
+            }
+            hitSlop={8}
+          >
+            <Text style={[s.shareLinkText, { color: c.textMuted }]}>
+              Compartir comprobante
+            </Text>
+            <AlamosIcon name="arrow" size={13} color={c.textMuted} />
+          </Pressable>
+        )}
       </View>
 
       {/* Flash blanco overlay — invisible 99% del tiempo, pulsa en el
