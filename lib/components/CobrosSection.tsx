@@ -670,7 +670,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 4,
-    marginTop: 22,
+    marginTop: 12,
     height: BAR_MAX_H + 24,
   },
   barCol: {
