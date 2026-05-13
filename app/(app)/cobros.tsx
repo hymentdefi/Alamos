@@ -10,6 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { fontFamily, radius, useTheme } from "../../lib/theme";
 import { Tap } from "../../lib/components/Tap";
@@ -62,6 +63,10 @@ export default function CobrosScreen() {
   const [pickerYear, setPickerYear] = useState(
     () => MOCK_TODAY.getFullYear(),
   );
+  /* Día sostenido (hold) en el grid del calendar. Sus eventos en la
+   * lista de abajo se pintan con brandDim para highlighteo. Clear al
+   * soltar (onPressOut). */
+  const [heldDay, setHeldDay] = useState<number | null>(null);
 
   const events = useMemo(() => generatePayouts(), []);
 
@@ -214,7 +219,10 @@ export default function CobrosScreen() {
           ))}
         </View>
 
-        {/* Calendar grid */}
+        {/* Calendar grid — los días con eventos son Pressable: hold
+            (onPressIn) levanta heldDay → highlightea su row en la
+            lista de abajo + pinta el círculo del día en brandDim
+            para feedback visual. Soltar (onPressOut) clear. */}
         <View style={s.grid}>
           {cells.map((cell, i) => {
             if (cell.day == null) {
@@ -222,13 +230,32 @@ export default function CobrosScreen() {
             }
             const dayEvents = eventsByDay.get(cell.day) ?? [];
             const today = isToday(cell.day);
-            return (
-              <View key={i} style={s.cell}>
+            const hasEvents = dayEvents.length > 0;
+            const held = heldDay === cell.day;
+
+            /* Background del círculo: today gana sobre held (today es
+             * más prominente, brand sólido). Si está held y no es
+             * today, brandDim (translúcido). */
+            const innerBg = today
+              ? c.brand
+              : held
+                ? c.brandDim
+                : "transparent";
+            const numColor = today
+              ? c.onColor
+              : held
+                ? c.brand
+                : c.text;
+            const numWeight =
+              today || held ? fontFamily[700] : fontFamily[500];
+
+            const content = (
+              <>
                 <View
                   style={[
                     s.dayInner,
-                    today && {
-                      backgroundColor: c.brand,
+                    {
+                      backgroundColor: innerBg,
                       borderCurve: "continuous",
                       borderRadius: 16,
                     },
@@ -237,18 +264,13 @@ export default function CobrosScreen() {
                   <Text
                     style={[
                       s.dayNum,
-                      {
-                        color: today ? c.onColor : c.text,
-                        fontFamily: today
-                          ? fontFamily[700]
-                          : fontFamily[500],
-                      },
+                      { color: numColor, fontFamily: numWeight },
                     ]}
                   >
                     {cell.day}
                   </Text>
                 </View>
-                {dayEvents.length > 0 ? (
+                {hasEvents ? (
                   <View style={s.dotsRow}>
                     {dayEvents.slice(0, 3).map((_, j) => (
                       <View
@@ -261,6 +283,30 @@ export default function CobrosScreen() {
                     ))}
                   </View>
                 ) : null}
+              </>
+            );
+
+            /* Solo los días con eventos son interactivos. Días vacíos
+             * quedan como View estático. */
+            if (hasEvents) {
+              return (
+                <Pressable
+                  key={i}
+                  style={s.cell}
+                  onPressIn={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setHeldDay(cell.day);
+                  }}
+                  onPressOut={() => setHeldDay(null)}
+                  hitSlop={4}
+                >
+                  {content}
+                </Pressable>
+              );
+            }
+            return (
+              <View key={i} style={s.cell}>
+                {content}
               </View>
             );
           })}
@@ -273,49 +319,82 @@ export default function CobrosScreen() {
             <Text style={[s.eventsTitle, { color: c.text }]}>
               Cobros de {monthNameFull(month).toLowerCase()}
             </Text>
-            {monthEvents.map((e, i, arr) => (
-              <View
-                key={e.id}
-                style={[
-                  s.eventRow,
-                  i < arr.length - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: c.border,
-                  },
-                ]}
-              >
-                <View style={s.eventDate}>
-                  <Text style={[s.eventDateText, { color: c.text }]}>
-                    {formatShortDate(e.date)}
-                  </Text>
-                  <Text
-                    style={[s.eventDateRel, { color: c.textMuted }]}
-                  >
-                    {formatRelativeDate(e.date)}
-                  </Text>
-                </View>
-                <View style={s.eventMid}>
-                  <Text
-                    style={[s.eventTicker, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    {e.ticker}
-                  </Text>
-                  <Text
-                    style={[s.eventType, { color: c.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {payoutTypeLabel(e.type)}
-                  </Text>
-                </View>
-                <Text
-                  style={[s.eventAmount, { color: c.text }]}
-                  numberOfLines={1}
+            {monthEvents.map((e, i, arr) => {
+              /* Highlight si el día del evento matchea heldDay. Solo
+               * un evento (o varios del mismo día) se pintan en
+               * brandDim, los demás quedan dimmed para que el ojo
+               * caiga sobre la selección. */
+              const evDay = Number(e.date.split("-")[2]);
+              const isHighlighted = heldDay === evDay;
+              const isDimmed = heldDay !== null && !isHighlighted;
+              const hairline =
+                i < arr.length - 1 && !isHighlighted
+                  ? {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    }
+                  : null;
+              const highlightStyle = isHighlighted
+                ? {
+                    backgroundColor: c.brandDim,
+                    borderCurve: "continuous" as const,
+                    borderRadius: radius.sm,
+                  }
+                : null;
+              return (
+                <View
+                  key={e.id}
+                  style={[
+                    s.eventRow,
+                    hairline,
+                    highlightStyle,
+                    isDimmed && { opacity: 0.4 },
+                  ]}
                 >
-                  {formatMoney(e.amount, e.currency)}
-                </Text>
-              </View>
-            ))}
+                  <View style={s.eventDate}>
+                    <Text
+                      style={[
+                        s.eventDateText,
+                        { color: isHighlighted ? c.brand : c.text },
+                      ]}
+                    >
+                      {formatShortDate(e.date)}
+                    </Text>
+                    <Text
+                      style={[s.eventDateRel, { color: c.textMuted }]}
+                    >
+                      {formatRelativeDate(e.date)}
+                    </Text>
+                  </View>
+                  <View style={s.eventMid}>
+                    <Text
+                      style={[
+                        s.eventTicker,
+                        { color: isHighlighted ? c.brand : c.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {e.ticker}
+                    </Text>
+                    <Text
+                      style={[s.eventType, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {payoutTypeLabel(e.type)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      s.eventAmount,
+                      { color: isHighlighted ? c.brand : c.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatMoney(e.amount, e.currency)}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ) : (
           <View style={s.empty}>
