@@ -109,6 +109,7 @@ interface ConfigState {
   bbCondition: "touch_upper" | "touch_lower" | "squeeze";
   // Volume
   volumeMultiplier: number;
+  volumeAvgPeriod: number;
 }
 
 const DEFAULT_CONFIG: ConfigState = {
@@ -128,6 +129,7 @@ const DEFAULT_CONFIG: ConfigState = {
   bbDeviation: 2,
   bbCondition: "touch_upper",
   volumeMultiplier: 2,
+  volumeAvgPeriod: 20,
 };
 
 export function IndicatorSheet({
@@ -560,13 +562,8 @@ export function IndicatorSheet({
                           : FadeIn.duration(220).delay(120)
                       }
                     >
-                      <SignalSection
+                      <ConfigParamList
                         type={selectedType}
-                        config={config}
-                        setConfig={setConfig}
-                        c={c}
-                      />
-                      <ExecutionSection
                         config={config}
                         setConfig={setConfig}
                         c={c}
@@ -602,7 +599,7 @@ export function IndicatorSheet({
                         color={c.red}
                       />
                       <Text style={[s.warningText, { color: c.red }]}>
-                        La EMA lenta tiene que ser mayor a la EMA rápida.
+                        La EMA rápida debe ser menor que la lenta.
                       </Text>
                     </View>
                   ) : null}
@@ -759,13 +756,15 @@ function FlashSegment({
   );
 }
 
-/* ─── Sections — Señal + Ejecución ──────────────────────────── */
+/* ─── ConfigParamList ──────────────────────────────────────── */
 
-/** Section "Señal" — agrupa los parámetros que definen QUÉ disparará
- *  la alerta (período, condición, umbral, temporalidad). Sin card
- *  container — los controles viven sobre c.bg con separadores
- *  sutiles entre ellos. Estructura varía por indicador. */
-function SignalSection({
+/** Lista plana de todos los parámetros configurables del indicador.
+ *  Sin section headers (la auditoría contra TradingView/StockCharts
+ *  los marcó como ruido). Los controles fluyen con sus labels
+ *  ("Período", "Condición", "Umbral", "Temporalidad", "Frecuencia"),
+ *  separados por separator hairline. Frecuencia queda último, antes
+ *  del CTA. */
+function ConfigParamList({
   type,
   config,
   setConfig,
@@ -778,16 +777,19 @@ function SignalSection({
 }) {
   return (
     <View style={s.section}>
-      <Text style={[s.sectionHeader, { color: c.textSecondary }]}>
-        Señal
-      </Text>
-
       {type === "ma" ? (
         <>
           <ParamRow
             label="Período"
             c={c}
-            chips={[9, 20, 50, 100, 200]}
+            /* SMA y EMA usan presets distintos: SMA arranca en 10
+             * (período 9 es atípico en SMA, más común en EMA — par
+             * 9/21, línea de señal MACD), EMA mantiene 9. */
+            chips={
+              config.maVariant === "ema"
+                ? [9, 20, 50, 100, 200]
+                : [10, 20, 50, 100, 200]
+            }
             chipValue={config.maPeriod}
             onChipChange={(v) =>
               setConfig({ ...config, maPeriod: Number(v) })
@@ -851,10 +853,20 @@ function SignalSection({
             }
           />
           <Separator c={c} />
+          {/* Umbral cross-validado con la condición:
+           *   Sobrecompra → chips [50,70,80], stepper [50,100]
+           *   Sobreventa  → chips [20,30,50], stepper [0,50]
+           * Si el user cambia la condición y el umbral actual queda
+           * fuera del nuevo rango, el handler de Condición lo snapea
+           * al default de esa zona (70 / 30). */}
           <ParamRow
             label="Umbral"
             c={c}
-            chips={[30, 50, 70]}
+            chips={
+              config.rsiCondition === "above"
+                ? [50, 70, 80]
+                : [20, 30, 50]
+            }
             chipValue={config.rsiThreshold}
             onChipChange={(v) =>
               setConfig({ ...config, rsiThreshold: Number(v) })
@@ -865,8 +877,8 @@ function SignalSection({
                 onChange={(v) =>
                   setConfig({ ...config, rsiThreshold: v })
                 }
-                min={0}
-                max={100}
+                min={config.rsiCondition === "above" ? 50 : 0}
+                max={config.rsiCondition === "above" ? 100 : 50}
                 step={1}
               />
             }
@@ -887,12 +899,21 @@ function SignalSection({
                 },
               ]}
               active={config.rsiCondition}
-              onChange={(v) =>
+              onChange={(v) => {
+                const next = v as "above" | "below";
+                /* Snap umbral al default de la nueva zona si el
+                 * actual queda fuera del rango válido. */
+                let nextThreshold = config.rsiThreshold;
+                if (next === "above" && nextThreshold < 50)
+                  nextThreshold = 70;
+                if (next === "below" && nextThreshold > 50)
+                  nextThreshold = 30;
                 setConfig({
                   ...config,
-                  rsiCondition: v as "above" | "below",
-                })
-              }
+                  rsiCondition: next,
+                  rsiThreshold: nextThreshold,
+                });
+              }}
               c={c}
             />
           </ParamRow>
@@ -904,7 +925,10 @@ function SignalSection({
           <ParamRow
             label="EMA rápida"
             c={c}
-            chips={[8, 12, 26]}
+            /* Saco 26 (valor canónico de la EMA lenta) para evitar
+             * combinaciones rápida ≥ lenta que invierten el signo
+             * del histograma. */
+            chips={[5, 8, 12]}
             chipValue={config.macdEmaFast}
             onChipChange={(v) =>
               setConfig({ ...config, macdEmaFast: Number(v) })
@@ -925,7 +949,9 @@ function SignalSection({
           <ParamRow
             label="EMA lenta"
             c={c}
-            chips={[21, 26, 50]}
+            /* Saco 21 (solapa con rápida) y 50 (excesivo). Agrego 17
+             * para scalping y 39 para largo plazo. */
+            chips={[17, 26, 39]}
             chipValue={config.macdEmaSlow}
             onChipChange={(v) =>
               setConfig({ ...config, macdEmaSlow: Number(v) })
@@ -944,9 +970,14 @@ function SignalSection({
           />
           <Separator c={c} />
           <ParamRow
-            label="Señal"
+            /* "Línea de señal" en vez de "Señal" para evitar
+             * ambigüedad con el section header viejo (ya
+             * eliminado) y para ser más descriptivo. */
+            label="Línea de señal"
             c={c}
-            chips={[5, 9, 14]}
+            /* Saco 14 (no es un valor de señal MACD documentado en
+             * la literatura). Dejo solo [5, 9]. */
+            chips={[5, 9]}
             chipValue={config.macdSignal}
             onChipChange={(v) =>
               setConfig({ ...config, macdSignal: Number(v) })
@@ -1072,29 +1103,56 @@ function SignalSection({
       ) : null}
 
       {type === "volume" ? (
-        <ParamRow
-          label="Multiplicador"
-          c={c}
-          chips={[1.5, 2, 3]}
-          chipValue={config.volumeMultiplier}
-          onChipChange={(v) =>
-            setConfig({ ...config, volumeMultiplier: Number(v) })
-          }
-          chipLabelFn={(v) => `${fmtDecimalChip(Number(v))}x`}
-          stepper={
-            <Stepper
-              value={config.volumeMultiplier}
-              onChange={(v) =>
-                setConfig({ ...config, volumeMultiplier: v })
-              }
-              min={1.1}
-              max={20}
-              step={0.1}
-              decimals={1}
-              suffix="x"
-            />
-          }
-        />
+        <>
+          {/* Período del promedio — define sobre qué ventana se
+           * calcula el volumen promedio que después se compara
+           * contra el multiplicador. Sin esto la alerta es ambigua
+           * ("supera 2× el promedio" pero ¿de qué ventana?). */}
+          <ParamRow
+            label="Promedio de"
+            c={c}
+            chips={[10, 20, 50]}
+            chipValue={config.volumeAvgPeriod}
+            onChipChange={(v) =>
+              setConfig({ ...config, volumeAvgPeriod: Number(v) })
+            }
+            stepper={
+              <Stepper
+                value={config.volumeAvgPeriod}
+                onChange={(v) =>
+                  setConfig({ ...config, volumeAvgPeriod: v })
+                }
+                min={5}
+                max={100}
+                step={1}
+              />
+            }
+          />
+          <Separator c={c} />
+          <ParamRow
+            label="Multiplicador"
+            c={c}
+            chips={[1.5, 2, 3]}
+            chipValue={config.volumeMultiplier}
+            onChipChange={(v) =>
+              setConfig({ ...config, volumeMultiplier: Number(v) })
+            }
+            chipLabelFn={(v) => `${fmtDecimalChip(Number(v))}x`}
+            stepper={
+              <Stepper
+                value={config.volumeMultiplier}
+                onChange={(v) =>
+                  setConfig({ ...config, volumeMultiplier: v })
+                }
+                min={1.1}
+                max={20}
+                step={0.1}
+                decimals={1}
+                suffix="x"
+              />
+            }
+          />
+        </>
       ) : null}
 
       <Separator c={c} />
@@ -1109,26 +1167,9 @@ function SignalSection({
           c={c}
         />
       </ParamRow>
-    </View>
-  );
-}
 
-/** Section "Ejecución" — agrupa los parámetros sobre CÓMO se notifica
- *  (frecuencia). Por ahora solo una fila. */
-function ExecutionSection({
-  config,
-  setConfig,
-  c,
-}: {
-  config: ConfigState;
-  setConfig: (next: ConfigState) => void;
-  c: ColorMap;
-}) {
-  return (
-    <View style={s.section}>
-      <Text style={[s.sectionHeader, { color: c.textSecondary }]}>
-        Ejecución
-      </Text>
+      <Separator c={c} />
+
       <ParamRow label="Frecuencia" c={c}>
         <Segmented
           options={[
@@ -1413,6 +1454,7 @@ function configFromAlert(a: IndicatorAlert): ConfigState {
   return {
     ...base,
     volumeMultiplier: a.multiplier,
+    volumeAvgPeriod: a.avgPeriod,
   };
 }
 
@@ -1467,6 +1509,7 @@ function buildInputFromConfig(
     type: "volume",
     ...common,
     multiplier: cfg.volumeMultiplier,
+    avgPeriod: cfg.volumeAvgPeriod,
   };
 }
 
@@ -1529,29 +1572,45 @@ function previewSegments(
     ];
   }
   if (type === "macd") {
-    let dir: string;
-    if (cfg.macdCondition === "bullish_signal")
-      dir = "cruce la línea de señal al alza";
-    else if (cfg.macdCondition === "bearish_signal")
-      dir = "cruce la línea de señal a la baja";
-    else if (cfg.macdCondition === "zero_up")
-      dir = "cruce la línea cero al alza";
-    else dir = "cruce la línea cero a la baja";
+    const formula = `MACD(${cfg.macdEmaFast},${cfg.macdEmaSlow},${cfg.macdSignal})`;
+    /* Legacy zero-cross conditions — siguen acá por compatibilidad
+     * con alertas viejas; la UI nueva solo muestra bullish/bearish. */
+    if (
+      cfg.macdCondition === "zero_up" ||
+      cfg.macdCondition === "zero_down"
+    ) {
+      const dir = cfg.macdCondition === "zero_up" ? "alza" : "baja";
+      return [
+        T("El "),
+        T(formula, true),
+        T(" de "),
+        T(ticker, true),
+        T(" cruce al "),
+        T(dir, true),
+        T(" la línea cero en "),
+        T(tf, true),
+        T("."),
+      ];
+    }
+    const dir = cfg.macdCondition === "bullish_signal" ? "alza" : "baja";
     return [
       T("El "),
-      T("MACD", true),
-      T(` ${dir} para `),
+      T(formula, true),
+      T(" de "),
       T(ticker, true),
-      T(" en "),
+      T(" cruce a la "),
+      T(dir, true),
+      T(" la línea de señal en "),
       T(tf, true),
       T("."),
     ];
   }
   if (type === "bollinger") {
+    const formula = `Bollinger(${cfg.bbPeriod}, ${fmtDecimalChip(cfg.bbDeviation)}σ)`;
     if (cfg.bbCondition === "squeeze") {
       return [
         T("Las "),
-        T("Bandas de Bollinger", true),
+        T(formula, true),
         T(" de "),
         T(ticker, true),
         T(" se contraigan en "),
@@ -1565,6 +1624,8 @@ function previewSegments(
       T(ticker, true),
       T(" toque la "),
       T(upper ? "banda superior" : "banda inferior", true),
+      T(" de "),
+      T(formula, true),
       T(" en "),
       T(tf, true),
       T("."),
@@ -1575,7 +1636,9 @@ function previewSegments(
     T(ticker, true),
     T(" supere "),
     T(`${cfg.volumeMultiplier.toFixed(1).replace(".", ",")}×`, true),
-    T(" el promedio en "),
+    T(" el promedio de "),
+    T(`${cfg.volumeAvgPeriod} días`, true),
+    T(" en "),
     T(tf, true),
     T("."),
   ];
@@ -1720,12 +1783,6 @@ const s = StyleSheet.create({
   section: {
     marginHorizontal: 16,
     marginTop: 14,
-  },
-  sectionHeader: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginBottom: 10,
   },
 
   /* ── ParamRow ──
