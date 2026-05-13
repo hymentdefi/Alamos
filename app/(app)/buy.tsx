@@ -677,15 +677,23 @@ const s = StyleSheet.create({
     fontSize: 14,
     marginTop: 10,
     letterSpacing: -0.1,
+    textAlign: "center",
   },
   available: {
     fontFamily: fontFamily[600],
     fontSize: 12,
     marginTop: 4,
     letterSpacing: -0.1,
+    textAlign: "center",
   },
+  /* Slider — paddingHorizontal alineado con el resto del screen
+   * (header, hero, keypad, CTA todos usan 20). Antes estaba en 56,
+   * lo que dejaba la pista del slider 72-90px más angosta que los
+   * elementos de arriba/abajo — el ojo lo perciba como
+   * desalineado aunque el centro geométrico coincida con
+   * screenWidth/2. Con 20 ahora todo respira al mismo ancho. */
   sliderRow: {
-    paddingHorizontal: 56,
+    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 2,
   },
