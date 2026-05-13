@@ -240,7 +240,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={toDisplay(scrubBucket.totalArs)}
-              size={36}
+              size={28}
               color={scrubBucket.paid ? c.brand : c.text}
               decimalsColor={c.textMuted}
               currency={currency}
@@ -253,7 +253,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={remainingDisplay}
-              size={36}
+              size={28}
               color={c.brand}
               decimalsColor={c.brand}
               currency={currency}
@@ -268,7 +268,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </Text>
             <AmountDisplay
               value={ytdDisplay}
-              size={36}
+              size={28}
               color={c.brand}
               decimalsColor={c.brand}
               currency={currency}
@@ -579,7 +579,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
   );
 }
 
-const BAR_MAX_H = 96;
+const BAR_MAX_H = 70;
 
 /* Paleta de tipos de payout para el Detalle del año. Tres shades
  * dentro del lenguaje brand para que se lean como variantes de la
@@ -609,19 +609,15 @@ const s = StyleSheet.create({
    * header de una sub-sección entera (no como label de un card). */
   sectionTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 30,
-    letterSpacing: -0.8,
+    fontSize: 22,
+    letterSpacing: -0.5,
   },
   sectionInfoDot: {
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
-    /* Pequeño offset óptico para que el icono caiga sobre el
-     * centro visual de "Cobros" (el line-box es más alto que la
-     * cap-height, así que alignItems: center deja el icon un
-     * poco más arriba de lo que se siente correcto). */
-    marginTop: 4,
+    marginTop: 2,
   },
 
   /* Card container — mismo lenguaje que rendimiento.tsx (s.card)
@@ -631,7 +627,7 @@ const s = StyleSheet.create({
    * reducen el gap visible entre cards de ~58pt → ~40pt. */
   card: {
     paddingHorizontal: 24,
-    paddingVertical: 18,
+    paddingVertical: 14,
     marginTop: 4,
   },
   /* Override del primer card: pegado al section header (sin gap
@@ -642,9 +638,9 @@ const s = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.5,
-    marginBottom: 16,
+    fontSize: 17,
+    letterSpacing: -0.3,
+    marginBottom: 12,
   },
 
   /* ─── Hero ─── */
@@ -670,8 +666,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 4,
-    marginTop: 12,
-    height: BAR_MAX_H + 24,
+    marginTop: 10,
+    height: BAR_MAX_H + 20,
   },
   barCol: {
     flex: 1,
@@ -702,8 +698,8 @@ const s = StyleSheet.create({
   },
   nextTicker: {
     fontFamily: fontFamily[700],
-    fontSize: 24,
-    letterSpacing: -0.5,
+    fontSize: 20,
+    letterSpacing: -0.4,
     marginBottom: 2,
   },
   nextSub: {
@@ -716,7 +712,7 @@ const s = StyleSheet.create({
   },
   nextAmount: {
     fontFamily: fontFamily[700],
-    fontSize: 18,
+    fontSize: 16,
     letterSpacing: -0.3,
     marginBottom: 2,
   },
@@ -730,7 +726,7 @@ const s = StyleSheet.create({
   cronoRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 10,
     gap: 12,
   },
   cronoDate: {
@@ -786,7 +782,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 10,
     gap: 12,
   },
   statsLabelWrap: {
