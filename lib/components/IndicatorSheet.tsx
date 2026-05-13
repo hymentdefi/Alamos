@@ -909,8 +909,13 @@ function ConfigParamList({
                 onChange={(v) =>
                   setConfig({ ...config, rsiThreshold: v })
                 }
-                min={config.rsiCondition === "above" ? 50 : 0}
-                max={config.rsiCondition === "above" ? 100 : 50}
+                /* RSI matemáticamente vive en (0, 100) — la fórmula
+                 * 100 - 100/(1+RS) es asintótica a los extremos, no
+                 * los toca. Por eso min=1 max=99 en vez de 0 y 100:
+                 * un threshold de 0 nunca dispararía la alerta y
+                 * uno de 100 tampoco. */
+                min={config.rsiCondition === "above" ? 50 : 1}
+                max={config.rsiCondition === "above" ? 99 : 50}
                 step={1}
               />
             }
