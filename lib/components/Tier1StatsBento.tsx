@@ -173,7 +173,7 @@ export function Tier1StatsBento({
 
   return (
     <View style={s.bentoCard}>
-      <Text style={[s.bentoTitle, { color: c.text }]}>Estadísticas</Text>
+      <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
       <View style={s.grid}>
         {cards.map((card) => {
           const dotColor = card.semaforo
@@ -185,14 +185,7 @@ export function Tier1StatsBento({
               onPress={() => setOpenStat(card.key)}
               haptic="selection"
               pressScale={0.97}
-              style={[
-                s.card,
-                {
-                  backgroundColor: c.surfaceHover,
-                  borderCurve: "continuous",
-                  borderRadius: radius.lg,
-                },
-              ]}
+              style={s.card}
             >
               <View style={s.cardHeader}>
                 <Text
@@ -270,7 +263,7 @@ const s = StyleSheet.create({
     marginTop: 16,
   },
   bentoTitle: {
-    fontFamily: fontFamily[700],
+    fontFamily: fontFamily[800],
     fontSize: 22,
     letterSpacing: -0.5,
     marginBottom: 16,

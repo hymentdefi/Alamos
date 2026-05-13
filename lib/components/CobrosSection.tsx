@@ -431,7 +431,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           {ytdPaid.totalArs > 0 ? (
             <View style={s.card}>
               <Text style={[s.eyebrow, { color: c.text }]}>
-                Por tipo
+                Detalle
               </Text>
               {(["cupon", "dividendo", "amortizacion"] as const)
                 .filter((t) => ytdPaid.byType[t] > 0)
@@ -574,8 +574,8 @@ const s = StyleSheet.create({
    * header de una sub-sección entera (no como label de un card). */
   sectionTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 26,
-    letterSpacing: -0.7,
+    fontSize: 22,
+    letterSpacing: -0.5,
   },
   sectionInfoDot: {
     width: 24,
