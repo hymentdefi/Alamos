@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -113,6 +113,12 @@ function buildSeries(
 
 export default function RendimientoScreen() {
   const router = useRouter();
+  /* Ref del ScrollView + Y measured de la sección Cobros para
+   * auto-scrollear ahí cuando el user selecciona una barra del mes
+   * (UX: que el detalle del mes seleccionado quede arriba de todo
+   * sin tener que scrollear manualmente). */
+  const scrollRef = useRef<ScrollView>(null);
+  const cobrosY = useRef(0);
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const [range, setRange] = useState<RendRange>("MAX");
@@ -193,6 +199,7 @@ export default function RendimientoScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingBottom: 180 }}
           showsVerticalScrollIndicator={false}
         >
@@ -309,7 +316,21 @@ export default function RendimientoScreen() {
           {/* Cobros — dividendos, cupones y amortizaciones del
               portfolio. Calendario forward + breakdown del año
               proyectado. Lo que ningún ALyC AR muestra bien. */}
-          <CobrosSection currency={currency} />
+          <View
+            onLayout={(e) => {
+              cobrosY.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <CobrosSection
+              currency={currency}
+              onMonthSelect={() => {
+                scrollRef.current?.scrollTo({
+                  y: cobrosY.current,
+                  animated: true,
+                });
+              }}
+            />
+          </View>
 
           <Text style={[s.disclaimer, { color: c.textFaint }]}>
             Cálculo time-weighted (TWR) sobre la valuación diaria del
