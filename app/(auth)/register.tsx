@@ -251,19 +251,19 @@ export default function RegisterScreen() {
           style={[
             s.cta,
             {
-              backgroundColor: isValid ? c.ink : c.surfaceHover,
+              backgroundColor: isValid ? c.brand : c.surfaceHover,
               opacity: loading ? 0.8 : 1,
             },
           ]}
         >
           {loading ? (
-            <ActivityIndicator color={c.bg} />
+            <ActivityIndicator color={c.onColor} />
           ) : (
             <>
               <Text
                 style={[
                   s.ctaText,
-                  { color: isValid ? c.bg : c.textMuted },
+                  { color: isValid ? c.onColor : c.textMuted },
                 ]}
               >
                 {isLast ? "Crear cuenta" : "Continuar"}
@@ -271,7 +271,7 @@ export default function RegisterScreen() {
               <Feather
                 name="arrow-right"
                 size={16}
-                color={isValid ? c.bg : c.textMuted}
+                color={isValid ? c.onColor : c.textMuted}
               />
             </>
           )}

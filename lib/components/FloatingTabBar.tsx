@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useTheme, fontFamily } from "../theme";
 import { DrawingIcon, tabPaths } from "./DrawingIcon";
+import { dispatchActiveTabTap } from "../tabs/activeTap";
 
 const BAR_CONTENT_HEIGHT = 68;
 /* Verde brand canónico — el tab activo lleva la identidad
@@ -68,7 +69,13 @@ export function FloatingTabBar({ contextTab }: Props = {}) {
 
   const onPressTab = (route: TabRoute, index: number) => {
     Haptics.selectionAsync().catch(() => {});
-    if (index === activeIndex) return;
+    if (index === activeIndex) {
+      /* Tap on the already-active tab → delega al handler registrado
+       * por la screen (scroll-to-top si no está arriba; refresh si ya
+       * está). Patrón estándar de las apps mobile (Instagram, X). */
+      dispatchActiveTabTap(route.name);
+      return;
+    }
     router.navigate(route.href as never);
   };
 

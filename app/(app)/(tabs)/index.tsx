@@ -10,8 +10,9 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { useNavigation, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
@@ -102,7 +103,6 @@ function BaseHome() {
   const insets = useSafeAreaInsets();
   const { c, mode } = useTheme();
   const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
   const { hasUnread } = useNotifications();
@@ -165,17 +165,26 @@ function BaseHome() {
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTimeout(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
       setRefreshing(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
     }, 900);
   }, []);
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    },
+    [],
+  );
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -186,18 +195,20 @@ function BaseHome() {
 
   // Tap sobre la tab Inicio estando en Inicio:
   //   · si no estoy arriba → scroll al tope
-  //   · si ya estoy arriba → disparar refresh (con animación de pull-to-refresh)
+  //   · si ya estoy arriba → disparar refresh
+  // Vía registerTabTap → FloatingTabBar despacha cuando detecta
+  // tap sobre la tab activa. (navigation.addListener('tabPress') no
+  // dispara con el tabBar custom, por eso usamos el registry.)
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      if (scrollYRef.current > 8) {
-        scrollRef.current?.scrollTo({ y: 0, animated: true });
-      } else if (!refreshing) {
-        onRefresh();
-      }
+    return registerTabTap("index", {
+      isAtTop: () => scrollYRef.current <= 8,
+      scrollToTop: () =>
+        scrollRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {
+        if (!refreshing) onRefresh();
+      },
     });
-    return unsub;
-  }, [navigation, isFocused, refreshing, onRefresh]);
+  }, [refreshing, onRefresh]);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   // Portfolios separados por moneda nativa del activo. No convertimos —
@@ -388,7 +399,6 @@ function BaseHome() {
         ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
         scrollEventThrottle={32}
         refreshControl={
@@ -479,26 +489,33 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {ranges.map((r) => {
-              const active = r === range;
-              const fg = active ? c.bg : chartColor;
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setRangeAndSave(r);
-                  }}
-                  style={[
-                    s.rangePill,
-                    active && { backgroundColor: chartColor },
-                  ]}
-                  hitSlop={8}
-                >
-                  <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
-                </Pressable>
-              );
-            })}
+            {/* Spacer invisible mirror del gear — balanza la fila
+                para que los pills queden visualmente centrados sin
+                quedar arrastrados a la izquierda por el peso del
+                gear de la derecha. */}
+            <View style={s.rangeSettingsBtn} pointerEvents="none" />
+            <View style={s.rangePillsRow}>
+              {ranges.map((r) => {
+                const active = r === range;
+                const fg = active ? c.bg : chartColor;
+                return (
+                  <Pressable
+                    key={r}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setRangeAndSave(r);
+                    }}
+                    style={[
+                      s.rangePill,
+                      active && { backgroundColor: chartColor },
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Text style={[s.rangeText, { color: fg }]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             {/* Settings icon al final del timeline — gear filled
                 que matchea el chartColor (verde si up, rojo si
                 down). Abre el sheet con los ajustes del chart. */}
@@ -935,7 +952,7 @@ function Investments({
         <Ionicons
           name="arrow-forward"
           size={18}
-          color="rgba(0,200,5,0.7)"
+          color={c.brand}
         />
       </Pressable>
 
@@ -1577,9 +1594,14 @@ const s = StyleSheet.create({
   },
   rangeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 0,
     paddingHorizontal: 4,
+  },
+  rangePillsRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
   rangePill: {
     paddingHorizontal: 9,

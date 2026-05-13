@@ -262,6 +262,8 @@ export default function ConfirmScreen() {
     amount,
     mode,
     currency,
+    orderType,
+    limitPrice,
     bridgeFrom,
     bridgeRate,
     bridgeFeePct,
@@ -273,6 +275,12 @@ export default function ConfirmScreen() {
     amount?: string;
     mode?: string;
     currency?: string;
+    /** Tipo de orden — "market" (default) o "limit". Se setea desde
+     *  buy.tsx via el OrderTypeSheet. */
+    orderType?: string;
+    /** Precio objetivo del límite (string, puede llegar con punto
+     *  decimal). Sólo aplica cuando orderType === "limit". */
+    limitPrice?: string;
     bridgeFrom?: string;
     bridgeRate?: string;
     bridgeFeePct?: string;
@@ -697,10 +705,26 @@ export default function ConfirmScreen() {
 
   if (!asset) return null;
 
+  const isLimit = orderType === "limit";
+  const limitPriceNum = Number.parseFloat(limitPrice ?? "");
+  const limitPriceValid = Number.isFinite(limitPriceNum) && limitPriceNum > 0;
+
   const rows: { label: string; value: string; strong?: boolean }[] = [
     {
-      label: "Precio estimado",
-      value: formatMoney(asset.price, nativeCurrency),
+      label: "Tipo de orden",
+      value:
+        isLimit && limitPriceValid
+          ? `Límite · ${formatMoney(limitPriceNum, nativeCurrency)}`
+          : isLimit
+            ? "Límite"
+            : "Mercado",
+    },
+    {
+      label: isLimit && limitPriceValid ? "Precio objetivo" : "Precio estimado",
+      value: formatMoney(
+        isLimit && limitPriceValid ? limitPriceNum : asset.price,
+        nativeCurrency,
+      ),
     },
     { label: "Cantidad", value: `${estQty.toFixed(4)} unidades` },
     {

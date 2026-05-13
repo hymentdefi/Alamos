@@ -20,6 +20,7 @@ import {
   seriesFromSeed,
 } from "../../lib/components/Sparkline";
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
+import { CobrosSection } from "../../lib/components/CobrosSection";
 import { Tap } from "../../lib/components/Tap";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 
@@ -342,10 +343,17 @@ export default function RendimientoScreen() {
             </View>
           ) : null}
 
+          {/* Cobros — dividendos, cupones y amortizaciones del
+              portfolio. Calendario forward + breakdown del año
+              proyectado. Lo que ningún ALyC AR muestra bien. */}
+          <CobrosSection currency={currency} />
+
           <Text style={[s.disclaimer, { color: c.textFaint }]}>
             Cálculo time-weighted (TWR) sobre la valuación diaria del
             portfolio. Los datos históricos son referenciales y se
-            actualizan al cierre de cada rueda.
+            actualizan al cierre de cada rueda. Los cobros futuros son
+            proyecciones según el cronograma de cada activo y pueden
+            variar por decisión del emisor o ajustes fiscales.
           </Text>
         </ScrollView>
       </View>

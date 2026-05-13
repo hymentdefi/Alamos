@@ -8,8 +8,8 @@ import {
   StyleSheet,
   Animated,
 } from "react-native";
-import { useNavigation, useRouter } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Feather,
@@ -111,8 +111,6 @@ function BaseExplore() {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { isFavorite } = useFavorites();
-  const navigation = useNavigation();
-  const isFocused = useIsFocused();
 
   const [query, setQuery] = useState("");
   const [activeMarketIdx, setActiveMarketIdx] = useState(0);
@@ -244,14 +242,17 @@ function BaseExplore() {
     listRef.current?.scrollTo({ y: 0, animated: false });
   }, []);
 
-  // Tap sobre la tab Mercado estando en Mercado → scroll al tope
+  // Tap sobre la tab Mercado estando en Mercado → scroll al tope.
+  // Vía registerTabTap → FloatingTabBar despacha cuando detecta tap
+  // sobre la tab activa.
   useEffect(() => {
-    const unsub = navigation.addListener("tabPress" as never, () => {
-      if (!isFocused) return;
-      listRef.current?.scrollTo({ y: 0, animated: true });
+    return registerTabTap("explore", {
+      isAtTop: () => false,
+      scrollToTop: () =>
+        listRef.current?.scrollTo({ y: 0, animated: true }),
+      refresh: () => {},
     });
-    return unsub;
-  }, [navigation, isFocused]);
+  }, []);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>

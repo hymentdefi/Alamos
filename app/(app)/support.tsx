@@ -183,27 +183,29 @@ export default function SupportScreen() {
           <Tap
             onPress={openChatAI}
             haptic="medium"
-            style={[s.chatCta, { backgroundColor: c.ink }]}
+            style={[s.chatCta, { backgroundColor: c.brand }]}
           >
             <View style={s.chatCtaLeft}>
-              <View style={[s.chatCtaIcon, { backgroundColor: c.brand }]}>
-                <Feather name="zap" size={18} color={c.ink} />
+              <View
+                style={[s.chatCtaIcon, { backgroundColor: c.onColor }]}
+              >
+                <Feather name="zap" size={18} color={c.brand} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.chatCtaTitle, { color: c.bg }]}>
+                <Text style={[s.chatCtaTitle, { color: c.onColor }]}>
                   Hablar con la IA
                 </Text>
                 <Text
                   style={[
                     s.chatCtaSub,
-                    { color: "rgba(250,250,247,0.64)" },
+                    { color: c.onColor, opacity: 0.7 },
                   ]}
                 >
                   Respuestas al instante, 24/7
                 </Text>
               </View>
             </View>
-            <Feather name="chevron-right" size={20} color={c.bg} />
+            <Feather name="chevron-right" size={20} color={c.onColor} />
           </Tap>
 
           <Tap

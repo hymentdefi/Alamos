@@ -588,14 +588,14 @@ export function AlertSheet({
                       style={[
                         s.quickChip,
                         {
-                          backgroundColor: tone,
+                          backgroundColor: "transparent",
                           borderColor: tone,
                         },
                       ]}
                       haptic="selection"
                       onPress={() => applyPct(pct)}
                     >
-                      <Text style={[s.quickText, { color: c.onColor }]}>
+                      <Text style={[s.quickText, { color: tone }]}>
                         {pct > 0 ? `+${pct}%` : `${pct}%`}
                       </Text>
                     </Tap>
@@ -644,11 +644,10 @@ export function AlertSheet({
                 style={[
                   s.cta,
                   {
-                    /* CTA neutro ink/text — coherente con el botón
-                     * principal de la pantalla de alertas. El brand
-                     * verde lo dejamos para CTAs primarios del flow
-                     * de transacciones (Operar, Comprar, etc.). */
-                    backgroundColor: submitting ? c.textMuted : c.text,
+                    /* CTA brand — el botón primario va en c.brand
+                     * con ink en c.onColor (blanco en light, oscuro
+                     * en dark). */
+                    backgroundColor: c.brand,
                     opacity: submitting ? 0.7 : 1,
                   },
                 ]}
@@ -656,7 +655,7 @@ export function AlertSheet({
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                <Text style={[s.ctaText, { color: c.bg }]}>
+                <Text style={[s.ctaText, { color: c.onColor }]}>
                   {submitting
                     ? isEditing
                       ? "Guardando…"
@@ -807,8 +806,9 @@ const s = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 4,
     alignItems: "center",
+    borderCurve: "continuous",
     borderRadius: radius.pill,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   quickText: {
     fontFamily: fontFamily[700],

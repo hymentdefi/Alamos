@@ -110,13 +110,13 @@ export default function OnboardingScreen() {
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
-          style={[s.cta, { backgroundColor: c.ink }]}
+          style={[s.cta, { backgroundColor: c.brand }]}
           onPress={next}
         >
-          <Text style={[s.ctaText, { color: c.bg }]}>
+          <Text style={[s.ctaText, { color: c.onColor }]}>
             {index === slides.length - 1 ? "Crear cuenta" : "Siguiente"}
           </Text>
-          <Feather name="arrow-right" size={16} color={c.bg} />
+          <Feather name="arrow-right" size={16} color={c.onColor} />
         </Pressable>
         <Pressable
           style={s.loginLink}

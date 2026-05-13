@@ -51,7 +51,7 @@ export default function WelcomeScreen() {
         <Button
           title="Solicitar acceso"
           onPress={() => router.push("/(auth)/register")}
-          right={<Feather name="arrow-right" size={16} color={c.bg} />}
+          right={<Feather name="arrow-right" size={16} color={c.onColor} />}
         />
         <Text style={[s.disclaimer, { color: c.textMuted }]}>
           Álamos Capital · Todas las inversiones implican riesgo.

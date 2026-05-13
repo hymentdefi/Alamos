@@ -36,21 +36,15 @@ export default function Button({
   const { c } = useTheme();
 
   const bg =
-    variant === "primary"
-      ? c.ink
-      : variant === "accent"
+    variant === "primary" || variant === "accent"
       ? c.brand
       : variant === "secondary"
       ? c.surfaceHover
       : "transparent";
   const fg =
-    variant === "primary"
-      ? c.bg
-      : variant === "ghost"
-      ? c.text
-      : variant === "accent"
+    variant === "primary" || variant === "accent"
       ? c.onColor /* texto sobre verde brand: blanco en light, negro en dark */
-      : c.ink;
+      : c.text; /* secondary y ghost: theme-aware (ink puro era invisible en dark) */
   const hasBorder = variant === "secondary";
   const border = hasBorder ? c.border : undefined;
 
