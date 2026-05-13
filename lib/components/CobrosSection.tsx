@@ -129,7 +129,7 @@ export function CobrosSection({ currency }: Props) {
       </View>
 
       {/* ─── Card 1: Hero + bar chart ─────────────────────────────── */}
-      <View style={s.card}>
+      <View style={[s.card, s.firstCard]}>
         {scrubBucket ? (
           <>
             <Text style={[s.heroLabel, { color: c.textMuted }]}>
@@ -412,7 +412,6 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 24,
     marginTop: 32,
-    marginBottom: 4,
   },
   sectionTitle: {
     fontFamily: fontFamily[700],
@@ -432,6 +431,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 24,
     marginTop: 16,
+  },
+  /* Override del primer card: pegado al section header (sin gap
+   * externo extra), así el título "Cobros" se siente como heading
+   * del card. El paddingTop:24 interno provee la respiración. */
+  firstCard: {
+    marginTop: 0,
   },
   eyebrow: {
     fontFamily: fontFamily[700],
