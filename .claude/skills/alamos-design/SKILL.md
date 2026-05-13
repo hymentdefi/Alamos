@@ -26,30 +26,42 @@ Si lo que estás construyendo podría pertenecer a cualquier app de fintech, EST
 
 Todos los colores salen de `lib/theme/index.ts` via `useTheme()`. SIN EXCEPCIONES.
 
+**Theme-aware** — los tokens cambian según light/dark mode. Los hex de abajo son referencia, no hardcodearlos.
+
 ```
-FONDOS
-  bg: #FAFAF7        ← fondo principal. Off-white cálido, NO blanco puro.
-  bgWarm: #F2F1EB     ← fondo secundario, secciones alternas.
-  surface: #FFFFFF    ← cards, modales, elementos elevados.
-  surfaceSunken: #EBEBE3 ← inputs, campos de texto.
+FONDOS (theme-aware)
+  bg              ← fondo principal del screen
+  bgWarm          ← fondo levemente elevado, secciones alternas
+  surface         ← cards, modales, elementos elevados
+  surfaceHover    ← estado hover/disabled/raised
+  surfaceSunken   ← inputs, campos de texto
 
-TEXTO
-  text: #0E0F0C       ← texto principal. Casi negro, NO #000000.
-  textSecondary: #2A2B27 ← texto secundario.
-  textMuted: #6B6C66   ← labels, placeholders.
-  textFaint: #B8B8B0   ← texto deshabilitado.
+TEXTO (theme-aware)
+  text            ← texto principal — invertido por theme (oscuro en light, claro en dark)
+  textSecondary   ← texto secundario
+  textMuted       ← labels, placeholders, inactive
+  textFaint       ← texto deshabilitado
 
-MARCA
-  brand: #00C805       ← ÚNICO verde de marca. Para el logo y branding SOLAMENTE.
-  action: #5ac43e      ← verde tierra para CTAs, nav active pill, botones primarios.
-  positive: #00A304    ← deltas positivos en charts/precios. NO para UI general.
-  red: #C83B3B         ← deltas negativos, errores.
+MARCA — UN solo verde, mismo en ambos modes
+  brand: #00C805  ← TODO el verde de la app: logo, CTAs, selecciones activas,
+                    deltas positivos. NO existe diferencia entre brand/action/
+                    positive — es el mismo token usado en todos esos roles.
+  onColor         ← ink que va SOBRE c.brand: blanco en light, casi-negro en dark.
+                    Theme-aware automático. USAR esto para texto sobre brand.
+
+DOWN (deltas negativos / destructive)
+  red             ← naranja del down state (#EB5D2A light / #F26A3D dark).
+                    NO es rojo puro — es naranja por feedback explícito del user.
+                    Usar para deltas negativos Y destructive actions (eliminar).
 
 BORDES
-  border: #E5E4DC      ← bordes sutiles. NO usar gris puro.
+  border          ← bordes sutiles, inactive outlines
+  borderStrong    ← bordes más visibles cuando hace falta
 ```
 
-REGLA ABSOLUTA: `brand` (#00C805) es SOLO para el logo y elementos de identidad de marca. Para botones y CTAs usar `action` (#5ac43e). Para deltas de precio usar `positive`/`red`. Nunca mezclar estos roles.
+REGLA ABSOLUTA: hay UN solo verde (`c.brand` = #00C805). NO existen otros verdes en la app (los tokens `action`, `positive`, `green` históricos están consolidados en `brand`). Si necesitás "un verde", usá `c.brand`. NO inventes verdes nuevos. NO hardcodear `#00C805` ni `rgba(0,200,5,...)` — siempre vía `c.brand`.
+
+REGLA ABSOLUTA: el down state es NARANJA (`c.red`, ~#EB5D2A), no rojo puro. Aplicar consistentemente para deltas negativos y destructive actions.
 
 ### Tipografía — Plus Jakarta Sans
 
@@ -82,6 +94,75 @@ Radius tokens: sm:8, md:12, lg:16, xl:20, xxl:28, pill:999
 
 Consistente, generoso. No apretar elementos. El espacio es parte del diseño.
 Usar los spacing tokens de `lib/theme` cuando existan.
+
+## Sistema de jerarquía de botones — DOS CATEGORÍAS ESTRICTAS
+
+Álamos tiene **solo dos tipos de botones interactivos**. Nada en el medio.
+
+### A. PRIMARY CTA — filled brand (UNA por pantalla)
+
+Acción principal de un screen. "Crear alerta", "Comprar", "Continuar", "Confirmar", "Aceptar", "Iniciar sesión", "Crear cuenta", "Agregar alerta", "Operar".
+
+```ts
+{
+  backgroundColor: c.brand,
+  borderCurve: "continuous",
+  borderRadius: radius.pill,  // o radius.lg según contexto
+}
+// Texto: { color: c.onColor }  ← blanco en light, oscuro en dark
+```
+
+Estados:
+- Disabled: `{ backgroundColor: c.surfaceHover }`, text `c.textMuted`
+- Loading: `opacity: 0.7`
+- Pressed: `opacity: 0.85-0.9`
+
+### B. SECONDARY — outline brand (selecciones importantes, no primarias)
+
+Chips activos, segmented activos, OptionList activo, filtros aplicados, "Ver detalle" si lo querés en brand.
+
+```ts
+{
+  backgroundColor: "transparent",     // ← JAMÁS tint fill
+  borderColor: c.brand,
+  borderWidth: 1.5,
+  borderCurve: "continuous",
+}
+// Texto: { color: c.brand }
+```
+
+### C. INACTIVE — outline gray
+
+Chips/segmented disponibles pero no seleccionados.
+
+```ts
+{
+  backgroundColor: "transparent",
+  borderColor: c.border,
+  borderWidth: 1.5,
+}
+// Texto: { color: c.textMuted }
+```
+
+### D. DESTRUCTIVE — outline red (naranja)
+
+"Eliminar alerta", "Cerrar cuenta", "Borrar permanentemente".
+
+```ts
+{
+  borderColor: c.red,
+  borderWidth: 1.5,
+}
+// Texto: { color: c.red }
+```
+
+### Reglas absolutas del sistema
+
+1. **NO medio fill.** Tinted bg (`${c.brand}10`, `rgba(0,200,5,0.X)`, etc) en un elemento interactivo está MAL. Outline puro.
+2. **NO neutral white/black CTA.** `backgroundColor: c.ink` o `c.text` para CTAs es el patrón viejo abandonado. Usar brand.
+3. **`c.onColor` para texto sobre brand**, no `c.bg` (no es lo mismo).
+4. **Disabled mantiene la forma** del filled, baja a `c.surfaceHover` + `c.textMuted`.
+5. **Excepciones permitidas para tinted bg**: hero illustration containers (display, no interactivo), tooltips, dim overlays, message bubbles, avatares. Eso NO son botones.
 
 ## Patrones de UI — cómo se ve Álamos
 
@@ -117,20 +198,23 @@ Usar los spacing tokens de `lib/theme` cuando existan.
 
 ## Anti-patterns — lo que NUNCA debe pasar
 
-1. **Colores hardcodeados**: NUNCA `color: '#333'` o `backgroundColor: 'white'`. Siempre tokens via `useTheme()`.
+1. **Colores hardcodeados**: NUNCA `color: '#333'`, `backgroundColor: 'white'`, ni `BRAND_GREEN = "#00C805"` constants. Siempre tokens via `useTheme()`. No `rgba(0,200,5,...)` literal.
 2. **Diseño genérico**: si podría ser cualquier app de fintech, rehacerlo. Debe sentirse Álamos.
 3. **borderRadius sin borderCurve**: ya explicado. NUNCA.
 4. **NativeWind/Tailwind**: NO existe en este proyecto. Solo `StyleSheet.create()`.
 5. **Componentes inventados**: antes de crear un nuevo Button, Card, Input — revisar `lib/components/`.
-6. **Verde de marca en CTAs**: brand (#00C805) es SOLO para logo. CTAs usan action (#5ac43e).
-7. **Blanco puro como fondo**: el fondo es #FAFAF7, no #FFFFFF. Superficie es #FFFFFF.
-8. **Texto negro puro**: el texto es #0E0F0C, no #000000.
-9. **Letter-spacing positivo o cero**: Álamos usa letter-spacing negativo en toda la tipografía.
-10. **Sombras fuertes**: si necesitás elevar, usar sombras sutiles. La elevación viene del color (surface sobre bg), no de drop-shadows pesados.
+6. **Medio fill en interactivos**: tinted bg (brand al 5-15% de opacity, sea via `rgba()` o `${c.brand}XX`) en chips/segmented/buttons activos está PROHIBIDO. Outline puro o filled solid, nada en el medio. Excepción única: hero illustration containers / display frames, que NO son táctiles.
+7. **Neutral white/black CTA**: `backgroundColor: c.ink` o `c.text` para botones primarios es el patrón viejo abandonado. Usar `c.brand` + `c.onColor`.
+8. **Letter-spacing positivo o cero**: Álamos usa letter-spacing negativo en toda la tipografía.
+9. **Sombras fuertes**: si necesitás elevar, usar sombras sutiles. La elevación viene del color (surface sobre bg), no de drop-shadows pesados.
+10. **Texto sobre brand con `c.bg`**: usar `c.onColor` (theme-aware: blanco en light, oscuro en dark). `c.bg` no se invierte correctamente.
 
 ## Componentes existentes — USAR antes de crear
 
-- `Button.tsx` — primary/secondary/accent/ghost. NO crear otro botón.
+- `Button.tsx` — variants:
+  - `primary` y `accent`: filled brand (`c.brand` bg + `c.onColor` text)
+  - `secondary`: outline gris con text `c.text` (theme-aware)
+  - `ghost`: text-only sin chrome, text `c.text`
 - `Logo.tsx` — `<AlamosLogo variant tone size />`. mark/lockup/lockupShort.
 - `Sparkline.tsx` — chart reutilizable con `pathFromSeed()`.
 - `Squircle.tsx` — wrapper para squircle cross-platform en componentes hero.
@@ -138,9 +222,10 @@ Usar los spacing tokens de `lib/theme` cuando existan.
 ## Cómo testear si tu output es "Álamos-styled"
 
 Preguntate:
-1. ¿Usa SOLO colores de los tokens? → Si no, está mal.
+1. ¿Usa SOLO colores de los tokens del theme (sin hardcoded hex / rgba)? → Si no, está mal.
 2. ¿Tiene borderCurve: continuous en TODAS las esquinas redondeadas? → Si no, está mal.
 3. ¿Usa Plus Jakarta Sans con letter-spacing negativo? → Si no, está mal.
-4. ¿Se ve como algo que podría estar en Robinhood? → Si no, repensar.
-5. ¿Se diferencia de una app genérica de finanzas? → Si no, está mal.
-6. ¿El fondo principal es off-white (#FAFAF7), no blanco puro? → Si no, está mal.
+4. ¿Los botones siguen las dos categorías estrictas (filled brand vs outline) sin medio fill? → Si no, está mal.
+5. ¿Texto sobre brand usa `c.onColor`? → Si no, está mal.
+6. ¿Se ve como algo que podría estar en Robinhood? → Si no, repensar.
+7. ¿Se diferencia de una app genérica de finanzas? → Si no, está mal.
