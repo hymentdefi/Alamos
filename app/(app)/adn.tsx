@@ -68,10 +68,10 @@ export default function AdnScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[s.title, { color: c.text }]}>ADN</Text>
+        <Text style={[s.title, { color: c.brand }]}>ADN</Text>
         <Text style={[s.subtitle, { color: c.textMuted }]}>
           Analizamos las características principales de tus
-          inversiones según seis factores académicos.
+          inversiones según distintos factores.
         </Text>
 
         <View style={s.factorsWrap}>

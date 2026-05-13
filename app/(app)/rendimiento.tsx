@@ -385,7 +385,7 @@ export default function RendimientoScreen() {
             </View>
             <Text style={[s.sectionLinkSub, { color: c.textMuted }]}>
               Analizamos las características principales de tus
-              inversiones según seis factores académicos.
+              inversiones según distintos factores.
             </Text>
           </Tap>
 

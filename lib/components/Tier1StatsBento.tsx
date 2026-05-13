@@ -103,14 +103,14 @@ export function Tier1StatsBento({
     },
     {
       key: "mwr",
-      label: "Tu ganancia",
+      label: "Ganancia",
       primary: `${stats.mwr.amount >= 0 ? "+" : "−"}${fmt(Math.abs(stats.mwr.amount))}`,
       primaryColor: stats.mwr.pct >= 0 ? c.brand : c.red,
       sub: formatPct(stats.mwr.pct),
     },
     {
       key: "twr",
-      label: "Performance de tus activos",
+      label: "Performance",
       primary: formatPct(stats.twr.pct),
       primaryColor: stats.twr.pct >= 0 ? c.brand : c.red,
     },
@@ -281,42 +281,44 @@ const s = StyleSheet.create({
   cardFullWidth: {
     width: "100%",
   },
+  /* Layout Robinhood-style: label muted sentence-case arriba (sin
+   * uppercase ni tracking positivo), valor grande pero no over-bold
+   * (700 en vez de 800), sub muted prolijo. Sentence case + tracking
+   * negativo en todo el bloque para mantener identidad Álamos. */
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardLabel: {
-    fontFamily: fontFamily[600],
-    fontSize: 12,
-    letterSpacing: -0.05,
+    fontFamily: fontFamily[500],
+    fontSize: 13,
+    letterSpacing: -0.15,
     flex: 1,
-    textTransform: "uppercase",
   },
   semaforoDot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
   },
   cardValue: {
-    fontFamily: fontFamily[800],
-    fontSize: 20,
-    letterSpacing: -0.5,
+    fontFamily: fontFamily[700],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
   cardSub: {
     fontFamily: fontFamily[500],
-    fontSize: 11,
-    letterSpacing: -0.05,
-    marginTop: 2,
+    fontSize: 12,
+    letterSpacing: -0.1,
+    marginTop: 3,
   },
   limitedBadge: {
-    fontFamily: fontFamily[600],
-    fontSize: 9,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginTop: 2,
+    fontFamily: fontFamily[500],
+    fontSize: 11,
+    letterSpacing: -0.05,
+    marginTop: 4,
   },
   /* CTA al pie del bento para navegar al Tier 2. */
   seeMore: {
