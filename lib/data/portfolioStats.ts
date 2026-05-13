@@ -243,6 +243,48 @@ function computeYieldFromPayouts(
   };
 }
 
+/* ─── Helper: total ARS del portfolio (sin efectivo) ──────────── */
+
+/** Suma de holdings convertidos a ARS, excluyendo efectivo. Misma
+ *  lógica que rendimiento.tsx — extraído acá para que /estadisticas
+ *  y otros consumers del Tier 1/2 puedan computar baseline sin
+ *  duplicar código. */
+export function computeTotalArs(): number {
+  return assets
+    .filter(
+      (a: Asset) =>
+        a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+    )
+    .reduce((acc, a) => {
+      const native = a.price * (a.qty ?? 0);
+      return acc + convertAmount(native, assetCurrency(a), "ARS");
+    }, 0);
+}
+
+/** Conveniente para los consumers que solo tienen (range, toDisplay)
+ *  y necesitan el shape completo de Tier1Stats sin haber computado
+ *  totalArs / invertido / ganancia / twrPct previamente. */
+export function getTier1Stats(
+  range: StatsRange,
+  toDisplay: (ars: number) => number,
+): Tier1Stats {
+  const totalArs = computeTotalArs();
+  const totalDisplay = toDisplay(totalArs);
+  const twrPct = MOCK_BY_RANGE[range].twrPct;
+  /* invertido = valor de partida del período. Si rendimiento = +X%,
+   * invertido = valor_actual / (1 + X/100). */
+  const invertido = totalDisplay / (1 + twrPct / 100);
+  const ganancia = totalDisplay - invertido;
+  return computeTier1Stats({
+    range,
+    totalInvertido: invertido,
+    twrPct,
+    gananciaAbs: ganancia,
+    totalArs,
+    toDisplay,
+  });
+}
+
 /* ─── Calculadora principal ───────────────────────────────────── */
 
 interface ComputeArgs {
@@ -652,4 +694,131 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
     body: "Tu rendimiento mostrado en distintas ventanas de tiempo, con TWR (limpio de aportes) y MWR (incluyendo cuándo aportaste). Te deja comparar performance del último día contra el último año o desde que empezaste.",
   },
 };
+
+/* ─── AI Portfolio Commentary (mock determinístico) ────────────
+ *
+ * Genera un análisis narrativo multi-párrafo a partir de las stats
+ * Tier 1 + Tier 2. Imita el output esperado del endpoint real
+ * POST /api/portfolio/{userId}/commentary (Claude Sonnet API),
+ * pero sin la llamada — para mock + dev experience.
+ *
+ * Estructura siguiendo la spec interna 4.2:
+ *   1. Resumen de performance + comparación con benchmark.
+ *   2. Riesgo (volatilidad + Sharpe interpretado).
+ *   3. Peor caída con contexto temporal.
+ *   4. Concentración / diversificación.
+ *   5. Income generado (si el portfolio paga rentas).
+ *
+ * Cuando se enchufe el endpoint real, este function se reemplaza
+ * por un fetch al API + parsing del response. La firma queda igual.
+ */
+
+export interface CommentaryParagraph {
+  /** Texto plano del párrafo. Inline bolds se marcan con **dobles
+   *  asteriscos** para que el UI los pinte en c.text bold. */
+  text: string;
+}
+
+const PERIOD_LABEL: Record<StatsRange, string> = {
+  "1D": "hoy",
+  "1W": "esta semana",
+  "1M": "este mes",
+  "3M": "los últimos 3 meses",
+  YTD: "lo que va del año",
+  "1A": "el último año",
+  MAX: "desde el inicio",
+};
+
+function pctText(p: number): string {
+  const sign = p >= 0 ? "+" : "−";
+  return `${sign}${Math.abs(p).toFixed(2).replace(".", ",")}%`;
+}
+
+function num1(n: number): string {
+  return n.toFixed(1).replace(".", ",");
+}
+
+function num2(n: number): string {
+  return n.toFixed(2).replace(".", ",");
+}
+
+interface CommentaryArgs {
+  range: StatsRange;
+  tier1: Tier1Stats;
+  tier2: Tier2Stats;
+  /** Necesario para formatear los montos en moneda de display. */
+  formatAmount: (amount: number) => string;
+}
+
+export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] {
+  const { range, tier1, tier2, formatAmount } = args;
+  const out: CommentaryParagraph[] = [];
+
+  /* ── Párrafo 1: Resumen de performance + benchmark ── */
+  const periodLabel = PERIOD_LABEL[range];
+  const direction = tier1.twr.pct >= 0 ? "creció" : "cayó";
+  const twrFormatted = pctText(tier1.twr.pct);
+  const alphaSign = tier1.alpha.pct > 0 ? "superando" : "por debajo de";
+  const benchmarkFormatted = pctText(tier1.alpha.benchmarkPct);
+
+  let p1 = `Tu portfolio ${direction} **${twrFormatted}** en ${periodLabel}`;
+  if (Math.abs(tier1.alpha.pct) > 0.3) {
+    p1 += `, ${alphaSign} al **S&P 500** (${benchmarkFormatted}).`;
+  } else {
+    p1 += `, en línea con el S&P 500 (${benchmarkFormatted}).`;
+  }
+  out.push({ text: p1 });
+
+  /* ── Párrafo 2: Riesgo + Sharpe ── */
+  const volTone =
+    tier1.volatility.semaforo === "verde"
+      ? "bajo"
+      : tier1.volatility.semaforo === "amarillo"
+        ? "moderado"
+        : "alto";
+  const sharpeQual =
+    tier1.sharpe.value > 1.0
+      ? "indica buena compensación por el riesgo asumido"
+      : tier1.sharpe.value > 0.5
+        ? "indica que la compensación por el riesgo es regular"
+        : "indica que el riesgo no se está pagando";
+  out.push({
+    text: `La volatilidad anualizada es **${num1(tier1.volatility.pct)}%** (riesgo ${volTone}) y el Sharpe ratio de **${num2(tier1.sharpe.value)}** ${sharpeQual}.`,
+  });
+
+  /* ── Párrafo 3: Peor caída ── */
+  if (tier1.maxDrawdown.recoveryDays > 0) {
+    out.push({
+      text: `La peor caída fue de **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}, y la recuperación tomó ${tier1.maxDrawdown.recoveryDays} días.`,
+    });
+  } else if (range !== "1D") {
+    out.push({
+      text: `La peor caída fue de **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}.`,
+    });
+  }
+
+  /* ── Párrafo 4: Concentración / diversificación ── */
+  if (tier2.concentracionTop5.pct > 60) {
+    out.push({
+      text: `Tus 5 posiciones más grandes concentran el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. Esto amplifica tanto las subas como las bajas, y reduce la protección que da la diversificación.`,
+    });
+  } else if (tier2.concentracionTop5.pct > 40) {
+    out.push({
+      text: `Tus 5 posiciones más grandes representan **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. El nivel de concentración es razonable pero monitoreable.`,
+    });
+  } else {
+    out.push({
+      text: `El portfolio está diversificado: tenés **${num1(tier2.posicionesEfectivas.value)}** posiciones efectivas, lo que reduce el impacto de un solo activo en el resultado.`,
+    });
+  }
+
+  /* ── Párrafo 5: Income (si el portfolio paga rentas) ── */
+  if (tier1.dividendYield.pct > 0 && tier2.income.totalYtd > 0) {
+    out.push({
+      text: `Generaste **${formatAmount(tier2.income.totalYtd)}** en cobros este año, un yield anualizado de **${num2(tier1.dividendYield.pct)}%**. Se proyectan **${formatAmount(tier2.income.forward12M)}** en los próximos 12 meses.`,
+    });
+  }
+
+  return out;
+}
 

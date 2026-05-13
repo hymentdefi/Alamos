@@ -6,10 +6,12 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { fontFamily, radius, useTheme } from "../../lib/theme";
+import { AiCommentaryCard } from "../../lib/components/AiCommentaryCard";
 import { Tap } from "../../lib/components/Tap";
 import { StatInfoSheet } from "../../lib/components/StatInfoSheet";
 import {
   computeTier2Stats,
+  getTier1Stats,
   type Semaforo,
   type StatKey,
   type StatsRange,
@@ -83,6 +85,14 @@ export default function EstadisticasScreen() {
     [range, toDisplay],
   );
 
+  /* Tier 1 stats — los necesitamos para el AI Commentary que combina
+   * Tier 1 (return, vol, Sharpe, alpha, yield) con Tier 2 (income
+   * breakdown, concentración). */
+  const tier1 = useMemo(
+    () => getTier1Stats(range, toDisplay),
+    [range, toDisplay],
+  );
+
   const fmt = (n: number) => formatMoney(n, currency as AssetCurrency);
 
   return (
@@ -137,6 +147,17 @@ export default function EstadisticasScreen() {
             );
           })}
         </View>
+
+        {/* ─── AI Portfolio Commentary ─────────────────────────────
+            Texto narrativo multi-párrafo generado a partir de las
+            stats Tier 1 + Tier 2. Mock determinístico hasta que
+            enchufemos el endpoint real a Claude Sonnet. */}
+        <AiCommentaryCard
+          range={range}
+          tier1={tier1}
+          tier2={stats}
+          formatAmount={fmt}
+        />
 
         {/* ─── Sub-sección 1: Rendimiento por período ───────────── */}
         <View style={s.section}>
