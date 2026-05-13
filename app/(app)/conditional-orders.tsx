@@ -23,6 +23,7 @@ import { Tap } from "../../lib/components/Tap";
 import { useToast } from "../../lib/toast/context";
 
 type OrderKind =
+  | "market"
   | "recurring"
   | "limit"
   | "trailingStop"
@@ -41,6 +42,15 @@ interface OrderOption {
 }
 
 const OPTIONS: OrderOption[] = [
+  {
+    key: "market",
+    title: "A mercado",
+    description: (t, side) =>
+      side === "sell"
+        ? `Vendé ${t} al precio disponible ahora.`
+        : `Comprá ${t} al precio disponible ahora.`,
+    available: true,
+  },
   {
     key: "recurring",
     title: "Inversión recurrente",
@@ -92,9 +102,15 @@ const OPTIONS: OrderOption[] = [
  * tap. Cada item es una row con glyph + título + descripción + chevron.
  */
 export default function ConditionalOrdersScreen() {
-  const { ticker, mode } = useLocalSearchParams<{
+  const { ticker, mode, current } = useLocalSearchParams<{
     ticker: string;
     mode?: string;
+    /** Tipo de orden actualmente activo en el screen que abrió este
+     *  selector. Sirve para marcar el row con un check visual y
+     *  hacer obvio cuál es "donde está parado el user" — sino,
+     *  desde /limit-order el user no entiende cómo "volver" a
+     *  market. Default "market" (caso /buy). */
+    current?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -106,6 +122,7 @@ export default function ConditionalOrdersScreen() {
     [ticker],
   );
   const side: "buy" | "sell" = mode === "sell" ? "sell" : "buy";
+  const currentKind: OrderKind = (current as OrderKind) || "market";
 
   if (!asset) return null;
 
@@ -117,7 +134,24 @@ export default function ConditionalOrdersScreen() {
       showToast(`${opt.title} todavía no está disponible.`);
       return;
     }
+    /* Si el user tapeó la opción que ya tiene activa, no abrimos
+     *  pantalla nueva — sólo cerramos este selector y volvemos
+     *  atrás. Sino, tapear "A mercado" estando en market causa
+     *  una pila duplicada de /buy. */
+    if (opt.key === currentKind) {
+      Haptics.selectionAsync().catch(() => {});
+      router.back();
+      return;
+    }
     Haptics.selectionAsync().catch(() => {});
+    if (opt.key === "market") {
+      /* Volver al /buy. El stack siempre tiene /buy abajo porque
+       *  /conditional-orders sólo se llega desde /buy (push) o
+       *  desde /limit-order (replace). router.back() cae en /buy
+       *  en ambos casos. */
+      router.back();
+      return;
+    }
     if (opt.key === "limit") {
       router.replace({
         pathname: "/(app)/limit-order",
@@ -159,6 +193,7 @@ export default function ConditionalOrdersScreen() {
               option={opt}
               ticker={asset.ticker}
               side={side}
+              isCurrent={opt.key === currentKind}
               onPress={() => onSelect(opt)}
             />
           ))}
@@ -172,11 +207,13 @@ function OrderRow({
   option,
   ticker,
   side,
+  isCurrent,
   onPress,
 }: {
   option: OrderOption;
   ticker: string;
   side: "buy" | "sell";
+  isCurrent: boolean;
   onPress: () => void;
 }) {
   const { c } = useTheme();
@@ -188,7 +225,10 @@ function OrderRow({
         s.row,
         {
           backgroundColor: c.surface,
-          borderColor: c.border,
+          /* La opción activa se distingue con un borde brand más
+           * grueso — patrón outline-brand del sistema de jerarquía. */
+          borderColor: isCurrent ? c.brand : c.border,
+          borderWidth: isCurrent ? 1.6 : 1,
           opacity: pressed ? 0.7 : 1,
         },
       ]}
@@ -209,6 +249,9 @@ function OrderRow({
               Próximamente
             </Text>
           ) : null}
+          {isCurrent && !muted ? (
+            <Text style={[s.currentPill, { color: c.brand }]}>Actual</Text>
+          ) : null}
         </View>
         <Text
           style={[s.rowDesc, { color: c.textMuted }]}
@@ -217,7 +260,11 @@ function OrderRow({
           {option.description(ticker, side)}
         </Text>
       </View>
-      <Feather name="chevron-right" size={18} color={c.textFaint} />
+      {isCurrent && !muted ? (
+        <Feather name="check" size={20} color={c.brand} />
+      ) : (
+        <Feather name="chevron-right" size={18} color={c.textFaint} />
+      )}
     </Pressable>
   );
 }
@@ -250,6 +297,12 @@ function OrderGlyph({
     >
       <Svg width={26} height={26} viewBox="0 0 48 48">
         <G fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+          {kind === "market" ? (
+            <>
+              {/* Bolt / rayo — "ejecuta ya, instantáneo". */}
+              <Polyline points="26,6 12,28 22,28 18,42 36,18 26,18 30,6 26,6" />
+            </>
+          ) : null}
           {kind === "recurring" ? (
             <>
               <Path d="M14 18a12 12 0 0 1 22 4" />
@@ -363,6 +416,15 @@ const s = StyleSheet.create({
   },
   soonPill: {
     fontFamily: fontFamily[600],
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  /* Pill "Actual" — chiquito al lado del título de la opción que ya
+   * está activa en la pantalla que abrió el selector. Brand verde,
+   * uppercase, mismo treatment que el soonPill pero con tono brand. */
+  currentPill: {
+    fontFamily: fontFamily[700],
     fontSize: 10,
     letterSpacing: 0.5,
     textTransform: "uppercase",
