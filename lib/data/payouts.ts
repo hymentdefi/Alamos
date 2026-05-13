@@ -272,6 +272,11 @@ export function monthNameFull(month: number): string {
   return MONTH_NAMES_FULL[month];
 }
 
+/** Abreviación corta del mes en español ("Ene", "Feb", ...). 0-indexed. */
+export function monthNameShort(month: number): string {
+  return MONTH_LABELS[month];
+}
+
 /** Ventana mensual centrada en hoy. Default: 5 atrás + 6 adelante = 12 bars. */
 export function monthlyBuckets(
   events: PayoutEvent[],
