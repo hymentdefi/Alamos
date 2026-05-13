@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -86,6 +88,11 @@ export function OrderTypeSheet({
 
   const translateY = useSharedValue(windowH);
   const backdropOpacity = useSharedValue(0);
+  /* Offset vertical para levantar el sheet cuando aparece el
+   *  teclado virtual — sino el CTA "Aplicar" queda tapado. Lo
+   *  manejamos como sharedValue para animarlo en UI thread junto
+   *  con el resto de transforms del sheet. */
+  const keyboardOffset = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
@@ -99,6 +106,37 @@ export function OrderTypeSheet({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  /* Listeners del teclado — keyboardWillShow en iOS (anticipa la
+   *  animación), keyboardDidShow en Android (no expone el evento
+   *  "will"). La duración del evento es la nativa del teclado;
+   *  espejamos con withTiming para mantenerlo smooth. */
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const onShow = (e: { endCoordinates: { height: number } }) => {
+      keyboardOffset.value = withTiming(e.endCoordinates.height, {
+        duration: 250,
+      });
+    };
+    const onHide = () => {
+      keyboardOffset.value = withTiming(0, { duration: 200 });
+    };
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardOffset]);
+
+  /* Cuando el sheet se cierra, también cerramos el teclado para que
+   *  no quede el offset sin sheet por encima. */
+  useEffect(() => {
+    if (!visible) Keyboard.dismiss();
   }, [visible]);
 
   const dismiss = () => {
@@ -149,7 +187,14 @@ export function OrderTypeSheet({
     });
 
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    /* Combina el drag (translateY del swipe) con el offset del
+     *  teclado: cuando el teclado aparece, el sheet sube
+     *  keyboardOffset px para que el CTA "Aplicar" no quede
+     *  tapado. El drag se acumula encima, así el swipe-down sigue
+     *  funcionando incluso con teclado abierto. */
+    transform: [
+      { translateY: translateY.value - keyboardOffset.value },
+    ],
   }));
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
@@ -178,6 +223,10 @@ export function OrderTypeSheet({
   const apply = () => {
     if (limitInvalid) return;
     Haptics.selectionAsync().catch(() => {});
+    /* Cerrar teclado primero para que el offset baje antes de
+     *  animar el sheet — sino se ve el sheet bajar levantado y
+     *  después el teclado desaparecer, dejando un blank flash. */
+    Keyboard.dismiss();
     onApply({
       orderType: draftType,
       limitPrice: draftType === "limit" ? draftPrice : "",
@@ -275,6 +324,15 @@ export function OrderTypeSheet({
                   placeholderTextColor={c.textFaint}
                   keyboardType="decimal-pad"
                   inputMode="decimal"
+                  /* iOS muestra el botón "Listo" en el accessory bar
+                   *  arriba del teclado decimal-pad; al apretarlo se
+                   *  cierra el teclado sin aplicar (igual que tocar
+                   *  fuera). Android no muestra accessory bar para
+                   *  numérico, así que esa plataforma queda como
+                   *  estaba (el user toca Aplicar o cierra con back). */
+                  returnKeyType="done"
+                  blurOnSubmit
+                  onSubmitEditing={() => Keyboard.dismiss()}
                   style={[s.limitInput, { color: c.text }]}
                   selectionColor={c.brand}
                 />
