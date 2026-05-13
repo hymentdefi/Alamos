@@ -306,6 +306,12 @@ export default function BuyScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
+      {/* Header — back arrow a la izquierda, título centrado al
+          ANCHO DE PANTALLA (no entre los flancos del header). Posición
+          absoluta del título garantiza que el centro del texto cae
+          siempre en el centro de pantalla, independiente del peso
+          visual del back arrow o de cualquier otro elemento en los
+          flancos. */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Tap
           style={s.iconBtn}
@@ -315,12 +321,18 @@ export default function BuyScreen() {
         >
           <Feather name="arrow-left" size={22} color={c.text} />
         </Tap>
-        <View style={s.headerCenter}>
+        <View style={{ flex: 1 }} />
+        <View
+          pointerEvents="none"
+          style={[
+            s.headerTitleAbsolute,
+            { paddingTop: insets.top + 12 },
+          ]}
+        >
           <Text style={[s.headerTitle, { color: c.text }]}>
             {isSell ? "Vender" : "Comprar"} {asset.ticker}
           </Text>
         </View>
-        <View style={{ width: 36 }} />
       </View>
 
       {/* Banner de mercado cerrado — sólo cuando aplica. La copy se
@@ -575,7 +587,19 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerCenter: { flex: 1, alignItems: "center" },
+  /* Título absoluto que ocupa todo el ancho del header y centra su
+   * contenido — independiente de los anchos del back arrow / cualquier
+   * otro elemento en los flancos. pointerEvents=none en el wrapper
+   * para que el back arrow detrás siga siendo tappable. */
+  headerTitleAbsolute: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     fontFamily: fontFamily[700],
     fontSize: 16,
