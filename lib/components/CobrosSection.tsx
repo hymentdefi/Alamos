@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { fontFamily, radius, useTheme } from "../theme";
 import { AmountDisplay } from "./AmountDisplay";
@@ -28,6 +33,74 @@ interface Props {
   /** Moneda en la que se muestran los totales. Las filas individuales
    *  mantienen su moneda nativa (USD para bonos, ARS para acciones AR). */
   currency: "ARS" | "USD";
+}
+
+/* Bar — barra del bar chart con animación de lift cuando se activa.
+ * Extraída a su propio componente para llamar useAnimatedStyle sin
+ * violar rules of hooks dentro del .map() del chart. La animación
+ * de translateY -6pt + opacity 1 le da el look "elevado" Robinhood-
+ * style a la barra seleccionada. */
+function Bar({
+  height,
+  color,
+  label,
+  labelColor,
+  labelWeight,
+  isActive,
+  isFaded,
+  onPress,
+}: {
+  height: number;
+  color: string;
+  label: string;
+  labelColor: string;
+  labelWeight: string;
+  isActive: boolean;
+  isFaded: boolean;
+  onPress: () => void;
+}) {
+  const lift = useSharedValue(0);
+
+  useEffect(() => {
+    lift.value = withTiming(isActive ? -6 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [isActive, lift]);
+
+  const barAnim = useAnimatedStyle(() => ({
+    transform: [{ translateY: lift.value }],
+  }));
+
+  return (
+    <Tap
+      onPress={onPress}
+      haptic="selection"
+      pressScale={0.94}
+      style={s.barCol}
+      hitSlop={4}
+    >
+      <Animated.View
+        style={[
+          s.bar,
+          {
+            height,
+            backgroundColor: color,
+            opacity: isFaded ? 0.4 : 1,
+          },
+          barAnim,
+        ]}
+      />
+      <Text
+        style={[
+          s.barLabel,
+          { color: labelColor, fontFamily: labelWeight },
+        ]}
+      >
+        {label}
+      </Text>
+    </Tap>
+  );
 }
 
 /**
@@ -92,6 +165,25 @@ export function CobrosSection({ currency }: Props) {
     [events],
   );
   const nextEvent = upcomingList[0];
+
+  /* Eventos del mes seleccionado (cuando hay scrub). Se usa para
+   * mostrar el detalle del mes que reemplaza a los cards normales. */
+  const scrubKey = scrubIdx != null ? buckets[scrubIdx]?.key : null;
+  const selectedMonthEvents = useMemo(() => {
+    if (!scrubKey) return [];
+    return events.filter((e) => e.date.startsWith(scrubKey));
+  }, [scrubKey, events]);
+
+  /* Tipos de payout con monto > 0, en orden fijo cupón → dividendo
+   * → amortización. Usado para el Detalle del año (bar segmentos +
+   * filas con dots). */
+  const detalleTypes = useMemo(
+    () =>
+      (["cupon", "dividendo", "amortizacion"] as const).filter(
+        (t) => fullYear.byType[t] > 0,
+      ),
+    [fullYear],
+  );
 
   /* Si no hay eventos, no renderizamos nada — para holdings sin renta
    * (solo crypto, solo FCI, etc.) la sección no aporta. */
@@ -195,47 +287,30 @@ export function CobrosSection({ currency }: Props) {
               ? Math.max(4, (b.totalArs / maxBucket) * BAR_MAX_H)
               : 2;
             const active = scrubIdx === i;
-            const baseColor = b.paid ? c.brand : c.border;
+            /* Barra activa siempre en brand (incluso si es mes
+             * futuro), para que se destaque sobre el resto. */
+            const baseColor = active ? c.brand : b.paid ? c.brand : c.border;
             const labelColor = active
-              ? c.text
+              ? c.brand
               : b.isCurrent
                 ? c.text
                 : c.textMuted;
+            const labelWeight =
+              active || b.isCurrent
+                ? fontFamily[700]
+                : fontFamily[500];
             return (
-              <Pressable
+              <Bar
                 key={b.key}
-                onPressIn={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setScrubIdx(i);
-                }}
-                onPressOut={() => setScrubIdx(null)}
-                style={s.barCol}
-                hitSlop={4}
-              >
-                <View
-                  style={[
-                    s.bar,
-                    {
-                      height: h,
-                      backgroundColor: baseColor,
-                      opacity: scrubIdx == null || active ? 1 : 0.45,
-                    },
-                  ]}
-                />
-                <Text
-                  style={[
-                    s.barLabel,
-                    {
-                      color: labelColor,
-                      fontFamily: b.isCurrent
-                        ? fontFamily[700]
-                        : fontFamily[500],
-                    },
-                  ]}
-                >
-                  {b.label}
-                </Text>
-              </Pressable>
+                height={h}
+                color={baseColor}
+                label={b.label}
+                labelColor={labelColor}
+                labelWeight={labelWeight}
+                isActive={active}
+                isFaded={scrubIdx != null && !active}
+                onPress={() => setScrubIdx(active ? null : i)}
+              />
             );
           })}
         </View>
@@ -260,144 +335,245 @@ export function CobrosSection({ currency }: Props) {
         </View>
       </View>
 
-      {/* ─── Card 2: Próximo cobro ─────────────────────────────────── */}
-      {nextEvent ? (
+      {scrubIdx == null ? (
+        <>
+          {/* ─── Card 2: Próximo cobro ─────────────────────────────── */}
+          {nextEvent ? (
+            <View style={s.card}>
+              <Text style={[s.eyebrow, { color: c.text }]}>
+                Próximo cobro
+              </Text>
+              <View style={s.nextRow}>
+                <View style={s.nextLeft}>
+                  <Text style={[s.nextTicker, { color: c.text }]}>
+                    {nextEvent.ticker}
+                  </Text>
+                  <Text
+                    style={[s.nextSub, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {nextEvent.assetName} ·{" "}
+                    {payoutTypeLabel(nextEvent.type)}
+                  </Text>
+                </View>
+                <View style={s.nextRight}>
+                  <Text style={[s.nextAmount, { color: c.text }]}>
+                    {formatMoney(nextEvent.amount, nextEvent.currency)}
+                  </Text>
+                  <Text style={[s.nextWhen, { color: c.brand }]}>
+                    {formatRelativeDate(nextEvent.date)}
+                    {daysUntil(nextEvent.date) > 1
+                      ? ` · ${formatShortDate(nextEvent.date)}`
+                      : ""}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
+          {/* ─── Card 3: Cronograma — próximos eventos + ver más ─── */}
+          {upcomingList.length > 1 ? (
+            <View style={s.card}>
+              <Text style={[s.eyebrow, { color: c.text }]}>
+                Cronograma
+              </Text>
+              {upcomingList.slice(1, 6).map((e, i, arr) => (
+                <View
+                  key={e.id}
+                  style={[
+                    s.cronoRow,
+                    i < arr.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                >
+                  <View style={s.cronoDate}>
+                    <Text style={[s.cronoDateText, { color: c.text }]}>
+                      {formatShortDate(e.date)}
+                    </Text>
+                    <Text
+                      style={[s.cronoDateRel, { color: c.textMuted }]}
+                    >
+                      {formatRelativeDate(e.date)}
+                    </Text>
+                  </View>
+                  <View style={s.cronoMid}>
+                    <Text
+                      style={[s.cronoTicker, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      {e.ticker}
+                    </Text>
+                    <Text
+                      style={[s.cronoType, { color: c.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {payoutTypeLabel(e.type)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[s.cronoAmount, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {formatMoney(e.amount, e.currency)}
+                  </Text>
+                </View>
+              ))}
+              <Tap
+                onPress={() => router.push("/cobros")}
+                haptic="selection"
+                pressScale={0.97}
+                style={[s.seeMore, { borderTopColor: c.border }]}
+              >
+                <Text style={[s.seeMoreText, { color: c.brand }]}>
+                  Ver el año completo
+                </Text>
+                <Feather
+                  name="chevron-right"
+                  size={16}
+                  color={c.brand}
+                />
+              </Tap>
+            </View>
+          ) : null}
+
+          {/* ─── Card 4: Detalle del año ─ Robinhood-style: barra
+              stacked arriba con segmentos por tipo + filas con dot
+              de color que matchea su segmento. */}
+          <View style={s.card}>
+            <Text style={[s.eyebrow, { color: c.text }]}>
+              Detalle del año
+            </Text>
+            {detalleTypes.length > 0 ? (
+              <View
+                style={[s.detalleBar, { backgroundColor: c.surfaceHover }]}
+              >
+                {detalleTypes.map((t) => (
+                  <View
+                    key={t}
+                    style={{
+                      flex: fullYear.byType[t],
+                      backgroundColor: TYPE_COLORS[t],
+                    }}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {detalleTypes.map((t, i, arr) => {
+              const ars = fullYear.byType[t];
+              const pct =
+                fullYear.totalArs > 0
+                  ? (ars / fullYear.totalArs) * 100
+                  : 0;
+              return (
+                <View
+                  key={t}
+                  style={[
+                    s.statsRow,
+                    i < arr.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: c.border,
+                    },
+                  ]}
+                >
+                  <View style={s.statsLabelWrap}>
+                    <View
+                      style={[
+                        s.statsDot,
+                        { backgroundColor: TYPE_COLORS[t] },
+                      ]}
+                    />
+                    <Text style={[s.statsLabel, { color: c.text }]}>
+                      {payoutTypeLabel(t, true)}
+                    </Text>
+                  </View>
+                  <View style={s.statsValueWrap}>
+                    <Text
+                      style={[s.statsValue, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      {formatMoney(toDisplay(ars), currency)}
+                    </Text>
+                    <Text style={[s.statsPct, { color: c.textMuted }]}>
+                      {pct.toFixed(0)}%
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={[s.cardFooter, { color: c.textFaint }]}>
+              Total proyectado{" "}
+              <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+                {formatMoney(toDisplay(fullYear.totalArs), currency)}
+              </Text>{" "}
+              en {currentYear}
+            </Text>
+          </View>
+        </>
+      ) : (
+        /* ─── Mes seleccionado: detalle de los eventos que arman el
+            total de ese mes. Replaza a los 3 cards inferiores
+            mientras hay scrub activo. Tap a la misma barra (o a
+            otra) cambia o limpia el detalle. */
         <View style={s.card}>
           <Text style={[s.eyebrow, { color: c.text }]}>
-            Próximo cobro
+            Cobros de{" "}
+            {scrubBucket
+              ? monthNameFull(scrubBucket.month).toLowerCase()
+              : ""}
           </Text>
-          <View style={s.nextRow}>
-            <View style={s.nextLeft}>
-              <Text style={[s.nextTicker, { color: c.text }]}>
-                {nextEvent.ticker}
-              </Text>
-              <Text
-                style={[s.nextSub, { color: c.textMuted }]}
-                numberOfLines={1}
-              >
-                {nextEvent.assetName} · {payoutTypeLabel(nextEvent.type)}
-              </Text>
-            </View>
-            <View style={s.nextRight}>
-              <Text style={[s.nextAmount, { color: c.text }]}>
-                {formatMoney(nextEvent.amount, nextEvent.currency)}
-              </Text>
-              <Text style={[s.nextWhen, { color: c.brand }]}>
-                {formatRelativeDate(nextEvent.date)}
-                {daysUntil(nextEvent.date) > 1
-                  ? ` · ${formatShortDate(nextEvent.date)}`
-                  : ""}
-              </Text>
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      {/* ─── Card 3: Cronograma — próximos eventos + ver más ───────── */}
-      {upcomingList.length > 1 ? (
-        <View style={s.card}>
-          <Text style={[s.eyebrow, { color: c.text }]}>Cronograma</Text>
-          {upcomingList.slice(1, 6).map((e, i, arr) => (
-            <View
-              key={e.id}
-              style={[
-                s.cronoRow,
-                i < arr.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: c.border,
-                },
-              ]}
-            >
-              <View style={s.cronoDate}>
-                <Text style={[s.cronoDateText, { color: c.text }]}>
-                  {formatShortDate(e.date)}
-                </Text>
-                <Text style={[s.cronoDateRel, { color: c.textMuted }]}>
-                  {formatRelativeDate(e.date)}
-                </Text>
-              </View>
-              <View style={s.cronoMid}>
-                <Text
-                  style={[s.cronoTicker, { color: c.text }]}
-                  numberOfLines={1}
-                >
-                  {e.ticker}
-                </Text>
-                <Text
-                  style={[s.cronoType, { color: c.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {payoutTypeLabel(e.type)}
-                </Text>
-              </View>
-              <Text
-                style={[s.cronoAmount, { color: c.text }]}
-                numberOfLines={1}
-              >
-                {formatMoney(e.amount, e.currency)}
-              </Text>
-            </View>
-          ))}
-          <Tap
-            onPress={() => router.push("/cobros")}
-            haptic="selection"
-            pressScale={0.97}
-            style={[s.seeMore, { borderTopColor: c.border }]}
-          >
-            <Text style={[s.seeMoreText, { color: c.brand }]}>
-              Ver el año completo
-            </Text>
-            <Feather name="chevron-right" size={16} color={c.brand} />
-          </Tap>
-        </View>
-      ) : null}
-
-      {/* ─── Card 4: Detalle del año ───────────────────────────────── */}
-      <View style={s.card}>
-        <Text style={[s.eyebrow, { color: c.text }]}>Detalle del año</Text>
-        {(["cupon", "dividendo", "amortizacion"] as const)
-          .filter((t) => fullYear.byType[t] > 0)
-          .map((t, i, arr) => {
-            const ars = fullYear.byType[t];
-            const pct = fullYear.totalArs > 0
-              ? (ars / fullYear.totalArs) * 100
-              : 0;
-            return (
+          {selectedMonthEvents.length > 0 ? (
+            selectedMonthEvents.map((e, i, arr) => (
               <View
-                key={t}
+                key={e.id}
                 style={[
-                  s.statsRow,
+                  s.cronoRow,
                   i < arr.length - 1 && {
                     borderBottomWidth: StyleSheet.hairlineWidth,
                     borderBottomColor: c.border,
                   },
                 ]}
               >
-                <Text style={[s.statsLabel, { color: c.textMuted }]}>
-                  {payoutTypeLabel(t, true)}
-                </Text>
-                <View style={s.statsValueWrap}>
-                  <Text
-                    style={[s.statsValue, { color: c.text }]}
-                    numberOfLines={1}
-                  >
-                    {formatMoney(toDisplay(ars), currency)}
+                <View style={s.cronoDate}>
+                  <Text style={[s.cronoDateText, { color: c.text }]}>
+                    {formatShortDate(e.date)}
                   </Text>
-                  <Text style={[s.statsPct, { color: c.textMuted }]}>
-                    {pct.toFixed(0)}%
+                  <Text
+                    style={[s.cronoDateRel, { color: c.textMuted }]}
+                  >
+                    {formatRelativeDate(e.date)}
                   </Text>
                 </View>
+                <View style={s.cronoMid}>
+                  <Text
+                    style={[s.cronoTicker, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {e.ticker}
+                  </Text>
+                  <Text
+                    style={[s.cronoType, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {payoutTypeLabel(e.type)}
+                  </Text>
+                </View>
+                <Text
+                  style={[s.cronoAmount, { color: c.text }]}
+                  numberOfLines={1}
+                >
+                  {formatMoney(e.amount, e.currency)}
+                </Text>
               </View>
-            );
-          })}
-        <Text style={[s.cardFooter, { color: c.textFaint }]}>
-          Total proyectado{" "}
-          <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-            {formatMoney(toDisplay(fullYear.totalArs), currency)}
-          </Text>{" "}
-          en {currentYear}
-        </Text>
-      </View>
+            ))
+          ) : (
+            <Text style={[s.emptyText, { color: c.textMuted }]}>
+              No hay cobros este mes.
+            </Text>
+          )}
+        </View>
+      )}
 
       <CobrosInfoSheet
         visible={infoOpen}
@@ -408,6 +584,17 @@ export function CobrosSection({ currency }: Props) {
 }
 
 const BAR_MAX_H = 96;
+
+/* Paleta de tipos de payout para el Detalle del año. Tres shades
+ * dentro del lenguaje brand para que se lean como variantes de la
+ * misma familia (no como colores arbitrarios). Cupón es el más
+ * vivid (típicamente el contributor más grande), amortización el
+ * más profundo, dividendo intermedio. */
+const TYPE_COLORS: Record<"cupon" | "dividendo" | "amortizacion", string> = {
+  cupon: "#00C805",
+  dividendo: "#5AC53A",
+  amortizacion: "#00B864",
+};
 
 const s = StyleSheet.create({
   /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
@@ -597,13 +784,36 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* ─── Stats rows (detalle del año) ─── */
+  /* ─── Detalle del año — Robinhood-style ─── */
+  /* Barra horizontal apilada con segmentos por tipo. Background
+   * surfaceHover para que se vea el "track" cuando solo hay 1 o 2
+   * tipos contribuyendo. */
+  detalleBar: {
+    flexDirection: "row",
+    height: 8,
+    borderCurve: "continuous",
+    borderRadius: radius.sm,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  /* Stats rows con dot de color al lado del label, matching su
+   * segmento del bar. Reemplazó al label muted simple. */
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 12,
+  },
+  statsLabelWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  statsDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   statsLabel: {
     fontFamily: fontFamily[500],
@@ -626,6 +836,13 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     minWidth: 36,
     textAlign: "right",
+  },
+  emptyText: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    lineHeight: 22,
+    letterSpacing: -0.1,
+    paddingVertical: 8,
   },
   cardFooter: {
     marginTop: 14,
