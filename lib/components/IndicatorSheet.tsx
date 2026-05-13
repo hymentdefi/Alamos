@@ -1095,7 +1095,8 @@ function ParamRow({
 }
 
 /** Segmented control de 2 opciones — pill container + item interior
- *  con bg c.text cuando está activo (texto oscuro). */
+ *  activo con tint brand sutil + texto en c.brand. Estilo Robinhood:
+ *  outline/ghost para que no compita con el CTA primario verde solid. */
 function Segmented<T extends string>({
   options,
   active,
@@ -1120,13 +1121,16 @@ function Segmented<T extends string>({
             }}
             style={[
               s.segmentedItem,
-              isActive && { backgroundColor: c.text },
+              isActive && { backgroundColor: `${c.brand}1F` },
             ]}
           >
             <Text
               style={[
                 s.segmentedText,
-                { color: isActive ? c.bg : c.textMuted },
+                {
+                  color: isActive ? c.brand : c.textMuted,
+                  fontFamily: isActive ? fontFamily[700] : fontFamily[600],
+                },
               ]}
               numberOfLines={1}
             >
@@ -1139,8 +1143,10 @@ function Segmented<T extends string>({
   );
 }
 
-/** Fila de chips horizontales — el activo se renderea con bg c.text
- *  e ink oscuro. Wrap natural si no caben todos en una línea. */
+/** Fila de chips horizontales — el activo se renderea outline brand
+ *  (border 1.5px c.brand + tint sutil + text c.brand). Estilo
+ *  Robinhood: ghost para que no compita con el CTA primario solid.
+ *  Wrap natural si no caben todos en una línea. */
 function ChipsRow<T extends number | string>({
   chips,
   value,
@@ -1168,13 +1174,17 @@ function ChipsRow<T extends number | string>({
             style={({ pressed }) => [
               s.chip,
               {
-                backgroundColor: active ? c.text : c.bgWarm,
+                backgroundColor: active ? `${c.brand}14` : c.bgWarm,
+                borderColor: active ? c.brand : "transparent",
                 opacity: pressed ? 0.7 : 1,
               },
             ]}
           >
             <Text
-              style={[s.chipText, { color: active ? c.bg : c.text }]}
+              style={[
+                s.chipText,
+                { color: active ? c.brand : c.text },
+              ]}
             >
               {labelFn ? labelFn(v) : String(v)}
             </Text>
@@ -1219,8 +1229,8 @@ function OptionList<T extends string>({
               style={[
                 s.optionLabel,
                 {
-                  color: isActive ? c.text : c.textSecondary,
-                  fontFamily: isActive ? fontFamily[800] : fontFamily[500],
+                  color: isActive ? c.brand : c.textSecondary,
+                  fontFamily: isActive ? fontFamily[700] : fontFamily[500],
                 },
               ]}
               numberOfLines={1}
@@ -1670,9 +1680,10 @@ const s = StyleSheet.create({
    * Px ~ 14h / 11v + pill radius. */
   chip: {
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderCurve: "continuous",
     borderRadius: radius.pill,
+    borderWidth: 1.5,
   },
   chipText: {
     fontFamily: fontFamily[700],
