@@ -258,15 +258,6 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
               decimalsColor={c.brand}
               currency={currency}
             />
-            {ytdDisplay > 0 ? (
-              <Text style={[s.heroSub, { color: c.textMuted }]}>
-                Cobraste{" "}
-                <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-                  {formatMoney(ytdDisplay, currency)}
-                </Text>{" "}
-                este año
-              </Text>
-            ) : null}
           </>
         ) : (
           // Fallback fin de año: si ya no queda nada por cobrar, mostramos
@@ -325,6 +316,19 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             );
           })}
         </View>
+
+        {/* Footer del card 1 — "Cobraste $X este año" debajo de las
+            barras. Solo cuando NO hay scrub activo (durante scrub el
+            hero ya muestra el monto del mes) y hay algo cobrado. */}
+        {scrubBucket == null && ytdDisplay > 0 ? (
+          <Text style={[s.heroFooter, { color: c.textMuted }]}>
+            Cobraste{" "}
+            <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
+              {formatMoney(ytdDisplay, currency)}
+            </Text>{" "}
+            este año
+          </Text>
+        ) : null}
       </View>
 
       {scrubIdx == null ? (
@@ -650,12 +654,15 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginBottom: 4,
   },
-  heroSub: {
+  /* Footer del card 1: "Cobraste $X este año" debajo del bar chart,
+   * en el lugar donde antes vivía el legend. Misma tipografía que
+   * el legendText anterior (12pt 500 muted) para mantener ese
+   * weight visual ya familiarizado. */
+  heroFooter: {
     fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    marginTop: 10,
+    fontSize: 13,
+    letterSpacing: -0.05,
+    marginTop: 14,
   },
 
   /* ─── Bar chart ─── */
