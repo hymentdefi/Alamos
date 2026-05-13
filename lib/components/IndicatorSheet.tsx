@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -20,6 +20,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -50,9 +51,11 @@ import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllu
  *   Paso 1 — Picker: lista de 6 indicadores con icono, nombre y
  *            descripción corta.
  *
- *   Paso 2 — Config: hero rectangular con ilustración + statement
- *            "Te avisaremos cuando ..." + cards "Señal" y "Ejecución"
- *            con todos los controles siempre visibles (no accordion).
+ *   Paso 2 — Config (rediseño): hero rect con bg oscuro + ilustración,
+ *            statement centrado dinámico, dos secciones (Señal /
+ *            Ejecución) sin card containers, controles binarios
+ *            (outline brand inactive / filled brand active), CTA con
+ *            ícono de campana abajo.
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
@@ -70,16 +73,22 @@ interface Props {
 const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
 
-const TIMEFRAMES: Timeframe[] = [
-  "1m",
-  "5m",
-  "15m",
-  "30m",
-  "1H",
-  "4H",
-  "1D",
-  "1W",
-];
+/** Bg constante del hero rect — charcoal verde-tintado.
+ *  Hardcoded porque el hero es un container de ilustración
+ *  (display, no interactivo) que necesita verse igual en light/dark
+ *  mode para que el palette de la ilustración (5FE850 verde
+ *  brillante + FFB300 oro) lea consistente. Excepción explícita
+ *  documentada en alamos-design SKILL.md: "hero illustration
+ *  containers" pueden tener bg hardcodeado. */
+const HERO_DARK = "#0F1411";
+
+/** Temporalidades expuestas en el nuevo UI. La spec del rediseño
+ *  reduce de 8 (1m/5m/15m/30m/1H/4H/1D/1W) a 4 más usadas para
+ *  que la fila entre sin scroll. El type Timeframe en la API sigue
+ *  soportando todas — alertas legacy con 5m/15m/etc se abren en
+ *  edit con ningún chip seleccionado y el user pasa a uno de los 4
+ *  nuevos. */
+const TIMEFRAMES: Timeframe[] = ["1H", "4H", "1D", "1W"];
 
 interface ConfigState {
   timeframe: Timeframe;
@@ -476,7 +485,7 @@ export function IndicatorSheet({
                 </ScrollView>
               </View>
 
-              {/* ──────── Paso 2: Config flat rows ──────── */}
+              {/* ──────── Paso 2: Config (rediseño) ──────── */}
               <View style={{ width: windowW, flex: 1 }}>
                 <View style={s.configHeader}>
                   {!isEditing ? (
@@ -488,6 +497,7 @@ export function IndicatorSheet({
                       hitSlop={12}
                       accessibilityLabel="Volver al selector de indicador"
                       accessibilityRole="button"
+                      style={s.configBack}
                     >
                       <Feather
                         name="chevron-left"
@@ -495,7 +505,9 @@ export function IndicatorSheet({
                         color={c.text}
                       />
                     </Pressable>
-                  ) : null}
+                  ) : (
+                    <View style={s.configBack} />
+                  )}
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -504,6 +516,9 @@ export function IndicatorSheet({
                       ? indicatorTitle(selectedType, config)
                       : "Configurar"}
                   </Text>
+                  {/* Spacer simétrico al chevron para que el título
+                   * quede centrado visualmente. */}
+                  <View style={s.configBack} />
                 </View>
 
                 <ScrollView
@@ -511,8 +526,9 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — rectángulo full-width con tint brand sutil
-                      conteniendo la ilustración 3D del indicador. */}
+                  {/* HERO — rectángulo full-width con bg oscuro
+                      constante (no theme-aware) conteniendo la
+                      ilustración del indicador centrada. */}
                   {selectedType ? (
                     <Animated.View
                       key={`hero-${isEditing ? "edit" : "create"}`}
@@ -521,32 +537,29 @@ export function IndicatorSheet({
                           ? FadeIn.duration(180)
                           : FadeIn.duration(220).delay(0)
                       }
-                      style={[
-                        s.heroRect,
-                        { backgroundColor: `${c.brand}10` },
-                      ]}
+                      style={[s.heroRect, { backgroundColor: HERO_DARK }]}
                     >
                       {selectedType === "ma" ? (
                         config.maVariant === "ema" ? (
-                          <EMAIndicatorIllustration size={88} />
+                          <EMAIndicatorIllustration size={104} />
                         ) : (
-                          <MAIndicatorIllustration size={88} />
+                          <MAIndicatorIllustration size={104} />
                         )
                       ) : selectedType === "rsi" ? (
-                        <RSIIndicatorIllustration size={88} />
+                        <RSIIndicatorIllustration size={104} />
                       ) : selectedType === "macd" ? (
-                        <MACDIndicatorIllustration size={88} />
+                        <MACDIndicatorIllustration size={104} />
                       ) : selectedType === "bollinger" ? (
-                        <BollingerIndicatorIllustration size={88} />
+                        <BollingerIndicatorIllustration size={104} />
                       ) : (
-                        <VolumeIndicatorIllustration size={88} />
+                        <VolumeIndicatorIllustration size={104} />
                       )}
                     </Animated.View>
                   ) : null}
 
-                  {/* STATEMENT — eyebrow small + sentence con tokens
-                      coloreados en c.brand. Reemplaza el anterior centered
-                      sin eyebrow. */}
+                  {/* STATEMENT — centrado, eyebrow + sentence con
+                      tokens dinámicos en c.brand. Cada token highlight
+                      flashea con opacity al cambiar. */}
                   {selectedType ? (
                     <Animated.View
                       key={`sentence-${isEditing ? "edit" : "create"}`}
@@ -558,9 +571,12 @@ export function IndicatorSheet({
                       style={s.statementBlock}
                     >
                       <Text
-                        style={[s.statementEyebrow, { color: c.textMuted }]}
+                        style={[
+                          s.statementEyebrow,
+                          { color: c.textSecondary },
+                        ]}
                       >
-                        Te avisaremos cuando
+                        Te avisaremos cuando:
                       </Text>
                       <PreviewSentence
                         type={selectedType}
@@ -579,27 +595,23 @@ export function IndicatorSheet({
                           : FadeIn.duration(220).delay(120)
                       }
                     >
-                      <SignalCard
+                      <SignalSection
                         type={selectedType}
                         config={config}
                         setConfig={setConfig}
                         c={c}
                       />
-                      <ExecutionCard
+                      <ExecutionSection
                         config={config}
                         setConfig={setConfig}
                         c={c}
                       />
                     </Animated.View>
                   ) : null}
-
-                  {/* Warning MACD inline arriba del CTA si emaSlow
-                      <= emaFast — pintado fuera del scroll area pero
-                      antes del sticky CTA para que sea visible. */}
                 </ScrollView>
 
-                {/* Warning + CTA sticky abajo, sin chrome bar (sin
-                    borderTop) — sit on c.bg como AlertSheet. */}
+                {/* CTA sticky abajo — verde brand sólido, radius 14,
+                    bell icon + texto. Sin chrome bar. */}
                 <Animated.View
                   entering={
                     isEditing
@@ -643,10 +655,10 @@ export function IndicatorSheet({
                             : submitting
                               ? 0.7
                               : 1,
-                        marginTop: 8,
                       },
                     ]}
                   >
+                    <Feather name="bell" size={18} color={c.onColor} />
                     <Text style={[s.ctaText, { color: c.onColor }]}>
                       {ctaLabel}
                     </Text>
@@ -673,7 +685,7 @@ function PickerRow({
   c,
 }: {
   /** Render function para el icono — permite pasar tanto un Feather
-   *  como una illustration custom. Se rendea en un slot 44×44 sin bg
+   *  como una illustration custom. Se rendea en un slot 56×56 sin bg
    *  (las illustrations ya tienen su propia composición). */
   icon: () => React.ReactNode;
   title: string;
@@ -704,12 +716,16 @@ function PickerRow({
   );
 }
 
-/* ─── Preview sentence con segmentos + overflow handling ─────── */
+/* ─── Statement — preview sentence con flash en tokens ──────── */
 
-/** Renderea la sentence preview con tokens highlightados en
- *  c.brand + fontFamily[800]. Si el texto total supera 80
- *  caracteres baja a 20/26 para que no rompa el layout en 4+
- *  líneas. */
+/** Renderea la sentence con tokens highlightados en c.brand. Cada
+ *  segmento es un FlashSegment que detecta cambios en su texto y
+ *  hace flash sutil (opacity 1 > 0.5 > 1 en 200ms) para dar feedback
+ *  cuando el user toca un control y el statement se actualiza.
+ *
+ *  El centered alignment del nuevo diseño viene del statementBlock,
+ *  no del Text inner — keep Text como inline para que segments
+ *  fluyan en una sola "frase" rendereable. */
 function PreviewSentence({
   type,
   ticker,
@@ -722,38 +738,74 @@ function PreviewSentence({
   c: ColorMap;
 }) {
   const segments = previewSegments(type, ticker, config);
-  const totalLength = segments.reduce((acc, s) => acc + s.text.length, 0);
-  const compact = totalLength > 80;
   return (
-    <Text
-      style={[
-        compact ? s.heroSentenceCompact : s.heroSentence,
-        { color: c.text },
-      ]}
-    >
+    <Text style={[s.statementSentence, { color: c.textSecondary }]}>
       {segments.map((seg, i) => (
-        <Text
-          key={`${i}-${seg.text}`}
-          style={
-            seg.highlight
-              ? { fontFamily: fontFamily[800], color: c.brand }
-              : { color: c.text }
-          }
-        >
-          {seg.text}
-        </Text>
+        <FlashSegment
+          key={`${type}-${i}`}
+          text={seg.text}
+          highlight={seg.highlight}
+          c={c}
+        />
       ))}
     </Text>
   );
 }
 
-/* ─── Cards always-visible — SignalCard + ExecutionCard ───────── */
+/** Segmento individual de la sentence. Si su texto cambia respecto
+ *  al render anterior, dispara un flash de opacity 1 → 0.5 → 1
+ *  (200ms total). Usado solo en segmentos highlight para no
+ *  parpadear el texto neutral. */
+function FlashSegment({
+  text,
+  highlight,
+  c,
+}: {
+  text: string;
+  highlight: boolean;
+  c: ColorMap;
+}) {
+  const opacity = useSharedValue(1);
+  const prevText = useRef<string>(text);
 
-/** Card "Señal" — agrupa los parámetros que definen QUÉ disparará la
- *  alerta (período, condición, umbral, temporalidad). Todos los
- *  controles siempre visibles, no hay accordion. Varía por
- *  indicador. */
-function SignalCard({
+  useEffect(() => {
+    if (prevText.current !== text) {
+      if (highlight) {
+        opacity.value = withSequence(
+          withTiming(0.5, { duration: 100, easing: Easing.out(Easing.cubic) }),
+          withTiming(1, { duration: 100, easing: Easing.in(Easing.cubic) }),
+        );
+      }
+      prevText.current = text;
+    }
+  }, [text, highlight, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  if (!highlight) {
+    return <Text style={{ color: c.textSecondary }}>{text}</Text>;
+  }
+  return (
+    <Animated.Text
+      style={[
+        { color: c.brand, fontFamily: fontFamily[500] },
+        animatedStyle,
+      ]}
+    >
+      {text}
+    </Animated.Text>
+  );
+}
+
+/* ─── Sections — Señal + Ejecución ──────────────────────────── */
+
+/** Section "Señal" — agrupa los parámetros que definen QUÉ disparará
+ *  la alerta (período, condición, umbral, temporalidad). Sin card
+ *  container — los controles viven sobre c.bg con separadores
+ *  sutiles entre ellos. Estructura varía por indicador. */
+function SignalSection({
   type,
   config,
   setConfig,
@@ -765,15 +817,22 @@ function SignalCard({
   c: ColorMap;
 }) {
   return (
-    <View style={[s.card, { backgroundColor: c.surface }]}>
-      <Text style={[s.cardHeader, { color: c.textMuted }]}>Señal</Text>
+    <View style={s.section}>
+      <Text style={[s.sectionHeader, { color: c.textSecondary }]}>
+        Señal
+      </Text>
 
       {type === "ma" ? (
         <>
           <ParamRow
             label="Período"
             c={c}
-            right={
+            chips={[9, 20, 50, 100, 200]}
+            chipValue={config.maPeriod}
+            onChipChange={(v) =>
+              setConfig({ ...config, maPeriod: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.maPeriod}
                 onChange={(v) => setConfig({ ...config, maPeriod: v })}
@@ -782,19 +841,21 @@ function SignalCard({
                 step={1}
               />
             }
-          >
-            <ChipsRow
-              chips={[9, 20, 50, 100, 200]}
-              value={config.maPeriod}
-              onChange={(v) => setConfig({ ...config, maPeriod: v })}
-              c={c}
-            />
-          </ParamRow>
+          />
+          <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <Segmented
+            <ContinuousSegmented
               options={[
-                { value: "above", label: "Por encima" },
-                { value: "below", label: "Por debajo" },
+                {
+                  value: "above",
+                  label: "Por encima",
+                  icon: "trending-up",
+                },
+                {
+                  value: "below",
+                  label: "Por debajo",
+                  icon: "trending-down",
+                },
               ]}
               active={config.maCondition}
               onChange={(v) =>
@@ -814,7 +875,12 @@ function SignalCard({
           <ParamRow
             label="Período"
             c={c}
-            right={
+            chips={[7, 9, 14, 21]}
+            chipValue={config.rsiPeriod}
+            onChipChange={(v) =>
+              setConfig({ ...config, rsiPeriod: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.rsiPeriod}
                 onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
@@ -823,18 +889,17 @@ function SignalCard({
                 step={1}
               />
             }
-          >
-            <ChipsRow
-              chips={[7, 9, 14, 21]}
-              value={config.rsiPeriod}
-              onChange={(v) => setConfig({ ...config, rsiPeriod: v })}
-              c={c}
-            />
-          </ParamRow>
+          />
+          <Separator c={c} />
           <ParamRow
             label="Umbral"
             c={c}
-            right={
+            chips={[30, 50, 70]}
+            chipValue={config.rsiThreshold}
+            onChipChange={(v) =>
+              setConfig({ ...config, rsiThreshold: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.rsiThreshold}
                 onChange={(v) =>
@@ -845,21 +910,21 @@ function SignalCard({
                 step={1}
               />
             }
-          >
-            <ChipsRow
-              chips={[30, 50, 70]}
-              value={config.rsiThreshold}
-              onChange={(v) =>
-                setConfig({ ...config, rsiThreshold: v })
-              }
-              c={c}
-            />
-          </ParamRow>
+          />
+          <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <Segmented
+            <ContinuousSegmented
               options={[
-                { value: "above", label: "Por encima" },
-                { value: "below", label: "Por debajo" },
+                {
+                  value: "above",
+                  label: "Sobrecompra",
+                  icon: "trending-up",
+                },
+                {
+                  value: "below",
+                  label: "Sobreventa",
+                  icon: "trending-down",
+                },
               ]}
               active={config.rsiCondition}
               onChange={(v) =>
@@ -877,9 +942,14 @@ function SignalCard({
       {type === "macd" ? (
         <>
           <ParamRow
-            label="Rápida"
+            label="EMA rápida"
             c={c}
-            right={
+            chips={[8, 12, 26]}
+            chipValue={config.macdEmaFast}
+            onChipChange={(v) =>
+              setConfig({ ...config, macdEmaFast: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.macdEmaFast}
                 onChange={(v) =>
@@ -891,10 +961,16 @@ function SignalCard({
               />
             }
           />
+          <Separator c={c} />
           <ParamRow
-            label="Lenta"
+            label="EMA lenta"
             c={c}
-            right={
+            chips={[21, 26, 50]}
+            chipValue={config.macdEmaSlow}
+            onChipChange={(v) =>
+              setConfig({ ...config, macdEmaSlow: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.macdEmaSlow}
                 onChange={(v) =>
@@ -906,10 +982,16 @@ function SignalCard({
               />
             }
           />
+          <Separator c={c} />
           <ParamRow
             label="Señal"
             c={c}
-            right={
+            chips={[5, 9, 14]}
+            chipValue={config.macdSignal}
+            onChipChange={(v) =>
+              setConfig({ ...config, macdSignal: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.macdSignal}
                 onChange={(v) => setConfig({ ...config, macdSignal: v })}
@@ -919,15 +1001,27 @@ function SignalCard({
               />
             }
           />
+          <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <OptionList
+            <ContinuousSegmented
               options={[
-                { value: "bullish_signal", label: "Cruce alcista" },
-                { value: "bearish_signal", label: "Cruce bajista" },
-                { value: "zero_up", label: "Cruza cero al alza" },
-                { value: "zero_down", label: "Cruza cero a la baja" },
+                {
+                  value: "bullish_signal",
+                  label: "Cruce alcista",
+                  icon: "trending-up",
+                },
+                {
+                  value: "bearish_signal",
+                  label: "Cruce bajista",
+                  icon: "trending-down",
+                },
               ]}
-              active={config.macdCondition}
+              active={
+                config.macdCondition === "bullish_signal" ||
+                config.macdCondition === "bearish_signal"
+                  ? config.macdCondition
+                  : "bullish_signal"
+              }
               onChange={(v) =>
                 setConfig({
                   ...config,
@@ -945,7 +1039,12 @@ function SignalCard({
           <ParamRow
             label="Período"
             c={c}
-            right={
+            chips={[10, 20, 50]}
+            chipValue={config.bbPeriod}
+            onChipChange={(v) =>
+              setConfig({ ...config, bbPeriod: Number(v) })
+            }
+            stepper={
               <Stepper
                 value={config.bbPeriod}
                 onChange={(v) => setConfig({ ...config, bbPeriod: v })}
@@ -955,10 +1054,17 @@ function SignalCard({
               />
             }
           />
+          <Separator c={c} />
           <ParamRow
             label="Desviación"
             c={c}
-            right={
+            chips={[1.5, 2, 2.5, 3]}
+            chipValue={config.bbDeviation}
+            onChipChange={(v) =>
+              setConfig({ ...config, bbDeviation: Number(v) })
+            }
+            chipLabelFn={(v) => fmtDecimalChip(Number(v))}
+            stepper={
               <Stepper
                 value={config.bbDeviation}
                 onChange={(v) =>
@@ -972,14 +1078,27 @@ function SignalCard({
               />
             }
           />
+          <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <OptionList
+            <ContinuousSegmented
               options={[
-                { value: "touch_upper", label: "Toca banda superior" },
-                { value: "touch_lower", label: "Toca banda inferior" },
-                { value: "squeeze", label: "Squeeze (volatilidad baja)" },
+                {
+                  value: "touch_upper",
+                  label: "Banda superior",
+                  icon: "trending-up",
+                },
+                {
+                  value: "touch_lower",
+                  label: "Banda inferior",
+                  icon: "trending-down",
+                },
               ]}
-              active={config.bbCondition}
+              active={
+                config.bbCondition === "touch_upper" ||
+                config.bbCondition === "touch_lower"
+                  ? config.bbCondition
+                  : "touch_upper"
+              }
               onChange={(v) =>
                 setConfig({
                   ...config,
@@ -996,7 +1115,13 @@ function SignalCard({
         <ParamRow
           label="Multiplicador"
           c={c}
-          right={
+          chips={[1.5, 2, 3]}
+          chipValue={config.volumeMultiplier}
+          onChipChange={(v) =>
+            setConfig({ ...config, volumeMultiplier: Number(v) })
+          }
+          chipLabelFn={(v) => `${fmtDecimalChip(Number(v))}x`}
+          stepper={
             <Stepper
               value={config.volumeMultiplier}
               onChange={(v) =>
@@ -1009,18 +1134,10 @@ function SignalCard({
               suffix="x"
             />
           }
-        >
-          <ChipsRow
-            chips={[1.5, 2, 3, 5]}
-            value={config.volumeMultiplier}
-            onChange={(v) =>
-              setConfig({ ...config, volumeMultiplier: v })
-            }
-            labelFn={(v) => `${v}x`}
-            c={c}
-          />
-        </ParamRow>
+        />
       ) : null}
+
+      <Separator c={c} />
 
       <ParamRow label="Temporalidad" c={c}>
         <ChipsRow
@@ -1036,9 +1153,9 @@ function SignalCard({
   );
 }
 
-/** Card "Ejecución" — agrupa los parámetros sobre CÓMO se notifica
+/** Section "Ejecución" — agrupa los parámetros sobre CÓMO se notifica
  *  (frecuencia). Por ahora solo una fila. */
-function ExecutionCard({
+function ExecutionSection({
   config,
   setConfig,
   c,
@@ -1048,10 +1165,12 @@ function ExecutionCard({
   c: ColorMap;
 }) {
   return (
-    <View style={[s.card, { backgroundColor: c.surface }]}>
-      <Text style={[s.cardHeader, { color: c.textMuted }]}>Ejecución</Text>
+    <View style={s.section}>
+      <Text style={[s.sectionHeader, { color: c.textSecondary }]}>
+        Ejecución
+      </Text>
       <ParamRow label="Frecuencia" c={c}>
-        <Segmented
+        <ContinuousSegmented
           options={[
             { value: "once", label: "Solo una vez" },
             { value: "always", label: "Cada vez" },
@@ -1067,86 +1186,131 @@ function ExecutionCard({
   );
 }
 
-/* ─── Helpers internos a las cards ─────────────────────────────── */
+/* ─── Helpers de layout de las sections ──────────────────────── */
 
-/** Una fila dentro de una card. Label arriba (opcionalmente con un
- *  control compacto a la derecha — p.ej. Stepper), y el control
- *  principal (chips / segmented / option list) debajo. */
+/** ParamRow — fila genérica con label arriba y control debajo.
+ *
+ *  Dos modos:
+ *  (A) Con `chips` + `stepper` props: renderea chips presets a la
+ *      izquierda (horizontal scroll si overflow) + stepper a la
+ *      derecha en una sola línea. Tocar un chip actualiza el valor;
+ *      usar el stepper para un valor que NO está en los presets
+ *      deselecciona los chips visualmente (chip no marcado activo
+ *      porque value !== chip).
+ *  (B) Con `children`: control libre (segmented, chips fila simple)
+ *      debajo del label.
+ *  Si pasás los dos, ambos renderean — children abajo del row de
+ *  chips+stepper. */
 function ParamRow({
   label,
   c,
-  right,
+  chips,
+  chipValue,
+  onChipChange,
+  chipLabelFn,
+  stepper,
   children,
 }: {
   label: string;
   c: ColorMap;
-  right?: React.ReactNode;
+  chips?: readonly (number | string)[];
+  chipValue?: number | string;
+  onChipChange?: (v: number | string) => void;
+  chipLabelFn?: (v: number | string) => string;
+  stepper?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const hasChipsStepper = chips && stepper;
   return (
     <View style={s.paramRow}>
-      <View style={s.paramRowHeader}>
-        <Text style={[s.paramLabel, { color: c.textMuted }]}>{label}</Text>
-        {right ? <View>{right}</View> : null}
-      </View>
+      <Text style={[s.paramLabel, { color: c.textMuted }]}>{label}</Text>
+      {hasChipsStepper ? (
+        <View style={s.chipsStepperRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.chipsScrollContent}
+            style={s.chipsScroll}
+          >
+            {chips.map((v) => {
+              const active = chipValue === v;
+              return (
+                <Chip
+                  key={String(v)}
+                  active={active}
+                  label={chipLabelFn ? chipLabelFn(v) : String(v)}
+                  onPress={() => onChipChange?.(v)}
+                  c={c}
+                />
+              );
+            })}
+          </ScrollView>
+          <View style={s.stepperWrap}>{stepper}</View>
+        </View>
+      ) : null}
       {children ? <View style={s.paramControl}>{children}</View> : null}
     </View>
   );
 }
 
-/** Segmented control de 2 opciones — dos chips outline lado a lado
- *  con flex 1. Active: border c.brand + text c.brand. Inactive:
- *  border c.border + text c.textMuted. Sin container chrome ni tint
- *  fill — mismo lenguaje que los chips. */
-function Segmented<T extends string>({
-  options,
+/** Separador sutil — línea hairline de c.border, vertical margin
+ *  para dar respiro entre param rows. Reemplaza el card chrome de
+ *  la versión anterior. */
+function Separator({ c }: { c: ColorMap }) {
+  return <View style={[s.separator, { backgroundColor: c.border }]} />;
+}
+
+/* ─── Controles ─────────────────────────────────────────────── */
+
+/** Chip individual — dos estados binarios:
+ *
+ *  Inactive: bg transparent + border c.brand 1.5 + text c.brand.
+ *  Active:   bg c.brand sólido + text c.onColor (theme-aware).
+ *
+ *  Sin tint fills, sin gray outline. Es el lenguaje de la
+ *  selección que el rediseño quiere — toda la UI vive en el verde
+ *  de marca, no hay neutros para los chips. */
+function Chip({
   active,
-  onChange,
+  label,
+  onPress,
   c,
 }: {
-  options: { value: T; label: string }[];
-  active: T;
-  onChange: (v: T) => void;
+  active: boolean;
+  label: string;
+  onPress: () => void;
   c: ColorMap;
 }) {
   return (
-    <View style={s.segmented}>
-      {options.map((opt) => {
-        const isActive = active === opt.value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(opt.value);
-            }}
-            style={[
-              s.segmentedItem,
-              { borderColor: isActive ? c.brand : c.border },
-            ]}
-          >
-            <Text
-              style={[
-                s.segmentedText,
-                {
-                  color: isActive ? c.brand : c.textMuted,
-                  fontFamily: isActive ? fontFamily[700] : fontFamily[600],
-                },
-              ]}
-              numberOfLines={1}
-            >
-              {opt.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      style={({ pressed }) => [
+        s.chip,
+        {
+          backgroundColor: active ? c.brand : "transparent",
+          borderColor: c.brand,
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          s.chipText,
+          { color: active ? c.onColor : c.brand },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
-/** Fila de chips horizontales — outline-only. Active: border c.brand
- *  1.5px + text c.brand, bg transparent. Inactive: border c.border
- *  1.5px + text c.textMuted, bg transparent. Sin tint fill nunca. */
+/** Fila de chips horizontales — para casos sin stepper (e.g.
+ *  Temporalidad). Sin scroll porque los presets son fijos y caben
+ *  en el ancho. */
 function ChipsRow<T extends number | string>({
   chips,
   value,
@@ -1165,52 +1329,37 @@ function ChipsRow<T extends number | string>({
       {chips.map((v) => {
         const active = value === v;
         return (
-          <Pressable
+          <Chip
             key={String(v)}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(v);
-            }}
-            style={({ pressed }) => [
-              s.chip,
-              {
-                backgroundColor: "transparent",
-                borderColor: active ? c.brand : c.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                s.chipText,
-                { color: active ? c.brand : c.textMuted },
-              ]}
-            >
-              {labelFn ? labelFn(v) : String(v)}
-            </Text>
-          </Pressable>
+            active={active}
+            label={labelFn ? labelFn(v) : String(v)}
+            onPress={() => onChange(v)}
+            c={c}
+          />
         );
       })}
     </View>
   );
 }
 
-/* ─── Inline editors ──────────────────────────────────────────── */
-
-
-function OptionList<T extends string>({
+/** Continuous segmented control — un solo container con border
+ *  c.brand. Cada option toma flex 1 sin gap. Active: bg c.brand +
+ *  text c.onColor. Inactive: bg transparent + text c.brand. Sin
+ *  separadores verticales entre options para que el fill se sienta
+ *  como un toggle continuo (Robinhood-style). */
+function ContinuousSegmented<T extends string>({
   options,
   active,
   onChange,
   c,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: keyof typeof Feather.glyphMap }[];
   active: T;
   onChange: (v: T) => void;
   c: ColorMap;
 }) {
   return (
-    <View style={s.optionList}>
+    <View style={[s.continuousSegmented, { borderColor: c.brand }]}>
       {options.map((opt) => {
         const isActive = active === opt.value;
         return (
@@ -1221,30 +1370,43 @@ function OptionList<T extends string>({
               onChange(opt.value);
             }}
             style={({ pressed }) => [
-              s.optionItem,
-              { opacity: pressed ? 0.6 : 1 },
+              s.continuousSegmentedItem,
+              {
+                backgroundColor: isActive ? c.brand : "transparent",
+                opacity: pressed && !isActive ? 0.7 : 1,
+              },
             ]}
           >
+            {opt.icon ? (
+              <Feather
+                name={opt.icon}
+                size={14}
+                color={isActive ? c.onColor : c.brand}
+                style={{ marginRight: 6 }}
+              />
+            ) : null}
             <Text
               style={[
-                s.optionLabel,
-                {
-                  color: isActive ? c.brand : c.textSecondary,
-                  fontFamily: isActive ? fontFamily[700] : fontFamily[500],
-                },
+                s.continuousSegmentedText,
+                { color: isActive ? c.onColor : c.brand },
               ]}
               numberOfLines={1}
             >
               {opt.label}
             </Text>
-            {isActive ? (
-              <Feather name="check" size={18} color={c.brand} />
-            ) : null}
           </Pressable>
         );
       })}
     </View>
   );
+}
+
+/** Formatea un número para mostrar en un chip cuando los presets
+ *  mezclan enteros y decimales. Entero → "2". Decimal → "1,5"
+ *  (locale es-AR). No agrega sufijo — caller suma "x", "σ", etc. */
+function fmtDecimalChip(v: number): string {
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(1).replace(".", ",");
 }
 
 /* ─── Helpers de conversión config ↔ alert + preview NL ───────── */
@@ -1346,8 +1508,8 @@ function buildInputFromConfig(
 
 function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   if (t === "ma") {
-    if (cfg && cfg.maVariant === "ema") return "Media Móvil Exponencial";
-    return "Media Móvil Simple";
+    if (cfg && cfg.maVariant === "ema") return "Media móvil exponencial";
+    return "Media móvil simple";
   }
   if (t === "rsi") return "RSI";
   if (t === "macd") return "MACD";
@@ -1355,9 +1517,9 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
-/** Genera los segmentos del preview — partes en bold/brand vs
- *  partes en texto normal. La structure de cada return define qué
- *  va resaltado: ticker, números, períodos, umbrales, timeframe. */
+/** Genera los segmentos del preview — partes en c.brand (highlight)
+ *  vs partes en c.textSecondary. La estructura de cada return define
+ *  qué va resaltado: ticker, números, períodos, umbrales, timeframe. */
 function previewSegments(
   type: IndicatorType,
   ticker: string,
@@ -1433,7 +1595,7 @@ function previewSegments(
     return [
       T("El precio de "),
       T(ticker, true),
-      T(` toque la `),
+      T(" toque la "),
       T(upper ? "banda superior" : "banda inferior", true),
       T(" en "),
       T(tf, true),
@@ -1477,11 +1639,7 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
 
-  /* ── Paso 1 — picker ──
-   * Densidad pensada para matchear la altura natural del AlertSheet
-   * (~729 px). Filas con ícono 48, descripción de 1-2 líneas,
-   * agrupadas en 3 secciones (TENDENCIA / MOMENTUM / VOLATILIDAD
-   * Y VOLUMEN). */
+  /* ── Paso 1 — picker ── */
   pickerHeader: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -1499,9 +1657,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 4,
   },
-  /* Eyebrow de sección dentro del picker — mismo lenguaje que
-   * sectionEyebrow del paso 2, con inset horizontal 20 para
-   * alinearse al picker (que usa pH 20, no 24). */
   pickerSection: {
     fontFamily: fontFamily[700],
     fontSize: 11,
@@ -1510,10 +1665,6 @@ const s = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
   },
-  /* Override del paddingTop para las secciones que NO son la primera.
-   * La primera (TENDENCIA) viene apenas después del header del picker
-   * y necesita aire; MOMENTUM y VOLATILIDAD Y VOLUMEN vienen después
-   * de su última row y sienten mejor con menos separación. */
   pickerSectionTight: {
     paddingTop: 4,
   },
@@ -1548,170 +1699,196 @@ const s = StyleSheet.create({
   configHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  configTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.6,
-  },
-
-  /* ── Cards always-visible (Señal + Ejecución) ── */
-  card: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
-    borderRadius: radius.lg,
-    borderCurve: "continuous",
-  },
-  cardHeader: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    marginBottom: 6,
-  },
-  paramRow: {
-    paddingVertical: 10,
-  },
-  paramRowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    minHeight: 28,
-    marginBottom: 8,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
-  paramLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.15,
-  },
-  paramControl: {
-    /* container para chips/segmented/option list. */
-  },
-  segmented: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  segmentedItem: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  configBack: {
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
-    borderWidth: 1.5,
   },
-  segmentedText: {
-    fontFamily: fontFamily[600],
-    fontSize: 14,
-    letterSpacing: -0.1,
+  configTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: fontFamily[700],
+    fontSize: 17,
+    letterSpacing: -0.3,
   },
 
-  /* Hero rectangular full-width — bg con tint sutil de c.brand,
-   * ilustración 3D centrada adentro. ~130 alto incluyendo padding. */
+  /* ── Hero rect ──
+   * Full-width con margin horizontal 16. Bg HERO_DARK constante.
+   * Radius 14 (override del token md/lg porque el spec lo pide
+   * literal). overflow hidden para que la ilustración respete los
+   * corners. */
   heroRect: {
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 8,
     height: 130,
-    borderRadius: radius.lg,
+    borderRadius: 14,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  /* Statement — eyebrow chico arriba + sentence con tokens en c.brand.
-   * Left-aligned (no centered) para feel "ficha técnica" no "poster". */
+
+  /* ── Statement ──
+   * Centered, eyebrow 12 + sentence 15 en c.textSecondary con
+   * tokens en c.brand 500 weight. Un padding vertical generoso para
+   * que respire entre el hero y la sección Señal. */
   statementBlock: {
     paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 18,
+    paddingTop: 16,
+    paddingBottom: 14,
+    alignItems: "center",
   },
   statementEyebrow: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.1,
     marginBottom: 6,
+    textAlign: "center",
   },
-  /* Sentence default — 20/700 -0.4, lineHeight 26, left-aligned. */
-  heroSentence: {
-    fontFamily: fontFamily[700],
-    fontSize: 20,
-    lineHeight: 26,
-    letterSpacing: -0.4,
-  },
-  /* Sentence compacta — para casos con texto largo (>80 chars).
-   * Baja a 18/24. */
-  heroSentenceCompact: {
-    fontFamily: fontFamily[700],
-    fontSize: 18,
-    lineHeight: 24,
-    letterSpacing: -0.3,
+  statementSentence: {
+    fontFamily: fontFamily[500],
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.15,
+    textAlign: "center",
   },
 
-  /* CTA container — flota sobre c.bg, sin chrome bar (sin border). */
+  /* ── Section (sin card chrome) ──
+   * Margen horizontal 16 alineado con el hero, padding interno
+   * controlado por las ParamRow + Separator. Sin bg, sin border,
+   * sin radius — los controles viven sobre c.bg. */
+  section: {
+    marginHorizontal: 16,
+    marginTop: 14,
+  },
+  sectionHeader: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+    marginBottom: 10,
+  },
+
+  /* ── ParamRow ──
+   * Label arriba (12/textMuted) + control debajo. Vertical padding
+   * leve para densidad cómoda sin sentirse compacto. */
+  paramRow: {
+    paddingVertical: 8,
+  },
+  paramLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    letterSpacing: -0.05,
+    marginBottom: 8,
+  },
+  paramControl: {
+    // container para children libres (segmented, chips fila).
+  },
+
+  /* ── Chips + Stepper inline ──
+   * Row con chips scroll horizontal a la izquierda y stepper a la
+   * derecha con marginLeft auto via flex layout. */
+  chipsStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chipsScroll: {
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  chipsScrollContent: {
+    gap: 8,
+    alignItems: "center",
+    paddingRight: 8,
+  },
+  stepperWrap: {
+    marginLeft: 8,
+  },
+
+  /* ── Chips (binarios) ──
+   * Inactive: outline c.brand 1.5 + text c.brand.
+   * Active:   fill c.brand + text c.onColor (theme-aware).
+   * Pill radius, padding 14h / 8v para feel compacto sin perder
+   * tap target. */
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chipText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+
+  /* ── Chips row simple (sin scroll) ──
+   * Para Temporalidad y otros casos con presets fijos. */
+  chipsWrap: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  /* ── Continuous segmented ──
+   * Un solo container con border c.brand. Cada item flex 1 sin gap.
+   * Active item bg c.brand bleed-to-edge (overflow hidden en
+   * container para que respete corners). Radius 10 según spec. */
+  continuousSegmented: {
+    flexDirection: "row",
+    borderCurve: "continuous",
+    borderRadius: 10,
+    borderWidth: 1.5,
+    overflow: "hidden",
+  },
+  continuousSegmentedItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  continuousSegmentedText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.1,
+  },
+
+  /* ── Separator sutil entre ParamRows ── */
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 6,
+  },
+
+  /* ── CTA container ──
+   * Floata sobre c.bg sin chrome bar. Bottom inset manejado a
+   * nivel del sheet padding. */
   ctaContainer: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 0,
     gap: 8,
   },
 
-  /* ── Editores inline ── */
-  chipsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  /* Chips estilo AlertSheet — sin border, sólido tone activo
-   * (c.text bg + c.bg text) vs inactivo (c.surface bg + c.text text).
-   * Px ~ 14h / 11v + pill radius. */
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-  },
-  chipText: {
-    fontFamily: fontFamily[700],
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  optionList: {
-    gap: 2,
-  },
-  optionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 0,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  optionLabel: {
-    flex: 1,
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  /* ── Warning ── */
+  /* ── Warning MACD ── */
   warning: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginTop: 10,
     borderCurve: "continuous",
     borderRadius: radius.md,
     borderWidth: 1,
@@ -1723,19 +1900,25 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* ── CTA — pill style match AlertSheet ── */
+  /* ── CTA — radius 14 + bell icon ─ texto 16/500 ── */
   cta: {
-    height: 58,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderCurve: "continuous",
+    borderRadius: 14,
   },
   ctaText: {
-    fontFamily: fontFamily[800],
-    fontSize: 17,
+    fontFamily: fontFamily[500],
+    fontSize: 16,
     letterSpacing: -0.2,
   },
 });
-// Suppress unused TextInput import warning — we may use it for keyboard-typed numbers in a future iteration.
+
+// Suppress unused TextInput import warning — TextInput se usa
+// indirectamente via Stepper.tsx, lo dejamos importado por si en
+// un futuro queremos un campo numeric inline en este archivo.
 void TextInput;
