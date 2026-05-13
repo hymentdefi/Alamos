@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 
 import { fontFamily, radius, useTheme } from "../theme";
 import { Tap } from "./Tap";
@@ -65,6 +67,7 @@ export function Tier1StatsBento({
   toDisplay,
 }: Props) {
   const { c } = useTheme();
+  const router = useRouter();
   const [openStat, setOpenStat] = useState<StatKey | null>(null);
 
   const stats: Tier1Stats = useMemo(
@@ -231,6 +234,22 @@ export function Tier1StatsBento({
         })}
       </View>
 
+      {/* "Ver más estadísticas →" — link al pie del bento que abre
+          la sub-pantalla de Tier 2 (/estadisticas). Pasamos el range
+          actual como query param para mantener el contexto del
+          usuario entre pantallas. */}
+      <Tap
+        onPress={() => router.push(`/estadisticas?range=${range}` as never)}
+        haptic="selection"
+        pressScale={0.97}
+        style={[s.seeMore, { borderTopColor: c.border }]}
+      >
+        <Text style={[s.seeMoreText, { color: c.brand }]}>
+          Ver más estadísticas
+        </Text>
+        <Feather name="chevron-right" size={16} color={c.brand} />
+      </Tap>
+
       <StatInfoSheet
         statKey={openStat}
         onClose={() => setOpenStat(null)}
@@ -304,5 +323,20 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
     marginTop: 2,
+  },
+  /* CTA al pie del bento para navegar al Tier 2. */
+  seeMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  seeMoreText: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
   },
 });

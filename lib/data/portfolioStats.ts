@@ -14,6 +14,7 @@
 
 import { generatePayouts, isPaid, MOCK_TODAY } from "./payouts";
 import { convertAmount } from "./accounts";
+import { assets, assetCurrency, type Asset } from "./assets";
 
 export type Semaforo = "verde" | "amarillo" | "rojo";
 
@@ -306,9 +307,213 @@ export function computeTier1Stats(args: ComputeArgs): Tier1Stats {
   };
 }
 
+/* ─── Tier 2 (sub-pantalla /estadisticas) ─────────────────────── */
+
+export interface ReturnsByPeriodRow {
+  period: StatsRange;
+  twr: number;
+  mwr: number;
+}
+
+export interface Tier2Stats {
+  /** Tabla rendimiento por período (7 filas D/W/M/3M/YTD/1A/MAX). */
+  returnsByPeriod: ReturnsByPeriodRow[];
+  /* Risk-adjusted */
+  sortino: { value: number; semaforo: Semaforo };
+  calmar: { value: number; semaforo: Semaforo };
+  beta: { value: number; benchmark: "S&P 500"; semaforo: Semaforo };
+  /* Benchmark capture */
+  upCapture: { pct: number };
+  downCapture: { pct: number };
+  /* Composición */
+  posicionesEfectivas: { value: number; semaforo: Semaforo };
+  concentracionTop5: { pct: number; semaforo: Semaforo };
+  /* Income breakdown (real, del data layer de payouts) */
+  income: {
+    cupones: number;
+    dividendos: number;
+    amortizaciones: number;
+    totalYtd: number;
+    forward12M: number;
+  };
+}
+
+/* Magnitudes mock por range. Mismo enfoque que Tier 1: cuando el
+ * server-side batch nightly esté listo, este map se reemplaza. */
+const TIER2_MOCK_BY_RANGE: Record<
+  StatsRange,
+  {
+    sortino: number;
+    calmar: number;
+    beta: number;
+    upCapture: number;
+    downCapture: number;
+  }
+> = {
+  "1D": { sortino: 0.58, calmar: 0.42, beta: 0.92, upCapture: 88, downCapture: 78 },
+  "1W": { sortino: 0.72, calmar: 0.54, beta: 0.93, upCapture: 90, downCapture: 80 },
+  "1M": { sortino: 1.04, calmar: 0.68, beta: 0.94, upCapture: 92, downCapture: 81 },
+  "3M": { sortino: 1.32, calmar: 0.84, beta: 0.95, upCapture: 95, downCapture: 78 },
+  YTD: { sortino: 1.58, calmar: 1.04, beta: 0.96, upCapture: 98, downCapture: 76 },
+  "1A": { sortino: 1.68, calmar: 1.16, beta: 0.97, upCapture: 102, downCapture: 74 },
+  MAX: { sortino: 1.74, calmar: 1.22, beta: 0.97, upCapture: 104, downCapture: 73 },
+};
+
+function sortinoSemaforo(v: number): Semaforo {
+  if (v > 1.5) return "verde";
+  if (v > 0.8) return "amarillo";
+  return "rojo";
+}
+
+function calmarSemaforo(v: number): Semaforo {
+  if (v > 1.0) return "verde";
+  if (v > 0.5) return "amarillo";
+  return "rojo";
+}
+
+/* Beta sweet spot 0.5-1.2 verde; 1.2-1.5 amarillo (más volátil que
+ * el mercado); arriba de 1.5 o muy bajo (<0.3) rojo. */
+function betaSemaforo(v: number): Semaforo {
+  if (v >= 0.5 && v <= 1.2) return "verde";
+  if (v > 1.2 && v < 1.5) return "amarillo";
+  return "rojo";
+}
+
+/* Posiciones efectivas: spec dice > 8 verde, 4-8 amarillo, < 4 rojo. */
+function posicionesEfectivasSemaforo(n: number): Semaforo {
+  if (n > 8) return "verde";
+  if (n > 4) return "amarillo";
+  return "rojo";
+}
+
+/* Top-5 concentration: < 40% verde, 40-60% amarillo, > 60% rojo. */
+function concentracionSemaforo(pct: number): Semaforo {
+  if (pct < 40) return "verde";
+  if (pct < 60) return "amarillo";
+  return "rojo";
+}
+
+/* Pesos del portfolio para HHI / Top-5. Real desde holdings. */
+function computeWeights(): Array<{ ticker: string; w: number; ars: number }> {
+  const held = assets.filter(
+    (a) => a.held && (a.qty ?? 0) > 0 && a.category !== "efectivo",
+  );
+  const positions = held.map((a: Asset) => {
+    const native = a.price * (a.qty ?? 0);
+    const ars = convertAmount(native, assetCurrency(a), "ARS");
+    return { ticker: a.ticker, ars };
+  });
+  const total = positions.reduce((acc, p) => acc + p.ars, 0);
+  return positions.map((p) => ({
+    ticker: p.ticker,
+    ars: p.ars,
+    w: total > 0 ? p.ars / total : 0,
+  }));
+}
+
+/* HHI (Herfindahl-Hirschman Index): Σ wᵢ². Posiciones efectivas = 1/HHI. */
+function computeHHI(): { hhi: number; posicionesEfectivas: number } {
+  const weights = computeWeights();
+  const hhi = weights.reduce((acc, p) => acc + p.w * p.w, 0);
+  return {
+    hhi,
+    posicionesEfectivas: hhi > 0 ? 1 / hhi : 0,
+  };
+}
+
+/* Top-N concentration: % del portfolio en las N posiciones más grandes. */
+function computeTopNConcentration(n: number): number {
+  const weights = computeWeights().sort((a, b) => b.w - a.w);
+  const top = weights.slice(0, n);
+  return top.reduce((acc, p) => acc + p.w, 0) * 100;
+}
+
+/* Income breakdown — real desde payouts.ts. Cobrado YTD por tipo +
+ * forward proyección de los próximos 12M. */
+function computeIncomeBreakdown(
+  toDisplay: (ars: number) => number,
+): Tier2Stats["income"] {
+  const events = generatePayouts();
+  const today = MOCK_TODAY;
+  const currentYear = today.getFullYear();
+  const oneYearFromNow = new Date(
+    today.getFullYear() + 1,
+    today.getMonth(),
+    today.getDate(),
+  );
+  const oneYearFromNowIso = oneYearFromNow.toISOString().slice(0, 10);
+  const todayIso = today.toISOString().slice(0, 10);
+
+  let cupones = 0;
+  let dividendos = 0;
+  let amortizaciones = 0;
+  let forward12M = 0;
+
+  for (const e of events) {
+    const amountArs = convertAmount(e.amount, e.currency, "ARS");
+    if (e.date.startsWith(`${currentYear}-`) && isPaid(e, today)) {
+      if (e.type === "cupon") cupones += amountArs;
+      else if (e.type === "dividendo") dividendos += amountArs;
+      else if (e.type === "amortizacion") amortizaciones += amountArs;
+    }
+    if (e.date > todayIso && e.date <= oneYearFromNowIso) {
+      forward12M += amountArs;
+    }
+  }
+
+  return {
+    cupones: toDisplay(cupones),
+    dividendos: toDisplay(dividendos),
+    amortizaciones: toDisplay(amortizaciones),
+    totalYtd: toDisplay(cupones + dividendos + amortizaciones),
+    forward12M: toDisplay(forward12M),
+  };
+}
+
+/* Tabla rendimiento por período. TWR del mock (mismo que Tier 1) +
+ * MWR derivado (TWR + jitter chiquito que sugiere timing de aportes). */
+function computeReturnsByPeriod(): ReturnsByPeriodRow[] {
+  const periods: StatsRange[] = [
+    "1D", "1W", "1M", "3M", "YTD", "1A", "MAX",
+  ];
+  return periods.map((p) => {
+    const twr = MOCK_BY_RANGE[p].twrPct;
+    const mwr = twr + Math.sign(twr) * 0.3;
+    return { period: p, twr, mwr };
+  });
+}
+
+export function computeTier2Stats(
+  range: StatsRange,
+  toDisplay: (ars: number) => number,
+): Tier2Stats {
+  const m = TIER2_MOCK_BY_RANGE[range];
+  const { posicionesEfectivas: posEf } = computeHHI();
+  const concentracion = computeTopNConcentration(5);
+
+  return {
+    returnsByPeriod: computeReturnsByPeriod(),
+    sortino: { value: m.sortino, semaforo: sortinoSemaforo(m.sortino) },
+    calmar: { value: m.calmar, semaforo: calmarSemaforo(m.calmar) },
+    beta: { value: m.beta, benchmark: "S&P 500", semaforo: betaSemaforo(m.beta) },
+    upCapture: { pct: m.upCapture },
+    downCapture: { pct: m.downCapture },
+    posicionesEfectivas: {
+      value: posEf,
+      semaforo: posicionesEfectivasSemaforo(posEf),
+    },
+    concentracionTop5: {
+      pct: concentracion,
+      semaforo: concentracionSemaforo(concentracion),
+    },
+    income: computeIncomeBreakdown(toDisplay),
+  };
+}
+
 /* ─── Catálogo de info sheets por stat ────────────────────────── */
 
 export type StatKey =
+  /* Tier 1 — bento del Rendimiento */
   | "totalInvertido"
   | "mwr"
   | "twr"
@@ -316,7 +521,20 @@ export type StatKey =
   | "maxDrawdown"
   | "sharpe"
   | "alpha"
-  | "dividendYield";
+  | "dividendYield"
+  /* Tier 2 — sub-pantalla /estadisticas */
+  | "sortino"
+  | "calmar"
+  | "beta"
+  | "upCapture"
+  | "downCapture"
+  | "posicionesEfectivas"
+  | "concentracionTop5"
+  | "cupones"
+  | "dividendos"
+  | "amortizaciones"
+  | "forward12M"
+  | "returnsByPeriod";
 
 /** Contenido del info sheet por métrica. Cada stat tiene su título
  *  retail-friendly + cuerpo explicativo. Usado por la UI para abrir
@@ -371,6 +589,67 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
     title: "¿Qué son los dividendos?",
     technicalName: "Dividend Yield TTM",
     body: "El rendimiento que generan tus activos en concepto de cupones y dividendos, medido sobre los últimos 12 meses. Se calcula como total cobrado dividido por el valor del portfolio. Un yield alto significa que tu cartera genera ingresos sin que tengas que vender posiciones.",
+  },
+  /* ─── Tier 2 ─── */
+  sortino: {
+    title: "¿Qué es la ganancia por riesgo de pérdida?",
+    technicalName: "Sortino Ratio",
+    body: "Es como el Sharpe Ratio, pero solo penaliza la volatilidad cuando las cosas van mal. Mide cuánto ganaste por cada unidad de riesgo de pérdida que asumiste. Más de 1,5 es bueno; por debajo de 0,8 indica que el riesgo a la baja no se está pagando.",
+  },
+  calmar: {
+    title: "¿Qué es la ganancia vs peor caída?",
+    technicalName: "Calmar Ratio",
+    body: "Tu rendimiento anual dividido por la peor caída que tuvo el portfolio. Te dice cuánto ganaste por cada punto de máxima pérdida soportada. Más de 1 significa que tus ganancias justificaron el dolor del peor momento.",
+  },
+  beta: {
+    title: "¿Qué es la sensibilidad al mercado?",
+    technicalName: "Beta",
+    body: "Mide cuánto se mueve tu portfolio cuando el mercado se mueve. Un beta de 1 significa que va igual; mayor a 1 amplifica los movimientos del mercado; menor a 1 los amortigua. Negativo significa que se mueve al revés.",
+  },
+  upCapture: {
+    title: "¿Qué es cuánto capturás en subas?",
+    technicalName: "Up-Capture Ratio",
+    body: "Cuando el mercado sube, ¿qué porcentaje de esa suba captura tu portfolio? Mayor a 100 significa que ganás más que el mercado en los buenos momentos; menor a 100 significa que te quedás atrás.",
+  },
+  downCapture: {
+    title: "¿Qué es cuánto caés en bajas?",
+    technicalName: "Down-Capture Ratio",
+    body: "Cuando el mercado cae, ¿qué porcentaje de esa caída sentís en tu portfolio? Menor a 100 significa que perdés menos que el mercado en los malos momentos — un escudo defensivo.",
+  },
+  posicionesEfectivas: {
+    title: "¿Qué son las posiciones efectivas?",
+    technicalName: "Inverso del HHI",
+    body: "Cuántas posiciones del mismo tamaño equivaldrían a tu portfolio actual, considerando la concentración real. Si tenés 20 holdings pero uno representa el 50%, tu número efectivo es mucho menor que 20. Más alto es más diversificado.",
+  },
+  concentracionTop5: {
+    title: "¿Qué es la concentración top 5?",
+    technicalName: "Top-N Concentration",
+    body: "Porcentaje del portfolio que vive en tus 5 posiciones más grandes. Menos del 40% se considera bien diversificado; arriba del 60% indica concentración alta que amplifica tanto las subas como las bajas.",
+  },
+  cupones: {
+    title: "¿Qué son los cupones?",
+    technicalName: "Bond Coupon Income",
+    body: "Los pagos de intereses que hacen los bonos en fechas fijas según su prospecto. Se reciben en cuotas a lo largo del año y son la fuente principal de ingreso de la parte de renta fija del portfolio.",
+  },
+  dividendos: {
+    title: "¿Qué son los dividendos?",
+    technicalName: "Stock Dividends",
+    body: "Pagos en efectivo que distribuyen las empresas a sus accionistas (vía acciones directas o CEDEARs) cuando el directorio los aprueba. No son fechas fijas: dependen de la política de la empresa y de sus resultados.",
+  },
+  amortizaciones: {
+    title: "¿Qué son las amortizaciones?",
+    technicalName: "Principal Repayment",
+    body: "Cuando un bono te devuelve parte del capital invertido, no solo intereses. Algunos bonos amortizan en cuotas según un cronograma; otros pagan todo al vencimiento (bullet). Es plata que vuelve a tu mano sin tener que vender.",
+  },
+  forward12M: {
+    title: "¿Qué es la proyección de ingresos?",
+    technicalName: "Forward 12M Income",
+    body: "Una estimación de cuánto vas a cobrar en los próximos 12 meses, considerando los cronogramas de cupones de tus bonos y las políticas de dividendos esperadas. Los dividendos pueden variar; los cupones de bonos suelen estar fijos en el prospecto.",
+  },
+  returnsByPeriod: {
+    title: "¿Qué es el rendimiento por período?",
+    technicalName: "Performance Table",
+    body: "Tu rendimiento mostrado en distintas ventanas de tiempo, con TWR (limpio de aportes) y MWR (incluyendo cuándo aportaste). Te deja comparar performance del último día contra el último año o desde que empezaste.",
   },
 };
 

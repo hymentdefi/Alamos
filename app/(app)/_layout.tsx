@@ -99,6 +99,12 @@ export default function AppLayout() {
           name="cobros"
           options={{ fullScreenGestureEnabled: false }}
         />
+        {/* Estadísticas (Tier 2): tabla con scroll horizontal + bottom
+            sheets, mismo riesgo de confundir scroll con swipe-back. */}
+        <Stack.Screen
+          name="estadisticas"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         {/* Asset alerts — pantalla full-screen con la lista de
             alertas custom del activo. Slide_from_bottom para
             que se sienta deep-dive. */}
