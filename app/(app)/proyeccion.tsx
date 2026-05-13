@@ -12,6 +12,7 @@ import { Feather } from "@expo/vector-icons";
 import Svg, { Path, Line } from "react-native-svg";
 
 import { fontFamily, radius, useTheme } from "../../lib/theme";
+import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { Tap } from "../../lib/components/Tap";
 import {
   computeTotalArs,
@@ -114,19 +115,21 @@ export default function ProyeccionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.title, { color: c.brand }]}>Proyección</Text>
-        <Text style={[s.subtitle, { color: c.textMuted }]}>
-          Simulamos miles de escenarios posibles para estimar cómo
-          podría crecer tu portfolio.
-        </Text>
 
-        {/* Hero estilo Robinhood: valor mediano grande arriba (brand),
-            etiqueta del horizonte abajo en muted. Sin la línea "hoy
-            vale X" — esa info ya la tiene el user en la home y se
-            sentía redundante en una pantalla de proyección. */}
+        {/* Hero estilo Robinhood: balance pattern (AmountDisplay con
+            decimales chiquitos arriba a la derecha) pintado en brand.
+            Mismo display que el balance de portfolio en home, sólo
+            que en verde. Sin línea "hoy vale X" porque esa info ya
+            la tiene en home. */}
         <View style={s.hero}>
-          <Text style={[s.heroValue, { color: c.brand }]}>
-            {fmt(mc.medianFinal)}
-          </Text>
+          <AmountDisplay
+            value={mc.medianFinal}
+            size={38}
+            weight={800}
+            currency={currency}
+            color={c.brand}
+            decimalsColor={c.brand}
+          />
           <Text style={[s.heroLabel, { color: c.textMuted }]}>
             Proyección mediana en {horizon} años
           </Text>
@@ -372,31 +375,20 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 4,
   },
-  subtitle: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    paddingHorizontal: 24,
-    marginTop: 6,
-    marginBottom: 24,
-  },
-
-  /* Hero Robinhood-style: valor grande primero, contexto abajo. */
+  /* Hero Robinhood-style: AmountDisplay (balance pattern) en brand,
+   * label muted abajo. marginTop 20 compensa el subtítulo que
+   * sacamos — la descripción de la pantalla ya la tiene el user en
+   * el sectionLink de Rendimiento. */
   hero: {
     paddingHorizontal: 24,
+    marginTop: 20,
     marginBottom: 20,
-  },
-  heroValue: {
-    fontFamily: fontFamily[800],
-    fontSize: 38,
-    letterSpacing: -1.4,
   },
   heroLabel: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.15,
-    marginTop: 4,
+    marginTop: 6,
   },
 
   chartWrap: {
