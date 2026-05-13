@@ -10,7 +10,6 @@ import {
   assets,
   assetCurrency,
   assetMarket,
-  formatMoney,
   formatPct,
   type Asset,
 } from "../../lib/data/assets";
@@ -22,6 +21,7 @@ import {
 import { AmountDisplay } from "../../lib/components/AmountDisplay";
 import { CobrosSection } from "../../lib/components/CobrosSection";
 import { Tap } from "../../lib/components/Tap";
+import { Tier1StatsBento } from "../../lib/components/Tier1StatsBento";
 import { AssetColorProvider } from "../../lib/asset-color/context";
 
 /**
@@ -199,21 +199,16 @@ export default function RendimientoScreen() {
    * el verde brand vibrante; la línea del Sparkline usa dataGreen
    * (en light coincide con brand, en dark es el verde más amigable). */
   const sparklineColor = up ? c.dataGreen : c.red;
-  const fmt = (n: number) => formatMoney(n, currency);
 
-  // Stats fijas (independientes del range). Single-column layout para
-  // que los valores con texto largo (ej. "Marzo · +5,2%") no queden
-  // truncados — un row por stat, label izquierda, valor derecha,
-  // hairlines entre rows. Mismo lenguaje key-value del stock detail
-  // adaptado a labels/valores más largos del rendimiento.
-  const stats: Array<{ label: string; value: string; tone?: "up" | "down" }> = [
-    { label: "Total invertido", value: fmt(invertido) },
-    { label: "YTD", value: "+8,4%", tone: "up" },
-    { label: "Mejor mes", value: "Marzo · +5,2%", tone: "up" },
-    { label: "Peor mes", value: "Octubre · −2,1%", tone: "down" },
-    { label: "Promedio mensual", value: "+1,3%", tone: "up" },
-    { label: "Días positivos", value: "62%" },
-  ];
+  /* toDisplay para el Tier1StatsBento — convierte ARS al display
+   * currency (alineado con cómo el screen ya convierte totalArs y
+   * el resto de las cifras). */
+  const toDisplay = useMemo(
+    () =>
+      (ars: number) =>
+        currency === "ARS" ? ars : convertAmount(ars, "ARS", currency),
+    [currency],
+  );
 
   return (
     <AssetColorProvider up={up}>
@@ -305,49 +300,19 @@ export default function RendimientoScreen() {
             })}
           </View>
 
-          {/* Stats — single column con hairlines entre rows. Mismo
-              lenguaje key-value que el stock detail; en lugar de 2-col
-              cada stat ocupa toda la fila, así los valores largos
-              ("Marzo · +5,2%") no se truncan. Tone color en los % para
-              que la lectura sea más vivaz: brand cuando es +, red
-              cuando es −. */}
-          <View style={s.card}>
-            <Text style={[s.cardEyebrow, { color: c.text }]}>
-              Estadísticas
-            </Text>
-            {stats.map((stat, i) => {
-              const valueColor =
-                stat.tone === "up"
-                  ? c.brand
-                  : stat.tone === "down"
-                    ? c.red
-                    : c.text;
-              return (
-                <View
-                  key={stat.label}
-                  style={[
-                    s.statsRow,
-                    i < stats.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[s.statsLabel, { color: c.textMuted }]}
-                  >
-                    {stat.label}
-                  </Text>
-                  <Text
-                    style={[s.statsValue, { color: valueColor }]}
-                    numberOfLines={1}
-                  >
-                    {stat.value}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+          {/* Tier 1 stats — bento grid de 8 cards según la spec
+              interna (Portfolio Statistics Engine v1.0). Tap a una
+              card abre el StatInfoSheet con el nombre técnico +
+              explicación retail. */}
+          <Tier1StatsBento
+            range={range}
+            currency={currency}
+            totalInvertido={invertido}
+            gananciaAbs={ganancia}
+            twrPct={rangePct}
+            totalArs={totalArs}
+            toDisplay={toDisplay}
+          />
 
           {/* Cobros — dividendos, cupones y amortizaciones del
               portfolio. Calendario forward + breakdown del año
@@ -470,39 +435,6 @@ const s = StyleSheet.create({
   },
 
   /* Cards */
-  card: {
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    marginTop: 16,
-  },
-  cardEyebrow: {
-    fontFamily: fontFamily[700],
-    fontSize: 22,
-    letterSpacing: -0.5,
-    marginBottom: 16,
-  },
-  /* Stats row — single column key-value. Label izquierda 14/500 muted,
-   * valor derecha 15/700 (text o tone color para %s). Hairline divider
-   * entre rows. Mismo lenguaje que el stock detail, adaptado a 1-col
-   * para que valores largos no se trunquen. */
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16,
-    gap: 12,
-  },
-  statsLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  statsValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-
   disclaimer: {
     marginTop: 24,
     marginHorizontal: 20,
