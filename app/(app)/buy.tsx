@@ -492,7 +492,7 @@ export default function BuyScreen() {
             s.cta,
             {
               backgroundColor:
-                hasInput && !exceeds ? c.ink : c.surfaceHover,
+                hasInput && !exceeds ? c.brand : c.surfaceHover,
             },
           ]}
           onPress={onContinue}
@@ -503,7 +503,7 @@ export default function BuyScreen() {
             style={[
               s.ctaText,
               {
-                color: hasInput && !exceeds ? c.bg : c.textMuted,
+                color: hasInput && !exceeds ? c.onColor : c.textMuted,
               },
             ]}
           >
@@ -514,7 +514,7 @@ export default function BuyScreen() {
           <Feather
             name="arrow-right"
             size={16}
-            color={hasInput && !exceeds ? c.bg : c.textMuted}
+            color={hasInput && !exceeds ? c.onColor : c.textMuted}
           />
         </Tap>
       </View>

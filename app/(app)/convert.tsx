@@ -364,13 +364,16 @@ export default function ConvertScreen() {
         <Pressable
           style={[
             s.cta,
-            { backgroundColor: canConfirm ? c.ink : c.surfaceHover },
+            { backgroundColor: canConfirm ? c.brand : c.surfaceHover },
           ]}
           onPress={onConfirm}
           disabled={!canConfirm}
         >
           <Text
-            style={[s.ctaText, { color: canConfirm ? c.bg : c.textMuted }]}
+            style={[
+              s.ctaText,
+              { color: canConfirm ? c.onColor : c.textMuted },
+            ]}
           >
             Revisar conversión
           </Text>

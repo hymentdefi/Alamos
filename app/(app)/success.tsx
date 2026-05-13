@@ -358,10 +358,12 @@ export default function SuccessScreen() {
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <Pressable
-          style={[s.cta, { backgroundColor: c.ink }]}
+          style={[s.cta, { backgroundColor: c.brand }]}
           onPress={() => router.replace("/(app)")}
         >
-          <Text style={[s.ctaText, { color: c.bg }]}>Volver al inicio</Text>
+          <Text style={[s.ctaText, { color: c.onColor }]}>
+            Volver al inicio
+          </Text>
         </Pressable>
 
         {/* Compartir comprobante — link editorial sin chrome, alineado

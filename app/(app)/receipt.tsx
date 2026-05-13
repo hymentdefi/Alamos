@@ -231,10 +231,10 @@ export default function ReceiptScreen() {
         <View style={s.actionWrap}>
           <Pressable
             onPress={onShare}
-            style={[s.shareBtn, { backgroundColor: c.text }]}
+            style={[s.shareBtn, { backgroundColor: c.brand }]}
           >
-            <AlamosIcon name="upload" size={16} color={c.bg} />
-            <Text style={[s.shareBtnText, { color: c.bg }]}>
+            <AlamosIcon name="upload" size={16} color={c.onColor} />
+            <Text style={[s.shareBtnText, { color: c.onColor }]}>
               Compartir comprobante
             </Text>
           </Pressable>
