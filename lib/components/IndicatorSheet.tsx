@@ -53,9 +53,9 @@ import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllu
  *
  *   Paso 2 — Config (rediseño): hero rect con bg oscuro + ilustración,
  *            statement centrado dinámico, dos secciones (Señal /
- *            Ejecución) sin card containers, controles binarios
- *            (outline brand inactive / filled brand active), CTA con
- *            ícono de campana abajo.
+ *            Ejecución) sin card containers, chips y segmented
+ *            outline-only (outline gray inactive / outline brand
+ *            active, match design system), CTA con ícono de campana.
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
@@ -844,7 +844,7 @@ function SignalSection({
           />
           <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <ContinuousSegmented
+            <Segmented
               options={[
                 {
                   value: "above",
@@ -913,7 +913,7 @@ function SignalSection({
           />
           <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <ContinuousSegmented
+            <Segmented
               options={[
                 {
                   value: "above",
@@ -1003,7 +1003,7 @@ function SignalSection({
           />
           <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <ContinuousSegmented
+            <Segmented
               options={[
                 {
                   value: "bullish_signal",
@@ -1080,7 +1080,7 @@ function SignalSection({
           />
           <Separator c={c} />
           <ParamRow label="Condición" c={c}>
-            <ContinuousSegmented
+            <Segmented
               options={[
                 {
                   value: "touch_upper",
@@ -1170,7 +1170,7 @@ function ExecutionSection({
         Ejecución
       </Text>
       <ParamRow label="Frecuencia" c={c}>
-        <ContinuousSegmented
+        <Segmented
           options={[
             { value: "once", label: "Solo una vez" },
             { value: "always", label: "Cada vez" },
@@ -1262,14 +1262,15 @@ function Separator({ c }: { c: ColorMap }) {
 
 /* ─── Controles ─────────────────────────────────────────────── */
 
-/** Chip individual — dos estados binarios:
+/** Chip individual — outline-only, dos estados:
  *
- *  Inactive: bg transparent + border c.brand 1.5 + text c.brand.
- *  Active:   bg c.brand sólido + text c.onColor (theme-aware).
+ *  Inactive: bg transparent + border c.border + text c.textMuted.
+ *  Active:   bg transparent + border c.brand + text c.brand.
  *
- *  Sin tint fills, sin gray outline. Es el lenguaje de la
- *  selección que el rediseño quiere — toda la UI vive en el verde
- *  de marca, no hay neutros para los chips. */
+ *  Sin fills. Convención del design system (alamos-design SKILL.md
+ *  categorías B/C): outline gray para disponible, outline brand para
+ *  seleccionado. Mismo lenguaje que el resto de chips/segmented de
+ *  la app (PR #205/#207/#208). */
 function Chip({
   active,
   label,
@@ -1290,8 +1291,8 @@ function Chip({
       style={({ pressed }) => [
         s.chip,
         {
-          backgroundColor: active ? c.brand : "transparent",
-          borderColor: c.brand,
+          backgroundColor: "transparent",
+          borderColor: active ? c.brand : c.border,
           opacity: pressed ? 0.7 : 1,
         },
       ]}
@@ -1299,7 +1300,7 @@ function Chip({
       <Text
         style={[
           s.chipText,
-          { color: active ? c.onColor : c.brand },
+          { color: active ? c.brand : c.textMuted },
         ]}
       >
         {label}
@@ -1342,12 +1343,11 @@ function ChipsRow<T extends number | string>({
   );
 }
 
-/** Continuous segmented control — un solo container con border
- *  c.brand. Cada option toma flex 1 sin gap. Active: bg c.brand +
- *  text c.onColor. Inactive: bg transparent + text c.brand. Sin
- *  separadores verticales entre options para que el fill se sienta
- *  como un toggle continuo (Robinhood-style). */
-function ContinuousSegmented<T extends string>({
+/** Segmented control — dos (o más) chips outline lado a lado con
+ *  gap entre items. Sin container chrome. Misma convención de
+ *  colores que Chip (outline gray inactive / outline brand active).
+ *  Soporta ícono opcional a la izquierda del label. */
+function Segmented<T extends string>({
   options,
   active,
   onChange,
@@ -1359,7 +1359,7 @@ function ContinuousSegmented<T extends string>({
   c: ColorMap;
 }) {
   return (
-    <View style={[s.continuousSegmented, { borderColor: c.brand }]}>
+    <View style={s.segmented}>
       {options.map((opt) => {
         const isActive = active === opt.value;
         return (
@@ -1370,10 +1370,11 @@ function ContinuousSegmented<T extends string>({
               onChange(opt.value);
             }}
             style={({ pressed }) => [
-              s.continuousSegmentedItem,
+              s.segmentedItem,
               {
-                backgroundColor: isActive ? c.brand : "transparent",
-                opacity: pressed && !isActive ? 0.7 : 1,
+                backgroundColor: "transparent",
+                borderColor: isActive ? c.brand : c.border,
+                opacity: pressed ? 0.7 : 1,
               },
             ]}
           >
@@ -1381,14 +1382,17 @@ function ContinuousSegmented<T extends string>({
               <Feather
                 name={opt.icon}
                 size={14}
-                color={isActive ? c.onColor : c.brand}
+                color={isActive ? c.brand : c.textMuted}
                 style={{ marginRight: 6 }}
               />
             ) : null}
             <Text
               style={[
-                s.continuousSegmentedText,
-                { color: isActive ? c.onColor : c.brand },
+                s.segmentedText,
+                {
+                  color: isActive ? c.brand : c.textMuted,
+                  fontFamily: isActive ? fontFamily[700] : fontFamily[600],
+                },
               ]}
               numberOfLines={1}
             >
@@ -1810,10 +1814,10 @@ const s = StyleSheet.create({
     marginLeft: 8,
   },
 
-  /* ── Chips (binarios) ──
-   * Inactive: outline c.brand 1.5 + text c.brand.
-   * Active:   fill c.brand + text c.onColor (theme-aware).
-   * Pill radius, padding 14h / 8v para feel compacto sin perder
+  /* ── Chips (outline-only) ──
+   * Inactive: border c.border + text c.textMuted.
+   * Active:   border c.brand + text c.brand.
+   * Pill radius, padding 14h / 7v para feel compacto sin perder
    * tap target. */
   chip: {
     paddingHorizontal: 14,
@@ -1837,28 +1841,28 @@ const s = StyleSheet.create({
     gap: 8,
   },
 
-  /* ── Continuous segmented ──
-   * Un solo container con border c.brand. Cada item flex 1 sin gap.
-   * Active item bg c.brand bleed-to-edge (overflow hidden en
-   * container para que respete corners). Radius 10 según spec. */
-  continuousSegmented: {
+  /* ── Segmented (outline-only) ──
+   * Dos (o más) chips outline lado a lado con gap entre items.
+   * Sin container chrome. Cada item lleva su propio border:
+   * c.brand si active, c.border si inactive. Pill radius para
+   * matchear el lenguaje del resto de chips. */
+  segmented: {
     flexDirection: "row",
-    borderCurve: "continuous",
-    borderRadius: 10,
-    borderWidth: 1.5,
-    overflow: "hidden",
+    gap: 8,
   },
-  continuousSegmentedItem: {
+  segmentedItem: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
   },
-  continuousSegmentedText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
+  segmentedText: {
+    fontSize: 14,
     letterSpacing: -0.1,
   },
 
