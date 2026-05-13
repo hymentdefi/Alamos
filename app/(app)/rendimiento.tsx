@@ -347,6 +347,34 @@ export default function RendimientoScreen() {
             toDisplay={toDisplay}
           />
 
+          {/* CTA "Proyección de tu portfolio" — entry point al
+              Monte Carlo (/proyeccion). Outlined card brand-tinted,
+              estilo del Tier 1 bento (mismo hairline + radius).
+              "Proyección" es el label retail per spec 5.5 — nunca
+              decimos "Monte Carlo" en la UI. */}
+          <Tap
+            onPress={() => router.push("/proyeccion" as never)}
+            haptic="selection"
+            pressScale={0.97}
+            style={[s.advCard, { borderColor: c.border }]}
+          >
+            <View style={s.advLeft}>
+              <View style={s.advIconWrap}>
+                <Feather name="trending-up" size={18} color={c.brand} />
+              </View>
+              <View style={s.advTextWrap}>
+                <Text style={[s.advTitle, { color: c.text }]}>
+                  Proyección de tu portfolio
+                </Text>
+                <Text style={[s.advSub, { color: c.textMuted }]}>
+                  Simulamos miles de escenarios posibles para estimar
+                  cómo podría crecer tu inversión.
+                </Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={20} color={c.textMuted} />
+          </Tap>
+
           {/* Cobros — dividendos, cupones y amortizaciones del
               portfolio. Calendario forward + breakdown del año
               proyectado. Lo que ningún ALyC AR muestra bien. */}
@@ -468,6 +496,52 @@ const s = StyleSheet.create({
   },
 
   /* Cards */
+  /* ─── CTA "Proyección de tu portfolio" ─── */
+  advCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginHorizontal: 24,
+    marginTop: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderCurve: "continuous",
+    borderRadius: radius.lg,
+  },
+  advLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  advIconWrap: {
+    width: 36,
+    height: 36,
+    borderCurve: "continuous",
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,200,5,0.12)",
+  },
+  advTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  advTitle: {
+    fontFamily: fontFamily[700],
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  advSub: {
+    fontFamily: fontFamily[500],
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.05,
+    marginTop: 2,
+  },
+
   disclaimer: {
     marginTop: 24,
     marginHorizontal: 20,

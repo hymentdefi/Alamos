@@ -105,6 +105,12 @@ export default function AppLayout() {
           name="estadisticas"
           options={{ fullScreenGestureEnabled: false }}
         />
+        {/* Proyección (Monte Carlo): fan chart + horizon pills.
+            Misma protección que el resto. */}
+        <Stack.Screen
+          name="proyeccion"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         {/* Asset alerts — pantalla full-screen con la lista de
             alertas custom del activo. Slide_from_bottom para
             que se sienta deep-dive. */}
