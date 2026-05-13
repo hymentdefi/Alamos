@@ -347,11 +347,11 @@ export default function RendimientoScreen() {
             toDisplay={toDisplay}
           />
 
-          {/* CTA "Proyección de tu portfolio" — entry point al
-              Monte Carlo (/proyeccion). Outlined card brand-tinted,
-              estilo del Tier 1 bento (mismo hairline + radius).
-              "Proyección" es el label retail per spec 5.5 — nunca
-              decimos "Monte Carlo" en la UI. */}
+          {/* CTAs Fase 3: "Proyección de tu portfolio" (Monte Carlo)
+              + "ADN de tu portfolio" (Factor Exposure). Outlined
+              cards brand-tinted icon, estilo del Tier 1 bento.
+              Labels retail per spec 5.5 + 6.4 — nunca decimos
+              "Monte Carlo" o "Factor Exposure" en la UI. */}
           <Tap
             onPress={() => router.push("/proyeccion" as never)}
             haptic="selection"
@@ -369,6 +369,29 @@ export default function RendimientoScreen() {
                 <Text style={[s.advSub, { color: c.textMuted }]}>
                   Simulamos miles de escenarios posibles para estimar
                   cómo podría crecer tu inversión.
+                </Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={20} color={c.textMuted} />
+          </Tap>
+
+          <Tap
+            onPress={() => router.push("/adn" as never)}
+            haptic="selection"
+            pressScale={0.97}
+            style={[s.advCard, { borderColor: c.border }]}
+          >
+            <View style={s.advLeft}>
+              <View style={s.advIconWrap}>
+                <Feather name="activity" size={18} color={c.brand} />
+              </View>
+              <View style={s.advTextWrap}>
+                <Text style={[s.advTitle, { color: c.text }]}>
+                  ADN de tu portfolio
+                </Text>
+                <Text style={[s.advSub, { color: c.textMuted }]}>
+                  Analizamos las características principales de tus
+                  inversiones según seis factores académicos.
                 </Text>
               </View>
             </View>

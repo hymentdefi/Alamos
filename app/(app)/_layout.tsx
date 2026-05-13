@@ -111,6 +111,12 @@ export default function AppLayout() {
           name="proyeccion"
           options={{ fullScreenGestureEnabled: false }}
         />
+        {/* ADN (Factor Exposure): barras horizontales 0-100 con
+            marker de benchmark. Misma protección. */}
+        <Stack.Screen
+          name="adn"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         {/* Asset alerts — pantalla full-screen con la lista de
             alertas custom del activo. Slide_from_bottom para
             que se sienta deep-dive. */}
