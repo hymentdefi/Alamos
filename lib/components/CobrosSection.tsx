@@ -416,15 +416,15 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: fontFamily[700],
-    fontSize: 48,
-    letterSpacing: -2,
+    fontSize: 32,
+    letterSpacing: -1,
   },
   sectionInfoDot: {
     width: 28,
     height: 28,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 6, // alinea óptico con el corte del título display
+    marginTop: 2, // pequeño offset óptico para alinear con la x-height
   },
 
   /* Card container — mismo lenguaje que rendimiento.tsx (s.card). */
