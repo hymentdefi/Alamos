@@ -120,7 +120,7 @@ function Bar({
  *      lo cobrado este año + bar chart de 12 meses (paid en brand,
  *      upcoming en border).
  *   2. Próximo cobro — destaca el siguiente evento con countdown.
- *   3. Cronograma — los próximos 5 eventos + "Ver el año completo"
+ *   3. Cronograma — los próximos 5 eventos + "Ver el calendario completo"
  *      → navega al calendario anual estilo Apple Calendar (/cobros).
  *
  * Los totales agregan a ARS via `convertAmount`. Las filas individuales
@@ -444,7 +444,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
                 style={[s.seeMore, { borderTopColor: c.border }]}
               >
                 <Text style={[s.seeMoreText, { color: c.brand }]}>
-                  Ver el año completo
+                  Ver el calendario completo
                 </Text>
                 <Feather
                   name="chevron-right"

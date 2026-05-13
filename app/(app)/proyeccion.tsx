@@ -374,14 +374,13 @@ const s = StyleSheet.create({
     letterSpacing: -1,
     paddingHorizontal: 24,
     marginTop: 4,
+    marginBottom: 6,
   },
   /* Hero Robinhood-style: AmountDisplay (balance pattern) en brand,
-   * label muted abajo. marginTop 20 compensa el subtítulo que
-   * sacamos — la descripción de la pantalla ya la tiene el user en
-   * el sectionLink de Rendimiento. */
+   * label muted abajo. Gap título→monto tight (igual al patrón de
+   * Portfolio tab donde heroTitle.marginBottom = 6). */
   hero: {
     paddingHorizontal: 24,
-    marginTop: 20,
     marginBottom: 20,
   },
   heroLabel: {
