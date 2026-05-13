@@ -69,9 +69,8 @@ export function AiCommentaryCard({
             stamps gritados ni emojis. La oración legal vive al final
             para cumplir compliance. */}
         <Text style={[s.disclaimer, { color: c.textFaint }]}>
-          Análisis informativo potenciado por Inteligencia Artificial
-          para que tomes mejores decisiones. No constituye
-          recomendación de inversión.
+          Análisis informativo potenciado por Inteligencia Artificial.
+          No constituye recomendación de inversión.
         </Text>
       </View>
     </View>
