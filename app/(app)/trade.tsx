@@ -173,7 +173,6 @@ export default function TradeScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={scrubIdx == null}
       >
         {/* ── Price header ── */}
         <View style={s.priceBlock}>

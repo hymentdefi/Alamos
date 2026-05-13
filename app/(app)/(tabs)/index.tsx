@@ -385,7 +385,6 @@ function BaseHome() {
         ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={scrubIndex == null}
         onScroll={onScroll}
         scrollEventThrottle={32}
         refreshControl={
