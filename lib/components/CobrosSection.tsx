@@ -232,7 +232,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           pressScale={0.97}
           hitSlop={8}
         >
-          <Text style={[s.sectionTitle, { color: c.text }]}>
+          <Text style={[s.sectionTitle, { color: c.brand }]}>
             Flujos del año
           </Text>
         </Tap>
@@ -490,9 +490,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
                     accent: true,
                   },
                 ] as const
-              )
-                .filter((row) => row.value > 0)
-                .map((row, i, arr) => (
+              ).map((row, i, arr) => (
                   <Tap
                     key={row.key}
                     onPress={() => setOpenStat(row.key)}

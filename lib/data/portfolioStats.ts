@@ -676,7 +676,7 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
   dividendos: {
     title: "¿Qué son los dividendos?",
     technicalName: "Stock Dividends",
-    body: "Pagos en efectivo que distribuyen las empresas a sus accionistas (vía acciones directas o CEDEARs) cuando el directorio los aprueba. No son fechas fijas: dependen de la política de la empresa y de sus resultados.",
+    body: "Pagos en efectivo que las empresas distribuyen a sus accionistas cuando el directorio los aprueba. Los recibís si tenés acciones argentinas, acciones estadounidenses o CEDEARs que las replican. Las fechas y montos dependen de la política de cada empresa.",
   },
   amortizaciones: {
     title: "¿Qué son las amortizaciones?",

@@ -173,7 +173,7 @@ export function Tier1StatsBento({
 
   return (
     <View style={s.bentoCard}>
-      <Text style={[s.bentoTitle, { color: c.text }]}>Estadísticas</Text>
+      <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
       {/* Lista vertical Robinhood-style: label muted izquierda,
           valor bold derecha + sub-texto debajo, hairline entre rows.
           Sin grid, sin cards, sin chrome — la jerarquía sale de la
