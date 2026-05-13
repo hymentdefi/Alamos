@@ -205,14 +205,16 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           pressScale={0.97}
           hitSlop={8}
         >
-          <Text style={[s.sectionTitle, { color: c.brand }]}>Cobros</Text>
+          <Text style={[s.sectionTitle, { color: c.brand }]}>
+            Flujos del año
+          </Text>
         </Tap>
         <Tap
           onPress={() => setInfoOpen(true)}
           haptic="selection"
           hitSlop={12}
           style={s.sectionInfoDot}
-          accessibilityLabel="Qué son los cobros"
+          accessibilityLabel="Qué son los flujos del año"
         >
           <Feather name="info" size={15} color={c.brand} />
         </Tap>
@@ -422,6 +424,54 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </View>
           ) : null}
 
+          {/* ─── Card 4: Por tipo — desglose de los flujos cobrados
+              YTD en cupones / dividendos / amortizaciones. Dot
+              colorado a la izquierda de cada label, totales del
+              año a la derecha. */}
+          {ytdPaid.totalArs > 0 ? (
+            <View style={s.card}>
+              <Text style={[s.eyebrow, { color: c.text }]}>
+                Por tipo
+              </Text>
+              {(["cupon", "dividendo", "amortizacion"] as const)
+                .filter((t) => ytdPaid.byType[t] > 0)
+                .map((t, i, arr) => (
+                  <View
+                    key={t}
+                    style={[
+                      s.tipoRow,
+                      i < arr.length - 1 && {
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: c.border,
+                      },
+                    ]}
+                  >
+                    <View style={s.tipoLeft}>
+                      <View
+                        style={[
+                          s.tipoDot,
+                          { backgroundColor: TYPE_COLORS[t] },
+                        ]}
+                      />
+                      <Text
+                        style={[s.tipoLabel, { color: c.text }]}
+                      >
+                        {payoutTypeLabel(t, true)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[s.tipoAmount, { color: c.text }]}
+                      numberOfLines={1}
+                    >
+                      {formatMoney(
+                        toDisplay(ytdPaid.byType[t]),
+                        currency,
+                      )}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          ) : null}
         </>
       ) : (
         /* ─── Mes seleccionado: detalle de los eventos que arman el
@@ -496,6 +546,16 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
 }
 
 const BAR_MAX_H = 84;
+
+/* Tres shades de brand para los dots del breakdown "Por tipo": el
+ * vivido para cupones (típicamente el contributor más grande), mint
+ * para dividendos, deep para amortizaciones. Hex fijos porque es
+ * paleta de chart, mismo criterio que el resto del proyecto. */
+const TYPE_COLORS: Record<"cupon" | "dividendo" | "amortizacion", string> = {
+  cupon: "#00C805",
+  dividendo: "#5AC53A",
+  amortizacion: "#00B864",
+};
 
 const s = StyleSheet.create({
   /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
@@ -664,6 +724,37 @@ const s = StyleSheet.create({
     marginTop: 1,
   },
   cronoAmount: {
+    fontFamily: fontFamily[700],
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+
+  /* ─── Por tipo (cupones / dividendos / amortizaciones) ─── */
+  tipoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    gap: 12,
+  },
+  tipoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  tipoDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  tipoLabel: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.1,
+  },
+  tipoAmount: {
     fontFamily: fontFamily[700],
     fontSize: 14,
     letterSpacing: -0.2,
