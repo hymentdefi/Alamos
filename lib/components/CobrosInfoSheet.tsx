@@ -165,9 +165,9 @@ export function CobrosInfoSheet({ visible, onClose }: Props) {
               <Text style={[s.bodyBold, { color: c.text }]}>
                 dividendos
               </Text>{" "}
-              cuando la empresa los aprueba.
-              {"\n\n"}
-              Acá ves cuándo y cuánto vas a cobrar este año.
+              cuando la empresa los aprueba. Te mostramos cuándo y
+              cuánto vas a cobrar este año, todo sumado en pesos
+              (los flujos en dólares se convierten al oficial vendedor).
             </Text>
           </View>
         </Animated.View>
