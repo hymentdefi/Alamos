@@ -226,24 +226,29 @@ export function CobrosCalendarIllustration({
             />
           ))}
 
-          {/* Header band divider — separa el "month name" area del
-              grid. Sobre la front layer únicamente. También en
-              brand para mantener coherencia con el outer border. */}
+          {/* Header band — fill brand sobre la parte de arriba del
+              front layer. Path con rounded top corners + flat bottom
+              (matchea el rx=13 de la card). Estilo Apple Calendar /
+              Robinhood: header colored + body white. */}
           <Path
-            d={`M${CARD_X} ${GRID_Y} H${CARD_X + CARD_W}`}
-            stroke={BRAND_GREEN}
-            strokeWidth={2.4}
+            d={`M${CARD_X + 13} ${CARD_Y}
+               H${CARD_X + CARD_W - 13}
+               A 13 13 0 0 1 ${CARD_X + CARD_W} ${CARD_Y + 13}
+               V${GRID_Y}
+               H${CARD_X}
+               V${CARD_Y + 13}
+               A 13 13 0 0 1 ${CARD_X + 13} ${CARD_Y} Z`}
+            fill={BRAND_GREEN}
           />
 
-          {/* Header punch dots — 2 pequeños circles negros simulando
-              las perforaciones de un calendar de pared. Pequeño
-              detalle de carácter. */}
-          <Circle cx={CARD_X + 26} cy={CARD_Y + 11} r={2.5} fill={STROKE_INK} />
+          {/* Header punch dots — perforaciones de un calendar de
+              pared. En blanco para contrastar contra el band brand. */}
+          <Circle cx={CARD_X + 26} cy={CARD_Y + 11} r={2.5} fill="#FFFFFF" />
           <Circle
             cx={CARD_X + CARD_W - 26}
             cy={CARD_Y + 11}
             r={2.5}
-            fill={STROKE_INK}
+            fill="#FFFFFF"
           />
 
           {/* Grid lines — 3 horizontales + 2 verticales dividiendo
