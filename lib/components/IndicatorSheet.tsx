@@ -554,6 +554,19 @@ export function IndicatorSheet({
                     </Animated.View>
                   ) : null}
 
+                  {/* Separator sutil entre el statement de arriba y
+                      los controles de abajo. Ayuda a leer el
+                      statement como "header" y los controles como
+                      el formulario propiamente dicho. */}
+                  {selectedType ? (
+                    <View
+                      style={[
+                        s.statementSeparator,
+                        { backgroundColor: c.border },
+                      ]}
+                    />
+                  ) : null}
+
                   {selectedType ? (
                     <Animated.View
                       entering={
@@ -696,7 +709,7 @@ function PreviewSentence({
 }) {
   const segments = previewSegments(type, ticker, config);
   return (
-    <Text style={[s.statementSentence, { color: c.textSecondary }]}>
+    <Text style={[s.statementSentence, { color: c.text }]}>
       {segments.map((seg, i) => (
         <FlashSegment
           key={`${type}-${i}`}
@@ -742,7 +755,9 @@ function FlashSegment({
   }));
 
   if (!highlight) {
-    return <Text style={{ color: c.textSecondary }}>{text}</Text>;
+    /* Sin override de color/weight — hereda c.text + fontFamily[400]
+     * del statementSentence padre. */
+    return <Text>{text}</Text>;
   }
   return (
     <Animated.Text
@@ -1768,28 +1783,37 @@ const s = StyleSheet.create({
   },
 
   /* ── Statement ──
-   * Centered, eyebrow 12 + sentence 15 en c.textSecondary con
-   * tokens en c.brand 500 weight. Un padding vertical generoso para
-   * que respire entre el hero y la sección Señal. */
+   * Left-aligned, eyebrow 12px en c.textSecondary + sentence 18px
+   * en c.text (primario, blanco en dark mode) weight 400, con
+   * tokens dinámicos en c.brand weight 500 (heredado de
+   * FlashSegment). Padding horizontal 16 alineado con la sección
+   * de controles abajo. */
   statementBlock: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 14,
-    alignItems: "center",
   },
   statementEyebrow: {
     fontFamily: fontFamily[500],
     fontSize: 12,
     letterSpacing: -0.1,
     marginBottom: 6,
-    textAlign: "center",
   },
   statementSentence: {
-    fontFamily: fontFamily[500],
-    fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: -0.15,
-    textAlign: "center",
+    fontFamily: fontFamily[400],
+    fontSize: 18,
+    lineHeight: 26 /* 1.45 × 18, según spec */,
+    letterSpacing: -0.2,
+  },
+  /* Separator sutil entre el statement y los controles. Mismo
+   * lenguaje que el Separator interno de las ParamRows, con
+   * marginHorizontal 16 para alinear con statementBlock y
+   * section. */
+  statementSeparator: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
   },
 
   /* ── Section (sin card chrome) ──
