@@ -709,7 +709,18 @@ function PreviewSentence({
 }) {
   const segments = previewSegments(type, ticker, config);
   return (
-    <Text style={[s.statementSentence, { color: c.text }]}>
+    <Text
+      style={[s.statementSentence, { color: c.text }]}
+      /* Safety net: si una combinación extrema (e.g. Bollinger
+       * período 100 + desv 2.5σ + ticker largo BTC/USDT) empuja
+       * la frase a 3 líneas, RN shrinkea el font hasta entrar en
+       * 2. Min scale 0.9 = ~14.4px piso, todavía legible. Para
+       * presets standard nunca dispara, todo renderea a 16px
+       * uniforme. */
+      numberOfLines={2}
+      adjustsFontSizeToFit
+      minimumFontScale={0.9}
+    >
       {segments.map((seg, i) => (
         <FlashSegment
           key={`${type}-${i}`}
@@ -1560,16 +1571,18 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
 }
 
 /** Genera los segmentos del preview — partes en c.brand (highlight)
- *  vs partes en c.text (neutral). Estructura compacta para entrar
- *  siempre en 2 líneas. Único toque educativo: el "(sobrecompra)"
- *  / "(sobreventa)" en RSI, que ayuda a leer la frase sin costar
- *  mucho espacio. */
+ *  vs partes en c.text (neutral). Estructura compacta + "velas de
+ *  TF" para que el user que recibe la push sepa la temporalidad.
+ *  Único bit educativo extra: "(sobrecompra)/(sobreventa)" en RSI. */
 function previewSegments(
   type: IndicatorType,
   ticker: string,
   cfg: ConfigState,
 ): { text: string; highlight: boolean }[] {
-  const tf = cfg.timeframe;
+  /* "velas de TF" — descripción de la temporalidad común a todos
+   * los indicadores. Sin esto el "en 1D" final del statement era
+   * críptico para usuarios menos técnicos. */
+  const tfDesc = `velas de ${cfg.timeframe}`;
   const T = (text: string, highlight = false) => ({ text, highlight });
   if (type === "ma") {
     const v = cfg.maVariant.toUpperCase();
@@ -1583,16 +1596,15 @@ function previewSegments(
       T(` ${dir} de la `),
       T(`${v}(${cfg.maPeriod})`, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
   if (type === "rsi") {
     const above = cfg.rsiCondition === "above";
     const dir = above ? "suba por encima" : "baje por debajo";
-    /* "(sobrecompra)" / "(sobreventa)" — único bit educativo que
-     * se mantiene de la versión expandida. Cuesta ~12 chars pero
-     * el user no tiene que recordar qué significa 70 vs 30. */
+    /* "(sobrecompra)" / "(sobreventa)" — bit educativo: el user
+     * no tiene que recordar qué significa 70 vs 30. */
     const zone = above ? "sobrecompra" : "sobreventa";
     return [
       T("El "),
@@ -1602,7 +1614,7 @@ function previewSegments(
       T(` ${dir} de `),
       T(`${cfg.rsiThreshold} (${zone})`, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
@@ -1623,7 +1635,7 @@ function previewSegments(
         T(" cruce al "),
         T(dir, true),
         T(" la línea cero en "),
-        T(tf, true),
+        T(tfDesc, true),
         T("."),
       ];
     }
@@ -1636,14 +1648,13 @@ function previewSegments(
       T(" cruce a la "),
       T(dir, true),
       T(" la línea de señal en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
   if (type === "bollinger") {
-    /* Notación compacta: "Bollinger(20, 2σ)" sin "períodos" ni
-     * espacio antes del paren. fmtDecimalChip omite ".0" en
-     * enteros, así "2" lee "2σ" en vez de "2,0σ". */
+    /* Notación compacta: "Bollinger(20, 2σ)". fmtDecimalChip omite
+     * ".0" en enteros, así "2" lee "2σ" en vez de "2,0σ". */
     const formula = `Bollinger(${cfg.bbPeriod}, ${fmtDecimalChip(cfg.bbDeviation)}σ)`;
     if (cfg.bbCondition === "squeeze") {
       return [
@@ -1652,7 +1663,7 @@ function previewSegments(
         T(" de "),
         T(ticker, true),
         T(" se contraigan en "),
-        T(tf, true),
+        T(tfDesc, true),
         T("."),
       ];
     }
@@ -1665,7 +1676,7 @@ function previewSegments(
       T(" de "),
       T(formula, true),
       T(" en "),
-      T(tf, true),
+      T(tfDesc, true),
       T("."),
     ];
   }
@@ -1679,7 +1690,7 @@ function previewSegments(
      * otros timeframes (1H, 4H) "días" sería incorrecto. */
     T(`${cfg.volumeAvgPeriod} períodos`, true),
     T(" en "),
-    T(tf, true),
+    T(tfDesc, true),
     T("."),
   ];
 }
@@ -1810,12 +1821,14 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 17/25 (line-height 1.47) en vez de 18/26: el extra de
-     * caracteres por línea garantiza que TODAS las frases entren
-     * en 2 líneas — Bollinger y MACD bearish con notación
-     * compacta rozan los 72 chars y a 18px caían en 3 líneas. */
-    fontSize: 17,
-    lineHeight: 25,
+    /* 16/23 (line-height 1.44) para que las frases con "en velas
+     * de TF" entren siempre en 2 líneas. Bollinger con presets
+     * máximos roza los 84 chars; a 16px caben ~42 chars/línea →
+     * ~84 chars/2 líneas exactos, con safety net de
+     * adjustsFontSizeToFit + minimumFontScale 0.9 en el outer
+     * Text por si una combinación extrema empuja una línea más. */
+    fontSize: 16,
+    lineHeight: 23,
     letterSpacing: -0.2,
   },
   /* Separator sutil entre el statement y los controles. Mismo
