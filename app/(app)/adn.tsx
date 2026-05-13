@@ -11,7 +11,6 @@ import {
   factorTiltLabel,
   FACTOR_EXPLANATIONS,
   FACTOR_LABELS,
-  FACTOR_TECHNICAL,
   type FactorKey,
 } from "../../lib/data/portfolioStats";
 
@@ -76,6 +75,7 @@ export default function AdnScreen() {
               key={key}
               factorKey={key}
               score={scores[key]}
+              isFirst={i === 0}
               isLast={i === FACTORS_ORDER.length - 1}
               c={c}
             />
@@ -99,11 +99,13 @@ export default function AdnScreen() {
 function FactorRow({
   factorKey,
   score,
+  isFirst,
   isLast,
   c,
 }: {
   factorKey: FactorKey;
   score: number;
+  isFirst: boolean;
   isLast: boolean;
   c: ReturnType<typeof useTheme>["c"];
 }) {
@@ -123,6 +125,7 @@ function FactorRow({
     <View
       style={[
         s.factorRow,
+        isFirst && { paddingTop: 0 },
         !isLast && {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: c.border,
@@ -133,9 +136,6 @@ function FactorRow({
         <View style={s.factorLabelWrap}>
           <Text style={[s.factorLabel, { color: c.text }]}>
             {FACTOR_LABELS[factorKey]}
-          </Text>
-          <Text style={[s.factorTech, { color: c.textMuted }]}>
-            {FACTOR_TECHNICAL[factorKey]}
           </Text>
         </View>
         <Text
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
     letterSpacing: -1,
     paddingHorizontal: 24,
     marginTop: 4,
-    marginBottom: 20,
+    marginBottom: 6,
   },
 
   factorsWrap: {
@@ -227,13 +227,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[700],
     fontSize: 15,
     letterSpacing: -0.2,
-  },
-  factorTech: {
-    fontFamily: fontFamily[600],
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginTop: 2,
   },
   factorScore: {
     fontFamily: fontFamily[800],
