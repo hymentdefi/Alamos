@@ -1821,14 +1821,16 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 16/23 (line-height 1.44) para que las frases con "en velas
-     * de TF" entren siempre en 2 líneas. Bollinger con presets
-     * máximos roza los 84 chars; a 16px caben ~42 chars/línea →
-     * ~84 chars/2 líneas exactos, con safety net de
-     * adjustsFontSizeToFit + minimumFontScale 0.9 en el outer
-     * Text por si una combinación extrema empuja una línea más. */
-    fontSize: 16,
-    lineHeight: 23,
+    /* 17/25 (line-height 1.47). La frase más larga posible del
+     * sistema es Bollinger con presets máximos + ticker largo
+     * (~85 chars). A 17px caben ~38 chars/línea, lo que pone esa
+     * frase al borde de 3 líneas — para ese caso extremo y solo
+     * ese, el safety net del PreviewSentence
+     * (adjustsFontSizeToFit + minimumFontScale 0.9) baja a ~15px
+     * para garantizar 2 líneas. Todos los presets standard
+     * renderean a 17px uniforme. */
+    fontSize: 17,
+    lineHeight: 25,
     letterSpacing: -0.2,
   },
   /* Separator sutil entre el statement y los controles. Mismo
