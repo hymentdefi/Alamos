@@ -347,23 +347,25 @@ export default function BuyScreen() {
           el contenido. */}
       <View style={s.modeRow}>
         <View
-          style={[
-            s.modeToggle,
-            { backgroundColor: c.surfaceHover, borderColor: c.border },
-          ]}
+          style={s.modeToggle}
         >
           <Tap
             onPress={() => switchInputMode("amount")}
             haptic="selection"
             style={[
               s.modeBtn,
-              inputMode === "amount" && { backgroundColor: c.ink },
+              {
+                borderColor:
+                  inputMode === "amount" ? c.brand : c.border,
+              },
             ]}
           >
             <Text
               style={[
                 s.modeBtnText,
-                { color: inputMode === "amount" ? c.bg : c.textSecondary },
+                {
+                  color: inputMode === "amount" ? c.brand : c.textMuted,
+                },
               ]}
             >
               {nativeCurrency === "ARS"
@@ -378,13 +380,18 @@ export default function BuyScreen() {
             haptic="selection"
             style={[
               s.modeBtn,
-              inputMode === "qty" && { backgroundColor: c.ink },
+              {
+                borderColor:
+                  inputMode === "qty" ? c.brand : c.border,
+              },
             ]}
           >
             <Text
               style={[
                 s.modeBtnText,
-                { color: inputMode === "qty" ? c.bg : c.textSecondary },
+                {
+                  color: inputMode === "qty" ? c.brand : c.textMuted,
+                },
               ]}
             >
               Cantidad en {unitWord}
@@ -571,17 +578,14 @@ const s = StyleSheet.create({
   },
   modeToggle: {
     flexDirection: "row",
-    borderWidth: 1,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    padding: 3,
-    gap: 2,
+    gap: 8,
   },
   modeBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
+    borderWidth: 1.5,
   },
   modeBtnText: {
     fontFamily: fontFamily[600],

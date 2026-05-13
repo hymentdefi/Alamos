@@ -382,19 +382,22 @@ export default function TradeScreen() {
 
         {/* ── Order form ── */}
         <View style={s.formBlock}>
-          {/* Buy/Sell toggle */}
-          <View style={[s.sideToggle, { backgroundColor: c.surfaceSunken }]}>
+          {/* Buy/Sell toggle — outline pattern. Direccional: buy verde
+              (c.brand) / sell naranja (c.red). Inactivo gris. */}
+          <View style={s.sideToggle}>
             <Pressable
               onPress={() => setSide("buy")}
               style={[
                 s.sideBtn,
-                side === "buy" && { backgroundColor: c.brand },
+                {
+                  borderColor: side === "buy" ? c.brand : c.border,
+                },
               ]}
             >
               <Text
                 style={[
                   s.sideBtnText,
-                  { color: side === "buy" ? c.onColor : c.textMuted },
+                  { color: side === "buy" ? c.brand : c.textMuted },
                 ]}
               >
                 Comprar / Long
@@ -404,13 +407,15 @@ export default function TradeScreen() {
               onPress={() => setSide("sell")}
               style={[
                 s.sideBtn,
-                side === "sell" && { backgroundColor: c.red },
+                {
+                  borderColor: side === "sell" ? c.red : c.border,
+                },
               ]}
             >
               <Text
                 style={[
                   s.sideBtnText,
-                  { color: side === "sell" ? c.onColor : c.textMuted },
+                  { color: side === "sell" ? c.red : c.textMuted },
                 ]}
               >
                 Vender / Short
@@ -462,19 +467,15 @@ export default function TradeScreen() {
                       style={[
                         s.levPill,
                         {
-                          backgroundColor: active
-                            ? c.brand
-                            : "transparent",
-                          borderColor: active
-                            ? c.brand
-                            : c.border,
+                          backgroundColor: "transparent",
+                          borderColor: active ? c.brand : c.border,
                         },
                       ]}
                     >
                       <Text
                         style={[
                           s.levPillText,
-                          { color: active ? c.onColor : c.textMuted },
+                          { color: active ? c.brand : c.textMuted },
                         ]}
                       >
                         {l}x
@@ -835,10 +836,7 @@ const s = StyleSheet.create({
   },
   sideToggle: {
     flexDirection: "row",
-    borderCurve: "continuous",
-    borderRadius: radius.sm,
-    padding: 3,
-    gap: 3,
+    gap: 8,
     marginBottom: 12,
   },
   sideBtn: {
@@ -846,7 +844,8 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
     borderCurve: "continuous",
-    borderRadius: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
   },
   sideBtnText: {
     fontFamily: fontFamily[700],

@@ -179,12 +179,12 @@ export function AppearanceSheet({ visible, onClose }: Props) {
                     s.radio,
                     {
                       borderColor: selected ? c.brand : c.border,
-                      backgroundColor: selected ? c.brand : "transparent",
+                      backgroundColor: "transparent",
                     },
                   ]}
                 >
                   {selected ? (
-                    <Feather name="check" size={14} color={c.bg} />
+                    <Feather name="check" size={14} color={c.brand} />
                   ) : null}
                 </View>
               </Pressable>
