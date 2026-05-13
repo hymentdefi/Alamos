@@ -99,14 +99,27 @@ function buildSeries(
   seed: string,
 ): number[] {
   const noise = seriesFromSeed(seed, length, "flat");
-  const noiseScale = end * 0.012;
+  const delta = end - start;
+  /* Cap el noise para que NUNCA tape el trend. Antes era end * 0.012
+   * (fijo); con deltas chicos como 1D (~1%) el ruido por punto
+   * superaba al trend y series[0] terminaba aleatoriamente arriba
+   * o abajo del start real → ganancia con signo random → chart en
+   * verde mientras matemáticamente era negativo. Ahora el ruido se
+   * limita a 30% de |delta|. */
+  const noiseScale = Math.min(
+    Math.abs(end) * 0.012,
+    Math.abs(delta) * 0.3,
+  );
   const out: number[] = [];
   for (let i = 0; i < length; i++) {
     const t = i / (length - 1);
-    const linear = start + (end - start) * t;
+    const linear = start + delta * t;
     const normalized = (noise[i] - 100) / 6;
     out.push(linear + normalized * noiseScale);
   }
+  /* Anchors fijos en ambos puntas. Sin esto, series[0] flotaba con
+   * el ruido y la diferencia con current quedaba contaminada. */
+  out[0] = start;
   out[length - 1] = end;
   return out;
 }
