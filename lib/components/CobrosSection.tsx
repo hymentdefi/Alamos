@@ -232,7 +232,7 @@ export function CobrosSection({ currency }: Props) {
           <>
             <Text style={[s.heroLabel, { color: c.textMuted }]}>
               {monthFullLabel(scrubBucket)}
-              {scrubBucket.paid ? "" : " · proyectado"}
+              {scrubBucket.paid ? "" : " proyectado"}
             </Text>
             <AmountDisplay
               value={toDisplay(scrubBucket.totalArs)}
