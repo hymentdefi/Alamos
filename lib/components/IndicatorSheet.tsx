@@ -37,6 +37,7 @@ import {
   type Timeframe,
 } from "../api/alerts";
 import { Stepper } from "./Stepper";
+import { Tap } from "./Tap";
 import { MAIndicatorIllustration } from "./illustrations/MAIndicatorIllustration";
 import { EMAIndicatorIllustration } from "./illustrations/EMAIndicatorIllustration";
 import { RSIIndicatorIllustration } from "./illustrations/RSIIndicatorIllustration";
@@ -55,7 +56,8 @@ import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllu
  *            statement centrado dinámico, dos secciones (Señal /
  *            Ejecución) sin card containers, chips y segmented
  *            outline-only (outline gray inactive / outline brand
- *            active, match design system), CTA con ícono de campana.
+ *            active, match design system), CTA pill brand idéntico
+ *            al de AlertSheet.
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
@@ -342,7 +344,15 @@ export function IndicatorSheet({
   const macdInvalid =
     selectedType === "macd" && config.macdEmaSlow <= config.macdEmaFast;
   const ctaEnabled = !!selectedType && !macdInvalid && !submitting;
-  const ctaLabel = isEditing ? "Guardar cambios" : "Crear alerta";
+  /* Etiqueta del CTA — mismo patrón que AlertSheet: durante el
+   * submit cambia a "Creando…" / "Guardando…" para feedback. */
+  const ctaLabel = submitting
+    ? isEditing
+      ? "Guardando…"
+      : "Creando…"
+    : isEditing
+      ? "Guardar cambios"
+      : "Crear alerta";
 
   return (
     <Modal
@@ -610,8 +620,9 @@ export function IndicatorSheet({
                   ) : null}
                 </ScrollView>
 
-                {/* CTA sticky abajo — verde brand sólido, radius 14,
-                    bell icon + texto. Sin chrome bar. */}
+                {/* CTA sticky abajo — mismo estilo que AlertSheet:
+                    pill brand, height 58, weight 800/17, sin icono.
+                    Tap con haptic medium para feedback al confirmar. */}
                 <Animated.View
                   entering={
                     isEditing
@@ -640,29 +651,23 @@ export function IndicatorSheet({
                       </Text>
                     </View>
                   ) : null}
-                  <Pressable
+                  <Tap
                     onPress={handleSubmit}
                     disabled={!ctaEnabled}
+                    haptic="medium"
                     accessibilityRole="button"
-                    style={({ pressed }) => [
+                    style={[
                       s.cta,
                       {
                         backgroundColor: c.brand,
-                        opacity: !ctaEnabled
-                          ? 0.5
-                          : pressed
-                            ? 0.85
-                            : submitting
-                              ? 0.7
-                              : 1,
+                        opacity: !ctaEnabled ? 0.5 : submitting ? 0.7 : 1,
                       },
                     ]}
                   >
-                    <Feather name="bell" size={18} color={c.onColor} />
                     <Text style={[s.ctaText, { color: c.onColor }]}>
                       {ctaLabel}
                     </Text>
-                  </Pressable>
+                  </Tap>
                 </Animated.View>
               </View>
             </Animated.View>
@@ -1904,20 +1909,18 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* ── CTA — radius 14 + bell icon ─ texto 16/500 ── */
+  /* ── CTA — match AlertSheet: pill height 58, weight 800/17 ── */
   cta: {
-    flexDirection: "row",
+    height: 58,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderCurve: "continuous",
-    borderRadius: 14,
+    marginTop: 8,
   },
   ctaText: {
-    fontFamily: fontFamily[500],
-    fontSize: 16,
+    fontFamily: fontFamily[800],
+    fontSize: 17,
     letterSpacing: -0.2,
   },
 });
