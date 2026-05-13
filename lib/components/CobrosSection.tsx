@@ -384,9 +384,13 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </View>
           ) : null}
 
-          {/* ─── Card 3: Cronograma — próximos eventos + ver más ─── */}
+          {/* ─── Card 3: Cronograma — próximos eventos + ver más ───
+              Override paddingBottom: 0 porque el seeMore link al pie
+              tiene su propio paddingVertical de 14pt — sin esto, el
+              gap entre Cronograma y Detalle quedaba 14pt más que el
+              gap entre Próximo cobro y Cronograma. */}
           {upcomingList.length > 1 ? (
-            <View style={s.card}>
+            <View style={[s.card, { paddingBottom: 0 }]}>
               <Text style={[s.eyebrow, { color: c.text }]}>
                 Cronograma
               </Text>
