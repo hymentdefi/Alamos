@@ -113,14 +113,13 @@ function Bar({
  * argentino es el calendario forward: no muestra solo lo que ya
  * cobraste, sino lo que viene.
  *
- * Cuatro cards en orden de jerarquía:
+ * Tres cards en orden de jerarquía:
  *   1. Hero — "Te queda por cobrar" en brand grande + sublabel con
  *      lo cobrado este año + bar chart de 12 meses (paid en brand,
  *      upcoming en border).
  *   2. Próximo cobro — destaca el siguiente evento con countdown.
  *   3. Cronograma — los próximos 5 eventos + "Ver el año completo"
  *      → navega al calendario anual estilo Apple Calendar (/cobros).
- *   4. Detalle del año — split por tipo (cupones/divs/amort).
  *
  * Los totales agregan a ARS via `convertAmount`. Las filas individuales
  * muestran la moneda nativa porque un cupón de AL30 en USD se lee con
@@ -177,17 +176,6 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
     if (!scrubKey) return [];
     return events.filter((e) => e.date.startsWith(scrubKey));
   }, [scrubKey, events]);
-
-  /* Tipos de payout con monto > 0, en orden fijo cupón → dividendo
-   * → amortización. Usado para el Detalle del año (bar segmentos +
-   * filas con dots). */
-  const detalleTypes = useMemo(
-    () =>
-      (["cupon", "dividendo", "amortizacion"] as const).filter(
-        (t) => fullYear.byType[t] > 0,
-      ),
-    [fullYear],
-  );
 
   /* Si no hay eventos, no renderizamos nada — para holdings sin renta
    * (solo crypto, solo FCI, etc.) la sección no aporta. */
@@ -434,78 +422,6 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
             </View>
           ) : null}
 
-          {/* ─── Card 4: Detalle del año ─ Robinhood-style: barra
-              stacked arriba con segmentos por tipo + filas con dot
-              de color que matchea su segmento. */}
-          <View style={s.card}>
-            <Text style={[s.eyebrow, { color: c.text }]}>
-              Detalle del año
-            </Text>
-            {detalleTypes.length > 0 ? (
-              <View
-                style={[s.detalleBar, { backgroundColor: c.surfaceHover }]}
-              >
-                {detalleTypes.map((t) => (
-                  <View
-                    key={t}
-                    style={{
-                      flex: fullYear.byType[t],
-                      backgroundColor: TYPE_COLORS[t],
-                    }}
-                  />
-                ))}
-              </View>
-            ) : null}
-            {detalleTypes.map((t, i, arr) => {
-              const ars = fullYear.byType[t];
-              const pct =
-                fullYear.totalArs > 0
-                  ? (ars / fullYear.totalArs) * 100
-                  : 0;
-              return (
-                <View
-                  key={t}
-                  style={[
-                    s.statsRow,
-                    i < arr.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    },
-                  ]}
-                >
-                  <View style={s.statsLabelWrap}>
-                    <View
-                      style={[
-                        s.statsDot,
-                        { backgroundColor: TYPE_COLORS[t] },
-                      ]}
-                    />
-                    <Text style={[s.statsLabel, { color: c.text }]}>
-                      {payoutTypeLabel(t, true)}
-                    </Text>
-                  </View>
-                  <View style={s.statsValueWrap}>
-                    <Text
-                      style={[s.statsValue, { color: c.text }]}
-                      numberOfLines={1}
-                    >
-                      {formatMoney(toDisplay(ars), currency)}
-                    </Text>
-                    <Text style={[s.statsPct, { color: c.textMuted }]}>
-                      {pct.toFixed(0)}%
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-            <Text style={[s.cardFooter, { color: c.textFaint }]}>
-              Total proyectado{" "}
-              <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-                {formatMoney(toDisplay(fullYear.totalArs), currency)}
-              </Text>{" "}
-              en {currentYear}
-            </Text>
-          </View>
         </>
       ) : (
         /* ─── Mes seleccionado: detalle de los eventos que arman el
@@ -580,17 +496,6 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
 }
 
 const BAR_MAX_H = 70;
-
-/* Paleta de tipos de payout para el Detalle del año. Tres shades
- * dentro del lenguaje brand para que se lean como variantes de la
- * misma familia (no como colores arbitrarios). Cupón es el más
- * vivid (típicamente el contributor más grande), amortización el
- * más profundo, dividendo intermedio. */
-const TYPE_COLORS: Record<"cupon" | "dividendo" | "amortizacion", string> = {
-  cupon: "#00C805",
-  dividendo: "#5AC53A",
-  amortizacion: "#00B864",
-};
 
 const s = StyleSheet.create({
   /* Section header — "Cobros" 48pt display + info dot. Vive fuera de
@@ -764,71 +669,12 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  /* ─── Detalle del año — Robinhood-style ─── */
-  /* Barra horizontal apilada con segmentos por tipo. Background
-   * surfaceHover para que se vea el "track" cuando solo hay 1 o 2
-   * tipos contribuyendo. */
-  detalleBar: {
-    flexDirection: "row",
-    height: 8,
-    borderCurve: "continuous",
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    marginBottom: 8,
-  },
-  /* Stats rows con dot de color al lado del label, matching su
-   * segmento del bar. Reemplazó al label muted simple. */
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    gap: 12,
-  },
-  statsLabelWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  statsDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statsLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  statsValueWrap: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  statsValue: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  statsPct: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.1,
-    minWidth: 36,
-    textAlign: "right",
-  },
   emptyText: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     lineHeight: 22,
     letterSpacing: -0.1,
     paddingVertical: 8,
-  },
-  cardFooter: {
-    marginTop: 14,
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    letterSpacing: -0.05,
   },
 
   /* ─── Ver más (cronograma → calendario completo) ─── */
