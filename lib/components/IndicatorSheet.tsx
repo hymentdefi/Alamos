@@ -52,12 +52,12 @@ import { VolumeIndicatorIllustration } from "./illustrations/VolumeIndicatorIllu
  *   Paso 1 — Picker: lista de 6 indicadores con icono, nombre y
  *            descripción corta.
  *
- *   Paso 2 — Config (rediseño): hero rect con bg oscuro + ilustración,
- *            statement centrado dinámico, dos secciones (Señal /
- *            Ejecución) sin card containers, chips y segmented
- *            outline-only (outline gray inactive / outline brand
- *            active, match design system), CTA pill brand idéntico
- *            al de AlertSheet.
+ *   Paso 2 — Config (rediseño): header left-aligned con chevron +
+ *            title (mismo tamaño que el picker), statement centrado
+ *            dinámico, dos secciones (Señal / Ejecución) sin card
+ *            containers, chips y segmented outline-only (outline
+ *            gray inactive / outline brand active, match design
+ *            system), CTA pill brand idéntico al de AlertSheet.
  *
  * Slide horizontal 220ms entre paso 1 y paso 2.
  * En EDIT: arranca directamente en paso 2 del tipo correspondiente
@@ -74,15 +74,6 @@ interface Props {
 
 const DISMISS_TRANSLATE = 110;
 const DISMISS_VELOCITY = 600;
-
-/** Bg constante del hero rect — charcoal verde-tintado.
- *  Hardcoded porque el hero es un container de ilustración
- *  (display, no interactivo) que necesita verse igual en light/dark
- *  mode para que el palette de la ilustración (5FE850 verde
- *  brillante + FFB300 oro) lea consistente. Excepción explícita
- *  documentada en alamos-design SKILL.md: "hero illustration
- *  containers" pueden tener bg hardcodeado. */
-const HERO_DARK = "#0F1411";
 
 /** Temporalidades expuestas en el nuevo UI. La spec del rediseño
  *  reduce de 8 (1m/5m/15m/30m/1H/4H/1D/1W) a 4 más usadas para
@@ -515,9 +506,7 @@ export function IndicatorSheet({
                         color={c.text}
                       />
                     </Pressable>
-                  ) : (
-                    <View style={s.configBack} />
-                  )}
+                  ) : null}
                   <Text
                     style={[s.configTitle, { color: c.text }]}
                     numberOfLines={1}
@@ -526,9 +515,6 @@ export function IndicatorSheet({
                       ? indicatorTitle(selectedType, config)
                       : "Configurar"}
                   </Text>
-                  {/* Spacer simétrico al chevron para que el título
-                   * quede centrado visualmente. */}
-                  <View style={s.configBack} />
                 </View>
 
                 <ScrollView
@@ -536,37 +522,6 @@ export function IndicatorSheet({
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* HERO — rectángulo full-width con bg oscuro
-                      constante (no theme-aware) conteniendo la
-                      ilustración del indicador centrada. */}
-                  {selectedType ? (
-                    <Animated.View
-                      key={`hero-${isEditing ? "edit" : "create"}`}
-                      entering={
-                        isEditing
-                          ? FadeIn.duration(180)
-                          : FadeIn.duration(220).delay(0)
-                      }
-                      style={[s.heroRect, { backgroundColor: HERO_DARK }]}
-                    >
-                      {selectedType === "ma" ? (
-                        config.maVariant === "ema" ? (
-                          <EMAIndicatorIllustration size={104} />
-                        ) : (
-                          <MAIndicatorIllustration size={104} />
-                        )
-                      ) : selectedType === "rsi" ? (
-                        <RSIIndicatorIllustration size={104} />
-                      ) : selectedType === "macd" ? (
-                        <MACDIndicatorIllustration size={104} />
-                      ) : selectedType === "bollinger" ? (
-                        <BollingerIndicatorIllustration size={104} />
-                      ) : (
-                        <VolumeIndicatorIllustration size={104} />
-                      )}
-                    </Animated.View>
-                  ) : null}
-
                   {/* STATEMENT — centrado, eyebrow + sentence con
                       tokens dinámicos en c.brand. Cada token highlight
                       flashea con opacity al cambiar. */}
@@ -1515,10 +1470,14 @@ function buildInputFromConfig(
   };
 }
 
+/** Título del paso 2 — Title Case para que matchee el lenguaje del
+ *  picker (donde "Media Móvil Simple" etc. está en title case en el
+ *  row del paso 1). "de" en "Bandas de Bollinger" queda en
+ *  minúscula por convención de español (preposiciones cortas). */
 function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   if (t === "ma") {
-    if (cfg && cfg.maVariant === "ema") return "Media móvil exponencial";
-    return "Media móvil simple";
+    if (cfg && cfg.maVariant === "ema") return "Media Móvil Exponencial";
+    return "Media Móvil Simple";
   }
   if (t === "rsi") return "RSI";
   if (t === "macd") return "MACD";
@@ -1704,43 +1663,29 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* ── Paso 2 — header ── */
+  /* ── Paso 2 — header ──
+   * Row left-aligned: chevron back (si no es edit mode) + title al
+   * mismo tamaño que el picker (22/800/-0.6). Sin centrar, sin
+   * spacer simétrico — el título arranca pegado al chevron. */
   configHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   configBack: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: -6,
   },
   configTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontFamily: fontFamily[700],
-    fontSize: 17,
-    letterSpacing: -0.3,
-  },
-
-  /* ── Hero rect ──
-   * Full-width con margin horizontal 16. Bg HERO_DARK constante.
-   * Radius 14 (override del token md/lg porque el spec lo pide
-   * literal). overflow hidden para que la ilustración respete los
-   * corners. */
-  heroRect: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    height: 130,
-    borderRadius: 14,
-    borderCurve: "continuous",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.6,
   },
 
   /* ── Statement ──
