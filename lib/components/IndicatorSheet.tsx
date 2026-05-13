@@ -1094,9 +1094,10 @@ function ParamRow({
   );
 }
 
-/** Segmented control de 2 opciones — container c.surface con border
- *  c.border (visible en light, casi invisible en dark). Active item
- *  con tint brand al ~10% + texto en c.brand. */
+/** Segmented control de 2 opciones — dos chips outline lado a lado
+ *  con flex 1. Active: border c.brand + text c.brand. Inactive:
+ *  border c.border + text c.textMuted. Sin container chrome ni tint
+ *  fill — mismo lenguaje que los chips. */
 function Segmented<T extends string>({
   options,
   active,
@@ -1109,12 +1110,7 @@ function Segmented<T extends string>({
   c: ColorMap;
 }) {
   return (
-    <View
-      style={[
-        s.segmented,
-        { backgroundColor: c.surface, borderColor: c.border },
-      ]}
-    >
+    <View style={s.segmented}>
       {options.map((opt) => {
         const isActive = active === opt.value;
         return (
@@ -1126,7 +1122,7 @@ function Segmented<T extends string>({
             }}
             style={[
               s.segmentedItem,
-              isActive && { backgroundColor: `${c.brand}1A` },
+              { borderColor: isActive ? c.brand : c.border },
             ]}
           >
             <Text
@@ -1600,11 +1596,7 @@ const s = StyleSheet.create({
   },
   segmented: {
     flexDirection: "row",
-    padding: 3,
-    borderRadius: radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    gap: 3,
+    gap: 8,
   },
   segmentedItem: {
     flex: 1,
@@ -1612,8 +1604,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     borderCurve: "continuous",
+    borderWidth: 1.5,
   },
   segmentedText: {
     fontFamily: fontFamily[600],
