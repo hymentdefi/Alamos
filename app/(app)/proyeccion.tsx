@@ -113,26 +113,22 @@ export default function ProyeccionScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[s.title, { color: c.text }]}>Proyección</Text>
+        <Text style={[s.title, { color: c.brand }]}>Proyección</Text>
         <Text style={[s.subtitle, { color: c.textMuted }]}>
           Simulamos miles de escenarios posibles para estimar cómo
           podría crecer tu portfolio.
         </Text>
 
-        {/* Hero: median final value at horizon */}
+        {/* Hero estilo Robinhood: valor mediano grande arriba (brand),
+            etiqueta del horizonte abajo en muted. Sin la línea "hoy
+            vale X" — esa info ya la tiene el user en la home y se
+            sentía redundante en una pantalla de proyección. */}
         <View style={s.hero}>
-          <Text style={[s.heroLabel, { color: c.textMuted }]}>
-            En {horizon} años, tu portfolio podría valer
-          </Text>
           <Text style={[s.heroValue, { color: c.brand }]}>
             {fmt(mc.medianFinal)}
           </Text>
-          <Text style={[s.heroSub, { color: c.textMuted }]}>
-            mediana de la proyección. Hoy vale{" "}
-            <Text style={{ color: c.text, fontFamily: fontFamily[700] }}>
-              {fmt(currentValue)}
-            </Text>
-            .
+          <Text style={[s.heroLabel, { color: c.textMuted }]}>
+            Proyección mediana en {horizon} años
           </Text>
         </View>
 
@@ -386,27 +382,21 @@ const s = StyleSheet.create({
     marginBottom: 24,
   },
 
+  /* Hero Robinhood-style: valor grande primero, contexto abajo. */
   hero: {
     paddingHorizontal: 24,
     marginBottom: 20,
-  },
-  heroLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 13,
-    letterSpacing: -0.05,
   },
   heroValue: {
     fontFamily: fontFamily[800],
     fontSize: 38,
     letterSpacing: -1.4,
-    marginTop: 6,
   },
-  heroSub: {
+  heroLabel: {
     fontFamily: fontFamily[500],
-    fontSize: 13,
-    lineHeight: 18,
-    letterSpacing: -0.05,
-    marginTop: 6,
+    fontSize: 14,
+    letterSpacing: -0.15,
+    marginTop: 4,
   },
 
   chartWrap: {
