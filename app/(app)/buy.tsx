@@ -427,6 +427,13 @@ export default function BuyScreen() {
           haptic="selection"
           pressScale={0.96}
         >
+          {/* Spacer fantasma del mismo ancho que el chevron-down de
+              la derecha (14px) — balancea el peso del icono para que
+              el TEXTO "A mercado" caiga visualmente en el centro de
+              pantalla, en línea con el título de arriba. Sin esto,
+              el chevron + gap empuja el texto ~9px a la izquierda
+              del centro real. */}
+          <View style={{ width: 14 }} />
           <Text style={[s.typePillText, { color: c.brand }]}>A mercado</Text>
           <Feather name="chevron-down" size={14} color={c.brand} />
         </Tap>
