@@ -122,7 +122,11 @@ export default function LimitOrderScreen() {
   const openTypeSelector = () => {
     router.replace({
       pathname: "/(app)/conditional-orders",
-      params: { ticker: asset.ticker, mode: isSell ? "sell" : "buy" },
+      params: {
+        ticker: asset.ticker,
+        mode: isSell ? "sell" : "buy",
+        current: "limit",
+      },
     });
   };
 
