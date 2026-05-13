@@ -347,55 +347,34 @@ export default function RendimientoScreen() {
             toDisplay={toDisplay}
           />
 
-          {/* CTAs Fase 3: "Proyección de tu portfolio" (Monte Carlo)
-              + "ADN de tu portfolio" (Factor Exposure). Outlined
-              cards brand-tinted icon, estilo del Tier 1 bento.
+          {/* Entradas Fase 3: "Proyección de tu portfolio" (Monte Carlo)
+              + "ADN de tu portfolio" (Factor Exposure). Section title
+              c.brand 22pt + chevron verde — mismo peso visual que
+              Análisis / Estadísticas / Flujos del año, pero tappable.
               Labels retail per spec 5.5 + 6.4 — nunca decimos
               "Monte Carlo" o "Factor Exposure" en la UI. */}
           <Tap
             onPress={() => router.push("/proyeccion" as never)}
             haptic="selection"
-            pressScale={0.97}
-            style={[s.advCard, { borderColor: c.border }]}
+            pressScale={0.98}
+            style={s.sectionLink}
           >
-            <View style={s.advLeft}>
-              <View style={s.advIconWrap}>
-                <Feather name="trending-up" size={18} color={c.brand} />
-              </View>
-              <View style={s.advTextWrap}>
-                <Text style={[s.advTitle, { color: c.text }]}>
-                  Proyección de tu portfolio
-                </Text>
-                <Text style={[s.advSub, { color: c.textMuted }]}>
-                  Simulamos miles de escenarios posibles para estimar
-                  cómo podría crecer tu inversión.
-                </Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={20} color={c.textMuted} />
+            <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
+              Proyección de tu portfolio
+            </Text>
+            <Feather name="chevron-right" size={22} color={c.brand} />
           </Tap>
 
           <Tap
             onPress={() => router.push("/adn" as never)}
             haptic="selection"
-            pressScale={0.97}
-            style={[s.advCard, { borderColor: c.border }]}
+            pressScale={0.98}
+            style={s.sectionLink}
           >
-            <View style={s.advLeft}>
-              <View style={s.advIconWrap}>
-                <Feather name="activity" size={18} color={c.brand} />
-              </View>
-              <View style={s.advTextWrap}>
-                <Text style={[s.advTitle, { color: c.text }]}>
-                  ADN de tu portfolio
-                </Text>
-                <Text style={[s.advSub, { color: c.textMuted }]}>
-                  Analizamos las características principales de tus
-                  inversiones según seis factores académicos.
-                </Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={20} color={c.textMuted} />
+            <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
+              ADN de tu portfolio
+            </Text>
+            <Feather name="chevron-right" size={22} color={c.brand} />
           </Tap>
 
           {/* Cobros — dividendos, cupones y amortizaciones del
@@ -518,51 +497,21 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  /* Cards */
-  /* ─── CTA "Proyección de tu portfolio" ─── */
-  advCard: {
+  /* ─── Section links "Proyección de tu portfolio" + "ADN" ─── */
+  sectionLink: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginHorizontal: 24,
-    marginTop: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderCurve: "continuous",
-    borderRadius: radius.lg,
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    marginTop: 28,
+    paddingVertical: 4,
   },
-  advLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  sectionLinkTitle: {
+    fontFamily: fontFamily[800],
+    fontSize: 22,
+    letterSpacing: -0.5,
     flex: 1,
     minWidth: 0,
-  },
-  advIconWrap: {
-    width: 36,
-    height: 36,
-    borderCurve: "continuous",
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,200,5,0.12)",
-  },
-  advTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  advTitle: {
-    fontFamily: fontFamily[700],
-    fontSize: 15,
-    letterSpacing: -0.2,
-  },
-  advSub: {
-    fontFamily: fontFamily[500],
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: -0.05,
-    marginTop: 2,
   },
 
   disclaimer: {

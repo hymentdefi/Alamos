@@ -794,13 +794,21 @@ export interface CommentaryParagraph {
   text: string;
 }
 
-const PERIOD_LABEL: Record<StatsRange, string> = {
+/**
+ * Frase temporal completa, lista para concatenar al final del verbo
+ * (no necesita "en" antepuesto). La preposición correcta varía
+ * según el rango: "hoy" / "esta semana" / "este mes" no la llevan,
+ * "en los últimos 3 meses" / "en lo que va del año" / "en el último
+ * año" / "desde el inicio" sí. Esto evita el bug "Tu portfolio cayó
+ * X% en hoy" que sale de concatenar "en " + label.
+ */
+const PERIOD_PHRASE: Record<StatsRange, string> = {
   "1D": "hoy",
   "1W": "esta semana",
   "1M": "este mes",
-  "3M": "los últimos 3 meses",
-  YTD: "lo que va del año",
-  "1A": "el último año",
+  "3M": "en los últimos 3 meses",
+  YTD: "en lo que va del año",
+  "1A": "en el último año",
   MAX: "desde el inicio",
 };
 
@@ -853,17 +861,17 @@ export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] 
   const out: CommentaryParagraph[] = [];
 
   /* ── Párrafo 1: Performance + drivers + benchmark ── */
-  const periodLabel = PERIOD_LABEL[range];
+  const periodPhrase = PERIOD_PHRASE[range];
   const direction = tier1.twr.pct >= 0 ? "creció" : "cayó";
   const twrFormatted = pctText(tier1.twr.pct);
   const benchmarkFormatted = pctText(tier1.alpha.benchmarkPct);
   const alphaSign = tier1.alpha.pct > 0 ? "superando" : "por debajo de";
 
-  let p1 = `Tu portfolio ${direction} **${twrFormatted}** en ${periodLabel}`;
+  let p1 = `Tu portfolio ${direction} **${twrFormatted}** ${periodPhrase}`;
   if (Math.abs(tier1.alpha.pct) > 0.3) {
-    p1 += `, ${alphaSign} al **S&P 500** (el índice más importante de Estados Unidos), que rindió ${benchmarkFormatted}.`;
+    p1 += `, ${alphaSign} al **S&P 500**, el principal índice de Estados Unidos, que rindió ${benchmarkFormatted}.`;
   } else {
-    p1 += `, en línea con el S&P 500 (que rindió ${benchmarkFormatted}).`;
+    p1 += `, en línea con el **S&P 500**, que rindió ${benchmarkFormatted}.`;
   }
 
   /* Top contributor / detractor — usamos "puntos al rendimiento"
@@ -892,16 +900,17 @@ export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] 
         ? "moderado"
         : "alto";
 
-  let p2 = `La **volatilidad anualizada** (cuánto oscilan los precios en un año típico) es **${num1(tier1.volatility.pct)}%**, considerada de riesgo ${volTone}. `;
+  let p2 = `La **volatilidad anualizada** mide cuánto oscilan los precios de tus activos en un año típico. La tuya es de **${num1(tier1.volatility.pct)}%**, un nivel de riesgo ${volTone}. `;
 
-  /* Sharpe en plano: cada caso con una frase que explica qué
-   * significa el número en términos prácticos. */
+  /* Sharpe en plano: defino el concepto una vez, después aplico
+   * la interpretación según el rango del valor. */
+  p2 += `El **Sharpe ratio** indica cuánto rendimiento extra obtenés por cada unidad de riesgo asumida. `;
   if (tier1.sharpe.value > 1.0) {
-    p2 += `El **Sharpe ratio** (cuánto rendimiento extra obtenés por cada unidad de riesgo) es de **${num2(tier1.sharpe.value)}**: arriba de 1 indica que el riesgo te está siendo bien pagado.`;
+    p2 += `El tuyo está en **${num2(tier1.sharpe.value)}**: arriba de 1 significa que el riesgo te está siendo bien pagado.`;
   } else if (tier1.sharpe.value > 0.5) {
-    p2 += `El **Sharpe ratio** (cuánto rendimiento extra obtenés por cada unidad de riesgo) es **${num2(tier1.sharpe.value)}**: el rendimiento alcanza para justificar el riesgo asumido, pero sin margen amplio.`;
+    p2 += `El tuyo es **${num2(tier1.sharpe.value)}**: el rendimiento alcanza para justificar el riesgo asumido, pero sin margen amplio.`;
   } else {
-    p2 += `El **Sharpe ratio** (cuánto rendimiento extra obtenés por cada unidad de riesgo) es **${num2(tier1.sharpe.value)}**, por debajo de 0,5: estás tomando riesgo que no te está siendo compensado.`;
+    p2 += `El tuyo es **${num2(tier1.sharpe.value)}**, por debajo de 0,5: estás tomando riesgo que no te está siendo compensado.`;
   }
 
   /* Drawdown si fue significativo en el período (> 5%) y se recuperó. */
@@ -910,15 +919,20 @@ export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] 
   }
   out.push({ text: p2 });
 
-  /* ── Párrafo 3: Composición (concentración + posiciones efectivas) ── */
+  /* ── Párrafo 3: Composición (concentración + posiciones efectivas) ──
+   * Defino "posiciones efectivas" una sola vez al final del párrafo
+   * para que las 3 ramas no repitan la explicación. */
+  const concentracionPct = tier2.concentracionTop5.pct.toFixed(0);
+  const efectivas = num1(tier2.posicionesEfectivas.value);
   let p3: string;
   if (tier2.concentracionTop5.pct > 60) {
-    p3 = `Tus 5 posiciones más grandes concentran el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio, lo cual es mucho: una caída fuerte en cualquiera de ellas te impactaría de lleno. La diversificación equivale a tener apenas **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas** (un número alto significa que el peso está bien repartido entre activos).`;
+    p3 = `Tus 5 posiciones más grandes concentran el **${concentracionPct}%** del portfolio, un nivel alto: una caída fuerte en cualquiera te impactaría de lleno. La diversificación real equivale a apenas **${efectivas} posiciones efectivas**.`;
   } else if (tier2.concentracionTop5.pct > 40) {
-    p3 = `Las 5 posiciones más grandes representan el **${tier2.concentracionTop5.pct.toFixed(0)}%** del portfolio. La diversificación es razonable: equivale a tener **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas**, una métrica que ajusta el conteo de activos por su peso real para que se entienda cuán distribuido está el riesgo.`;
+    p3 = `Las 5 posiciones más grandes representan el **${concentracionPct}%** del portfolio. La diversificación es razonable y equivale a **${efectivas} posiciones efectivas**.`;
   } else {
-    p3 = `El portfolio está bien diversificado: las 5 posiciones más grandes representan solo el **${tier2.concentracionTop5.pct.toFixed(0)}%**, equivalente a **${num1(tier2.posicionesEfectivas.value)} posiciones efectivas** (ajuste del conteo de activos por su peso real). Esto reduce el impacto de un solo activo en el rendimiento total.`;
+    p3 = `El portfolio está bien diversificado: las 5 posiciones más grandes representan solo el **${concentracionPct}%**, equivalente a **${efectivas} posiciones efectivas**. Esto reduce el impacto de un solo activo en el rendimiento total.`;
   }
+  p3 += ` Las **posiciones efectivas** ajustan el conteo de activos por su peso real para reflejar cuán distribuido está el riesgo.`;
   out.push({ text: p3 });
 
   /* ── Párrafo 4: Contextual (cash idle si es > 5% del portfolio) ──
