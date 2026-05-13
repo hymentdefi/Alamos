@@ -320,26 +320,7 @@ export default function BuyScreen() {
             {isSell ? "Vender" : "Comprar"} {asset.ticker}
           </Text>
         </View>
-        {/* Pill de tipo de orden — por default "A mercado". Tap abre
-            /conditional-orders con la lista de tipos (limit, stop,
-            etc). Reemplaza el spacer vacío que había antes. */}
-        <Tap
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/conditional-orders",
-              params: {
-                ticker: asset.ticker,
-                mode: isSell ? "sell" : "buy",
-              },
-            })
-          }
-          style={s.typePill}
-          haptic="selection"
-          pressScale={0.96}
-        >
-          <Text style={[s.typePillText, { color: c.brand }]}>A mercado</Text>
-          <Feather name="chevron-down" size={14} color={c.brand} />
-        </Tap>
+        <View style={{ width: 36 }} />
       </View>
 
       {/* Banner de mercado cerrado — sólo cuando aplica. La copy se
@@ -417,6 +398,30 @@ export default function BuyScreen() {
             </Text>
           </Tap>
         </View>
+      </View>
+
+      {/* Pill de tipo de orden — debajo del toggle Monto/Cantidad,
+          centrado. Por default "A mercado". Tap abre
+          /conditional-orders con la lista de tipos (limit, stop,
+          etc). */}
+      <View style={s.typePillRow}>
+        <Tap
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/conditional-orders",
+              params: {
+                ticker: asset.ticker,
+                mode: isSell ? "sell" : "buy",
+              },
+            })
+          }
+          style={s.typePill}
+          haptic="selection"
+          pressScale={0.96}
+        >
+          <Text style={[s.typePillText, { color: c.brand }]}>A mercado</Text>
+          <Feather name="chevron-down" size={14} color={c.brand} />
+        </Tap>
       </View>
 
       {/* Spacer superior: empuja hero + slider hacia abajo. */}
@@ -571,8 +576,15 @@ const s = StyleSheet.create({
     fontSize: 16,
     letterSpacing: -0.25,
   },
-  /* Pill de tipo de orden — discreto pero presente, en brand verde.
-   * Tap abre /conditional-orders con la lista de tipos disponibles. */
+  /* Pill de tipo de orden — debajo del toggle Monto/Cantidad,
+   * centrado. Discreto pero presente, en brand verde. Tap abre
+   * /conditional-orders con la lista de tipos disponibles. */
+  typePillRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingTop: 10,
+    paddingHorizontal: 20,
+  },
   typePill: {
     flexDirection: "row",
     alignItems: "center",
