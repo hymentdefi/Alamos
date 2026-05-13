@@ -110,21 +110,18 @@ export function CobrosSection({ currency }: Props) {
 
   return (
     <>
-      {/* ─── Section header — mismo lenguaje visual que la BriefingCard
-          del stock detail: título en brand color + arrow-right + tap
-          que navega a /cobros (la página completa con calendario
-          anual). El info dot queda al lado para abrir el sheet con
-          la explicación, sin interferir con el navigation gesture. */}
+      {/* ─── Section header — título "Cobros" en brand (estilo
+          BriefingCard del stock detail pero sin arrow, más grande)
+          + info dot al lado también en brand. Tap del título navega
+          a /cobros, tap del info dot abre el sheet de explicación. */}
       <View style={s.sectionHeader}>
         <Tap
           onPress={() => router.push("/cobros")}
           haptic="selection"
           pressScale={0.97}
           hitSlop={8}
-          style={s.sectionTitleTap}
         >
           <Text style={[s.sectionTitle, { color: c.brand }]}>Cobros</Text>
-          <Feather name="arrow-right" size={18} color={c.brand} />
         </Tap>
         <Tap
           onPress={() => setInfoOpen(true)}
@@ -133,7 +130,7 @@ export function CobrosSection({ currency }: Props) {
           style={s.sectionInfoDot}
           accessibilityLabel="Qué son los cobros"
         >
-          <Feather name="info" size={18} color={c.textMuted} />
+          <Feather name="info" size={18} color={c.brand} />
         </Tap>
       </View>
 
@@ -424,21 +421,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 32,
   },
-  /* Tap del título — mismo layout que briefingHead del stock detail
-   * (flex row + gap 6 + alignItems center). Title + arrow viven en
-   * un mismo press target que navega a /cobros. */
-  sectionTitleTap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  /* Title style — clavado a briefingHeadText del stock detail:
-   * fontFamily 800 (peso heaviest), fontSize 22, letterSpacing -0.5.
-   * Brand color porque cobros son inherentemente positivos (income). */
+  /* Title style — heaviest weight + brand color, más grande que el
+   * briefing del stock detail porque acá funciona como section
+   * header de una sub-sección entera (no como label de un card). */
   sectionTitle: {
     fontFamily: fontFamily[800],
-    fontSize: 22,
-    letterSpacing: -0.5,
+    fontSize: 30,
+    letterSpacing: -0.8,
   },
   sectionInfoDot: {
     width: 28,
