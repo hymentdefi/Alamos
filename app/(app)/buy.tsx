@@ -412,6 +412,7 @@ export default function BuyScreen() {
               params: {
                 ticker: asset.ticker,
                 mode: isSell ? "sell" : "buy",
+                current: "market",
               },
             })
           }
