@@ -777,12 +777,10 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
  * POST /api/portfolio/{userId}/commentary (Claude Sonnet API),
  * pero sin la llamada — para mock + dev experience.
  *
- * Estructura siguiendo la spec interna 4.2:
- *   1. Resumen de performance + comparación con benchmark.
- *   2. Riesgo (volatilidad + Sharpe interpretado).
- *   3. Peor caída con contexto temporal.
- *   4. Concentración / diversificación.
- *   5. Income generado (si el portfolio paga rentas).
+ * Estructura tight (2-3 párrafos):
+ *   1. Performance del período + benchmark + driver principal.
+ *   2. Riesgo + composición en frases cortas.
+ *   3. Cash idle si supera 5% del portfolio (opcional).
  *
  * Cuando se enchufe el endpoint real, este function se reemplaza
  * por un fetch al API + parsing del response. La firma queda igual.
@@ -821,10 +819,6 @@ function num1(n: number): string {
   return n.toFixed(1).replace(".", ",");
 }
 
-function num2(n: number): string {
-  return n.toFixed(2).replace(".", ",");
-}
-
 interface CommentaryArgs {
   range: StatsRange;
   tier1: Tier1Stats;
@@ -834,21 +828,16 @@ interface CommentaryArgs {
 }
 
 /**
- * Estructura del commentary (4 párrafos):
- *   1. Performance — period return + top contributor/detractor +
- *      benchmark (S&P 500).
- *   2. Riesgo — vol level + Sharpe en plano + observación de
- *      drawdown si fue significativo en el período.
- *   3. Composición — concentración top-5 (con alerta si > 60%) +
- *      posiciones efectivas.
- *   4. Contextual — cash idle si es > 5% del portfolio, con
- *      aclaración del tipo de cambio cuando aplica.
+ * Estructura del commentary (2-3 párrafos cortos):
+ *   1. Performance del período + benchmark + driver principal
+ *      (top contributor o detractor).
+ *   2. Riesgo + concentración en frases breves.
+ *   3. Cash idle si supera 5% del portfolio (opcional).
  *
- * Voz: usa términos técnicos (Sharpe, volatilidad anualizada,
- * puntos porcentuales) para que el análisis se sienta profesional,
- * pero acompaña cada uno con una explicación ultra-sencilla
- * inline para que cualquier retail entienda. Sin condescender ni
- * tirar jerga sin contexto.
+ * Voz: tight, observacional. Las explicaciones de cada métrica
+ * viven en el StatInfoSheet — acá sólo damos los números relevantes
+ * con una palabra de contexto. Voz técnica pero accesible,
+ * sin meter explicaciones largas (eso vive en el StatInfoSheet).
  *
  * Reglas (compliance):
  *   NUNCA recomendar compras o ventas, predecir movimientos del
@@ -860,87 +849,45 @@ export function generateCommentary(args: CommentaryArgs): CommentaryParagraph[] 
   const { range, tier1, tier2, formatAmount } = args;
   const out: CommentaryParagraph[] = [];
 
-  /* ── Párrafo 1: Performance + drivers + benchmark ── */
+  /* ── Párrafo 1: Performance + benchmark + driver principal ── */
   const periodPhrase = PERIOD_PHRASE[range];
   const direction = tier1.twr.pct >= 0 ? "creció" : "cayó";
   const twrFormatted = pctText(tier1.twr.pct);
   const benchmarkFormatted = pctText(tier1.alpha.benchmarkPct);
-  const alphaSign = tier1.alpha.pct > 0 ? "superando" : "por debajo de";
 
   let p1 = `Tu portfolio ${direction} **${twrFormatted}** ${periodPhrase}`;
   if (Math.abs(tier1.alpha.pct) > 0.3) {
-    p1 += `, ${alphaSign} al **S&P 500**, el principal índice de Estados Unidos, que rindió ${benchmarkFormatted}.`;
+    const alphaSign = tier1.alpha.pct > 0 ? "superando al" : "por debajo del";
+    p1 += `, ${alphaSign} **S&P 500**, que rindió ${benchmarkFormatted}.`;
   } else {
     p1 += `, en línea con el **S&P 500**, que rindió ${benchmarkFormatted}.`;
   }
 
-  /* Top contributor / detractor — usamos "puntos al rendimiento"
-   * en vez de "pp" para que el retail entienda sin saber la jerga. */
   const top = tier2.attribution.topContributor;
   const bottom = tier2.attribution.topDetractor;
   if (top && top.contribPp >= 0.3) {
-    p1 += ` El principal motor fue **${top.ticker}**: te sumó ${num1(top.contribPp)} puntos al rendimiento total`;
-    if (bottom && Math.abs(bottom.contribPp) >= 0.3) {
-      p1 += `, mientras que **${bottom.ticker}** te restó ${num1(Math.abs(bottom.contribPp))} puntos.`;
-    } else {
-      p1 += `.`;
-    }
+    p1 += ` **${top.ticker}** aportó ${num1(top.contribPp)} puntos al rendimiento.`;
   } else if (bottom && Math.abs(bottom.contribPp) >= 0.3) {
-    p1 += ` El mayor lastre fue **${bottom.ticker}**: te restó ${num1(Math.abs(bottom.contribPp))} puntos al rendimiento total.`;
+    p1 += ` **${bottom.ticker}** restó ${num1(Math.abs(bottom.contribPp))} puntos.`;
   }
   out.push({ text: p1 });
 
-  /* ── Párrafo 2: Riesgo (vol + Sharpe + drawdown contextual) ──
-   * Cada término técnico viene con una explicación inline ultra
-   * sencilla para que el retail entienda qué está leyendo. */
+  /* ── Párrafo 2: Riesgo + composición en frases cortas ── */
   const volTone =
     tier1.volatility.semaforo === "verde"
       ? "bajo"
       : tier1.volatility.semaforo === "amarillo"
         ? "moderado"
         : "alto";
-
-  let p2 = `La **volatilidad anualizada** mide cuánto oscilan los precios de tus activos en un año típico. La tuya es de **${num1(tier1.volatility.pct)}%**, un nivel de riesgo ${volTone}. `;
-
-  /* Sharpe en plano: defino el concepto una vez, después aplico
-   * la interpretación según el rango del valor. */
-  p2 += `El **Sharpe ratio** indica cuánto rendimiento extra obtenés por cada unidad de riesgo asumida. `;
-  if (tier1.sharpe.value > 1.0) {
-    p2 += `El tuyo está en **${num2(tier1.sharpe.value)}**: arriba de 1 significa que el riesgo te está siendo bien pagado.`;
-  } else if (tier1.sharpe.value > 0.5) {
-    p2 += `El tuyo es **${num2(tier1.sharpe.value)}**: el rendimiento alcanza para justificar el riesgo asumido, pero sin margen amplio.`;
-  } else {
-    p2 += `El tuyo es **${num2(tier1.sharpe.value)}**, por debajo de 0,5: estás tomando riesgo que no te está siendo compensado.`;
-  }
-
-  /* Drawdown si fue significativo en el período (> 5%) y se recuperó. */
-  if (tier1.maxDrawdown.pct > 5 && tier1.maxDrawdown.recoveryDays > 0) {
-    p2 += ` La peor caída del período fue de **${num1(tier1.maxDrawdown.pct)}%** en ${tier1.maxDrawdown.date}, y tardaste ${tier1.maxDrawdown.recoveryDays} días en recuperarte hasta el pico anterior.`;
-  }
-  out.push({ text: p2 });
-
-  /* ── Párrafo 3: Composición (concentración + posiciones efectivas) ──
-   * Defino "posiciones efectivas" una sola vez al final del párrafo
-   * para que las 3 ramas no repitan la explicación. */
   const concentracionPct = tier2.concentracionTop5.pct.toFixed(0);
   const efectivas = num1(tier2.posicionesEfectivas.value);
-  let p3: string;
-  if (tier2.concentracionTop5.pct > 60) {
-    p3 = `Tus 5 posiciones más grandes concentran el **${concentracionPct}%** del portfolio, un nivel alto: una caída fuerte en cualquiera te impactaría de lleno. La diversificación real equivale a apenas **${efectivas} posiciones efectivas**.`;
-  } else if (tier2.concentracionTop5.pct > 40) {
-    p3 = `Las 5 posiciones más grandes representan el **${concentracionPct}%** del portfolio. La diversificación es razonable y equivale a **${efectivas} posiciones efectivas**.`;
-  } else {
-    p3 = `El portfolio está bien diversificado: las 5 posiciones más grandes representan solo el **${concentracionPct}%**, equivalente a **${efectivas} posiciones efectivas**. Esto reduce el impacto de un solo activo en el rendimiento total.`;
-  }
-  p3 += ` Las **posiciones efectivas** ajustan el conteo de activos por su peso real para reflejar cuán distribuido está el riesgo.`;
-  out.push({ text: p3 });
+  const p2 = `Volatilidad anualizada de **${num1(tier1.volatility.pct)}%**, riesgo ${volTone}. Tus 5 posiciones más grandes concentran el **${concentracionPct}%** del portfolio, equivalente a **${efectivas} posiciones efectivas**.`;
+  out.push({ text: p2 });
 
-  /* ── Párrafo 4: Contextual (cash idle si es > 5% del portfolio) ──
-   * Aclaración FX al pie: si hay holdings en USD o USDT, el total
-   * mostrado se convirtió a pesos al oficial vendedor. */
+  /* ── Párrafo 3 opcional: cash idle si > 5% del portfolio ── */
   if (tier2.cashIdle.pctOfPortfolio > 5) {
     out.push({
-      text: `Tenés **${formatAmount(tier2.cashIdle.display)}** sin invertir, un **${num1(tier2.cashIdle.pctOfPortfolio)}%** del portfolio total. Es capital quieto que no está generando rendimiento. Los saldos en dólares y USDT se convierten a pesos al tipo de cambio oficial vendedor para calcular el total.`,
+      text: `Tenés **${formatAmount(tier2.cashIdle.display)}** sin invertir, un **${num1(tier2.cashIdle.pctOfPortfolio)}%** del portfolio.`,
     });
   }
 

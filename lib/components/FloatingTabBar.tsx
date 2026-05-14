@@ -22,7 +22,7 @@ type TabRoute = {
 
 const TAB_ROUTES: TabRoute[] = [
   { name: "index",     href: "/(app)/",          title: "Inicio",    path: tabPaths.home },
-  { name: "explore",   href: "/(app)/explore",   title: "Mercado",   path: tabPaths.markets },
+  { name: "explore",   href: "/(app)/explore",   title: "Invertir",  path: tabPaths.markets },
   { name: "portfolio", href: "/(app)/portfolio", title: "Portfolio", path: tabPaths.portfolio },
   { name: "tarjeta",   href: "/(app)/tarjeta",   title: "Tarjeta",   path: tabPaths.tarjeta },
   { name: "news",      href: "/(app)/news",      title: "Noticias",  path: tabPaths.news },

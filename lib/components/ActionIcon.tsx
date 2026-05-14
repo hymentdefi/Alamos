@@ -3,32 +3,40 @@ import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../theme";
 
 /**
- * Iconos de acción del home (Ingresar / Enviar / Convertir).
+ * Iconos de acción del home (Ingresar / Enviar / Invertir).
  *
- * Outline brand puro — círculo con stroke c.brand 2.5px (sin fill ni
- * tint) y símbolo interno (flecha down/up/arrows-swap) en stroke
- * c.brand 4px. Mantiene la presencia del set "tint-S" del brand pack
- * pero sin el medio-fill — sigue la regla del sistema de jerarquía:
- * solid brand (CTA primario) o outline (importante pero secundario).
+ * Por default: outline brand puro — círculo con stroke c.brand 3px y
+ * símbolo interno en stroke c.brand 4px. Sin fill ni tint.
+ *
+ * Con `filled`: círculo solid c.brand, símbolo en stroke c.onColor.
+ * Patrón filled brand CTA del design system — usado para destacar el
+ * action principal (Ingresar) sobre los secundarios (Enviar, Invertir).
  */
 
-export type ActionIconName = "ingresar" | "enviar" | "convertir";
+export type ActionIconName = "ingresar" | "enviar" | "invertir";
 
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del stroke (símbolo + círculo). Default:
-   *  c.brand del theme (#00C805 canónico). */
+  /** Override del color del símbolo (y del stroke del círculo si no
+   *  está filled). Default: c.brand del theme (#00C805 canónico). */
   stroke?: string;
+  /** Variant filled — círculo solid c.brand, símbolo en c.onColor.
+   *  Reservado para el primary action (Ingresar). Default false. */
+  filled?: boolean;
 }
 
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
   stroke,
+  filled = false,
 }: Props) {
   const { c } = useTheme();
-  const strokeColor = stroke ?? c.brand;
+  const brand = stroke ?? c.brand;
+  const symbolColor = filled ? c.onColor : brand;
+  const circleFill = filled ? brand : "none";
+  const circleStroke = filled ? "none" : brand;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
@@ -36,14 +44,14 @@ export const ActionIcon = memo(function ActionIcon({
         cx={32}
         cy={32}
         r={30.5}
-        fill="none"
-        stroke={strokeColor}
+        fill={circleFill}
+        stroke={circleStroke}
         strokeWidth={3}
       />
       <G
         transform="translate(32 32)"
         fill="none"
-        stroke={strokeColor}
+        stroke={symbolColor}
         strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -59,11 +67,10 @@ export const ActionIcon = memo(function ActionIcon({
             <Path d="M-9 -1 L0 -10 L9 -1" />
           </>
         ) : (
+          // invertir: flecha trending up (growth/invest universal).
           <>
-            <Path d="M-10 -6 L10 -6" />
-            <Path d="M4 -12 L10 -6 L4 0" />
-            <Path d="M10 6 L-10 6" />
-            <Path d="M-4 0 L-10 6 L-4 12" />
+            <Path d="M-10 8 L10 -10" />
+            <Path d="M3 -10 L10 -10 L10 -3" />
           </>
         )}
       </G>

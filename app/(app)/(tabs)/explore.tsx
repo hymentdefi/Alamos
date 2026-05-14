@@ -259,7 +259,7 @@ function BaseExplore() {
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.titleRow}>
           <View style={s.titleWithBadge}>
-            <Text style={[s.title, { color: c.text }]}>Mercado</Text>
+            <Text style={[s.title, { color: c.text }]}>Invertir</Text>
             <MarketClosedIcon
               session={marketSessionByMarket(market.id)}
               size={22}

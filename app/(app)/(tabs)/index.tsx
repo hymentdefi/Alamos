@@ -578,11 +578,16 @@ function ActionButton({
   label,
   onPress,
   haptic,
+  filled = false,
 }: {
   iconName: ActionIconName;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
+  /** filled aplica el variant primary CTA del ActionIcon (círculo
+   *  solid c.brand + símbolo c.onColor). Reservado para el action
+   *  principal del home (Ingresar). */
+  filled?: boolean;
 }) {
   const { c } = useTheme();
   return (
@@ -592,11 +597,7 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      {/* El ActionIcon YA es un squircle con fill brand verde y stroke
-          blanco — no necesita un wrapper de surface adicional como
-          tenía antes (la opcion 'glass' Revolut). El icono mismo
-          es el bloque visual. */}
-      <ActionIcon name={iconName} size={51} />
+      <ActionIcon name={iconName} size={51} filled={filled} />
       <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
         {label}
       </Text>
@@ -717,15 +718,17 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — squircle icons custom (Ingresar/Enviar/
-          Convertir) con verde brand y stroke blanco. El icono YA es
-          la surface; sin wrapper circular como en la versión
-          'Revolut glass' previa. */}
+      {/* Acciones del home — Ingresar / Enviar / Invertir. Ingresar
+          es el primary CTA (filled brand): destaca para guiar al
+          user nuevo a fondear su cuenta. Enviar/Invertir quedan
+          outline (secondary). Invertir lleva al tab Invertir
+          (antes "Mercado") donde el user navega activos. */}
       <View style={s.actionsRow}>
         <ActionButton
           iconName="ingresar"
           label="Ingresar"
           haptic="medium"
+          filled
           onPress={() =>
             router.push({
               pathname: "/(app)/transfer",
@@ -745,10 +748,10 @@ function Dinero(_: {
           }
         />
         <ActionButton
-          iconName="convertir"
-          label="Convertir"
+          iconName="invertir"
+          label="Invertir"
           haptic="medium"
-          onPress={() => router.push("/(app)/convert")}
+          onPress={() => router.push("/(app)/explore")}
         />
       </View>
 
