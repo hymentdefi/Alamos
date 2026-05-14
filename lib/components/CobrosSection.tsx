@@ -140,9 +140,9 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
   const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
-  /* Sheet de detalle (cupones / dividendos / amortizaciones /
-   * forward12M). Cada row del card Detalle abre su entry de
-   * STAT_INFO con la explicación retail. */
+  /* Sheet de detalle (cupones / dividendos / amortizaciones).
+   * Cada row del card Detalle abre su entry de STAT_INFO con la
+   * explicación retail. */
   const [openStat, setOpenStat] = useState<StatKey | null>(null);
 
   const events = useMemo(() => generatePayouts(), []);
@@ -191,26 +191,6 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
     return events.filter((e) => e.date.startsWith(scrubKey));
   }, [scrubKey, events]);
 
-  /* Forward 12M — sumatoria de eventos por venir en los próximos
-   * 12 meses, en ARS. Reusable en el card Detalle como
-   * "Proyectado 12M". */
-  const forward12MArs = useMemo(() => {
-    const today = MOCK_TODAY;
-    const todayIso = today.toISOString().slice(0, 10);
-    const oneYearFromNow = new Date(
-      today.getFullYear() + 1,
-      today.getMonth(),
-      today.getDate(),
-    );
-    const oneYearFromNowIso = oneYearFromNow.toISOString().slice(0, 10);
-    let total = 0;
-    for (const e of events) {
-      if (e.date > todayIso && e.date <= oneYearFromNowIso) {
-        total += toArs(e.amount, e.currency);
-      }
-    }
-    return total;
-  }, [events, toArs]);
 
   /* Si no hay eventos, no renderizamos nada — para holdings sin renta
    * (solo crypto, solo FCI, etc.) la sección no aporta. */
@@ -464,11 +444,11 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
           ) : null}
 
           {/* ─── Card 4: Detalle — desglose de los flujos cobrados
-              YTD por tipo (cupones / dividendos / amortizaciones) +
-              proyectado 12M. Mismo estilo que el StatRow de la
-              sub-pantalla /estadisticas: label + sub-texto a la
-              izquierda, valor a la derecha, tappable abre el
-              StatInfoSheet con explicación retail por término. */}
+              YTD por tipo (cupones / dividendos / amortizaciones).
+              Mismo estilo que el StatRow de /estadisticas: label +
+              sub-texto a la izquierda, valor a la derecha, tappable
+              abre el StatInfoSheet con explicación retail por
+              término. */}
           {ytdPaid.totalArs > 0 ? (
             <View style={s.card}>
               <Text style={[s.eyebrow, { color: c.text }]}>
@@ -493,13 +473,6 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
                     label: "Amortizaciones",
                     sub: "devolución de capital",
                     value: ytdPaid.byType.amortizacion,
-                  },
-                  {
-                    key: "forward12M" as StatKey,
-                    label: "Proyectado 12M",
-                    sub: "estimación de cobros próximo año",
-                    value: forward12MArs,
-                    accent: true,
                   },
                 ] as const
               ).map((row, i, arr) => (
@@ -532,10 +505,7 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
                       </Text>
                     </View>
                     <Text
-                      style={[
-                        s.detalleValue,
-                        { color: row.accent ? tone : c.text },
-                      ]}
+                      style={[s.detalleValue, { color: c.text }]}
                       numberOfLines={1}
                     >
                       {formatMoney(toDisplay(row.value), currency)}
