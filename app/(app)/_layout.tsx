@@ -105,12 +105,6 @@ export default function AppLayout() {
           name="estadisticas"
           options={{ fullScreenGestureEnabled: false }}
         />
-        {/* Proyección (Monte Carlo): fan chart + horizon pills.
-            Misma protección que el resto. */}
-        <Stack.Screen
-          name="proyeccion"
-          options={{ fullScreenGestureEnabled: false }}
-        />
         {/* ADN (Factor Exposure): barras horizontales 0-100 con
             marker de benchmark. Misma protección. */}
         <Stack.Screen

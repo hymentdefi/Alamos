@@ -331,12 +331,13 @@ export default function RendimientoScreen() {
             tier1={tier1Stats}
             tier2={tier2Stats}
             formatAmount={fmtAmount}
+            tone={color}
           />
 
-          {/* Tier 1 stats — bento grid de 8 cards según la spec
-              interna (Portfolio Statistics Engine v1.0). Tap a una
-              card abre el StatInfoSheet con el nombre técnico +
-              explicación retail. */}
+          {/* Tier 1 stats — grilla 3×2 (con la última full-width)
+              según la spec interna (Portfolio Statistics Engine
+              v1.0). Tap a una celda abre el StatInfoSheet con el
+              nombre técnico + explicación retail. */}
           <Tier1StatsBento
             range={range}
             currency={currency}
@@ -345,32 +346,14 @@ export default function RendimientoScreen() {
             twrPct={rangePct}
             totalArs={totalArs}
             toDisplay={toDisplay}
+            tone={color}
           />
 
-          {/* Entradas Fase 3: "Proyección de tu portfolio" (Monte Carlo)
-              + "ADN de tu portfolio" (Factor Exposure). Mismo pattern
-              que el BriefingCard de stock detail — título c.brand 22pt
-              + arrow-right verde pegado al lado, descripción debajo.
-              Labels retail per spec 5.5 + 6.4 — nunca decimos
-              "Monte Carlo" o "Factor Exposure" en la UI. */}
-          <Tap
-            onPress={() => router.push("/proyeccion" as never)}
-            haptic="selection"
-            pressScale={0.98}
-            style={s.sectionLink}
-          >
-            <View style={s.sectionLinkHead}>
-              <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
-                Proyección de tu portfolio
-              </Text>
-              <Feather name="arrow-right" size={20} color={c.brand} />
-            </View>
-            <Text style={[s.sectionLinkSub, { color: c.textMuted }]}>
-              Simulamos miles de escenarios posibles para estimar cómo
-              podría crecer tu inversión.
-            </Text>
-          </Tap>
-
+          {/* Entrada "ADN de tu portfolio" (Factor Exposure). Mismo
+              pattern que el BriefingCard de stock detail — título
+              tone (brand cuando up, c.red cuando down) 22pt +
+              arrow-right pegado al lado, descripción debajo. Spec
+              6.4: nunca decimos "Factor Exposure" en la UI. */}
           <Tap
             onPress={() => router.push("/adn" as never)}
             haptic="selection"
@@ -378,10 +361,10 @@ export default function RendimientoScreen() {
             style={s.sectionLink}
           >
             <View style={s.sectionLinkHead}>
-              <Text style={[s.sectionLinkTitle, { color: c.brand }]}>
+              <Text style={[s.sectionLinkTitle, { color }]}>
                 ADN de tu portfolio
               </Text>
-              <Feather name="arrow-right" size={20} color={c.brand} />
+              <Feather name="arrow-right" size={20} color={color} />
             </View>
             <Text style={[s.sectionLinkSub, { color: c.textMuted }]}>
               Analizamos las características principales de tus
@@ -399,6 +382,7 @@ export default function RendimientoScreen() {
           >
             <CobrosSection
               currency={currency}
+              tone={color}
               onMonthSelect={() => {
                 scrollRef.current?.scrollTo({
                   y: cobrosY.current,

@@ -39,6 +39,14 @@ interface Props {
    *  (no cuando deselecciona). El parent suele usarlo para hacer
    *  auto-scroll y dejar el header de Cobros arriba de todo. */
   onMonthSelect?: () => void;
+  /** Color tonal — c.brand cuando el rendimiento del rango es
+   *  positivo, c.red cuando es negativo. Pinta título "Flujos del
+   *  año" + info icon + nextWhen + "Ver el calendario completo" +
+   *  chevron + filas acentuadas del detalle. Los indicadores
+   *  semánticos (pagado/proyectado, hero AmountDisplay del ingreso
+   *  YTD) se mantienen en c.brand porque representan income, no
+   *  rendimiento del portfolio. */
+  tone: string;
 }
 
 /* Bar — barra del bar chart con animación de lift cuando se activa.
@@ -127,7 +135,7 @@ function Bar({
  * muestran la moneda nativa porque un cupón de AL30 en USD se lee con
  * más fidelidad que el equivalente en pesos.
  */
-export function CobrosSection({ currency, onMonthSelect }: Props) {
+export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
   const { c } = useTheme();
   const router = useRouter();
   const [scrubIdx, setScrubIdx] = useState<number | null>(null);
@@ -232,7 +240,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           pressScale={0.97}
           hitSlop={8}
         >
-          <Text style={[s.sectionTitle, { color: c.brand }]}>
+          <Text style={[s.sectionTitle, { color: tone }]}>
             Flujos del año
           </Text>
         </Tap>
@@ -243,7 +251,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
           style={s.sectionInfoDot}
           accessibilityLabel="Qué son los flujos del año"
         >
-          <Feather name="info" size={15} color={c.brand} />
+          <Feather name="info" size={15} color={tone} />
         </Tap>
       </View>
 
@@ -373,7 +381,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
                   <Text style={[s.nextAmount, { color: c.text }]}>
                     {formatMoney(nextEvent.amount, nextEvent.currency)}
                   </Text>
-                  <Text style={[s.nextWhen, { color: c.brand }]}>
+                  <Text style={[s.nextWhen, { color: tone }]}>
                     {formatRelativeDate(nextEvent.date)}
                     {daysUntil(nextEvent.date) > 1
                       ? ` · ${formatShortDate(nextEvent.date)}`
@@ -443,13 +451,13 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
                 pressScale={0.97}
                 style={[s.seeMore, { borderTopColor: c.border }]}
               >
-                <Text style={[s.seeMoreText, { color: c.brand }]}>
+                <Text style={[s.seeMoreText, { color: tone }]}>
                   Ver el calendario completo
                 </Text>
                 <Feather
                   name="chevron-right"
                   size={16}
-                  color={c.brand}
+                  color={tone}
                 />
               </Tap>
             </View>
@@ -526,7 +534,7 @@ export function CobrosSection({ currency, onMonthSelect }: Props) {
                     <Text
                       style={[
                         s.detalleValue,
-                        { color: row.accent ? c.brand : c.text },
+                        { color: row.accent ? tone : c.text },
                       ]}
                       numberOfLines={1}
                     >
