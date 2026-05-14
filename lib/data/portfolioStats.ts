@@ -675,12 +675,12 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
   mwr: {
     title: "¿Qué es tu ganancia?",
     technicalName: "Money-Weighted Return (IRR)",
-    body: "La tasa de retorno que tuvo TU plata, considerando cuándo aportaste y cuánto. Si compraste en buen momento, va a ser más alta que el rendimiento puro del activo. Mide tu performance personal como inversor.",
+    body: "El monto real que ganaste o perdiste en este período. Considera cuándo aportaste plata: si pusiste cuando estaba barato, este número es más alto. Es lo que efectivamente te quedó.",
   },
   twr: {
-    title: "¿Qué es la performance de tus activos?",
+    title: "¿Qué es el retorno?",
     technicalName: "Time-Weighted Return (TWR)",
-    body: "La ganancia pura de los activos del portfolio, sin que afecten los aportes o retiros que hiciste. Sirve para comparar tu portfolio contra benchmarks como el S&P 500 en igualdad de condiciones.",
+    body: "Qué tan bien rindieron los activos del portfolio en porcentaje, sin importar cuándo aportaste o retiraste plata. Sirve para comparar tu portfolio contra benchmarks como el S&P 500 en igualdad de condiciones.",
   },
   volatility: {
     title: "¿Qué es el riesgo de tu portfolio?",
@@ -766,7 +766,7 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
   returnsByPeriod: {
     title: "¿Qué es el rendimiento por período?",
     technicalName: "Performance Table",
-    body: "Tu rendimiento mostrado en distintas ventanas de tiempo, con TWR (limpio de aportes) y MWR (incluyendo cuándo aportaste). Te deja comparar performance del último día contra el último año o desde que empezaste.",
+    body: "Tu rendimiento mostrado en distintas ventanas de tiempo, con TWR (limpio de aportes) y MWR (incluyendo cuándo aportaste). Te deja comparar el último día contra el último año o desde que empezaste.",
   },
 };
 

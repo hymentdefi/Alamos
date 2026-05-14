@@ -49,7 +49,7 @@ function semaforoColor(s: Semaforo, c: ReturnType<typeof useTheme>["c"]) {
  * Stats (6, en 3 filas × 2 columnas):
  *   1. Total invertido (Cost basis)
  *   2. Ganancia (MWR)
- *   3. Performance (TWR)
+ *   3. Retorno (TWR)
  *   4. Riesgo (Volatilidad anualizada) — semáforo
  *   5. vs Mercado (Alpha vs S&P 500) — semáforo
  *   6. Dividendos (Yield TTM)
@@ -114,7 +114,7 @@ export function Tier1StatsBento({
     },
     {
       key: "twr",
-      label: "Performance",
+      label: "Retorno",
       primary: formatPct(stats.twr.pct),
       primaryColor: stats.twr.pct >= 0 ? c.brand : c.red,
     },
