@@ -126,9 +126,6 @@ export function Tier1StatsBento({
       key: "dividendYield",
       label: "Dividendos",
       primary: `${stats.dividendYield.pct.toFixed(2).replace(".", ",")}%`,
-      sub: stats.dividendYield.cobradoYtd > 0
-        ? `${fmt(stats.dividendYield.cobradoYtd)} cobrado`
-        : "anual",
     },
   ];
 
