@@ -28,6 +28,10 @@ interface Props {
   totalArs: number;
   /** Convertidor ARS → display currency. */
   toDisplay: (ars: number) => number;
+  /** Color tonal — c.brand cuando el rendimiento del rango es
+   *  positivo, c.red cuando es negativo. Pinta el título y los
+   *  links de identidad del bento. */
+  tone: string;
 }
 
 /* Color del semáforo. Verde es brand, amarillo es brand-amber custom
@@ -63,6 +67,7 @@ export function Tier1StatsBento({
   twrPct,
   totalArs,
   toDisplay,
+  tone,
 }: Props) {
   const { c } = useTheme();
   const router = useRouter();
@@ -127,15 +132,6 @@ export function Tier1StatsBento({
       limited: stats.limitedData,
     },
     {
-      key: "alpha",
-      label: "vs Mercado",
-      primary: formatPct(stats.alpha.pct),
-      primaryColor: stats.alpha.pct >= 0 ? c.brand : c.red,
-      sub: `S&P 500 · ${formatPct(stats.alpha.benchmarkPct)}`,
-      semaforo: stats.alpha.semaforo,
-      limited: stats.limitedData,
-    },
-    {
       key: "dividendYield",
       label: "Dividendos",
       primary: `${stats.dividendYield.pct.toFixed(2).replace(".", ",")}%`,
@@ -147,7 +143,7 @@ export function Tier1StatsBento({
 
   return (
     <View style={s.bentoCard}>
-      <Text style={[s.bentoTitle, { color: c.brand }]}>Estadísticas</Text>
+      <Text style={[s.bentoTitle, { color: tone }]}>Estadísticas</Text>
       {/* Grid Apple/Robinhood: 6 stats en 3 filas × 2 columnas, sin
           card chrome — sólo hairlines dividiendo celdas. Vertical
           entre columnas, horizontal entre filas. */}
@@ -243,10 +239,10 @@ export function Tier1StatsBento({
         pressScale={0.97}
         style={[s.seeMore, { borderTopColor: c.border }]}
       >
-        <Text style={[s.seeMoreText, { color: c.brand }]}>
+        <Text style={[s.seeMoreText, { color: tone }]}>
           Ver más estadísticas
         </Text>
-        <Feather name="chevron-right" size={16} color={c.brand} />
+        <Feather name="chevron-right" size={16} color={tone} />
       </Tap>
 
       <StatInfoSheet

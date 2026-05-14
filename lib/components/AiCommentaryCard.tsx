@@ -16,6 +16,10 @@ interface Props {
   tier2: Tier2Stats;
   /** Formateador de moneda para los montos del cuerpo (income). */
   formatAmount: (n: number) => string;
+  /** Color tonal — c.brand cuando el rendimiento del rango es
+   *  positivo, c.red cuando es negativo. Pinta el título "Análisis"
+   *  + zap icon para que toda la pantalla respire la misma señal. */
+  tone: string;
 }
 
 /**
@@ -38,6 +42,7 @@ export function AiCommentaryCard({
   tier1,
   tier2,
   formatAmount,
+  tone,
 }: Props) {
   const { c } = useTheme();
 
@@ -49,8 +54,8 @@ export function AiCommentaryCard({
   return (
     <View style={s.card}>
       <View style={s.header}>
-        <Feather name="zap" size={16} color={c.brand} />
-        <Text style={[s.title, { color: c.brand }]}>Análisis</Text>
+        <Feather name="zap" size={16} color={tone} />
+        <Text style={[s.title, { color: tone }]}>Análisis</Text>
       </View>
 
       {paragraphs.map((p, i) => (
