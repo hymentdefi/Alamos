@@ -1821,11 +1821,10 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 22/32 (line-height ~1.45). Salto grande para ver hasta dónde
-     * llega la prominencia antes de que el safety net empiece a
-     * shrinkear visiblemente para muchas frases. */
-    fontSize: 22,
-    lineHeight: 32,
+    /* 20/29 (line-height 1.45). Punto intermedio entre el 18 que
+     * sabemos seguro y el 22 que estaba al borde. */
+    fontSize: 20,
+    lineHeight: 29,
     letterSpacing: -0.3,
   },
   /* Separator sutil entre el statement y los controles. Mismo
