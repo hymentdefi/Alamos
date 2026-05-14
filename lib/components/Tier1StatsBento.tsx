@@ -46,17 +46,15 @@ function semaforoColor(s: Semaforo, c: ReturnType<typeof useTheme>["c"]) {
  * Tier 1 stats bento — grid 2-col con las métricas principales del
  * portfolio según la spec interna (Portfolio Statistics Engine v1.0).
  *
- * Stats (6, en 3 filas × 2 columnas):
+ * Stats (4, en 2 filas × 2 columnas):
  *   1. Total invertido (Cost basis)
- *   2. Ganancia (MWR)
- *   3. Retorno (TWR)
- *   4. Riesgo (Volatilidad anualizada) — semáforo
- *   5. vs Mercado (Alpha vs S&P 500) — semáforo
- *   6. Dividendos (Yield TTM)
+ *   2. Retorno (TWR) — porcentaje
+ *   3. Riesgo (Volatilidad anualizada) — semáforo
+ *   4. Dividendos (Yield TTM)
  *
  * Cada celda tappable abre el StatInfoSheet con la explicación retail
- * + nombre técnico. Las celdas de riesgo (Vol/Alpha) tienen dot
- * semáforo verde/amarillo/rojo. Si el range es corto (<6m), se
+ * + nombre técnico. La celda de Riesgo tiene dot semáforo
+ * verde/amarillo/rojo. Si el range es corto (<6m), se
  * muestra badge "Datos limitados" en esas mismas.
  */
 export function Tier1StatsBento({
@@ -106,13 +104,6 @@ export function Tier1StatsBento({
       primary: fmt(stats.totalInvertido),
     },
     {
-      key: "mwr",
-      label: "Ganancia",
-      primary: `${stats.mwr.amount >= 0 ? "+" : "−"}${fmt(Math.abs(stats.mwr.amount))}`,
-      primaryColor: stats.mwr.pct >= 0 ? c.brand : c.red,
-      sub: formatPct(stats.mwr.pct),
-    },
-    {
       key: "twr",
       label: "Retorno",
       primary: formatPct(stats.twr.pct),
@@ -144,11 +135,15 @@ export function Tier1StatsBento({
   return (
     <View style={s.bentoCard}>
       <Text style={[s.bentoTitle, { color: tone }]}>Estadísticas</Text>
-      {/* Grid Apple/Robinhood: 6 stats en 3 filas × 2 columnas, sin
+      {/* Grid Apple/Robinhood: 4 stats en 2 filas × 2 columnas, sin
           card chrome — sólo hairlines dividiendo celdas. Vertical
-          entre columnas, horizontal entre filas. */}
+          entre columnas, horizontal entre filas. Filas computadas
+          a partir de cards.length para sobrevivir a stats add/remove. */}
       <View style={s.grid}>
-        {[0, 2, 4].map((startIdx) => {
+        {Array.from(
+          { length: Math.ceil(cards.length / 2) },
+          (_, i) => i * 2,
+        ).map((startIdx) => {
           const row = cards.slice(startIdx, startIdx + 2);
           const isLastRow = startIdx + 2 >= cards.length;
           return (
