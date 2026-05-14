@@ -1821,17 +1821,12 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 18/26 (line-height ~1.44, matchea spec original). El user
-     * verificó visualmente que la frase más larga del sistema
-     * (Bollinger período 100 + 2,5σ + ticker BTC/USDT ~85 chars)
-     * entraba en 2 líneas con margen a 17px. Subo a 18 que sigue
-     * siendo seguro — Plus Jakarta Sans renderea más estrecho
-     * que mi estimación inicial. El safety net del PreviewSentence
-     * sigue activo por si una combinación todavía más extrema
-     * empuja a 3 líneas. */
-    fontSize: 18,
-    lineHeight: 26,
-    letterSpacing: -0.2,
+    /* 22/32 (line-height ~1.45). Salto grande para ver hasta dónde
+     * llega la prominencia antes de que el safety net empiece a
+     * shrinkear visiblemente para muchas frases. */
+    fontSize: 22,
+    lineHeight: 32,
+    letterSpacing: -0.3,
   },
   /* Separator sutil entre el statement y los controles. Mismo
    * lenguaje que el Separator interno de las ParamRows, con
