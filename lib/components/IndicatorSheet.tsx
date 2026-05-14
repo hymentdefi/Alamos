@@ -1821,16 +1821,16 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 17/25 (line-height 1.47). La frase más larga posible del
-     * sistema es Bollinger con presets máximos + ticker largo
-     * (~85 chars). A 17px caben ~38 chars/línea, lo que pone esa
-     * frase al borde de 3 líneas — para ese caso extremo y solo
-     * ese, el safety net del PreviewSentence
-     * (adjustsFontSizeToFit + minimumFontScale 0.9) baja a ~15px
-     * para garantizar 2 líneas. Todos los presets standard
-     * renderean a 17px uniforme. */
-    fontSize: 17,
-    lineHeight: 25,
+    /* 18/26 (line-height ~1.44, matchea spec original). El user
+     * verificó visualmente que la frase más larga del sistema
+     * (Bollinger período 100 + 2,5σ + ticker BTC/USDT ~85 chars)
+     * entraba en 2 líneas con margen a 17px. Subo a 18 que sigue
+     * siendo seguro — Plus Jakarta Sans renderea más estrecho
+     * que mi estimación inicial. El safety net del PreviewSentence
+     * sigue activo por si una combinación todavía más extrema
+     * empuja a 3 líneas. */
+    fontSize: 18,
+    lineHeight: 26,
     letterSpacing: -0.2,
   },
   /* Separator sutil entre el statement y los controles. Mismo
