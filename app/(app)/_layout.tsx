@@ -193,6 +193,10 @@ export default function AppLayout() {
             gestureEnabled: false,
           }}
         />
+        {/* Tu Álamo — antes era una tab, ahora se accede vía el botón
+            hamburguesa top-left de Inicio. Slide_from_right standard
+            con edge-swipe-back. */}
+        <Stack.Screen name="alamo" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="security" />
         <Stack.Screen name="chat" />

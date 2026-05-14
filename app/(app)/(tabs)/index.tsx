@@ -360,6 +360,17 @@ function BaseHome() {
         style={StyleSheet.absoluteFill}
       />
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        {/* Hamburger top-left: abre /alamo (perfil + settings). Antes
+            Tu Álamo era una tab del bottom bar — ahora se accede acá
+            estilo Robinhood (3 rayitos limpios). */}
+        <Tap
+          style={s.menuBtn}
+          onPress={() => router.push("/(app)/alamo")}
+          hitSlop={8}
+          haptic="selection"
+        >
+          <Feather name="menu" size={24} color={c.text} />
+        </Tap>
         <View style={s.topActions}>
           <Animated.View
             style={{ transform: [{ scale: giftPulse }] }}
@@ -1018,7 +1029,16 @@ const s = StyleSheet.create({
     paddingBottom: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+  },
+  /* Hamburger Robinhood-style: 3 rayitos limpios sin chrome.
+   * Mismo hit area (40×40) que los topIconBtn de la derecha para
+   * que se sienta consistente al tap. */
+  menuBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   topActions: {
     flexDirection: "row",
