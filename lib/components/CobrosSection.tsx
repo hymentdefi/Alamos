@@ -40,12 +40,11 @@ interface Props {
    *  auto-scroll y dejar el header de Cobros arriba de todo. */
   onMonthSelect?: () => void;
   /** Color tonal — c.brand cuando el rendimiento del rango es
-   *  positivo, c.red cuando es negativo. Pinta título "Flujos del
-   *  año" + info icon + nextWhen + "Ver el calendario completo" +
-   *  chevron + filas acentuadas del detalle. Los indicadores
-   *  semánticos (pagado/proyectado, hero AmountDisplay del ingreso
-   *  YTD) se mantienen en c.brand porque representan income, no
-   *  rendimiento del portfolio. */
+   *  positivo, c.red cuando es negativo. Pinta todo lo que era
+   *  verde en la sección: título "Flujos del año", info icon,
+   *  hero AmountDisplay (te queda por cobrar / cobraste este año
+   *  / monto del mes pagado), barras del bar chart (activas y
+   *  pagadas), nextWhen, "Ver el calendario completo" + chevron. */
   tone: string;
 }
 
@@ -246,7 +245,7 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
             <AmountDisplay
               value={toDisplay(scrubBucket.totalArs)}
               size={32}
-              color={scrubBucket.paid ? c.brand : c.text}
+              color={scrubBucket.paid ? tone : c.text}
               decimalsColor={c.textMuted}
               currency={currency}
             />
@@ -259,8 +258,8 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
             <AmountDisplay
               value={remainingDisplay}
               size={32}
-              color={c.brand}
-              decimalsColor={c.brand}
+              color={tone}
+              decimalsColor={tone}
               currency={currency}
             />
           </>
@@ -274,8 +273,8 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
             <AmountDisplay
               value={ytdDisplay}
               size={32}
-              color={c.brand}
-              decimalsColor={c.brand}
+              color={tone}
+              decimalsColor={tone}
               currency={currency}
             />
           </>
@@ -287,11 +286,11 @@ export function CobrosSection({ currency, onMonthSelect, tone }: Props) {
               ? Math.max(4, (b.totalArs / maxBucket) * BAR_MAX_H)
               : 2;
             const active = scrubIdx === i;
-            /* Barra activa siempre en brand (incluso si es mes
+            /* Barra activa siempre en tone (incluso si es mes
              * futuro), para que se destaque sobre el resto. */
-            const baseColor = active ? c.brand : b.paid ? c.brand : c.border;
+            const baseColor = active ? tone : b.paid ? tone : c.border;
             const labelColor = active
-              ? c.brand
+              ? tone
               : b.isCurrent
                 ? c.text
                 : c.textMuted;
