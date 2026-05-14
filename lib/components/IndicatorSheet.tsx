@@ -708,15 +708,15 @@ function PreviewSentence({
   c: ColorMap;
 }) {
   const segments = previewSegments(type, ticker, config);
+  const { fontSize, lineHeight } = fontForIndicator(type);
   return (
     <Text
-      style={[s.statementSentence, { color: c.text }]}
-      /* Safety net: si una combinación extrema (e.g. Bollinger
-       * período 100 + desv 2.5σ + ticker largo BTC/USDT) empuja
-       * la frase a 3 líneas, RN shrinkea el font hasta entrar en
-       * 2. Min scale 0.9 = ~14.4px piso, todavía legible. Para
-       * presets standard nunca dispara, todo renderea a 16px
-       * uniforme. */
+      style={[s.statementSentence, { color: c.text, fontSize, lineHeight }]}
+      /* Safety net: si una combinación extrema empuja una frase a
+       * 3 líneas, RN shrinkea el font hasta entrar en 2. Floor en
+       * 0.9 del fontSize base — para los presets standard de cada
+       * indicador nunca debería dispararse, cada uno tiene un
+       * tamaño calibrado para entrar en 2 líneas con margen. */
       numberOfLines={2}
       adjustsFontSizeToFit
       minimumFontScale={0.9}
@@ -1570,6 +1570,25 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
+/** Asigna fontSize / lineHeight al statement según el indicador,
+ *  para que cada frase entre cómoda en 2 líneas sin disparar el
+ *  safety net. SMA/EMA tienen las frases más cortas (~67-70 chars)
+ *  → font más grande. Bollinger tiene las más largas (~81-85 chars
+ *  con presets máximos) → font más chico. RSI/Volume/MACD en el
+ *  medio. lineHeight calculado a ratio ~1.45 (matchea spec
+ *  original) y redondeado al px. */
+function fontForIndicator(type: IndicatorType): {
+  fontSize: number;
+  lineHeight: number;
+} {
+  if (type === "ma") return { fontSize: 22, lineHeight: 32 };
+  if (type === "rsi") return { fontSize: 21, lineHeight: 30 };
+  if (type === "volume" || type === "macd")
+    return { fontSize: 20, lineHeight: 29 };
+  // bollinger
+  return { fontSize: 19, lineHeight: 28 };
+}
+
 /** Genera los segmentos del preview — partes en c.brand (highlight)
  *  vs partes en c.text (neutral). Estructura compacta + "velas de
  *  TF" para que el user que recibe la push sepa la temporalidad.
@@ -1821,9 +1840,10 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 19/28 (line-height ~1.47). */
-    fontSize: 19,
-    lineHeight: 28,
+    /* fontSize / lineHeight se inyectan inline desde
+     * fontForIndicator() — cada indicador tiene su tamaño
+     * calibrado para que su frase máxima entre cómoda en 2
+     * líneas sin disparar el safety net. */
     letterSpacing: -0.3,
   },
   /* Separator sutil entre el statement y los controles. Mismo
