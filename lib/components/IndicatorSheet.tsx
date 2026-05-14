@@ -1821,10 +1821,9 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* 20/29 (line-height 1.45). Punto intermedio entre el 18 que
-     * sabemos seguro y el 22 que estaba al borde. */
-    fontSize: 20,
-    lineHeight: 29,
+    /* 19/28 (line-height ~1.47). */
+    fontSize: 19,
+    lineHeight: 28,
     letterSpacing: -0.3,
   },
   /* Separator sutil entre el statement y los controles. Mismo
