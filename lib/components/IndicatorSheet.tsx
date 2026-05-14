@@ -708,10 +708,9 @@ function PreviewSentence({
   c: ColorMap;
 }) {
   const segments = previewSegments(type, ticker, config);
-  const { fontSize, lineHeight } = fontForIndicator(type);
   return (
     <Text
-      style={[s.statementSentence, { color: c.text, fontSize, lineHeight }]}
+      style={[s.statementSentence, { color: c.text }]}
       /* Safety net: si una combinación extrema empuja una frase a
        * 3 líneas, RN shrinkea el font hasta entrar en 2. Floor en
        * 0.9 del fontSize base — para los presets standard de cada
@@ -1570,25 +1569,6 @@ function indicatorTitle(t: IndicatorType, cfg?: ConfigState): string {
   return "Volumen";
 }
 
-/** Asigna fontSize / lineHeight al statement según el indicador,
- *  para que cada frase entre cómoda en 2 líneas sin disparar el
- *  safety net. SMA/EMA tienen las frases más cortas (~67-70 chars)
- *  → font más grande. Bollinger tiene las más largas (~81-85 chars
- *  con presets máximos) → font más chico. RSI/Volume/MACD en el
- *  medio. lineHeight calculado a ratio ~1.45 (matchea spec
- *  original) y redondeado al px. */
-function fontForIndicator(type: IndicatorType): {
-  fontSize: number;
-  lineHeight: number;
-} {
-  if (type === "ma") return { fontSize: 22, lineHeight: 32 };
-  if (type === "rsi") return { fontSize: 21, lineHeight: 30 };
-  if (type === "volume" || type === "macd")
-    return { fontSize: 20, lineHeight: 29 };
-  // bollinger
-  return { fontSize: 19, lineHeight: 28 };
-}
-
 /** Genera los segmentos del preview — partes en c.brand (highlight)
  *  vs partes en c.text (neutral). Estructura compacta + "velas de
  *  TF" para que el user que recibe la push sepa la temporalidad.
@@ -1840,10 +1820,13 @@ const s = StyleSheet.create({
   },
   statementSentence: {
     fontFamily: fontFamily[400],
-    /* fontSize / lineHeight se inyectan inline desde
-     * fontForIndicator() — cada indicador tiene su tamaño
-     * calibrado para que su frase máxima entre cómoda en 2
-     * líneas sin disparar el safety net. */
+    /* 21/30 (line-height ~1.43) uniforme para todos los
+     * indicadores. Si alguna frase larga (Bollinger max) no
+     * entra en 2 líneas, el safety net del PreviewSentence
+     * (adjustsFontSizeToFit + minimumFontScale 0.9) shrinkea
+     * solo esa frase puntual. */
+    fontSize: 21,
+    lineHeight: 30,
     letterSpacing: -0.3,
   },
   /* Separator sutil entre el statement y los controles. Mismo
