@@ -670,7 +670,7 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
   totalInvertido: {
     title: "¿Qué es el total invertido?",
     technicalName: "Cost basis",
-    body: "Es la suma de todo el capital que aportaste al portfolio. No incluye las ganancias o pérdidas: solo lo que pusiste de tu bolsillo. Sirve de ancla para medir cuánto ganaste o perdiste sobre lo invertido.",
+    body: "Es la suma de todo el capital que aportaste al portfolio desde que empezaste. No depende del período seleccionado: siempre es lo mismo, porque refleja toda tu plata puesta a lo largo de la historia. Sirve de ancla para medir cuánto ganaste o perdiste sobre lo invertido.",
   },
   mwr: {
     title: "¿Qué es tu ganancia?",
@@ -680,7 +680,7 @@ export const STAT_INFO: Record<StatKey, StatInfo> = {
   twr: {
     title: "¿Qué es el retorno?",
     technicalName: "Time-Weighted Return (TWR)",
-    body: "Qué tan bien rindieron los activos del portfolio en porcentaje, sin importar cuándo aportaste o retiraste plata. Sirve para comparar tu portfolio contra benchmarks como el S&P 500 en igualdad de condiciones.",
+    body: "Qué tan bien rindieron los activos del portfolio en porcentaje durante el período seleccionado, sin importar cuándo aportaste o retiraste plata.",
   },
   volatility: {
     title: "¿Qué es el riesgo de tu portfolio?",
