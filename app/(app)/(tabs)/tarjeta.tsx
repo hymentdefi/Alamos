@@ -14,9 +14,9 @@ import { useFloatingTabBarHeight } from "../../../lib/components/FloatingTabBar"
 /**
  * Tab Tarjeta — placeholder de la futura tarjeta de débito Álamos. La
  * pantalla todavía no tiene producto detrás: muestra una representación
- * visual de la tarjeta + un eyebrow "Próximamente" + copy minimal que
- * comunica la idea. El contenido real (activación, movimientos, límites,
- * controles) se construirá cuando el producto exista.
+ * visual de la tarjeta + copy minimal que comunica la idea. El contenido
+ * real (activación, movimientos, límites, controles) se construirá
+ * cuando el producto exista.
  */
 export default function TarjetaScreen() {
   const { c } = useTheme();
@@ -46,9 +46,6 @@ export default function TarjetaScreen() {
       >
         <View style={s.heroBlock}>
           <Text style={[s.title, { color: c.text }]}>Tarjeta</Text>
-          <Text style={[s.eyebrow, { color: c.brand }]}>
-            PRÓXIMAMENTE
-          </Text>
         </View>
 
         <View style={s.cardWrap}>
@@ -127,12 +124,6 @@ const s = StyleSheet.create({
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -1.2,
-  },
-  eyebrow: {
-    fontFamily: fontFamily[800],
-    fontSize: 11,
-    letterSpacing: 1.4,
-    marginTop: 4,
   },
   /* Card art wrapper — aspect ratio fijo del PVC standard (1.586:1).
    * Centrado horizontalmente con padding lateral cómodo. */
