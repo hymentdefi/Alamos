@@ -26,7 +26,6 @@ const TAB_ROUTES: TabRoute[] = [
   { name: "portfolio", href: "/(app)/portfolio", title: "Portfolio", path: tabPaths.portfolio },
   { name: "tarjeta",   href: "/(app)/tarjeta",   title: "Tarjeta",   path: tabPaths.tarjeta },
   { name: "news",      href: "/(app)/news",      title: "Noticias",  path: tabPaths.news },
-  { name: "alamo",     href: "/(app)/alamo",     title: "Tu Álamo",  path: tabPaths.alamo },
 ];
 
 /**
@@ -160,9 +159,9 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     gap: 3,
   },
-  /* fontSize 11 (era 12) — con 6 tabs el ancho por slot cae a ~60 px
-   * en pantallas chicas (iPhone SE), y "Portfolio" / "Noticias" /
-   * "Tu Álamo" se cortaban a 12. */
+  /* fontSize 11 (era 12) — con 5 tabs el ancho por slot cae a ~72 px
+   * en pantallas chicas (iPhone SE), y "Portfolio" / "Noticias" se
+   * cortaban a 12. */
   label: {
     fontFamily: fontFamily[700],
     fontSize: 11,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Linking,
   Pressable,
@@ -9,16 +9,15 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useTheme, fontFamily, radius } from "../../../lib/theme";
-import { useAuth } from "../../../lib/auth/context";
-import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
-import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
-import { Tap } from "../../../lib/components/Tap";
-import { AppearanceSheet } from "../../../lib/components/AppearanceSheet";
+import { useTheme, fontFamily, radius } from "../../lib/theme";
+import { useAuth } from "../../lib/auth/context";
+import { AlamosAvatar } from "../../lib/components/AlamosAvatar";
+import { AlamosRefreshControl } from "../../lib/components/AlamosRefreshControl";
+import { Tap } from "../../lib/components/Tap";
+import { AppearanceSheet } from "../../lib/components/AppearanceSheet";
 
 const APP_VERSION = "v1.0.0";
 
@@ -27,8 +26,6 @@ export default function AlamoScreen() {
   const insets = useSafeAreaInsets();
   const { c, mode, pref } = useTheme();
   const { user, logout } = useAuth();
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollYRef = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -45,19 +42,6 @@ export default function AlamoScreen() {
     }, 1100);
   }, []);
 
-  // Tap-on-active-tab: scroll al tope si no estoy arriba; refresh
-  // si ya estoy. Mismo patrón que el resto de las tabs.
-  useEffect(() => {
-    return registerTabTap("alamo", {
-      isAtTop: () => scrollYRef.current <= 8,
-      scrollToTop: () =>
-        scrollRef.current?.scrollTo({ y: 0, animated: true }),
-      refresh: () => {
-        if (!refreshing) onRefresh();
-      },
-    });
-  }, [refreshing, onRefresh]);
-
   const firstName = user?.fullName?.split(" ")[0] ?? "Martín";
   const fullName = user?.fullName ?? firstName;
 
@@ -70,6 +54,18 @@ export default function AlamoScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bgWarm }]}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <Tap
+          onPress={() => router.back()}
+          haptic="selection"
+          hitSlop={12}
+          style={s.iconBtn}
+        >
+          <Feather name="arrow-left" size={24} color={c.text} />
+        </Tap>
+        <View style={{ flex: 1 }} />
+      </View>
+
       {/* ── Card de identidad: avatar + nombre + email. */}
       <View
         style={[
@@ -77,7 +73,7 @@ export default function AlamoScreen() {
           {
             backgroundColor: c.surface,
             borderColor: c.border,
-            marginTop: insets.top + 14,
+            marginTop: 8,
           },
         ]}
       >
@@ -101,16 +97,11 @@ export default function AlamoScreen() {
       </View>
 
       <ScrollView
-        ref={scrollRef}
         contentContainerStyle={{
           paddingTop: 10,
           paddingBottom: 220,
         }}
         showsVerticalScrollIndicator={false}
-        onScroll={(e) => {
-          scrollYRef.current = e.nativeEvent.contentOffset.y;
-        }}
-        scrollEventThrottle={16}
         refreshControl={
           <AlamosRefreshControl
             refreshing={refreshing}
@@ -330,6 +321,22 @@ function Divider() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
 
   /* Card de identidad: avatar + nombre + email. */
   identityCard: {
