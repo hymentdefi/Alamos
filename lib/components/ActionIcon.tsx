@@ -5,12 +5,9 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Invertir / Actividad).
  *
- * Por default: outline brand puro — círculo con stroke c.brand 3px y
- * símbolo interno en stroke c.brand 4px. Sin fill ni tint.
- *
- * Con `filled`: círculo solid c.brand, símbolo en stroke c.onColor.
- * Patrón filled brand CTA del design system — usado para destacar el
- * action principal (Ingresar) sobre los secundarios (Enviar, Invertir).
+ * Layout Lemon-style: círculo oscuro sólido (c.ink en light, gris
+ * oscuro en dark) con el símbolo en c.brand (verde). Alto contraste,
+ * el verde pop sobre la base oscura.
  */
 
 export type ActionIconName = "ingresar" | "enviar" | "invertir" | "actividad";
@@ -18,36 +15,26 @@ export type ActionIconName = "ingresar" | "enviar" | "invertir" | "actividad";
 interface Props {
   name: ActionIconName;
   size?: number;
-  /** Override del color del símbolo (y del stroke del círculo si no
-   *  está filled). Default: c.brand del theme (#00C805 canónico). */
+  /** Override del color del símbolo. Default: c.brand del theme. */
   stroke?: string;
-  /** Variant filled — círculo solid c.brand, símbolo en c.onColor.
-   *  Reservado para el primary action (Ingresar). Default false. */
-  filled?: boolean;
 }
 
 export const ActionIcon = memo(function ActionIcon({
   name,
   size = 56,
   stroke,
-  filled = false,
 }: Props) {
-  const { c } = useTheme();
-  const brand = stroke ?? c.brand;
-  const symbolColor = filled ? c.onColor : brand;
-  const circleFill = filled ? brand : "none";
-  const circleStroke = filled ? "none" : brand;
+  const { c, mode } = useTheme();
+  const isDark = mode === "dark";
+  const symbolColor = stroke ?? c.brand;
+  /* Círculo Lemon-style: bien oscuro en light (#0E0F0C ink),
+   * gris oscuro en dark (#1F1F1F surfaceHover-ish) para que se
+   * lea sobre el card #0F0F0F sin desaparecer. */
+  const circleColor = isDark ? "#1F1F1F" : "#0E0F0C";
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Circle
-        cx={32}
-        cy={32}
-        r={30.5}
-        fill={circleFill}
-        stroke={circleStroke}
-        strokeWidth={3}
-      />
+      <Circle cx={32} cy={32} r={30.5} fill={circleColor} />
       <G
         transform="translate(32 32)"
         fill="none"

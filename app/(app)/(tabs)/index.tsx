@@ -15,7 +15,6 @@ import { useIsFocused } from "@react-navigation/native";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
 import { Tap } from "../../../lib/components/Tap";
 import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
-import { GlassCard } from "../../../lib/components/GlassCard";
 import { ConvertCurrencyButton } from "../../../lib/components/ConvertCurrencyButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -418,16 +417,35 @@ function BaseHome() {
           <View style={s.balanceRow}>
             <AmountDisplay
               value={balanceDisplay}
-              size={40}
+              size={54}
               weight={800}
               currency={currency}
             />
           </View>
 
-          {/* CurrencyPill — pill chiquito ARS/USD que abre el sheet
-              "Cómo ver tu portfolio". Mismo mecanismo que el portfolio
-              tab — el sheet aclara que es la misma cartera, sólo
-              distinta valuación. */}
+          {/* Delta pill — Lemon-style. Bg brand-tinted (verde si up,
+              naranja si down), pct + time label adentro. Sin el
+              triángulo ni el monto absoluto, que era ruido visual:
+              el balance arriba ya muestra el valor, este pill sólo
+              comunica "cómo se movió y cuándo". */}
+          <View style={s.deltaRow}>
+            <View
+              style={[
+                s.deltaPill,
+                {
+                  backgroundColor: displayIsUp ? c.brandDim : c.redDim,
+                },
+              ]}
+            >
+              <Text style={[s.deltaPillText, { color: trendColor }]}>
+                {formatPct(displayPct)} · {timeLabel}
+              </Text>
+            </View>
+          </View>
+
+          {/* CurrencyPill — chip secundario que abre el sheet
+              "Cómo ver tu portfolio". Misma cartera, distinta
+              valuación. */}
           <View style={s.currencyPillRow}>
             <Tap
               haptic="selection"
@@ -447,28 +465,6 @@ function BaseHome() {
                 color={c.textMuted}
               />
             </Tap>
-          </View>
-
-          <View style={s.deltaRow}>
-            <Text style={[s.deltaTri, { color: trendColor }]}>
-              {displayIsUp ? "▲" : "▼"}
-            </Text>
-            <Text style={[s.deltaText, { color: trendColor }]}>
-              {maskAmount(
-                currency === "ARS"
-                  ? formatARS(Math.abs(deltaDisplay))
-                  : formatUSD(Math.abs(deltaDisplay)),
-                hideAmounts,
-              )}
-            </Text>
-            <Text style={[s.deltaSep, { color: trendColor }]}>·</Text>
-            <Text style={[s.deltaText, { color: trendColor }]}>
-              {formatPct(displayPct)}
-            </Text>
-            <Text style={[s.deltaSep, { color: c.textMuted }]}>·</Text>
-            <Text style={[s.timeLabel, { color: c.textMuted }]}>
-              {timeLabel}
-            </Text>
           </View>
 
           <View style={[s.chartWrap, { marginTop: 18 }]}>
@@ -564,22 +560,17 @@ function BaseHome() {
   );
 }
 
-/* ─── Action button: círculo glass con label debajo (estilo Revolut) ─── */
+/* ─── Action button: círculo Lemon-style con label debajo ─── */
 function ActionButton({
   iconName,
   label,
   onPress,
   haptic,
-  filled = false,
 }: {
   iconName: ActionIconName;
   label: string;
   onPress: () => void;
   haptic: "medium" | "light";
-  /** filled aplica el variant primary CTA del ActionIcon (círculo
-   *  solid c.brand + símbolo c.onColor). Reservado para el action
-   *  principal del home (Ingresar). */
-  filled?: boolean;
 }) {
   const { c } = useTheme();
   return (
@@ -589,8 +580,8 @@ function ActionButton({
       haptic={haptic}
       pressScale={0.94}
     >
-      <ActionIcon name={iconName} size={51} filled={filled} />
-      <Text style={[s.actionLabel, { color: c.textMuted }]} numberOfLines={1}>
+      <ActionIcon name={iconName} size={51} />
+      <Text style={[s.actionLabel, { color: c.text }]} numberOfLines={1}>
         {label}
       </Text>
     </Tap>
@@ -762,7 +753,7 @@ function Dinero(_: {
         </Pressable>
       </View>
 
-      <GlassCard padding={4}>
+      <View style={s.listWrap}>
         {sortedAccounts.map((a, i) => (
           <AccountRow
             key={a.id}
@@ -770,7 +761,7 @@ function Dinero(_: {
             withTopDivider={i > 0}
           />
         ))}
-      </GlassCard>
+      </View>
 
       <View style={s.convertBtnWrap}>
         <ConvertCurrencyButton
@@ -950,7 +941,7 @@ function Investments({
         />
       </Pressable>
 
-      <GlassCard padding={grouped.length > 0 ? 4 : 16}>
+      <View style={grouped.length > 0 ? s.listWrap : s.emptyWrap}>
         {grouped.length > 0 ? (
           grouped.map(([slug, data], i) => {
             const lookup = findCategoryBySlug(slug);
@@ -1010,10 +1001,10 @@ function Investments({
           })
         ) : (
           <Text style={[s.emptyPortfolio, { color: c.textMuted }]}>
-            Todavía no tenés inversiones. Entrá a Mercado para empezar.
+            Todavía no tenés inversiones. Entrá a Invertir para empezar.
           </Text>
         )}
-      </GlassCard>
+      </View>
     </View>
   );
 }
@@ -1072,6 +1063,17 @@ const s = StyleSheet.create({
   sectionBlock: {
     marginTop: 8,
     paddingHorizontal: 20,
+  },
+
+  /* Listas de Tu dinero / Tus inversiones — sueltas sobre el card
+   * blanco, sin chrome propio (sin borde, sin shadow). Los rows
+   * mismos manejan sus dividers con borderTop hairline. */
+  listWrap: {
+    paddingHorizontal: 4,
+  },
+  emptyWrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
 
   /* Acciones del home — estilo Revolut: círculo glass arriba con
@@ -1585,31 +1587,24 @@ const s = StyleSheet.create({
     letterSpacing: -2,
     marginBottom: 8,
   },
+  /* Delta como pill Lemon-style: bg brand/red tinted, pct + time
+   * adentro. flex-start porque queremos width auto basado en el
+   * contenido, no full-width del card. */
   deltaRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    marginTop: 10,
     marginBottom: 4,
-    flexWrap: "wrap",
   },
-  deltaTri: {
-    fontFamily: fontFamily[800],
-    fontSize: 12,
+  deltaPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
   },
-  deltaText: {
-    fontFamily: fontFamily[700],
-    fontSize: 14,
-    letterSpacing: -0.2,
-  },
-  deltaSep: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  timeLabel: {
-    fontFamily: fontFamily[500],
-    fontSize: 14,
-    letterSpacing: -0.2,
+  deltaPillText: {
+    fontFamily: fontFamily[600],
+    fontSize: 13,
+    letterSpacing: -0.15,
   },
   /* Timeline del chart — mismo lenguaje visual que el del stock
    * detail: 6 pills (1D / 7D / 1M / 3M / 1A / MAX) en cápsula
