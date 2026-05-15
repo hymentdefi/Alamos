@@ -381,16 +381,8 @@ function BaseHome() {
   }, [held]);
 
 
-  const isDark = mode === "dark";
-  // Layout estilo Lemon: bg gris claro (#F0F0F0) que contrasta con
-  // un card blanco grande conteniendo todo el contenido del home.
-  // En dark el bg es OLED negro y el card se eleva sobre eso. La
-  // jerarquía siempre es card > bg (card lifted, bg drop).
-  const outerBg = isDark ? "#000000" : "#F0F0F0";
-  const cardBg = isDark ? "#0F0F0F" : "#FFFFFF";
-
   return (
-    <View style={[s.root, { backgroundColor: outerBg }]}>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 2 }]}>
         {/* Layer 1 — Avatar + bell. Visible al tope del scroll, hace
             fade-out con scale-down a medida que el user scrollea.
@@ -470,8 +462,7 @@ function BaseHome() {
           />
         }
       >
-        <View style={[s.contentCard, { backgroundColor: cardBg }]}>
-          <View style={s.heroBlock}>
+        <View style={s.heroBlock}>
           {/* Header del hero: "Tu portfolio" a la izquierda + chip
               ARS/USD a la derecha. Antes el chip estaba debajo del
               balance — moverlo acá libera espacio vertical y hace
@@ -604,15 +595,9 @@ function BaseHome() {
               onPress={() => router.push("/(app)/activity")}
             />
           </View>
-        </View>
 
-        {/* Card 2 — Tu dinero + Tus inversiones, separada por un
-            gap del card 1 (hero + actions). Permite respirar
-            visualmente las dos zonas. */}
-        <View style={[s.contentCard, s.contentCardSecond, { backgroundColor: cardBg }]}>
-          <Dinero byCategory={byCategory} />
-          <Investments byCategory={byCategory} />
-        </View>
+        <Dinero byCategory={byCategory} />
+        <Investments byCategory={byCategory} />
       </Animated.ScrollView>
 
       {/* Sheet "Cómo ver tu portfolio" — abierto desde el pill ARS/USD
@@ -1594,26 +1579,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 0,
     paddingBottom: 12,
-  },
-  /* Card blanco Lemon-style. marginHorizontal 12 deja respirar al
-   * card sobre el bg gris; radius xxl + overflow hidden cierran las
-   * esquinas y clipean el chart (que tiene marginH negativo para
-   * extenderse a los bordes del card). marginTop 0 lo pega al
-   * topBar — el card arranca apenas debajo del avatar/campana. */
-  contentCard: {
-    marginHorizontal: 12,
-    marginTop: 0,
-    paddingTop: 18,
-    paddingBottom: 24,
-    borderCurve: "continuous",
-    borderRadius: radius.xxl,
-    overflow: "hidden",
-  },
-  /* Override para el segundo card — gap de 10pt con el primero para
-   * que se sienta como dos zonas distintas sobre el bg gris. Mismo
-   * radius/padding pero más respiro. */
-  contentCardSecond: {
-    marginTop: 10,
   },
   /* Header del hero: "Tu portfolio" + chip ARS/USD en la misma fila. */
   portfolioTitleRow: {
