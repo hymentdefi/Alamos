@@ -336,7 +336,7 @@ function BaseHome() {
           hitSlop={8}
           haptic="selection"
         >
-          <AlamosAvatar size={28} initial={firstName} />
+          <AlamosAvatar size={36} initial={firstName} />
         </Tap>
         <View style={s.topActions}>
           <Tap
@@ -347,7 +347,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={32}
+              size={40}
             />
           </Tap>
         </View>
@@ -958,11 +958,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  /* Avatar 28pt en círculo de hit area 32×32 — el círculo del
+  /* Avatar 36pt en círculo de hit area 40×40 — el círculo del
    * AlamosAvatar es la chrome visible, el botón sólo aporta hit. */
   avatarBtn: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -971,10 +971,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  /* Pill que envuelve el TopRightIcon — hit area 32×32. */
+  /* Pill que envuelve el TopRightIcon — hit area 40×40. */
   topIconBtn: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
