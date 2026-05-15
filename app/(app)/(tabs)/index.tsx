@@ -55,6 +55,8 @@ import { AmountDisplay } from "../../../lib/components/AmountDisplay";
 import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
+import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
+import { useAuth } from "../../../lib/auth/context";
 import {
   AlamosIcon,
   type AlamosIconName,
@@ -102,6 +104,8 @@ function BaseHome() {
   const { c, mode } = useTheme();
   const refreshTint = mode === "dark" ? "#FFFFFF" : c.textMuted;
   const isFocused = useIsFocused();
+  const { user } = useAuth();
+  const firstName = user?.fullName?.split(" ")[0] ?? "A";
   const { hideAmounts, set: setHideAmounts } = usePrivacy();
   const { hasUnread } = useNotifications();
   // Range del chart — persistido en SecureStore para que la próxima
@@ -259,31 +263,6 @@ function BaseHome() {
     return generateSeries(total, rangeChanges[range] * ampMult, seed);
   }, [total, range, considerCashflow]);
 
-  // Respiración del botón de regalo: scale 1 → 1.10 → 1 con pausa de 1.5s
-  // entre breaths. Suficiente para llamar la atención sin distraer.
-  const giftPulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (!isFocused) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(giftPulse, {
-          toValue: 1.1,
-          duration: 850,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(giftPulse, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.delay(1500),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isFocused, giftPulse]);
 
   const rangePct = rangeChanges[range];
   const isUp = rangePct >= 0;
@@ -349,35 +328,19 @@ function BaseHome() {
 
   return (
     <View style={[s.root, { backgroundColor: outerBg }]}>
-      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
-        {/* Hamburger top-left: abre /alamo (perfil + settings). Antes
-            Tu Álamo era una tab del bottom bar — ahora se accede acá
-            estilo Robinhood (3 rayitos limpios). */}
+      <View style={[s.topBar, { paddingTop: insets.top + 4 }]}>
+        {/* Avatar del user — tap abre /alamo (perfil + settings).
+            Reemplaza al hamburger genérico estilo Robinhood: la
+            inicial del nombre en círculo coloreado es más Álamos. */}
         <Tap
-          style={s.menuBtn}
+          style={s.avatarBtn}
           onPress={() => router.push("/(app)/alamo")}
           hitSlop={8}
           haptic="selection"
         >
-          <Feather name="menu" size={24} color={c.text} />
+          <AlamosAvatar size={32} initial={firstName} />
         </Tap>
         <View style={s.topActions}>
-          <Animated.View
-            style={{ transform: [{ scale: giftPulse }] }}
-          >
-            <Tap
-              style={s.topIconBtn}
-              onPress={() =>
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Success,
-                ).catch(() => {})
-              }
-              hitSlop={8}
-              haptic="medium"
-            >
-              <TopRightIcon name="sorpresa" size={44} />
-            </Tap>
-          </Animated.View>
           <Tap
             style={s.topIconBtn}
             onPress={() => router.push("/(app)/activity")}
@@ -386,7 +349,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={44}
+              size={36}
             />
           </Tap>
         </View>
@@ -409,11 +372,31 @@ function BaseHome() {
       >
         <View style={[s.contentCard, { backgroundColor: cardBg }]}>
           <View style={s.heroBlock}>
-          <Text style={[s.portfolioTitle, { color: c.textMuted }]} numberOfLines={1}>
-            Tu portfolio
-          </Text>
-          {/* Balance unificado — convertido a la moneda seleccionada.
-              Sin swipe horizontal. */}
+          {/* Header del hero: "Tu portfolio" a la izquierda + chip
+              ARS/USD a la derecha. Antes el chip estaba debajo del
+              balance — moverlo acá libera espacio vertical y hace
+              la moneda parte del label del saldo. */}
+          <View style={s.portfolioTitleRow}>
+            <Text
+              style={[s.portfolioTitle, { color: c.textMuted }]}
+              numberOfLines={1}
+            >
+              Tu portfolio
+            </Text>
+            <Tap
+              haptic="selection"
+              pressScale={0.96}
+              onPress={() => setCurrencyOpen(true)}
+              style={[s.currencyPill, { backgroundColor: c.surfaceHover }]}
+            >
+              <Text style={[s.currencyPillCode, { color: c.text }]}>
+                {currency}
+              </Text>
+              <Feather name="chevron-down" size={12} color={c.textMuted} />
+            </Tap>
+          </View>
+
+          {/* Balance unificado — convertido a la moneda seleccionada. */}
           <View style={s.balanceRow}>
             <AmountDisplay
               value={balanceDisplay}
@@ -421,50 +404,6 @@ function BaseHome() {
               weight={800}
               currency={currency}
             />
-          </View>
-
-          {/* Delta pill — Lemon-style. Bg brand-tinted (verde si up,
-              naranja si down), pct + time label adentro. Sin el
-              triángulo ni el monto absoluto, que era ruido visual:
-              el balance arriba ya muestra el valor, este pill sólo
-              comunica "cómo se movió y cuándo". */}
-          <View style={s.deltaRow}>
-            <View
-              style={[
-                s.deltaPill,
-                {
-                  backgroundColor: displayIsUp ? c.brandDim : c.redDim,
-                },
-              ]}
-            >
-              <Text style={[s.deltaPillText, { color: trendColor }]}>
-                {formatPct(displayPct)} · {timeLabel}
-              </Text>
-            </View>
-          </View>
-
-          {/* CurrencyPill — chip secundario que abre el sheet
-              "Cómo ver tu portfolio". Misma cartera, distinta
-              valuación. */}
-          <View style={s.currencyPillRow}>
-            <Tap
-              haptic="selection"
-              pressScale={0.96}
-              onPress={() => setCurrencyOpen(true)}
-              style={[
-                s.currencyPill,
-                { backgroundColor: c.surfaceHover },
-              ]}
-            >
-              <Text style={[s.currencyPillCode, { color: c.text }]}>
-                {currency}
-              </Text>
-              <Feather
-                name="chevron-down"
-                size={12}
-                color={c.textMuted}
-              />
-            </Tap>
           </View>
 
           <View style={[s.chartWrap, { marginTop: 18 }]}>
@@ -1015,31 +954,28 @@ const s = StyleSheet.create({
   /* ─── Core layout ─── */
   root: { flex: 1 },
   topBar: {
-    paddingHorizontal: 20,
-    paddingBottom: 2,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  /* Hamburger Robinhood-style: 3 rayitos limpios sin chrome.
-   * Mismo hit area (40×40) que los topIconBtn de la derecha para
-   * que se sienta consistente al tap. */
-  menuBtn: {
-    width: 40,
-    height: 40,
+  /* Avatar 32pt en lugar del hamburger genérico. Tap abre /alamo. */
+  avatarBtn: {
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
   },
   topActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
   },
-  /* Pill que envuelve el TopRightIcon — el ícono ya trae su propio
-     fondo (tint verde), así que el botón solo aporta hit area. */
+  /* Pill que envuelve el TopRightIcon. */
   topIconBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
@@ -1527,19 +1463,27 @@ const s = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 12,
   },
-  /* Card blanco que contiene todo el home — bg grise alrededor
-   * (Lemon-style). marginHorizontal 12 deja respirar al card sobre
-   * el bg gris; radius xxl + overflow hidden cierran las esquinas
-   * y clipean el chart (que tiene marginH negativo para extenderse
-   * a los bordes del card). */
+  /* Card blanco Lemon-style. marginHorizontal 12 deja respirar al
+   * card sobre el bg gris; radius xxl + overflow hidden cierran las
+   * esquinas y clipean el chart (que tiene marginH negativo para
+   * extenderse a los bordes del card). marginTop 2 lo pega arriba
+   * al topBar achicado. */
   contentCard: {
     marginHorizontal: 12,
-    marginTop: 8,
-    paddingTop: 20,
+    marginTop: 2,
+    paddingTop: 18,
     paddingBottom: 24,
     borderCurve: "continuous",
     borderRadius: radius.xxl,
     overflow: "hidden",
+  },
+  /* Header del hero: "Tu portfolio" + chip ARS/USD en la misma fila. */
+  portfolioTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 4,
   },
   /* "Tu portfolio" como eyebrow chiquito — el balance abajo es la
    * estrella visual del hero. fontFamily 600 + textMuted lo deja
@@ -1548,7 +1492,7 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[600],
     fontSize: 15,
     letterSpacing: -0.2,
-    marginBottom: 4,
+    flexShrink: 1,
   },
   /* Balance unificado — fila con sólo el AmountDisplay. Sin swipe
    * horizontal: el currency se cambia desde el pill de abajo que
@@ -1558,13 +1502,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 6,
   },
-  /* Pill ARS/USD — chiquito, debajo del saldo. Tap → abre el
-   * CurrencySheet para cambiar moneda con un acto deliberado.
-   * Mismo patrón que el portfolio tab. */
-  currencyPillRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
+  /* Pill ARS/USD — chiquito, va a la derecha del "Tu portfolio".
+   * Tap → abre el CurrencySheet para cambiar moneda con un acto
+   * deliberado. Mismo patrón que el portfolio tab. */
   currencyPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1586,25 +1526,6 @@ const s = StyleSheet.create({
     lineHeight: 50,
     letterSpacing: -2,
     marginBottom: 8,
-  },
-  /* Delta como pill Lemon-style: bg brand/red tinted, pct + time
-   * adentro. flex-start porque queremos width auto basado en el
-   * contenido, no full-width del card. */
-  deltaRow: {
-    flexDirection: "row",
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  deltaPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-  },
-  deltaPillText: {
-    fontFamily: fontFamily[600],
-    fontSize: 13,
-    letterSpacing: -0.15,
   },
   /* Timeline del chart — mismo lenguaje visual que el del stock
    * detail: 6 pills (1D / 7D / 1M / 3M / 1A / MAX) en cápsula
