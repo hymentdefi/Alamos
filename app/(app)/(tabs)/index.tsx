@@ -5,11 +5,14 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Animated,
-  Easing,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from "react-native";
+import Animated, {
+  Extrapolate,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
@@ -57,6 +60,7 @@ import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
 import { AlamosAvatar } from "../../../lib/components/AlamosAvatar";
 import { useAuth } from "../../../lib/auth/context";
+import { MagnifyIcon } from "../../../lib/components/MagnifyIcon";
 import {
   AlamosIcon,
   type AlamosIconName,
@@ -166,7 +170,6 @@ function BaseHome() {
 
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const scrollYRef = useRef(0);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onRefresh = useCallback(() => {
@@ -188,12 +191,51 @@ function BaseHome() {
     [],
   );
 
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollYRef.current = e.nativeEvent.contentOffset.y;
+  /* Reanimated shared value que trackea el scrollY en UI thread —
+   * lo usa el sticky searchBar para animar opacity + translateY
+   * en 60fps sin pasar por el JS thread. Lo lee también el
+   * registerTabTap (la lectura de .value desde JS está permitida). */
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
     },
-    [],
-  );
+  });
+
+  /* Sticky search bar — aparece cuando el user scrollea hacia abajo
+   * (Robinhood-pattern). De 0 a 40px de scroll está completamente
+   * oculto (translateY -50, opacity 0). De 40 a 100 hace transición
+   * suave: cae desde arriba con opacity hasta 1 y translateY 0.
+   * Tap → /(app)/explore (la tab Invertir, donde está la search
+   * real). */
+  const SEARCH_START = 40;
+  const SEARCH_FULL = 100;
+  const searchStickyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [SEARCH_START, SEARCH_FULL],
+      [0, 1],
+      Extrapolate.CLAMP,
+    ),
+    transform: [
+      {
+        translateY: interpolate(
+          scrollY.value,
+          [SEARCH_START, SEARCH_FULL],
+          [-50, 0],
+          Extrapolate.CLAMP,
+        ),
+      },
+      {
+        scale: interpolate(
+          scrollY.value,
+          [SEARCH_START, SEARCH_FULL],
+          [0.96, 1],
+          Extrapolate.CLAMP,
+        ),
+      },
+    ],
+  }));
 
   // Tap sobre la tab Inicio estando en Inicio:
   //   · si no estoy arriba → scroll al tope
@@ -203,14 +245,14 @@ function BaseHome() {
   // dispara con el tabBar custom, por eso usamos el registry.)
   useEffect(() => {
     return registerTabTap("index", {
-      isAtTop: () => scrollYRef.current <= 8,
+      isAtTop: () => scrollY.value <= 8,
       scrollToTop: () =>
         scrollRef.current?.scrollTo({ y: 0, animated: true }),
       refresh: () => {
         if (!refreshing) onRefresh();
       },
     });
-  }, [refreshing, onRefresh]);
+  }, [refreshing, onRefresh, scrollY]);
 
   const held = useMemo(() => assets.filter((a) => a.held), []);
   // Portfolios separados por moneda nativa del activo. No convertimos —
@@ -353,12 +395,12 @@ function BaseHome() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
         refreshControl={
           <AlamosRefreshControl
             refreshing={refreshing}
@@ -473,7 +515,36 @@ function BaseHome() {
 
         <Investments byCategory={byCategory} />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Sticky search bar — aparece al scrollear. Position absolute
+          debajo del topBar. Tap → /(app)/explore (la tab Invertir).
+          Robinhood-pattern: slide-down + fade + scale, todo en UI
+          thread con Reanimated. Va DESPUÉS de la ScrollView en JSX
+          para que renderee encima de todo lo que scrollea. */}
+      <Animated.View
+        style={[
+          s.searchSticky,
+          { top: insets.top + 44 },
+          searchStickyStyle,
+        ]}
+        pointerEvents="box-none"
+      >
+        <Tap
+          onPress={() => router.push("/(app)/explore")}
+          haptic="selection"
+          pressScale={0.98}
+          style={[
+            s.searchBox,
+            { backgroundColor: c.surfaceSunken },
+          ]}
+        >
+          <MagnifyIcon size={18} color={c.textMuted} strokeWidth={2.4} />
+          <Text style={[s.searchPlaceholder, { color: c.textMuted }]}>
+            Buscar activos
+          </Text>
+        </Tap>
+      </Animated.View>
 
       {/* Sheet de ajustes del chart — abierto desde el icon de
           settings al final del timeline. */}
@@ -957,6 +1028,30 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+
+  /* Sticky search bar — absolute, sentado justo debajo del topBar
+   * (top: insets.top + 44). Aparece via Reanimated cuando el user
+   * scrollea. zIndex alto para que quede sobre el card que sube. */
+  searchSticky: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  searchPlaceholder: {
+    fontFamily: fontFamily[500],
+    fontSize: 14,
+    letterSpacing: -0.15,
   },
   /* Avatar 36pt en círculo de hit area 40×40 — el círculo del
    * AlamosAvatar es la chrome visible, el botón sólo aporta hit. */
