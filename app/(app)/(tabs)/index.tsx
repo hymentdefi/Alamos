@@ -328,17 +328,15 @@ function BaseHome() {
 
   return (
     <View style={[s.root, { backgroundColor: outerBg }]}>
-      <View style={[s.topBar, { paddingTop: insets.top + 4 }]}>
-        {/* Avatar del user — tap abre /alamo (perfil + settings).
-            Reemplaza al hamburger genérico estilo Robinhood: la
-            inicial del nombre en círculo coloreado es más Álamos. */}
+      <View style={[s.topBar, { paddingTop: insets.top + 2 }]}>
+        {/* Avatar del user — tap abre /alamo (perfil + settings). */}
         <Tap
           style={s.avatarBtn}
           onPress={() => router.push("/(app)/alamo")}
           hitSlop={8}
           haptic="selection"
         >
-          <AlamosAvatar size={32} initial={firstName} />
+          <AlamosAvatar size={28} initial={firstName} />
         </Tap>
         <View style={s.topActions}>
           <Tap
@@ -349,7 +347,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={36}
+              size={32}
             />
           </Tap>
         </View>
@@ -955,15 +953,16 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingBottom: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  /* Avatar 32pt en lugar del hamburger genérico. Tap abre /alamo. */
+  /* Avatar 28pt en círculo de hit area 32×32 — el círculo del
+   * AlamosAvatar es la chrome visible, el botón sólo aporta hit. */
   avatarBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -972,10 +971,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  /* Pill que envuelve el TopRightIcon. */
+  /* Pill que envuelve el TopRightIcon — hit area 32×32. */
   topIconBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
@@ -1466,11 +1465,11 @@ const s = StyleSheet.create({
   /* Card blanco Lemon-style. marginHorizontal 12 deja respirar al
    * card sobre el bg gris; radius xxl + overflow hidden cierran las
    * esquinas y clipean el chart (que tiene marginH negativo para
-   * extenderse a los bordes del card). marginTop 2 lo pega arriba
-   * al topBar achicado. */
+   * extenderse a los bordes del card). marginTop 0 lo pega al
+   * topBar — el card arranca apenas debajo del avatar/campana. */
   contentCard: {
     marginHorizontal: 12,
-    marginTop: 2,
+    marginTop: 0,
     paddingTop: 18,
     paddingBottom: 24,
     borderCurve: "continuous",
