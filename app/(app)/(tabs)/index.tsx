@@ -13,7 +13,6 @@ import {
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { registerTabTap } from "../../../lib/tabs/activeTap";
-import { LinearGradient } from "expo-linear-gradient";
 import { Tap } from "../../../lib/components/Tap";
 import { AlamosRefreshControl } from "../../../lib/components/AlamosRefreshControl";
 import { GlassCard } from "../../../lib/components/GlassCard";
@@ -342,23 +341,15 @@ function BaseHome() {
 
 
   const isDark = mode === "dark";
-  // Backdrop sutil estilo Revolut — warm top, neutral mid, cool
-  // bottom (light); o leve elevación negro→puro (dark). Las cards
-  // glass de abajo se apoyan sobre este gradient para que la
-  // sensación sea "vidrio sobre superficie tintada", no "cuadrado
-  // blanco sobre fondo blanco".
-  const bgGradient: readonly [string, string, string] = isDark
-    ? ["#0E0E0C", "#080808", "#000000"]
-    : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
+  // Layout estilo Lemon: bg gris claro (#F0F0F0) que contrasta con
+  // un card blanco grande conteniendo todo el contenido del home.
+  // En dark el bg es OLED negro y el card se eleva sobre eso. La
+  // jerarquía siempre es card > bg (card lifted, bg drop).
+  const outerBg = isDark ? "#000000" : "#F0F0F0";
+  const cardBg = isDark ? "#0F0F0F" : "#FFFFFF";
 
   return (
-    <View style={[s.root, { backgroundColor: c.bg }]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={bgGradient}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[s.root, { backgroundColor: outerBg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         {/* Hamburger top-left: abre /alamo (perfil + settings). Antes
             Tu Álamo era una tab del bottom bar — ahora se accede acá
@@ -417,8 +408,9 @@ function BaseHome() {
           />
         }
       >
-        <View style={s.heroBlock}>
-          <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
+        <View style={[s.contentCard, { backgroundColor: cardBg }]}>
+          <View style={s.heroBlock}>
+          <Text style={[s.portfolioTitle, { color: c.textMuted }]} numberOfLines={1}>
             Tu portfolio
           </Text>
           {/* Balance unificado — convertido a la moneda seleccionada.
@@ -547,7 +539,7 @@ function BaseHome() {
         <Dinero byCategory={byCategory} />
 
         <Investments byCategory={byCategory} />
-
+        </View>
       </ScrollView>
 
       {/* Sheet de ajustes del chart — abierto desde el icon de
@@ -1533,15 +1525,28 @@ const s = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 12,
   },
+  /* Card blanco que contiene todo el home — bg grise alrededor
+   * (Lemon-style). marginHorizontal 12 deja respirar al card sobre
+   * el bg gris; radius xxl + overflow hidden cierran las esquinas
+   * y clipean el chart (que tiene marginH negativo para extenderse
+   * a los bordes del card). */
+  contentCard: {
+    marginHorizontal: 12,
+    marginTop: 8,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderCurve: "continuous",
+    borderRadius: radius.xxl,
+    overflow: "hidden",
+  },
+  /* "Tu portfolio" como eyebrow chiquito — el balance abajo es la
+   * estrella visual del hero. fontFamily 600 + textMuted lo deja
+   * como label sutil arriba del monto. */
   portfolioTitle: {
-    fontFamily: fontFamily[800],
-    fontSize: 38,
-    lineHeight: 40,
-    // Letter-spacing brutal — los displays bold de Brubank
-    // condensan los caracteres mucho más de lo que parece. Este
-    // -2.2 da el feel "headline editorial confident".
-    letterSpacing: -2.2,
-    marginBottom: 6,
+    fontFamily: fontFamily[600],
+    fontSize: 15,
+    letterSpacing: -0.2,
+    marginBottom: 4,
   },
   /* Balance unificado — fila con sólo el AmountDisplay. Sin swipe
    * horizontal: el currency se cambia desde el pill de abajo que
