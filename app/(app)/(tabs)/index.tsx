@@ -69,14 +69,12 @@ import {
   ActionIcon,
   type ActionIconName,
 } from "../../../lib/components/ActionIcon";
-import { ChartSettingsSheet } from "../../../lib/components/ChartSettingsSheet";
 import { EarningsInfoSheet } from "../../../lib/components/EarningsInfoSheet";
 import { CategoryGlyph } from "../../../lib/components/CategoryGlyph";
 import {
   categorizeAsset,
   findCategoryBySlug,
 } from "../../../lib/data/marketCategories";
-import { GearIcon } from "../../../lib/components/GearIcon";
 import { usePrivacy, maskAmount } from "../../../lib/privacy/context";
 import { useNotifications } from "../../../lib/notifications/context";
 import { TopRightIcon } from "../../../lib/components/TopRightIcon";
@@ -141,7 +139,6 @@ function BaseHome() {
   const onScrubEnd = useCallback(() => setScrubIndex(null), []);
 
   /* ─── Ajustes del chart ─── */
-  const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
   // Setting cards principales — considerar movimientos de plata.
   const [considerCashflow, setConsiderCashflow] = useState(true);
   /* Línea de referencia y suavizado del trazo: SIEMPRE prendidos.
@@ -389,7 +386,7 @@ function BaseHome() {
           >
             <TopRightIcon
               name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={40}
+              size={56}
             />
           </Tap>
         </View>
@@ -463,11 +460,11 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {/* Spacer invisible mirror del gear — balanza la fila
-                para que las pills queden visualmente centradas
-                sin quedar arrastradas a la izquierda por el peso
-                del gear de la derecha. */}
-            <View style={s.rangeSettingsBtn} pointerEvents="none" />
+            {/* Spacer invisible a la izquierda que mirroa el LIVE
+                de la derecha — mantiene las pills visualmente
+                centradas independientemente de si LIVE está
+                visible o no. */}
+            <View style={s.livePillSpacer} pointerEvents="none" />
             <View style={s.rangePillsRow}>
               {ranges.map((r) => {
                 const active = r === range;
@@ -495,25 +492,67 @@ function BaseHome() {
                 );
               })}
             </View>
-            {/* Settings icon al final del timeline — gear filled
-                que matchea el chartColor (verde si up, rojo si
-                down). Abre el sheet con los ajustes del chart. */}
-            <Pressable
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setChartSettingsOpen(true);
-              }}
-              hitSlop={10}
-              style={s.rangeSettingsBtn}
-            >
-              <GearIcon size={20} color={chartColor} holeColor={c.bg} />
-            </Pressable>
+            {/* LIVE pill al final del timeline — solo se muestra
+                cuando estamos en 1D (mercados live). chartColor
+                como fondo (verde si up, rojo si down), texto c.bg
+                para contraste. */}
+            {range === "1D" ? (
+              <View style={[s.livePill, { backgroundColor: chartColor }]}>
+                <Text style={[s.liveText, { color: c.bg }]}>LIVE</Text>
+              </View>
+            ) : (
+              <View style={s.livePillSpacer} />
+            )}
+          </View>
+
+          {/* Acciones del home — Ingresar / Enviar / Invertir /
+              Actividad. Outline brand para los cuatro. Antes vivían
+              dentro de <Dinero/>, ahora viven en card 1 junto al
+              hero (split del layout en 2 cards). */}
+          <View style={s.actionsRow}>
+            <ActionButton
+              iconName="ingresar"
+              label="Ingresar"
+              haptic="medium"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "deposit" },
+                })
+              }
+            />
+            <ActionButton
+              iconName="enviar"
+              label="Enviar"
+              haptic="light"
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/transfer",
+                  params: { mode: "send" },
+                })
+              }
+            />
+            <ActionButton
+              iconName="invertir"
+              label="Invertir"
+              haptic="medium"
+              onPress={() => router.push("/(app)/explore")}
+            />
+            <ActionButton
+              iconName="actividad"
+              label="Actividad"
+              haptic="light"
+              onPress={() => router.push("/(app)/activity")}
+            />
           </View>
         </View>
 
-        <Dinero byCategory={byCategory} />
-
-        <Investments byCategory={byCategory} />
+        {/* Card 2 — Tu dinero + Tus inversiones, separada por un
+            gap del card 1 (hero + actions). Permite respirar
+            visualmente las dos zonas. */}
+        <View style={[s.contentCard, s.contentCardSecond, { backgroundColor: cardBg }]}>
+          <Dinero byCategory={byCategory} />
+          <Investments byCategory={byCategory} />
         </View>
       </Animated.ScrollView>
 
@@ -545,15 +584,6 @@ function BaseHome() {
           </Text>
         </Tap>
       </Animated.View>
-
-      {/* Sheet de ajustes del chart — abierto desde el icon de
-          settings al final del timeline. */}
-      <ChartSettingsSheet
-        visible={chartSettingsOpen}
-        considerCashflow={considerCashflow}
-        onChangeConsiderCashflow={onChangeConsiderCashflow}
-        onClose={() => setChartSettingsOpen(false)}
-      />
 
       {/* Sheet "Cómo ver tu portfolio" — abierto desde el pill ARS/USD
           debajo del balance. Mismo mecanismo que el portfolio tab. */}
@@ -709,47 +739,6 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — Ingresar / Enviar / Invertir / Actividad.
-          Outline brand para los cuatro (sin destacar uno sobre los
-          otros). Invertir lleva al tab Invertir; Actividad lleva al
-          feed de movimientos del portfolio. */}
-      <View style={s.actionsRow}>
-        <ActionButton
-          iconName="ingresar"
-          label="Ingresar"
-          haptic="medium"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "deposit" },
-            })
-          }
-        />
-        <ActionButton
-          iconName="enviar"
-          label="Enviar"
-          haptic="light"
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/transfer",
-              params: { mode: "send" },
-            })
-          }
-        />
-        <ActionButton
-          iconName="invertir"
-          label="Invertir"
-          haptic="medium"
-          onPress={() => router.push("/(app)/explore")}
-        />
-        <ActionButton
-          iconName="actividad"
-          label="Actividad"
-          haptic="light"
-          onPress={() => router.push("/(app)/activity")}
-        />
-      </View>
-
       <View style={s.earningsHead}>
         <Text style={[s.earningsTitle, { color: c.textMuted }]}>Tu dinero</Text>
         <Pressable
@@ -1066,10 +1055,13 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  /* Pill que envuelve el TopRightIcon — hit area 40×40. */
+  /* Pill que envuelve el TopRightIcon — hit area 48×48, ícono 56
+   * para que matchee visualmente con el avatar 36 (la bell tiene
+   * internal padding del viewBox así que necesita ser más grande
+   * en el size prop para perceptual parity). */
   topIconBtn: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     alignItems: "center",
@@ -1571,6 +1563,12 @@ const s = StyleSheet.create({
     borderRadius: radius.xxl,
     overflow: "hidden",
   },
+  /* Override para el segundo card — gap de 10pt con el primero para
+   * que se sienta como dos zonas distintas sobre el bg gris. Mismo
+   * radius/padding pero más respiro. */
+  contentCardSecond: {
+    marginTop: 10,
+  },
   /* Header del hero: "Tu portfolio" + chip ARS/USD en la misma fila. */
   portfolioTitleRow: {
     flexDirection: "row",
@@ -1643,13 +1641,26 @@ const s = StyleSheet.create({
     borderCurve: "continuous",
     borderRadius: radius.pill,
   },
-  rangeSettingsBtn: {
-    /* Mismos paddings que rangePill para que el gear se alinee al
-     * baseline de los textos del timeline. */
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+  /* LIVE pill al final del timeline — solo visible cuando range
+   * === "1D". chartColor de fondo, c.bg de texto. */
+  livePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderCurve: "continuous",
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+  },
+  liveText: {
+    fontFamily: fontFamily[800],
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  /* Spacer mirror del LIVE pill a la izquierda — mantiene las
+   * pills del timeline visualmente centradas independientemente
+   * de si LIVE se muestra. Ancho aproximado del LIVE pill. */
+  livePillSpacer: {
+    width: 44,
   },
   rangeText: {
     fontFamily: fontFamily[700],
