@@ -187,20 +187,10 @@ export default function AppLayout() {
             gestureEnabled: false,
           }}
         />
-        {/* Tu Álamo — antes era una tab, ahora se accede vía el avatar
-            top-left de Inicio. Slide_from_left para que entre desde
-            el costado del avatar (sensación de drawer). Duración
-            400ms para que se sienta slow & smooth. Gesture direction
-            invertido para que el swipe-back venga del borde derecho
-            (consistente con la dirección de entrada). */}
-        <Stack.Screen
-          name="alamo"
-          options={{
-            animation: "slide_from_left",
-            animationDuration: 400,
-            gestureDirection: "horizontal-inverted",
-          }}
-        />
+        {/* Tu Álamo — accedido vía el avatar top-left de Inicio.
+            Slide_from_right standard con back gesture desde el
+            borde izquierdo. */}
+        <Stack.Screen name="alamo" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="security" />
         <Stack.Screen name="chat" />
