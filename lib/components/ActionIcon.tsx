@@ -5,9 +5,9 @@ import { useTheme } from "../theme";
 /**
  * Iconos de acción del home (Ingresar / Enviar / Invertir / Actividad).
  *
- * Layout Lemon-style: círculo oscuro sólido (c.ink en light, gris
- * oscuro en dark) con el símbolo en c.brand (verde). Alto contraste,
- * el verde pop sobre la base oscura.
+ * Círculo gris cálido (c.surfaceHover — #F5F5F5 light / #1A1A1A dark)
+ * con el símbolo en c.brand (verde). Soft: los botones se sienten
+ * parte del card blanco sin gritar.
  */
 
 export type ActionIconName = "ingresar" | "enviar" | "invertir" | "actividad";
@@ -24,13 +24,9 @@ export const ActionIcon = memo(function ActionIcon({
   size = 56,
   stroke,
 }: Props) {
-  const { c, mode } = useTheme();
-  const isDark = mode === "dark";
+  const { c } = useTheme();
   const symbolColor = stroke ?? c.brand;
-  /* Círculo Lemon-style: bien oscuro en light (#0E0F0C ink),
-   * gris oscuro en dark (#1F1F1F surfaceHover-ish) para que se
-   * lea sobre el card #0F0F0F sin desaparecer. */
-  const circleColor = isDark ? "#1F1F1F" : "#0E0F0C";
+  const circleColor = c.surfaceHover;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
