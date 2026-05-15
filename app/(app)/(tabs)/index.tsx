@@ -54,7 +54,6 @@ import {
   seriesFromSeed,
 } from "../../../lib/components/Sparkline";
 import { AmountDisplay } from "../../../lib/components/AmountDisplay";
-import { AlamosLogo } from "../../../lib/components/Logo";
 import { CurrencySheet } from "../../../lib/components/CurrencySheet";
 import { MoneyIcon } from "../../../lib/components/MoneyIcon";
 import { AccountFlag } from "../../../lib/components/AccountFlag";
@@ -346,21 +345,18 @@ function BaseHome() {
   // Backdrop sutil estilo Revolut — warm top, neutral mid, cool
   // bottom (light); o leve elevación negro→puro (dark). Las cards
   // glass de abajo se apoyan sobre este gradient para que la
-  // Hero gradient con tinte brand subtle al tope que desvanece al c.bg.
-  // Le da una "halo" verde apenas perceptible detrás del balance — la
-  // identidad Alamos se siente al abrir la app vs cualquier fintech
-  // genérica. En dark el tinte es un poco más fuerte porque la base
-  // ya es oscura y necesita más contraste para registrarse.
+  // sensación sea "vidrio sobre superficie tintada", no "cuadrado
+  // blanco sobre fondo blanco".
   const bgGradient: readonly [string, string, string] = isDark
-    ? ["rgba(0, 200, 5, 0.10)", "rgba(0, 200, 5, 0.03)", c.bg]
-    : ["rgba(0, 200, 5, 0.07)", "rgba(0, 200, 5, 0.02)", c.bg];
+    ? ["#0E0E0C", "#080808", "#000000"]
+    : ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
 
   return (
     <View style={[s.root, { backgroundColor: c.bg }]}>
       <LinearGradient
         pointerEvents="none"
         colors={bgGradient}
-        locations={[0, 0.25, 0.6]}
+        locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
@@ -422,18 +418,6 @@ function BaseHome() {
         }
       >
         <View style={s.heroBlock}>
-          {/* Isotipo de Alamos como watermark detrás del hero —
-              identidad de marca ambiente, no decorativo agresivo.
-              Tono green + opacity baja para que se sienta sin
-              competir con el balance. Sale parcialmente por el
-              borde derecho (negative right) para que se vea como
-              un acento, no un sticker centrado. */}
-          <AlamosLogo
-            variant="mark"
-            tone="green"
-            size={180}
-            style={s.heroWatermark}
-          />
           <Text style={[s.portfolioTitle, { color: c.text }]} numberOfLines={1}>
             Tu portfolio
           </Text>
@@ -1544,17 +1528,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 0,
     paddingBottom: 12,
-  },
-  /* Watermark Alamos detrás del hero — absolute, parcialmente fuera
-   * del borde derecho (overflow visible no en JSX, pero negative
-   * right + opacity baja hace que se sienta como acento ambiental
-   * de marca. opacity 0.05 es el sweet spot: se percibe sin
-   * registrar conscientemente. */
-  heroWatermark: {
-    position: "absolute",
-    top: -8,
-    right: -28,
-    opacity: 0.05,
   },
   portfolioTitle: {
     fontFamily: fontFamily[800],
