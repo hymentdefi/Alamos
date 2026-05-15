@@ -9,6 +9,8 @@ import {
 import Animated, {
   Extrapolate,
   interpolate,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -199,40 +201,62 @@ function BaseHome() {
     },
   });
 
-  /* Sticky search bar — aparece cuando el user scrollea hacia abajo
-   * (Robinhood-pattern). De 0 a 40px de scroll está completamente
-   * oculto (translateY -50, opacity 0). De 40 a 100 hace transición
-   * suave: cae desde arriba con opacity hasta 1 y translateY 0.
-   * Tap → /(app)/explore (la tab Invertir, donde está la search
-   * real). */
-  const SEARCH_START = 40;
-  const SEARCH_FULL = 100;
-  const searchStickyStyle = useAnimatedStyle(() => ({
+  /* Crossfade en el top bar al scrollear (Robinhood-style). De 0 a
+   * 60px el avatar+bell están visibles. De 60 a 130 hace crossfade
+   * suave: avatar+bell fade-out con scale 1→0.92, la search bar
+   * (que ocupa el mismo espacio del top bar) fade-in con scale
+   * 0.96→1. Ocupa exactamente el lugar donde estaban C y la bell. */
+  const SCROLL_THRESHOLD_START = 60;
+  const SCROLL_THRESHOLD_FULL = 130;
+  const topBarDefaultStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       scrollY.value,
-      [SEARCH_START, SEARCH_FULL],
+      [SCROLL_THRESHOLD_START, SCROLL_THRESHOLD_FULL],
+      [1, 0],
+      Extrapolate.CLAMP,
+    ),
+    transform: [
+      {
+        scale: interpolate(
+          scrollY.value,
+          [SCROLL_THRESHOLD_START, SCROLL_THRESHOLD_FULL],
+          [1, 0.92],
+          Extrapolate.CLAMP,
+        ),
+      },
+    ],
+  }));
+  const topBarSearchStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [SCROLL_THRESHOLD_START, SCROLL_THRESHOLD_FULL],
       [0, 1],
       Extrapolate.CLAMP,
     ),
     transform: [
       {
-        translateY: interpolate(
-          scrollY.value,
-          [SEARCH_START, SEARCH_FULL],
-          [-50, 0],
-          Extrapolate.CLAMP,
-        ),
-      },
-      {
         scale: interpolate(
           scrollY.value,
-          [SEARCH_START, SEARCH_FULL],
+          [SCROLL_THRESHOLD_START, SCROLL_THRESHOLD_FULL],
           [0.96, 1],
           Extrapolate.CLAMP,
         ),
       },
     ],
   }));
+  /* JS state derivado del scrollY para alternar pointerEvents entre
+   * las dos capas: cuando la search está casi visible, layer 1 deja
+   * de recibir taps y layer 2 los recibe. Evita phantom taps sobre
+   * un avatar invisible. */
+  const [showSearch, setShowSearch] = useState(false);
+  useAnimatedReaction(
+    () => scrollY.value > (SCROLL_THRESHOLD_START + SCROLL_THRESHOLD_FULL) / 2,
+    (curr, prev) => {
+      if (curr !== prev) {
+        runOnJS(setShowSearch)(curr ?? false);
+      }
+    },
+  );
 
   // Tap sobre la tab Inicio estando en Inicio:
   //   · si no estoy arriba → scroll al tope
@@ -368,28 +392,65 @@ function BaseHome() {
   return (
     <View style={[s.root, { backgroundColor: outerBg }]}>
       <View style={[s.topBar, { paddingTop: insets.top + 2 }]}>
-        {/* Avatar del user — tap abre /alamo (perfil + settings). */}
-        <Tap
-          style={s.avatarBtn}
-          onPress={() => router.push("/(app)/alamo")}
-          hitSlop={8}
-          haptic="selection"
+        {/* Layer 1 — Avatar + bell. Visible al tope del scroll, hace
+            fade-out con scale-down a medida que el user scrollea.
+            Sigue siendo el child "normal" del topBar (in-flow) para
+            que defina su altura. */}
+        <Animated.View
+          style={[s.topBarLayer, topBarDefaultStyle]}
+          pointerEvents={showSearch ? "none" : "box-none"}
         >
-          <AlamosAvatar size={36} initial={firstName} />
-        </Tap>
-        <View style={s.topActions}>
+          {/* Avatar del user — tap abre /alamo (perfil + settings). */}
           <Tap
-            style={s.topIconBtn}
-            onPress={() => router.push("/(app)/activity")}
+            style={s.avatarBtn}
+            onPress={() => router.push("/(app)/alamo")}
             hitSlop={8}
             haptic="selection"
           >
-            <TopRightIcon
-              name={hasUnread ? "notificacion-dot" : "notificacion"}
-              size={56}
-            />
+            <AlamosAvatar size={36} initial={firstName} />
           </Tap>
-        </View>
+          <View style={s.topActions}>
+            <Tap
+              style={s.topIconBtn}
+              onPress={() => router.push("/(app)/activity")}
+              hitSlop={8}
+              haptic="selection"
+            >
+              <TopRightIcon
+                name={hasUnread ? "notificacion-dot" : "notificacion"}
+                size={56}
+              />
+            </Tap>
+          </View>
+        </Animated.View>
+
+        {/* Layer 2 — Search bar. Absolute sobre el mismo lugar donde
+            estaban el avatar + bell. Aparece (fade-in + scale) cuando
+            el user scrollea pasado el threshold. Tap → /(app)/explore
+            (la tab Invertir con la búsqueda real). */}
+        <Animated.View
+          style={[
+            s.topBarSearch,
+            { top: insets.top + 2 },
+            topBarSearchStyle,
+          ]}
+          pointerEvents={showSearch ? "box-none" : "none"}
+        >
+          <Tap
+            onPress={() => router.push("/(app)/explore")}
+            haptic="selection"
+            pressScale={0.98}
+            style={[
+              s.topBarSearchBox,
+              { backgroundColor: c.surfaceHover },
+            ]}
+          >
+            <MagnifyIcon size={18} color={c.textMuted} strokeWidth={2.4} />
+            <Text style={[s.topBarSearchText, { color: c.textMuted }]}>
+              Buscar activos
+            </Text>
+          </Tap>
+        </Animated.View>
       </View>
 
       <Animated.ScrollView
@@ -555,35 +616,6 @@ function BaseHome() {
           <Investments byCategory={byCategory} />
         </View>
       </Animated.ScrollView>
-
-      {/* Sticky search bar — aparece al scrollear. Position absolute
-          debajo del topBar. Tap → /(app)/explore (la tab Invertir).
-          Robinhood-pattern: slide-down + fade + scale, todo en UI
-          thread con Reanimated. Va DESPUÉS de la ScrollView en JSX
-          para que renderee encima de todo lo que scrollea. */}
-      <Animated.View
-        style={[
-          s.searchSticky,
-          { top: insets.top + 44 },
-          searchStickyStyle,
-        ]}
-        pointerEvents="box-none"
-      >
-        <Tap
-          onPress={() => router.push("/(app)/explore")}
-          haptic="selection"
-          pressScale={0.98}
-          style={[
-            s.searchBox,
-            { backgroundColor: c.surfaceSunken },
-          ]}
-        >
-          <MagnifyIcon size={18} color={c.textMuted} strokeWidth={2.4} />
-          <Text style={[s.searchPlaceholder, { color: c.textMuted }]}>
-            Buscar activos
-          </Text>
-        </Tap>
-      </Animated.View>
 
       {/* Sheet "Cómo ver tu portfolio" — abierto desde el pill ARS/USD
           debajo del balance. Mismo mecanismo que el portfolio tab. */}
@@ -1011,33 +1043,49 @@ function Investments({
 const s = StyleSheet.create({
   /* ─── Core layout ─── */
   root: { flex: 1 },
+  /* Top bar — contenedor con padding. La distribución horizontal
+   * y el alineamiento de los items la hace cada capa (topBarLayer
+   * y topBarSearch). Position relative para que la search
+   * absolute se ancle a esta caja. */
   topBar: {
     paddingHorizontal: 16,
     paddingBottom: 0,
+    position: "relative",
+  },
+
+  /* Sticky search bar — absolute, sentado justo debajo del topBar
+   * para que crossfade. */
+  /* Layer 1 del top bar: avatar + bell. Row in-flow (no absolute)
+   * para que defina la altura del top bar. Hace fade-out al scroll. */
+  topBarLayer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
-  /* Sticky search bar — absolute, sentado justo debajo del topBar
-   * (top: insets.top + 44). Aparece via Reanimated cuando el user
-   * scrollea. zIndex alto para que quede sobre el card que sube. */
-  searchSticky: {
+  /* Layer 2 del top bar: search bar. Absolute sobre layer 1. El
+   * `top` se inyecta inline (insets.top + 2) para alinear con el
+   * inicio del layer 1 (que arranca después del paddingTop del
+   * topBar). left/right 16 matchea el paddingHorizontal del topBar
+   * (= ocupa todo el ancho del content box). justifyContent center
+   * verticalmente alinea el searchBox al centro de la altura de
+   * la layer 1. */
+  topBarSearch: {
     position: "absolute",
     left: 16,
     right: 16,
-    zIndex: 10,
+    bottom: 0,
+    justifyContent: "center",
   },
-  searchBox: {
+  topBarSearchBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 10,
   },
-  searchPlaceholder: {
+  topBarSearchText: {
     fontFamily: fontFamily[500],
     fontSize: 14,
     letterSpacing: -0.15,
