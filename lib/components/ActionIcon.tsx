@@ -35,7 +35,7 @@ export const ActionIcon = memo(function ActionIcon({
         transform="translate(32 32)"
         fill="none"
         stroke={symbolColor}
-        strokeWidth={4}
+        strokeWidth={2.6}
         strokeLinecap="round"
         strokeLinejoin="round"
       >

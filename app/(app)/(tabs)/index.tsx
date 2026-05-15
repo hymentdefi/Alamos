@@ -1484,13 +1484,13 @@ const s = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
   },
-  /* "Tu portfolio" como eyebrow chiquito — el balance abajo es la
-   * estrella visual del hero. fontFamily 600 + textMuted lo deja
-   * como label sutil arriba del monto. */
+  /* "Tu portfolio" como eyebrow del balance — fontFamily 600 +
+   * textMuted lo deja como label sutil arriba del monto sin
+   * competir. */
   portfolioTitle: {
     fontFamily: fontFamily[600],
-    fontSize: 15,
-    letterSpacing: -0.2,
+    fontSize: 17,
+    letterSpacing: -0.3,
     flexShrink: 1,
   },
   /* Balance unificado — fila con sólo el AmountDisplay. Sin swipe
