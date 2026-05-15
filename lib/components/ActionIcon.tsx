@@ -3,7 +3,7 @@ import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../theme";
 
 /**
- * Iconos de acción del home (Ingresar / Enviar / Invertir).
+ * Iconos de acción del home (Ingresar / Enviar / Invertir / Actividad).
  *
  * Por default: outline brand puro — círculo con stroke c.brand 3px y
  * símbolo interno en stroke c.brand 4px. Sin fill ni tint.
@@ -13,7 +13,7 @@ import { useTheme } from "../theme";
  * action principal (Ingresar) sobre los secundarios (Enviar, Invertir).
  */
 
-export type ActionIconName = "ingresar" | "enviar" | "invertir";
+export type ActionIconName = "ingresar" | "enviar" | "invertir" | "actividad";
 
 interface Props {
   name: ActionIconName;
@@ -66,12 +66,15 @@ export const ActionIcon = memo(function ActionIcon({
             <Path d="M0 10 L0 -10" />
             <Path d="M-9 -1 L0 -10 L9 -1" />
           </>
-        ) : (
+        ) : name === "invertir" ? (
           // invertir: flecha trending up (growth/invest universal).
           <>
             <Path d="M-10 8 L10 -10" />
             <Path d="M3 -10 L10 -10 L10 -3" />
           </>
+        ) : (
+          // actividad: pulso flat-spike-flat (activity feed / heartbeat).
+          <Path d="M-11 0 L-5 0 L-3 -7 L0 7 L3 -7 L5 0 L11 0" />
         )}
       </G>
     </Svg>

@@ -718,10 +718,10 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — Ingresar / Enviar / Invertir. Outline
-          brand para los tres (sin destacar uno sobre los otros).
-          Invertir lleva al tab Invertir (antes "Mercado") donde
-          el user navega activos. */}
+      {/* Acciones del home — Ingresar / Enviar / Invertir / Actividad.
+          Outline brand para los cuatro (sin destacar uno sobre los
+          otros). Invertir lleva al tab Invertir; Actividad lleva al
+          feed de movimientos del portfolio. */}
       <View style={s.actionsRow}>
         <ActionButton
           iconName="ingresar"
@@ -750,6 +750,12 @@ function Dinero(_: {
           label="Invertir"
           haptic="medium"
           onPress={() => router.push("/(app)/explore")}
+        />
+        <ActionButton
+          iconName="actividad"
+          label="Actividad"
+          haptic="light"
+          onPress={() => router.push("/(app)/activity")}
         />
       </View>
 
