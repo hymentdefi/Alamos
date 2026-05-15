@@ -565,6 +565,7 @@ function BaseHome() {
               <View style={s.livePillSpacer} />
             )}
           </View>
+          </View>
 
           {/* Acciones del home — Ingresar / Enviar / Invertir /
               Actividad. Outline brand para los cuatro. Antes vivían
