@@ -718,17 +718,15 @@ function Dinero(_: {
 
   return (
     <View style={s.sectionBlock}>
-      {/* Acciones del home — Ingresar / Enviar / Invertir. Ingresar
-          es el primary CTA (filled brand): destaca para guiar al
-          user nuevo a fondear su cuenta. Enviar/Invertir quedan
-          outline (secondary). Invertir lleva al tab Invertir
-          (antes "Mercado") donde el user navega activos. */}
+      {/* Acciones del home — Ingresar / Enviar / Invertir. Outline
+          brand para los tres (sin destacar uno sobre los otros).
+          Invertir lleva al tab Invertir (antes "Mercado") donde
+          el user navega activos. */}
       <View style={s.actionsRow}>
         <ActionButton
           iconName="ingresar"
           label="Ingresar"
           haptic="medium"
-          filled
           onPress={() =>
             router.push({
               pathname: "/(app)/transfer",
