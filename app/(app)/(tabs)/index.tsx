@@ -400,14 +400,16 @@ function BaseHome() {
           style={[s.topBarLayer, topBarDefaultStyle]}
           pointerEvents={showSearch ? "none" : "box-none"}
         >
-          {/* Avatar del user — tap abre /alamo (perfil + settings). */}
+          {/* Avatar del user — tap abre /alamo. interactive=false
+              desactiva el cycle-color interno del AlamosAvatar
+              (que consumía el tap antes de llegar al Tap externo). */}
           <Tap
             style={s.avatarBtn}
             onPress={() => router.push("/(app)/alamo")}
             hitSlop={8}
             haptic="selection"
           >
-            <AlamosAvatar size={36} initial={firstName} />
+            <AlamosAvatar size={36} initial={firstName} interactive={false} />
           </Tap>
           <View style={s.topActions}>
             <Tap
@@ -521,12 +523,15 @@ function BaseHome() {
           </View>
 
           <View style={s.rangeRow}>
-            {/* Spacer invisible a la izquierda que mirroa el LIVE
-                de la derecha — mantiene las pills visualmente
-                centradas independientemente de si LIVE está
-                visible o no. */}
-            <View style={s.livePillSpacer} pointerEvents="none" />
             <View style={s.rangePillsRow}>
+              {/* LIVE como primera pill, a la izquierda de 1D. Solo
+                  visible cuando estamos en 1D (mercados live).
+                  chartColor de fondo, c.bg de texto. */}
+              {range === "1D" ? (
+                <View style={[s.livePill, { backgroundColor: chartColor }]}>
+                  <Text style={[s.liveText, { color: c.bg }]}>LIVE</Text>
+                </View>
+              ) : null}
               {ranges.map((r) => {
                 const active = r === range;
                 return (
@@ -553,17 +558,6 @@ function BaseHome() {
                 );
               })}
             </View>
-            {/* LIVE pill al final del timeline — solo se muestra
-                cuando estamos en 1D (mercados live). chartColor
-                como fondo (verde si up, rojo si down), texto c.bg
-                para contraste. */}
-            {range === "1D" ? (
-              <View style={[s.livePill, { backgroundColor: chartColor }]}>
-                <Text style={[s.liveText, { color: c.bg }]}>LIVE</Text>
-              </View>
-            ) : (
-              <View style={s.livePillSpacer} />
-            )}
           </View>
           </View>
 
@@ -1704,12 +1698,6 @@ const s = StyleSheet.create({
     fontFamily: fontFamily[800],
     fontSize: 10,
     letterSpacing: 0.5,
-  },
-  /* Spacer mirror del LIVE pill a la izquierda — mantiene las
-   * pills del timeline visualmente centradas independientemente
-   * de si LIVE se muestra. Ancho aproximado del LIVE pill. */
-  livePillSpacer: {
-    width: 44,
   },
   rangeText: {
     fontFamily: fontFamily[700],
