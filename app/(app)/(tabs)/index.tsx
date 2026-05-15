@@ -524,12 +524,15 @@ function BaseHome() {
 
           <View style={s.rangeRow}>
             <View style={s.rangePillsRow}>
-              {/* LIVE como primera pill, a la izquierda de 1D. Solo
-                  visible cuando estamos en 1D (mercados live).
-                  chartColor de fondo, c.bg de texto. */}
+              {/* LIVE como pill más, mismo peso visual que las
+                  demás. Solo visible en 1D (mercados live). Igual
+                  styling que las range pills inactivas: text-only
+                  chartColor sobre bg transparente. */}
               {range === "1D" ? (
-                <View style={[s.livePill, { backgroundColor: chartColor }]}>
-                  <Text style={[s.liveText, { color: c.bg }]}>LIVE</Text>
+                <View style={s.rangePill}>
+                  <Text style={[s.rangeText, { color: chartColor }]}>
+                    LIVE
+                  </Text>
                 </View>
               ) : null}
               {ranges.map((r) => {
@@ -1683,21 +1686,6 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderCurve: "continuous",
     borderRadius: radius.pill,
-  },
-  /* LIVE pill al final del timeline — solo visible cuando range
-   * === "1D". chartColor de fondo, c.bg de texto. */
-  livePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderCurve: "continuous",
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  liveText: {
-    fontFamily: fontFamily[800],
-    fontSize: 10,
-    letterSpacing: 0.5,
   },
   rangeText: {
     fontFamily: fontFamily[700],
